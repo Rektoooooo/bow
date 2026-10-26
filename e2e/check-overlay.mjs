@@ -320,6 +320,42 @@ await app.evaluate(({ BrowserWindow }) => {
 await sidebar.waitForTimeout(500);
 check("closing a private window archives nothing", (await getState()).archive.length === archiveCountBefore);
 
+// Boosts: CSS of your own for a site, Zap to hide clicked elements, and off again.
+await commandBar("newTab", "example.com/boost");
+await sidebar.waitForTimeout(2500);
+const pageStyle = (expression) =>
+  app.evaluate(({ webContents }, code) => {
+    const boostPage = webContents.getAllWebContents().find((contents) => contents.getURL().includes("example.com/boost"));
+    return boostPage.executeJavaScript(code);
+  }, expression);
+await dispatch({ type: "setBoostCss", site: "example.com", css: "body { background: rgb(1, 2, 3) !important; }" });
+await sidebar.waitForTimeout(600);
+const boostedBackground = await pageStyle("getComputedStyle(document.body).backgroundColor");
+await app.evaluate(({ webContents }) => webContents.getAllWebContents().find((contents) => contents.getURL().includes("example.com/boost")).reload());
+await sidebar.waitForTimeout(2500);
+const backgroundAfterReload = await pageStyle("getComputedStyle(document.body).backgroundColor");
+check("a Boost's CSS changes the site, also after a reload", boostedBackground === "rgb(1, 2, 3)" && backgroundAfterReload === "rgb(1, 2, 3)", `${boostedBackground} / ${backgroundAfterReload}`);
+
+await dispatch({ type: "openSiteControls" });
+await overlay.waitForSelector(".site-controls", { timeout: 5000 });
+await overlay.click(".site-button:has-text('Zap Elements')");
+await sidebar.waitForTimeout(600);
+await clickLinkInPage("example.com/boost");
+await sidebar.waitForTimeout(800);
+const linkDisplay = await pageStyle("getComputedStyle(document.querySelector('a')).display");
+await app.evaluate(({ webContents }) => {
+  webContents.getAllWebContents().find((contents) => contents.getURL().includes("example.com/boost")).sendInputEvent({ type: "keyDown", keyCode: "Escape" });
+});
+state = await getState();
+const exampleBoost = (state.boosts ?? []).find((boost) => boost.site === "example.com");
+check("Zap hides the clicked element and remembers it", linkDisplay === "none" && exampleBoost?.zappedSelectors.length === 1, `${linkDisplay} ${JSON.stringify(exampleBoost?.zappedSelectors)}`);
+
+await dispatch({ type: "setBoostEnabled", site: "example.com", isEnabled: false });
+await sidebar.waitForTimeout(600);
+const offBackground = await pageStyle("getComputedStyle(document.body).backgroundColor");
+const offLinkDisplay = await pageStyle("getComputedStyle(document.querySelector('a')).display");
+check("turning the Boost off restores the site", offBackground !== "rgb(1, 2, 3)" && offLinkDisplay !== "none", `${offBackground} ${offLinkDisplay}`);
+
 // Theme editor: light appearance, a second color (gradient) and grain apply to the Space.
 state = await getState();
 await dispatch({ type: "openThemeEditor", spaceId: state.activeSpaceId });

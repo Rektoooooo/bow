@@ -147,6 +147,19 @@ export interface RoutingRule {
   spaceId: SpaceId;
 }
 
+/**
+ * Arc's Boosts: your own changes to a site. CSS you write, and elements you "zapped" (clicked away), applied to
+ * every page of that site. Example: { site: "example.com", css: "body { font-size: 18px }", zappedSelectors: ["#ad"] }
+ */
+export interface Boost {
+  id: string;
+  /** The site it applies to, as urls.ts getSiteKey() returns it ("github.com", "bbc.co.uk"). */
+  site: string;
+  css: string;
+  zappedSelectors: string[];
+  isEnabled: boolean;
+}
+
 /** Everything the browser saves to disk. */
 export interface BrowserState {
   /** Raise this number when the saved shape changes, and add an upgrade step to migrate.ts. */
@@ -164,6 +177,8 @@ export interface BrowserState {
   settings: BrowserSettings;
   /** Air Traffic Control rules, checked in order. Optional, so files saved before it existed still load. */
   routingRules?: RoutingRule[];
+  /** Boosts, one per site. Optional, so files saved before it existed still load. */
+  boosts?: Boost[];
 }
 
 /**

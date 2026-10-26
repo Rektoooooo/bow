@@ -38,8 +38,8 @@ and your browsing history. Running it twice adds nothing twice.
 - A small player for a tab playing sound in the background.
 
 **Spaces and profiles**
-- Create, rename, change the emoji, pick a theme (one to three colors as a gradient, light / dark / automatic,
-  film grain), reorder, delete. Two-finger swipe on the sidebar or ⌃1–⌃9 switches Spaces.
+- Create, rename, change the emoji, edit the theme (one to three colors as a gradient, light / dark / automatic,
+  film grain; Space menu › Edit Theme…), reorder, delete. Two-finger swipe on the sidebar or ⌃1–⌃9 switches Spaces.
 - Each profile has its own cookies, logins and Favorites (an Electron session partition). Space menu › Profile
   moves a Space to another profile or a new one.
 - Private windows (⇧⌘N) keep nothing: an in-memory session, no history, no archive.
@@ -57,6 +57,10 @@ and your browsing history. Running it twice adds nothing twice.
 - **Split View**: two to four tabs side by side or stacked, one row in the sidebar.
 - **Little Window**: links from other apps (and ⌥⌘N) open in a small window; "Open in Space" moves the page into the
   sidebar. A Little Window left alone for 6 hours goes to the Archive.
+- **Boosts**: your own CSS for a site, and Zap (click elements to hide them for good), from the site controls or the
+  Command Bar. Turn a Boost off or reset it any time.
+- **Air Traffic Control**: rules such as "address contains github.com → Work" send links from other apps to a Space
+  (Library › Settings).
 - Site controls (copy link, screenshot, mute, inspect, zoom, clear site data), Find in page, downloads, a
   right-click menu in pages, and automatic Picture-in-Picture when you leave a tab playing a video.
 

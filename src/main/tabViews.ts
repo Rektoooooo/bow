@@ -52,6 +52,8 @@ export interface TabViewEvents {
   onWillNavigate(tabId: ItemId, url: string, isUserInitiated: boolean): boolean;
   /** The user right-clicked in the page. */
   onContextMenu(tabId: ItemId, contents: WebContents, params: ContextMenuParams): void;
+  /** The page's document is ready (Boost CSS goes in now). */
+  onDomReady(tabId: ItemId, contents: WebContents): void;
 }
 
 /** One web view per loaded tab, keyed by tab id. Lives only in memory. */
@@ -179,6 +181,7 @@ function watchTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvent
       events.onFaviconChanged(tabId, firstFaviconUrl);
     }
   });
+  contents.on("dom-ready", () => events.onDomReady(tabId, contents));
   contents.on("did-start-loading", () => events.onRuntimeChanged());
   contents.on("did-stop-loading", () => events.onRuntimeChanged());
   contents.on("audio-state-changed", () => events.onRuntimeChanged());

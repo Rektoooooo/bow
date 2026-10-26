@@ -61,6 +61,20 @@ function isNavigationCommand(value: unknown): boolean {
   return value === "back" || value === "forward" || value === "reload" || value === "stop";
 }
 
+/** A site key such as "github.com": letters, digits, dots and dashes only. */
+const SITE_PATTERN = /^[a-z0-9.-]{1,253}$/;
+
+function isSite(value: unknown): boolean {
+  return typeof value === "string" && SITE_PATTERN.test(value);
+}
+
+/** Boost CSS may be longer than other text; boosts.ts refuses anything above its own limit too. */
+const MAX_BOOST_CSS_MESSAGE_LENGTH = 20000;
+
+function isBoostCss(value: unknown): boolean {
+  return typeof value === "string" && value.length <= MAX_BOOST_CSS_MESSAGE_LENGTH;
+}
+
 function isRoutingMatchType(value: unknown): boolean {
   return value === "contains" || value === "is";
 }
@@ -172,6 +186,10 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   createProfileForSpace: { spaceId: isText },
   addRoutingRule: { matchType: isRoutingMatchType, value: isText, spaceId: isText },
   removeRoutingRule: { ruleId: isText },
+  setBoostCss: { site: isSite, css: isBoostCss },
+  setBoostEnabled: { site: isSite, isEnabled: isBoolean },
+  deleteBoost: { site: isSite },
+  openBoostEditor: {},
   toggleMediaPlayback: {},
   dismissMedia: {},
   navigate: { command: isNavigationCommand },

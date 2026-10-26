@@ -13,7 +13,7 @@ import type { AppMenuCommands } from "./appMenu";
 import { importFromArc } from "./arcImportController";
 import { applyChange, getRecentTabIds, getState } from "./browserCore";
 import { openLittleWindow } from "./littleWindow";
-import { findNextMatch, openCommandBar, openFind, openLibrary } from "./overlayController";
+import { findNextMatch, openCommandBar, openFind, openLibrary, runSiteCommand } from "./overlayController";
 import { copyTabUrl, toggleDevTools, zoomPage } from "./pageCommands";
 import { closePeek, isPeekOpen, openPeekAsTab } from "./peek";
 import { showMenuRequest } from "./menus";
@@ -126,4 +126,5 @@ export const appMenuCommands: AppMenuCommands = {
   openUrlInNewTab: (url) => openLinkInNewTab(url, "foreground"),
   openPeekAsTab: () => openPeekAsTab(),
   openPrivateWindow: () => openLittleWindow(null, { isPrivate: true }),
+  zapElements: () => runSiteCommand("zap"),
 };

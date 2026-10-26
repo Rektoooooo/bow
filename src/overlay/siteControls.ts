@@ -11,7 +11,7 @@
  *   toolbar sliders button → "overlay:show" (siteControls) → renderSiteControls() → button → overlayApi.siteCommand
  */
 import type { SiteCommand, SiteInfo } from "../shared/overlay";
-import { createElement, createTextButton } from "../renderer/dom.js";
+import { createElement, createTextButton, dispatch } from "../renderer/dom.js";
 import { createIcon } from "../renderer/icons.js";
 import type { IconName } from "../renderer/icons.js";
 
@@ -26,6 +26,20 @@ function createActionTile(icon: IconName, label: string, command: SiteCommand, i
   tile.append(createIcon(icon), createElement("span", "site-tile-label", label));
   tile.addEventListener("click", () => window.overlayApi.siteCommand(command));
   return tile;
+}
+
+/**
+ * Sums up a site's Boost in a few words, e.g. "On · 2 zapped · custom CSS".
+ */
+function describeBoost(boost: NonNullable<SiteInfo["boost"]>): string {
+  const parts = [boost.isEnabled ? "On" : "Off"];
+  if (boost.zapCount > 0) {
+    parts.push(`${boost.zapCount} zapped`);
+  }
+  if (boost.hasCss) {
+    parts.push("custom CSS");
+  }
+  return parts.join(" · ");
 }
 
 /**
@@ -64,6 +78,36 @@ export function renderSiteControls(host: HTMLElement, site: SiteInfo): void {
   zoomControls.append(zoomOut, zoomValue, zoomIn);
   zoomRow.append(zoomControls);
 
+  const boostRow = createElement("div", "site-row site-row-column");
+  const boostHeader = createElement("div", "site-boost-header");
+  boostHeader.append(createElement("span", "site-row-label", "Boost"));
+  const boostSummary = site.boost === null ? "Change how this site looks" : describeBoost(site.boost);
+  boostHeader.append(createElement("span", "site-row-note", boostSummary));
+  const boostButtons = createElement("div", "site-buttons");
+  const zapButton = createTextButton("Zap Elements", "site-button", () => window.overlayApi.siteCommand("zap"));
+  zapButton.title = "Click elements on the page to hide them for good; Escape when done";
+  zapButton.disabled = !site.isLoaded || site.site === null;
+  const editButton = createTextButton("Edit CSS…", "site-button", () => dispatch({ type: "openBoostEditor" }));
+  editButton.disabled = site.site === null;
+  boostButtons.append(zapButton, editButton);
+  boostRow.append(boostHeader, boostButtons);
+  if (site.boost !== null && site.site !== null) {
+    const boostSite = site.site;
+    const isEnabled = site.boost.isEnabled;
+    const manageButtons = createElement("div", "site-buttons");
+    manageButtons.append(
+      createTextButton(isEnabled ? "Turn Off" : "Turn On", "site-button", () => {
+        dispatch({ type: "setBoostEnabled", site: boostSite, isEnabled: !isEnabled });
+        window.overlayApi.close();
+      }),
+      createTextButton("Reset Boost", "site-button", () => {
+        dispatch({ type: "deleteBoost", site: boostSite });
+        window.overlayApi.close();
+      }),
+    );
+    boostRow.append(manageButtons);
+  }
+
   const permissionsRow = createElement("div", "site-row site-row-column");
   permissionsRow.append(createElement("span", "site-row-label", "Permissions"));
   permissionsRow.append(
@@ -78,6 +122,6 @@ export function renderSiteControls(host: HTMLElement, site: SiteInfo): void {
   clearButton.title = "Deletes this site's cookies and storage in this profile, then reloads (you will be signed out)";
   buttons.append(reloadButton, clearButton);
 
-  panel.append(header, tiles, zoomRow, permissionsRow, buttons, createElement("p", "site-url", site.url));
+  panel.append(header, tiles, zoomRow, boostRow, permissionsRow, buttons, createElement("p", "site-url", site.url));
   host.replaceChildren(panel);
 }

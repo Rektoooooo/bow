@@ -71,6 +71,10 @@ export type BrowserAction =
   | { type: "createProfileForSpace"; spaceId: SpaceId }
   | { type: "addRoutingRule"; matchType: RoutingMatchType; value: string; spaceId: SpaceId }
   | { type: "removeRoutingRule"; ruleId: string }
+  | { type: "setBoostCss"; site: string; css: string }
+  | { type: "setBoostEnabled"; site: string; isEnabled: boolean }
+  | { type: "deleteBoost"; site: string }
+  | { type: "openBoostEditor" }
   | { type: "toggleMediaPlayback" }
   | { type: "dismissMedia" }
   | { type: "navigate"; command: NavigationCommand }
@@ -120,6 +124,10 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "createProfileForSpace",
   "addRoutingRule",
   "removeRoutingRule",
+  "setBoostCss",
+  "setBoostEnabled",
+  "deleteBoost",
+  "openBoostEditor",
   "toggleMediaPlayback",
   "dismissMedia",
   "navigate",

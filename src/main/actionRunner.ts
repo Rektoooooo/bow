@@ -15,9 +15,11 @@ import type { SpaceTheme } from "../shared/types";
 import { applyChange, getState, getWindow, previewSidebarWidthWhileDragging, scheduleRuntimePush, sendSidebarCommand, setSidebarPeek } from "./browserCore";
 import { dismissMedia, toggleMediaPlayback } from "./media";
 import { addRoutingRule, removeRoutingRule } from "./routing";
+import { deleteBoost, setBoostCss, setBoostEnabled } from "./boosts";
+import { reapplyBoostsToAllPages } from "./boostPages";
 import { showMenuRequest } from "./menus";
 import type { MenuHost } from "./menus";
-import { openCommandBar, openLibrary, openSiteControls, openThemeEditor } from "./overlayController";
+import { openBoostEditor, openCommandBar, openLibrary, openSiteControls, openThemeEditor } from "./overlayController";
 import { setSplitOrientation, separateTabFromSplit, splitTabs, unsplit } from "./split";
 import {
   addToFavorites,
@@ -180,6 +182,17 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => addRoutingRule(state, action.matchType, action.value, action.spaceId, now));
     case "removeRoutingRule":
       return applyChange((state) => removeRoutingRule(state, action.ruleId));
+    case "setBoostCss":
+      applyChange((state) => setBoostCss(state, action.site, action.css, now));
+      return reapplyBoostsToAllPages(getState());
+    case "setBoostEnabled":
+      applyChange((state) => setBoostEnabled(state, action.site, action.isEnabled));
+      return reapplyBoostsToAllPages(getState());
+    case "deleteBoost":
+      applyChange((state) => deleteBoost(state, action.site));
+      return reapplyBoostsToAllPages(getState());
+    case "openBoostEditor":
+      return openBoostEditor();
     case "createProfileForSpace":
       return applyChange((state) => {
         const created = createProfile(state, "", now);

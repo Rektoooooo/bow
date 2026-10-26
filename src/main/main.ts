@@ -36,6 +36,7 @@ import { addVisit, loadHistory, saveHistoryNow, setVisitTitle } from "./historyS
 import { registerIpcHandlers } from "./ipc";
 import { archiveIdleLittleWindows, handleExternalUrl, registerLittleWindowIpc } from "./littleWindow";
 import { showPageContextMenu } from "./menus";
+import { applyBoostToPage } from "./boostPages";
 import { initializePeek, openPeek, relayoutPeek } from "./peek";
 import { createOverlayView, getOverlayContents } from "./overlay";
 import { refreshOpenPanel, registerOverlayIpc, relayoutOverlay, setCommandActionRegistry } from "./overlayController";
@@ -92,6 +93,9 @@ const tabViewEvents: TabViewEvents = {
     return true;
   },
   onContextMenu: (_tabId, contents, params) => showPageContextMenu(menuHost, contents, params),
+  onDomReady: (_tabId, contents) => {
+    applyBoostToPage(contents, getState()).catch(() => undefined);
+  },
 };
 
 /**

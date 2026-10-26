@@ -62,6 +62,8 @@ and every Arc behavior we can observe is written down before Arc shuts down.
 
 - [x] Profiles UI (Space menu › Profile), private windows (⇧⌘N), resizable sidebar, unread dot, window bounds remembered
 
+- [x] Air Traffic Control (route links from other apps to a Space), theme editor, Boosts (CSS + Zap)
+
 ### 2.7 Wrap-up
 - [ ] Unit tests for every pure module; e2e rewritten for the new UI; permission check still passing
 - [ ] README screenshot, CLAUDE.md (this Mac's facts), new handoff, commit + push

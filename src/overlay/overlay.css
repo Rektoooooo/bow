@@ -614,6 +614,79 @@ button:disabled {
   user-select: text;
 }
 
+/* ---------- Boosts ---------- */
+
+.site-boost-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.site-row-column .site-buttons {
+  width: 100%;
+}
+
+.boost-editor {
+  top: 10vh;
+  left: 50%;
+  width: min(620px, calc(100vw - 48px));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  animation: none;
+}
+
+.boost-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.boost-title {
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.boost-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.boost-css {
+  height: 260px;
+  resize: vertical;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--field);
+  color: var(--ink);
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  outline: none;
+  user-select: text;
+}
+
+.boost-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.boost-delete {
+  margin-right: auto;
+  flex: none;
+  color: var(--danger);
+}
+
+.boost-save {
+  flex: none;
+  background: var(--chip-active);
+  color: var(--chip-active-ink);
+}
+
 /* ---------- Theme editor (beside the sidebar; no dimming, so the change shows live) ---------- */
 
 body[data-panel="theme"] .backdrop {

@@ -26,6 +26,7 @@ export type OverlayPanel =
   | { kind: "library"; section: LibrarySection }
   | { kind: "siteControls" }
   | { kind: "find" }
+  | { kind: "boost"; site: string; css: string }
   | { kind: "theme"; spaceId: string; spaceName: string; spaceIcon: string; theme: SpaceTheme; sidebarWidth: number; presets: { label: string; colors: string[]; appearance: ThemeAppearance }[] }
   | { kind: "peek"; frame: { x: number; y: number; width: number; height: number }; url: string; title: string };
 
@@ -80,6 +81,9 @@ export interface SiteInfo {
   isMuted: boolean;
   zoomPercent: number;
   isLoaded: boolean;
+  /** The site's Boost key ("example.com"), and its Boost if it has one. */
+  site: string | null;
+  boost: { isEnabled: boolean; zapCount: number; hasCss: boolean } | null;
 }
 
 /** Everything the overlay needs to draw a panel. */
@@ -92,7 +96,7 @@ export interface OverlayShowMessage {
 }
 
 /** Commands the site controls can send. */
-export type SiteCommand = "copyLink" | "screenshot" | "toggleMute" | "devTools" | "zoomIn" | "zoomOut" | "zoomReset" | "clearSiteData" | "reload";
+export type SiteCommand = "copyLink" | "screenshot" | "toggleMute" | "devTools" | "zoomIn" | "zoomOut" | "zoomReset" | "clearSiteData" | "reload" | "zap";
 
 /** Find-in-page progress. */
 export interface FindProgress {

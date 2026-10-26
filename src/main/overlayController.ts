@@ -28,6 +28,9 @@ import { searchHistory } from "./history";
 import { clearHistory, getHistory } from "./historyStore";
 import { computeCardBounds } from "./layout";
 import { THEME_PRESETS } from "./themePresets";
+import { addZappedSelector, findBoostForUrl } from "./boosts";
+import { reapplyBoostsToAllPages, zapElements } from "./boostPages";
+import { getSiteKey } from "./urls";
 import { SIDEBAR_WIDTH_PX } from "../shared/settings";
 import type { Bounds } from "./layout";
 import { getOverlayContents, hideOverlay, sendToOverlay, setOverlayBounds, showOverlay } from "./overlay";
@@ -150,6 +153,8 @@ function buildSiteInfo(state: BrowserState): SiteInfo | null {
     // Keep the full address as the label.
   }
   const zoomFactor = contents === null ? 1 : contents.getZoomFactor();
+  const boost = findBoostForUrl(state, tab.url);
+  const boostSummary = boost === undefined ? null : { isEnabled: boost.isEnabled, zapCount: boost.zappedSelectors.length, hasCss: boost.css.trim() !== "" };
   return {
     tabId: tab.id,
     url: tab.url,
@@ -158,7 +163,33 @@ function buildSiteInfo(state: BrowserState): SiteInfo | null {
     isMuted: tab.isMuted,
     zoomPercent: Math.round(zoomFactor * 100),
     isLoaded: contents !== null,
+    site: getSiteKey(tab.url),
+    boost: boostSummary,
   };
+}
+
+/**
+ * Opens the Boost CSS editor for the selected tab's site.
+ */
+export function openBoostEditor(): void {
+  const state = getState();
+  const site = buildSiteInfo(state)?.site ?? null;
+  if (site === null) {
+    return;
+  }
+  const boost = (state.boosts ?? []).find((candidate) => candidate.site === site);
+  openPanel({ kind: "boost", site: site, css: boost === undefined ? "" : boost.css });
+}
+
+/**
+ * Starts Zap mode on the selected tab: the panel closes, and each click in the page hides that element.
+ */
+function startZapping(site: string, tabId: string): void {
+  closeOverlay();
+  zapElements(tabId, (selector) => {
+    applyChange((state) => addZappedSelector(state, site, selector, Date.now()));
+    reapplyBoostsToAllPages(getState());
+  });
 }
 
 /**
@@ -447,6 +478,10 @@ function handleSiteCommand(command: SiteCommand): void {
     closeOverlay();
     return;
   }
+  if (command === "zap" && site.site !== null && contents !== null) {
+    startZapping(site.site, site.tabId);
+    return;
+  }
   if (command === "toggleMute") {
     setMuted(site.tabId, !site.isMuted);
   }
@@ -476,6 +511,13 @@ function handleSiteCommand(command: SiteCommand): void {
     contents.session.clearStorageData({ origin: origin }).then(() => contents.reload());
   }
   openPanel({ kind: "siteControls" });
+}
+
+/**
+ * Runs a site-controls command without the panel (the Command Bar's "Zap Elements").
+ */
+export function runSiteCommand(command: SiteCommand): void {
+  handleSiteCommand(command);
 }
 
 /**
@@ -514,7 +556,7 @@ function isMode(value: unknown): value is CommandBarMode {
   return value === "newTab" || value === "editUrl" || value === "splitWith";
 }
 
-const SITE_COMMANDS: SiteCommand[] = ["copyLink", "screenshot", "toggleMute", "devTools", "zoomIn", "zoomOut", "zoomReset", "clearSiteData", "reload"];
+const SITE_COMMANDS: SiteCommand[] = ["copyLink", "screenshot", "toggleMute", "devTools", "zoomIn", "zoomOut", "zoomReset", "clearSiteData", "reload", "zap"];
 
 /** Longest text accepted from the overlay. */
 const MAX_TEXT_LENGTH = 8192;

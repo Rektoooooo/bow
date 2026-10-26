@@ -57,6 +57,8 @@ function buildFixedActions(host: CommandActionHost): FixedAction[] {
     { entry: { id: "split", title: "Add Split View", keywords: ["split screen", "side by side"] }, run: () => commands.addSplitPane() },
     { entry: { id: "library", title: "Open Library", keywords: ["archive", "archived tabs"] }, run: () => commands.openLibrary() },
     { entry: { id: "find", title: "Find in Page", keywords: ["search page"] }, run: () => commands.openFind() },
+    { entry: { id: "edit-boost", title: "Edit Boost for This Site", keywords: ["boost", "custom css", "style"] }, run: () => host.runAction({ type: "openBoostEditor" }) },
+    { entry: { id: "zap", title: "Zap Elements", keywords: ["boost", "hide element", "remove element"] }, run: () => commands.zapElements() },
     { entry: { id: "devtools", title: "Developer Tools", keywords: ["inspect", "console"] }, run: () => commands.toggleDevTools() },
     { entry: { id: "zoom-in", title: "Zoom In", keywords: ["bigger"] }, run: () => commands.zoom("in") },
     { entry: { id: "zoom-out", title: "Zoom Out", keywords: ["smaller"] }, run: () => commands.zoom("out") },

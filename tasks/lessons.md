@@ -20,6 +20,8 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 - When the same failure survives two different fixes, stop changing remedies: run an experiment that splits the
   possibilities (same object? same call? same options?), and compare a working call with the failing one field by field.
 - example.com's body text no longer contains "Example" (only its title does); search for "domain" in tests.
+- `webContents.removeInsertedCSS()` does not remove CSS inserted with `{ cssOrigin: "user" }` (Electron 44). Insert
+  Boost CSS with the default author origin, and serialize insert/remove per page.
 
 ## This Mac
 - Two macOS accounts; facts differ per account (Homebrew owner, Node location, gh accounts). Check `whoami` and the

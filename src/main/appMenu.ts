@@ -46,6 +46,7 @@ export interface AppMenuCommands {
   openUrlInNewTab(url: string): void;
   openPeekAsTab(): void;
   openPrivateWindow(): void;
+  zapElements(): void;
 }
 
 /** Where the Help menu points. */
