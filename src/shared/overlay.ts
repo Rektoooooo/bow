@@ -29,7 +29,7 @@ export type OverlayPanel =
   | { kind: "boost"; site: string; css: string }
   | { kind: "theme"; spaceId: string; spaceName: string; spaceIcon: string; theme: SpaceTheme; sidebarWidth: number; presets: { label: string; colors: string[]; appearance: ThemeAppearance }[] }
   | { kind: "peek"; frame: { x: number; y: number; width: number; height: number }; url: string; title: string }
-  | { kind: "permission"; requestId: string; host: string; kinds: SitePermissionKind[] };
+  | { kind: "permission"; requestId: string; host: string; kinds: SitePermissionKind[]; appName: string | null };
 
 /** The Peek header's buttons. */
 export type PeekCommand = "openAsTab" | "split" | "close";

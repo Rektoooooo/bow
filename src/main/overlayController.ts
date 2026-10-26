@@ -275,8 +275,8 @@ function openPanel(panel: OverlayPanel): void {
 /**
  * Shows a permission prompt (permissionPrompts.ts decides when).
  */
-export function openPermissionPrompt(requestId: string, host: string, kinds: SitePermissionKind[]): void {
-  openPanel({ kind: "permission", requestId: requestId, host: host, kinds: kinds });
+export function openPermissionPrompt(requestId: string, host: string, kinds: SitePermissionKind[], appName: string | null): void {
+  openPanel({ kind: "permission", requestId: requestId, host: host, kinds: kinds, appName: appName });
 }
 
 /**

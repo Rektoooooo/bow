@@ -74,16 +74,23 @@ async function waitForPageAnswer() {
   }
   return null;
 }
-const promptText = async () => {
-  const prompt = await overlay.waitForSelector(".permission-prompt", { timeout: 5000 }).catch(() => null);
-  return prompt === null ? null : (await prompt.textContent()).replace(/\s+/g, " ").trim();
-};
 // The overlay page keeps its last drawing after it closes; whether it is on screen is decided by the main window.
 const isOverlayOnScreen = () =>
   app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
     return win.contentView.children.some((child) => child.webContents?.getURL().endsWith("/overlay/overlay.html"));
   });
+// The prompt's text once the overlay is on screen with it, or null when no prompt comes within 5 s.
+const promptText = async () => {
+  for (let attempt = 0; attempt < 25; attempt++) {
+    if (await isOverlayOnScreen()) {
+      const prompt = await overlay.waitForSelector(".permission-prompt", { timeout: 2000 }).catch(() => null);
+      return prompt === null ? null : (await prompt.textContent()).replace(/\s+/g, " ").trim();
+    }
+    await sleep(200);
+  }
+  return null;
+};
 const savedNotificationAnswers = async () =>
   ((await getState()).sitePermissions ?? []).filter((answer) => answer.origin === "https://example.com" && answer.kind === "notifications");
 
@@ -113,6 +120,18 @@ await promptText();
 await overlay.keyboard.press("Escape");
 check("Escape refuses this once", (await waitForPageAnswer()) === "denied");
 check("and saves nothing", (await savedNotificationAnswers()).length === 0);
+
+// A link to an app asks every time and names the app; Block opens nothing and saves nothing.
+const answersBefore = ((await getState()).sitePermissions ?? []).length;
+await inTab("location.href = 'mailto:someone@example.com'; true");
+const appPrompt = await promptText();
+check("a link to an app asks first, naming the app", appPrompt?.includes("example.com wants to open "), appPrompt ?? "no prompt");
+await overlay.click(".permission-button:not(.is-primary)");
+await sleep(400);
+check("Block keeps the app closed and saves nothing", !(await isOverlayOnScreen()) && ((await getState()).sitePermissions ?? []).length === answersBefore);
+await inTab("location.href = 'no-app-handles-this-scheme-7f3a:test'; true");
+await sleep(1200);
+check("a link no app on this Mac handles is refused without a prompt", !(await isOverlayOnScreen()));
 
 // Our own pages never get a prompt.
 const sidebarAnswer = await page.evaluate(() => Notification.requestPermission());

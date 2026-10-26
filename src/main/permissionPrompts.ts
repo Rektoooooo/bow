@@ -2,7 +2,8 @@
  * WHY this file exists:
  *   Asks the user when a site wants the camera, microphone, location, notifications or the clipboard, like the prompt
  *   Arc (Chromium) shows under the address bar, and remembers the answer per profile and site. Private windows ask
- *   every time and remember nothing. Our own pages never get here: profiles.ts refuses them first.
+ *   every time and remember nothing. Links to apps (mailto:, zoommtg:, steam:) ask every time. Our own pages never
+ *   get here: profiles.ts refuses them first.
  *
  * Data source:
  *   Requests from profiles.ts's permission handlers; saved answers in BrowserState.sitePermissions (sitePermissions.ts).
@@ -12,6 +13,7 @@
  *   → Allow / Block (action answerPermissionPrompt) → answerPermissionPrompt() → applyChange(setPermissionAnswer)
  *   → the page gets its answer. Escape or a click outside refuses this once and saves nothing.
  */
+import { app } from "electron";
 import type { WebContents } from "electron";
 import type { ProfileId, SitePermissionKind } from "../shared/types";
 import { applyChange, getState } from "./browserCore";
@@ -30,6 +32,8 @@ interface PendingPrompt {
   profileId: ProfileId | null;
   origin: string;
   kinds: SitePermissionKind[];
+  /** For a link to an app: the app's name. Such answers are never saved. */
+  appName: string | null;
   answerRequests: ((isAllowed: boolean) => void)[];
 }
 
@@ -48,6 +52,7 @@ export function initializePermissionPrompts(): void {
     isAllowed: (profileId, origin, kinds) =>
       profileId !== null && kinds.every((kind) => findPermissionAnswer(getState(), profileId, origin, kind) === true),
     request: (contents, profileId, origin, kinds) => request(contents, profileId, origin, kinds),
+    requestOpenApp: (contents, origin, externalUrl) => requestOpenApp(contents, origin, externalUrl),
   });
   onPanelEnded((panel, reason) => {
     if (panel.kind === "permission" && panel.requestId === shownPromptId) {
@@ -74,16 +79,34 @@ function request(contents: WebContents | null, profileId: ProfileId | null, orig
       return Promise.resolve(true);
     }
   }
+  return askUser(contents, profileId, origin, kinds, null);
+}
+
+/**
+ * A link to an app: asks every time, naming the app macOS would open. Refused without asking when no app handles it.
+ */
+function requestOpenApp(contents: WebContents | null, origin: string, externalUrl: string): Promise<boolean> {
+  const appName = externalUrl === "" ? "" : app.getApplicationNameForProtocol(externalUrl);
+  if (appName === "") {
+    return Promise.resolve(false);
+  }
+  return askUser(contents, null, origin, [], appName);
+}
+
+/**
+ * Queues a prompt, or joins the same question already waiting.
+ */
+function askUser(contents: WebContents | null, profileId: ProfileId | null, origin: string, kinds: SitePermissionKind[], appName: string | null): Promise<boolean> {
   return new Promise((resolve) => {
     const sameQuestion = pendingPrompts.find(
-      (prompt) => prompt.profileId === profileId && prompt.origin === origin && prompt.kinds.join() === kinds.join(),
+      (prompt) => prompt.profileId === profileId && prompt.origin === origin && prompt.kinds.join() === kinds.join() && prompt.appName === appName,
     );
     if (sameQuestion !== undefined) {
       sameQuestion.answerRequests.push(resolve);
       return;
     }
     promptCounter = promptCounter + 1;
-    const prompt: PendingPrompt = { id: `permission-${promptCounter}`, profileId: profileId, origin: origin, kinds: kinds, answerRequests: [resolve] };
+    const prompt: PendingPrompt = { id: `permission-${promptCounter}`, profileId: profileId, origin: origin, kinds: kinds, appName: appName, answerRequests: [resolve] };
     pendingPrompts.push(prompt);
     // A tab that closes while its question waits takes the question with it.
     contents?.once("destroyed", () => settlePrompt(prompt.id, false, false));
@@ -109,7 +132,7 @@ function showNextPrompt(): void {
     return;
   }
   shownPromptId = next.id;
-  openPermissionPrompt(next.id, new URL(next.origin).host, next.kinds);
+  openPermissionPrompt(next.id, new URL(next.origin).host, next.kinds, next.appName);
 }
 
 /**

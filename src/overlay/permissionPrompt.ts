@@ -1,7 +1,7 @@
 /**
  * WHY this file exists:
- *   The permission prompt: "meet.google.com wants to use your camera and microphone" with Block and Allow, in a
- *   small card at the page's top left, like Arc's (Chromium's) bubble under the address bar.
+ *   The permission prompt: "meet.google.com wants to use your camera and microphone" (or "zoom.us wants to open
+ *   zoom.us") with Block and Allow, in a small card at the page's top left, like Arc's (Chromium's) bubble.
  *
  * Data source:
  *   The "permission" panel from permissionPrompts.ts (which site, what it wants, the request id).
@@ -49,7 +49,8 @@ export function renderPermissionPrompt(host: HTMLElement, panel: Extract<Overlay
   const text = createElement("div", "permission-text");
   text.append(createIcon("lock", "icon permission-icon"));
   const message = createElement("p", "permission-message");
-  message.append(createElement("strong", "permission-host", panel.host), ` wants to ${describePermissionKinds(panel.kinds)}`);
+  const wish = panel.appName === null ? describePermissionKinds(panel.kinds) : `open ${panel.appName}`;
+  message.append(createElement("strong", "permission-host", panel.host), ` wants to ${wish}`);
   text.append(message);
   const buttons = createElement("div", "permission-buttons");
   buttons.append(

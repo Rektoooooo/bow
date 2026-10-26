@@ -80,6 +80,7 @@ in Arc). Running it twice adds nothing twice.
 - **Permission prompts**: a site that wants your camera, microphone, location, notifications or clipboard asks
   first ("meet.google.com wants to use your camera and microphone", Block / Allow). The answer is remembered per
   profile and site; the site controls list it with a Reset. Private windows ask every time and remember nothing.
+  Links to apps (mailto:, zoommtg:, steam:, …) ask every time and name the app macOS would open.
 - Site controls (copy link, screenshot, mute, inspect, zoom, permissions, clear site data), Find in page,
   downloads, Print (⌘P), spelling suggestions, a right-click menu in pages, and automatic Picture-in-Picture when
   you leave a tab playing a video.

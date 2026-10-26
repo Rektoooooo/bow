@@ -114,7 +114,8 @@ function shouldOpenInPeek(tabId: ItemId, url: string): boolean {
   const state = getState();
   const tab = findTab(state, tabId);
   const root = findRootLocation(state, tabId);
-  if (tab === undefined || root === null || root.kind === "today") {
+  // Links to apps (mailto:, zoommtg:, …) are not pages; they go to the app prompt instead.
+  if (tab === undefined || root === null || root.kind === "today" || !isRecordableUrl(url)) {
     return false;
   }
   return !isSameSite(tab.url, url);

@@ -71,10 +71,12 @@ const todayTabs = (state) => activeSpace(state).todayIds.map((id) => state.items
 const pinnedItems = (state) => activeSpace(state).pinnedIds.map((id) => state.items[id]);
 const favorites = (state) => state.profiles[0].favoriteIds.map((id) => state.items[id]);
 const itemCount = (state) => Object.keys(state.items).length;
+// Only web pages: our own overlay and status bubble (file: pages) can be on screen too, e.g. with a site's
+// permission prompt (DuckDuckGo asks for the location on a "best pizza" search).
 const tabViewBounds = (app) => app.evaluate(({ BrowserWindow }) => {
   const win = BrowserWindow.getAllWindows()[0];
   return win.contentView.children
-    .filter((child) => child.webContents && child.webContents !== win.webContents)
+    .filter((child) => child.webContents && child.webContents !== win.webContents && !child.webContents.getURL().startsWith("file:"))
     .map((child) => child.getBounds());
 });
 

@@ -31,6 +31,8 @@ export interface PermissionDecider {
   isAllowed(profileId: ProfileId | null, origin: string, kinds: SitePermissionKind[]): boolean;
   /** A real request: the saved answer, or ask the user. */
   request(contents: WebContents | null, profileId: ProfileId | null, origin: string, kinds: SitePermissionKind[]): Promise<boolean>;
+  /** A link to an app (mailto:, zoommtg:, steam:, …): ask every time, like Chromium does by default. */
+  requestOpenApp(contents: WebContents | null, origin: string, externalUrl: string): Promise<boolean>;
 }
 
 let permissionDecider: PermissionDecider | null = null;
@@ -71,10 +73,19 @@ export function restrictWebPermissions(targetSession: Session): void {
       callback(true);
       return;
     }
-    const mediaTypes = "mediaTypes" in details ? (details.mediaTypes ?? []) : [];
-    const kinds = toPermissionKinds(permission, mediaTypes);
     const origin = getPermissionOrigin(details.requestingUrl);
     const profileId = sessionProfileIds.get(targetSession);
+    if (permission === "openExternal") {
+      const externalUrl = "externalURL" in details ? (details.externalURL ?? "") : "";
+      if (origin === null || profileId === undefined || permissionDecider === null) {
+        callback(false);
+        return;
+      }
+      permissionDecider.requestOpenApp(webContents, origin, externalUrl).then(callback, () => callback(false));
+      return;
+    }
+    const mediaTypes = "mediaTypes" in details ? (details.mediaTypes ?? []) : [];
+    const kinds = toPermissionKinds(permission, mediaTypes);
     if (kinds === null || origin === null || profileId === undefined || permissionDecider === null) {
       callback(false);
       return;
