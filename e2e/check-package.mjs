@@ -32,6 +32,8 @@ const infoPlist = JSON.parse(execFileSync("plutil", ["-convert", "json", "-o", "
 const schemes = (infoPlist.CFBundleURLTypes ?? []).flatMap((type) => type.CFBundleURLSchemes ?? []);
 check("Info.plist declares http and https", schemes.includes("http") && schemes.includes("https"), schemes.join(", "));
 check("Info.plist names the app", infoPlist.CFBundleName === "Sidebar Browser", infoPlist.CFBundleName);
+const usageTexts = [infoPlist.NSCameraUsageDescription, infoPlist.NSMicrophoneUsageDescription, infoPlist.NSLocationWhenInUseUsageDescription];
+check("Info.plist explains camera, microphone and location use", usageTexts.every((text) => typeof text === "string" && text.startsWith("Websites you allow")), usageTexts.join(" | "));
 check("the app icon is ours", fs.readFileSync(path.join(bundlePath, "Contents", "Resources", infoPlist.CFBundleIconFile)).equals(fs.readFileSync(path.join(appDir, "build", "icon.icns"))));
 
 const app = await _electron.launch({ executablePath, args: [`--user-data-dir=${userDataDir}`], timeout: 30000 });

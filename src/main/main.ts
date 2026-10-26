@@ -32,6 +32,7 @@ import {
 import { createCommandActionRegistry } from "./commandBarActions";
 import { startTrackingDownloads } from "./downloads";
 import { getExtensionMenuItems, initializeExtensionHost, prepareExtensions } from "./extensionHost";
+import { initializePermissionPrompts } from "./permissionPrompts";
 import { isRecordableUrl } from "./history";
 import { addVisit, loadHistory, saveHistoryNow, setVisitTitle } from "./historyStore";
 import { registerIpcHandlers } from "./ipc";
@@ -242,6 +243,8 @@ async function handleAppReady(): Promise<void> {
 
   // Our own pages (sidebar, overlay, Little Window bar) use the default session; lock it down like the profiles.
   restrictWebPermissions(session.defaultSession);
+  // Sites ask before using the camera, microphone, location, notifications or the clipboard.
+  initializePermissionPrompts();
   startTrackingDownloads(() => {
     scheduleRuntimePush();
     refreshOpenPanel();

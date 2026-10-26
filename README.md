@@ -77,8 +77,12 @@ in Arc). Running it twice adds nothing twice.
   Command Bar. Turn a Boost off or reset it any time.
 - **Air Traffic Control**: rules such as "address contains github.com → Work" send links from other apps to a Space
   (Library › Settings).
-- Site controls (copy link, screenshot, mute, inspect, zoom, clear site data), Find in page, downloads, a
-  right-click menu in pages, and automatic Picture-in-Picture when you leave a tab playing a video.
+- **Permission prompts**: a site that wants your camera, microphone, location, notifications or clipboard asks
+  first ("meet.google.com wants to use your camera and microphone", Block / Allow). The answer is remembered per
+  profile and site; the site controls list it with a Reset. Private windows ask every time and remember nothing.
+- Site controls (copy link, screenshot, mute, inspect, zoom, permissions, clear site data), Find in page,
+  downloads, Print (⌘P), spelling suggestions, a right-click menu in pages, and automatic Picture-in-Picture when
+  you leave a tab playing a video.
 
 **Extensions**
 - Chrome extensions per profile, like Arc: imported from Arc or loaded from a folder (Library › Extensions ›
@@ -135,7 +139,8 @@ Three ideas keep it simple:
 - Web pages run sandboxed and cannot talk to the app. They get no preload script, except in a profile that has
   extensions: there the extension library's preload runs in an isolated world, so page scripts see nothing new.
   Our own pages only accept their own messages, and every message field is checked.
-- Every profile's session refuses website permissions (camera, microphone, location, notifications) except full
-  screen and clipboard writes, until a permission prompt exists. `e2e/permission-check.mjs` proves it.
+- Websites get nothing they were not allowed: camera, microphone, location, notifications and clipboard reading
+  need the user's Allow (remembered per profile and site), everything else is refused, except full screen and
+  clipboard writes. Our own pages are refused without asking. `e2e/permission-check.mjs` proves it.
 - Our pages cannot navigate away or open windows, and only load their own scripts.
 - Import from Arc only reads Arc's files (its history database through a temporary copy) and never changes them.

@@ -10,7 +10,7 @@
  * Data flow:
  *   sidebar.ts → window.browserApi.dispatch(action) → preload → ipc.ts parseAction() → main.ts runAction()
  */
-import type { ItemId, ItemLocation, RoutingMatchType, SpaceId, SpaceTheme, SplitOrientation } from "./types";
+import type { ItemId, ItemLocation, RoutingMatchType, SitePermissionKind, SpaceId, SpaceTheme, SplitOrientation } from "./types";
 
 /** Toolbar and keyboard navigation commands for the page on screen. */
 export type NavigationCommand = "back" | "forward" | "reload" | "stop";
@@ -87,7 +87,9 @@ export type BrowserAction =
   | { type: "removeExtension"; profileId: string; extensionId: string }
   | { type: "loadUnpackedExtension" }
   | { type: "importFromArc" }
-  | { type: "showExtensionsMenu"; anchor: { x: number; y: number; width: number; height: number } };
+  | { type: "showExtensionsMenu"; anchor: { x: number; y: number; width: number; height: number } }
+  | { type: "answerPermissionPrompt"; requestId: string; isAllowed: boolean }
+  | { type: "removeSitePermission"; profileId: string; origin: string; kind: SitePermissionKind };
 
 /** Every action type, for checking an incoming `type` string. */
 export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
@@ -146,4 +148,6 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "loadUnpackedExtension",
   "importFromArc",
   "showExtensionsMenu",
+  "answerPermissionPrompt",
+  "removeSitePermission",
 ];

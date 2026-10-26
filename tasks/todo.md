@@ -67,6 +67,8 @@ and every Arc behavior we can observe is written down before Arc shuts down.
 - [x] Packaged app (`npm run package`), own icon, Set as Default Browser, links that launch the app
 - [x] Chrome extensions: load unpacked, import the user's Arc extensions per profile (keep Arc's on/off),
       Library › Extensions (on/off, remove), toolbar extensions menu with action popups
+- [x] Permission prompts (camera, microphone, location, notifications, clipboard; per profile and site), Print,
+      spelling suggestions
 - [x] Command Bar: Tab to search a site (YouTube, Wikipedia, GitHub, …)
 
 ### 2.7 Wrap-up

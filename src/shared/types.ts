@@ -176,6 +176,21 @@ export interface InstalledExtension {
   source: "arc" | "unpacked";
 }
 
+/** What a site can ask for. A request for camera and microphone together is two kinds. */
+export type SitePermissionKind = "camera" | "microphone" | "notifications" | "location" | "clipboard";
+
+/**
+ * The user's answer to a site asking for something, per profile, like Arc's (Chromium's) permission prompts.
+ * Example: { profileId: "profile-default", origin: "https://meet.google.com", kind: "camera", isAllowed: true }
+ */
+export interface SitePermission {
+  profileId: ProfileId;
+  /** The asking page's origin (scheme, host and port). */
+  origin: string;
+  kind: SitePermissionKind;
+  isAllowed: boolean;
+}
+
 /** Everything the browser saves to disk. */
 export interface BrowserState {
   /** Raise this number when the saved shape changes, and add an upgrade step to migrate.ts. */
@@ -197,6 +212,8 @@ export interface BrowserState {
   boosts?: Boost[];
   /** Chrome extensions per profile. Optional, so files saved before it existed still load. */
   extensions?: InstalledExtension[];
+  /** Answers to sites' permission requests. Optional, so files saved before it existed still load. */
+  sitePermissions?: SitePermission[];
 }
 
 /**

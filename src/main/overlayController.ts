@@ -18,7 +18,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { OVERLAY_CHANNELS } from "../shared/overlay";
 import type { CommandBarLine, CommandBarMode, LibraryData, LibrarySection, OverlayPanel, SiteCommand, SiteInfo } from "../shared/overlay";
-import type { BrowserState, ItemId } from "../shared/types";
+import type { BrowserState, ItemId, SitePermissionKind } from "../shared/types";
 import { applyChange, getLayoutOptions, getRecentTabIds, getState, getWindow } from "./browserCore";
 import { rankCommandBarResults } from "./commandBar";
 import type { CommandBarResult } from "./commandBar";
@@ -32,7 +32,7 @@ import { THEME_PRESETS } from "./themePresets";
 import { addZappedSelector, findBoostForUrl } from "./boosts";
 import { reapplyBoostsToAllPages, zapElements } from "./boostPages";
 import { getSiteKey } from "./urls";
-import { SIDEBAR_WIDTH_PX } from "../shared/settings";
+import { DEFAULT_PROFILE_ID, SIDEBAR_WIDTH_PX } from "../shared/settings";
 import type { Bounds } from "./layout";
 import { getOverlayContents, hideOverlay, sendToOverlay, setOverlayBounds, showOverlay } from "./overlay";
 import { closePeek, isPeekOpen, openPeekAsTab, openPeekInSplit } from "./peek";
@@ -41,7 +41,8 @@ import { splitTabs } from "./split";
 import { getSelectedTabId, openTab, selectTab } from "./state";
 import { loadUrlInTab, openLinkInNewTab, setMuted } from "./tabActions";
 import { getFocusedContents, getTabContents } from "./tabViews";
-import { findTab, getActiveSpace } from "./tree";
+import { findProfileIdOfItem, findTab, getActiveSpace } from "./tree";
+import { getPermissionOrigin, getSitePermissions } from "./sitePermissions";
 import { looksLikeWebAddress, normalizeTypedInput } from "./urls";
 
 /** DuckDuckGo's suggestion service; it is also the browser's search engine (urls.ts). */
@@ -60,6 +61,40 @@ const LIBRARY_HISTORY_LIMIT = 300;
 const FIND_BAR_WIDTH_PX = 380;
 const FIND_BAR_HEIGHT_PX = 56;
 const FIND_BAR_MARGIN_PX = 10;
+
+/** Size of a permission prompt, at the page card's top left. Must fit overlay.css's .permission-prompt. */
+const PERMISSION_PROMPT_WIDTH_PX = 360;
+const PERMISSION_PROMPT_HEIGHT_PX = 116;
+const PERMISSION_PROMPT_MARGIN_PX = 10;
+
+/** Why a panel went away: closed (Escape, a click outside, an answer) or replaced by another panel. */
+export type PanelEndReason = "closed" | "replaced";
+
+/** Functions to run when a panel goes away (permissionPrompts.ts shows a waiting prompt or notes a dismissal). */
+const panelEndListeners: ((panel: OverlayPanel, reason: PanelEndReason) => void)[] = [];
+
+/**
+ * Registers a function to run whenever a panel closes or another panel replaces it.
+ */
+export function onPanelEnded(listener: (panel: OverlayPanel, reason: PanelEndReason) => void): void {
+  panelEndListeners.push(listener);
+}
+
+/**
+ * Tells the listeners that a panel went away.
+ */
+function notifyPanelEnded(panel: OverlayPanel, reason: PanelEndReason): void {
+  for (const listener of panelEndListeners) {
+    listener(panel, reason);
+  }
+}
+
+/**
+ * True while the overlay shows any panel.
+ */
+export function isPanelShown(): boolean {
+  return shownPanel !== null;
+}
 
 /** The panel on screen, or null. */
 let shownPanel: OverlayPanel | null = null;
@@ -108,6 +143,11 @@ function computeOverlayBounds(panel: OverlayPanel): Bounds | null {
   const contentSize = window.getContentSize();
   const contentWidth = contentSize[0] ?? 0;
   const contentHeight = contentSize[1] ?? 0;
+  if (panel.kind === "permission") {
+    // Under the toolbar at the page's top left, like Chromium's permission bubble; the page stays usable around it.
+    const pageCard = computeCardBounds(contentWidth, contentHeight, getLayoutOptions());
+    return { x: pageCard.x + PERMISSION_PROMPT_MARGIN_PX, y: pageCard.y + PERMISSION_PROMPT_MARGIN_PX, width: PERMISSION_PROMPT_WIDTH_PX, height: PERMISSION_PROMPT_HEIGHT_PX };
+  }
   if (panel.kind !== "find") {
     return { x: 0, y: 0, width: contentWidth, height: contentHeight };
   }
@@ -165,6 +205,9 @@ function buildSiteInfo(state: BrowserState): SiteInfo | null {
     // Keep the full address as the label.
   }
   const zoomFactor = contents === null ? 1 : contents.getZoomFactor();
+  const profileId = findProfileIdOfItem(state, tab.id) ?? DEFAULT_PROFILE_ID;
+  const origin = getPermissionOrigin(tab.url);
+  const permissions = origin === null ? [] : getSitePermissions(state, profileId, origin).map((answer) => ({ kind: answer.kind, isAllowed: answer.isAllowed }));
   const boost = findBoostForUrl(state, tab.url);
   const boostSummary = boost === undefined ? null : { isEnabled: boost.isEnabled, zapCount: boost.zappedSelectors.length, hasCss: boost.css.trim() !== "" };
   return {
@@ -177,6 +220,9 @@ function buildSiteInfo(state: BrowserState): SiteInfo | null {
     isLoaded: contents !== null,
     site: getSiteKey(tab.url),
     boost: boostSummary,
+    profileId: profileId,
+    origin: origin,
+    permissions: permissions,
   };
 }
 
@@ -214,12 +260,32 @@ function openPanel(panel: OverlayPanel): void {
     return;
   }
   const state = getState();
+  const replacedPanel = shownPanel;
   shownPanel = panel;
+  if (replacedPanel !== null) {
+    notifyPanelEnded(replacedPanel, "replaced");
+  }
   const library = panel.kind === "library" ? buildLibraryData(state) : null;
   const site = panel.kind === "siteControls" ? buildSiteInfo(state) : null;
   showOverlay(window, bounds, { panel: panel, isDark: isActiveSpaceDark(state), library: library, site: site }).catch((error) => {
     console.error("Could not open the overlay:", error);
   });
+}
+
+/**
+ * Shows a permission prompt (permissionPrompts.ts decides when).
+ */
+export function openPermissionPrompt(requestId: string, host: string, kinds: SitePermissionKind[]): void {
+  openPanel({ kind: "permission", requestId: requestId, host: host, kinds: kinds });
+}
+
+/**
+ * Closes the overlay when it shows the given permission prompt.
+ */
+export function closePermissionPrompt(requestId: string): void {
+  if (shownPanel?.kind === "permission" && shownPanel.requestId === requestId) {
+    closeOverlay();
+  }
 }
 
 /**
@@ -291,8 +357,12 @@ export function closeOverlay(): void {
   if (shownPanel?.kind === "find") {
     getFocusedContents()?.stopFindInPage("keepSelection");
   }
+  const closedPanel = shownPanel;
   shownPanel = null;
   hideOverlay(window);
+  if (closedPanel !== null) {
+    notifyPanelEnded(closedPanel, "closed");
+  }
   // Give the keyboard back to the page, or to the sidebar when no page is open.
   const pageContents = getFocusedContents();
   if (pageContents !== null) {

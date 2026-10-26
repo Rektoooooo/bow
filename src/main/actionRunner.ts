@@ -21,6 +21,8 @@ import { importFromArc } from "./arcImportController";
 import { showExtensionsMenu } from "./extensionHost";
 import { removeExtension, setExtensionEnabled } from "./extensionList";
 import { loadUnpackedExtension } from "./extensionsController";
+import { answerPermissionPrompt } from "./permissionPrompts";
+import { removePermissionAnswer } from "./sitePermissions";
 import { showMenuRequest } from "./menus";
 import type { MenuHost } from "./menus";
 import { openBoostEditor, openCommandBar, openLibrary, openSiteControls, openThemeEditor } from "./overlayController";
@@ -232,5 +234,9 @@ export function runAction(action: BrowserAction): void {
       return;
     case "showExtensionsMenu":
       return showExtensionsMenu(action.anchor);
+    case "answerPermissionPrompt":
+      return answerPermissionPrompt(action.requestId, action.isAllowed);
+    case "removeSitePermission":
+      return applyChange((state) => removePermissionAnswer(state, action.profileId, action.origin, action.kind));
   }
 }

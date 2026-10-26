@@ -34,6 +34,13 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 - Electron's session `extension-ready` fires in the same tick `loadExtension` resolves; neither means the content
   scripts are ready. Test what we guarantee (loaded before the window), not Chromium's internal timing.
 
+- An uncaught exception in the main process shows a modal error dialog, and that dialog keeps the app from quitting.
+  Page events still arrive while quitting: `getWindow()` returns null once the window is destroyed; never hold a
+  `BrowserWindow` reference across that without `isDestroyed()`. Install an `uncaughtException` listener in a
+  throwaway check to see the stack.
+- On macOS, `getUserMedia` waits on the system's camera/microphone dialog before our permission handler runs, so
+  e2e checks use notifications for the prompt flow.
+
 ## Dependencies
 - Check a package's license **per version** and diff a just-published release against the previous one before
   adding it (electron-chrome-extensions 4.9 was GPL with a runtime license check; 4.10, one day old, is MIT and only

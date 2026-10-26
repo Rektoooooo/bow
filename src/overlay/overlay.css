@@ -963,3 +963,72 @@ body[data-panel="theme"] .backdrop {
 .find-previous .icon {
   transform: rotate(180deg);
 }
+
+/* ---------- Permission prompt (the overlay is only as big as the card) ---------- */
+
+.permission-prompt {
+  inset: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 14px 14px 12px;
+  border-radius: 12px;
+}
+
+.permission-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.permission-icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--muted);
+}
+
+.permission-message {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13.5px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.permission-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.permission-button {
+  min-width: 76px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.permission-button:hover {
+  background: var(--highlight);
+}
+
+.permission-button.is-primary {
+  background: var(--chip-active);
+  color: var(--chip-active-ink);
+}
+
+.site-permission {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.site-permission-name {
+  flex: 1;
+  color: var(--ink);
+  font-size: 13px;
+}

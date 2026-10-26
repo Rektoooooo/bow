@@ -10,15 +10,47 @@
  *
  * Data flow:
  *   tabViews.ts needs a page for a tab → getProfileSession(profileId) → session with permission rules installed
+ *   a page asks for the camera, … → permission handler → the decider (permissionPrompts.ts) → saved answer or prompt
  */
 import { app, session } from "electron";
-import type { Session } from "electron";
-import type { ProfileId } from "../shared/types";
+import type { Session, WebContents } from "electron";
+import type { ProfileId, SitePermissionKind } from "../shared/types";
+import { getPermissionOrigin, toPermissionKinds } from "./sitePermissions";
 
 /**
- * Website permissions we allow without asking. Everything else is refused until a permission prompt exists.
+ * Website permissions we allow without asking.
  */
 const ALLOWED_WEB_PERMISSIONS = new Set(["fullscreen", "clipboard-sanitized-write"]);
+
+/**
+ * Decides the permissions the user is asked about (camera, microphone, location, notifications, clipboard).
+ * permissionPrompts.ts provides it at startup; until then, and for anything else, the answer is no.
+ */
+export interface PermissionDecider {
+  /** Quick checks (navigator.permissions, Notification.permission): true only for a saved "allow". */
+  isAllowed(profileId: ProfileId | null, origin: string, kinds: SitePermissionKind[]): boolean;
+  /** A real request: the saved answer, or ask the user. */
+  request(contents: WebContents | null, profileId: ProfileId | null, origin: string, kinds: SitePermissionKind[]): Promise<boolean>;
+}
+
+let permissionDecider: PermissionDecider | null = null;
+
+/** The profile of each web page session; null for a private window's session. Our own pages' session is not here. */
+const sessionProfileIds = new Map<Session, ProfileId | null>();
+
+/**
+ * Connects the permission handlers to the code that asks the user. Runs once at startup.
+ */
+export function setPermissionDecider(decider: PermissionDecider): void {
+  permissionDecider = decider;
+}
+
+/**
+ * Returns the profile a page's session belongs to: a profile id, null for a private window, undefined for our pages.
+ */
+export function findSessionProfileId(targetSession: Session): ProfileId | null | undefined {
+  return sessionProfileIds.get(targetSession);
+}
 
 /** Sessions that already have our rules, so each is configured once. */
 const configuredSessions = new Set<Session>();
@@ -27,18 +59,39 @@ const configuredSessions = new Set<Session>();
 const sessionCreatedListeners: ((profileSession: Session) => void)[] = [];
 
 /**
- * Installs the permission rules on a session: only the permissions in ALLOWED_WEB_PERMISSIONS are granted.
+ * Installs the permission rules on a session: the permissions in ALLOWED_WEB_PERMISSIONS are granted, the ones the
+ * user decides on go to the decider (only in web page sessions), everything else is refused.
  */
 export function restrictWebPermissions(targetSession: Session): void {
   if (configuredSessions.has(targetSession)) {
     return;
   }
-  targetSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-    const isAllowed = ALLOWED_WEB_PERMISSIONS.has(permission);
-    callback(isAllowed);
+  targetSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    if (ALLOWED_WEB_PERMISSIONS.has(permission)) {
+      callback(true);
+      return;
+    }
+    const mediaTypes = "mediaTypes" in details ? (details.mediaTypes ?? []) : [];
+    const kinds = toPermissionKinds(permission, mediaTypes);
+    const origin = getPermissionOrigin(details.requestingUrl);
+    const profileId = sessionProfileIds.get(targetSession);
+    if (kinds === null || origin === null || profileId === undefined || permissionDecider === null) {
+      callback(false);
+      return;
+    }
+    permissionDecider.request(webContents, profileId, origin, kinds).then(callback, () => callback(false));
   });
-  targetSession.setPermissionCheckHandler((_webContents, permission) => {
-    return ALLOWED_WEB_PERMISSIONS.has(permission);
+  targetSession.setPermissionCheckHandler((_webContents, permission, requestingOrigin, details) => {
+    if (ALLOWED_WEB_PERMISSIONS.has(permission)) {
+      return true;
+    }
+    const kinds = toPermissionKinds(permission, details.mediaType === undefined ? [] : [details.mediaType]);
+    const origin = getPermissionOrigin(requestingOrigin);
+    const profileId = sessionProfileIds.get(targetSession);
+    if (kinds === null || origin === null || profileId === undefined || permissionDecider === null) {
+      return false;
+    }
+    return permissionDecider.isAllowed(profileId, origin, kinds);
   });
   configuredSessions.add(targetSession);
 }
@@ -49,6 +102,7 @@ export function restrictWebPermissions(targetSession: Session): void {
  */
 export function getProfileSession(profileId: ProfileId): Session {
   const profileSession = session.fromPartition(`persist:${profileId}`);
+  sessionProfileIds.set(profileSession, profileId);
   if (!configuredSessions.has(profileSession)) {
     restrictWebPermissions(profileSession);
     for (const listener of sessionCreatedListeners) {
@@ -69,6 +123,7 @@ export function createPrivateSession(): Session {
   privateSessionCounter = privateSessionCounter + 1;
   // A partition name without "persist:" is kept in memory only.
   const privateSession = session.fromPartition(`private-${Date.now()}-${privateSessionCounter}`);
+  sessionProfileIds.set(privateSession, null);
   restrictWebPermissions(privateSession);
   for (const listener of sessionCreatedListeners) {
     listener(privateSession);

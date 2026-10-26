@@ -128,6 +128,7 @@ export const appMenuCommands: AppMenuCommands = {
   openPeekAsTab: () => openPeekAsTab(),
   openPrivateWindow: () => openLittleWindow(null, { isPrivate: true }),
   zapElements: () => runSiteCommand("zap"),
+  printPage: () => getFocusedContents()?.print(),
   setAsDefaultBrowser: () => {
     setAsDefaultBrowser().catch((error) => console.error("Set as default browser failed:", error));
   },

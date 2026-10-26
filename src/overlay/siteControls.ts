@@ -1,8 +1,8 @@
 /**
  * WHY this file exists:
  *   Arc's Site Control Center: a popover from the toolbar with quick actions for the page you are on. Ours shows
- *   whether the connection is secure, copy link, screenshot, mute, inspect, zoom, the permission policy, reload and
- *   "clear site data".
+ *   whether the connection is secure, copy link, screenshot, mute, inspect, zoom, Boost, what the site was allowed
+ *   or refused (with Reset), reload and "clear site data".
  *
  * Data source:
  *   SiteInfo from overlayController.ts (address, host, secure, muted, zoom).
@@ -11,9 +11,19 @@
  *   toolbar sliders button → "overlay:show" (siteControls) → renderSiteControls() → button → overlayApi.siteCommand
  */
 import type { SiteCommand, SiteInfo } from "../shared/overlay";
+import type { SitePermissionKind } from "../shared/types";
 import { createElement, createTextButton, dispatch } from "../renderer/dom.js";
 import { createIcon } from "../renderer/icons.js";
 import type { IconName } from "../renderer/icons.js";
+
+/** How the permission kinds read in the site controls. */
+const PERMISSION_NAMES: Record<SitePermissionKind, string> = {
+  camera: "Camera",
+  microphone: "Microphone",
+  notifications: "Notifications",
+  location: "Location",
+  clipboard: "Clipboard",
+};
 
 /**
  * Builds one square action button with an icon and a label underneath.
@@ -110,9 +120,26 @@ export function renderSiteControls(host: HTMLElement, site: SiteInfo): void {
 
   const permissionsRow = createElement("div", "site-row site-row-column");
   permissionsRow.append(createElement("span", "site-row-label", "Permissions"));
-  permissionsRow.append(
-    createElement("span", "site-row-note", "Camera, microphone, location and notifications are blocked for every site. Full screen and copying are allowed."),
-  );
+  if (site.permissions.length === 0) {
+    permissionsRow.append(
+      createElement("span", "site-row-note", "This site has not asked for anything. Sites ask before using your camera, microphone, location, notifications or clipboard."),
+    );
+  }
+  const siteOrigin = site.origin;
+  for (const permission of site.permissions) {
+    const line = createElement("div", "site-permission");
+    line.append(createElement("span", "site-permission-name", PERMISSION_NAMES[permission.kind]));
+    line.append(createElement("span", "site-row-note", permission.isAllowed ? "Allowed" : "Blocked"));
+    const resetButton = createTextButton("Reset", "site-button", () => {
+      if (siteOrigin !== null) {
+        dispatch({ type: "removeSitePermission", profileId: site.profileId, origin: siteOrigin, kind: permission.kind });
+        window.overlayApi.close();
+      }
+    });
+    resetButton.title = "Forget this answer; the site asks again next time";
+    line.append(resetButton);
+    permissionsRow.append(line);
+  }
 
   const buttons = createElement("div", "site-buttons");
   const reloadButton = createTextButton("Reload", "site-button", () => window.overlayApi.siteCommand("reload"));

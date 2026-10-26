@@ -17,6 +17,15 @@
       </array>
     </dict>
   </array>
+  <!-- macOS shows these when a site you allowed first uses the camera, microphone or location. -->
+  <key>NSCameraUsageDescription</key>
+  <string>Websites you allow can use the camera, for example for video calls.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Websites you allow can use the microphone, for example for calls.</string>
+  <key>NSLocationUsageDescription</key>
+  <string>Websites you allow can see your location, for example maps.</string>
+  <key>NSLocationWhenInUseUsageDescription</key>
+  <string>Websites you allow can see your location, for example maps.</string>
   <key>LSApplicationCategoryType</key>
   <string>public.app-category.productivity</string>
   <key>NSHumanReadableCopyright</key>

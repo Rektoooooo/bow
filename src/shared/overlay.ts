@@ -11,7 +11,7 @@
  *   main.ts openOverlay(panel) → "overlay:show" → overlay.ts draws the panel
  *   overlay.ts → overlayApi.query / choose / siteCommand / find → main.ts
  */
-import type { ArchivedTab, ItemId, RoutingRule, SpaceTheme, ThemeAppearance } from "./types";
+import type { ArchivedTab, ItemId, RoutingRule, SitePermissionKind, SpaceTheme, ThemeAppearance } from "./types";
 
 /** What a Command Bar line does when chosen. */
 export type CommandBarResultKind = "navigate" | "search" | "tab" | "history" | "action";
@@ -28,7 +28,8 @@ export type OverlayPanel =
   | { kind: "find" }
   | { kind: "boost"; site: string; css: string }
   | { kind: "theme"; spaceId: string; spaceName: string; spaceIcon: string; theme: SpaceTheme; sidebarWidth: number; presets: { label: string; colors: string[]; appearance: ThemeAppearance }[] }
-  | { kind: "peek"; frame: { x: number; y: number; width: number; height: number }; url: string; title: string };
+  | { kind: "peek"; frame: { x: number; y: number; width: number; height: number }; url: string; title: string }
+  | { kind: "permission"; requestId: string; host: string; kinds: SitePermissionKind[] };
 
 /** The Peek header's buttons. */
 export type PeekCommand = "openAsTab" | "split" | "close";
@@ -100,6 +101,10 @@ export interface SiteInfo {
   /** The site's Boost key ("example.com"), and its Boost if it has one. */
   site: string | null;
   boost: { isEnabled: boolean; zapCount: number; hasCss: boolean } | null;
+  /** The page's profile and origin, and what the site was allowed or refused there (permission prompts). */
+  profileId: string;
+  origin: string | null;
+  permissions: { kind: SitePermissionKind; isAllowed: boolean }[];
 }
 
 /** Everything the overlay needs to draw a panel. */

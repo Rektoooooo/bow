@@ -1,5 +1,8 @@
-// Checks that a website in a tab is refused camera, microphone, location and notifications,
-// that the tab runs in a profile partition (not the default session), and that the sidebar page cannot be navigated away.
+// Checks the permission rules:
+// - a website in a tab runs in a profile partition, gets nothing it was not allowed, and asks with a prompt;
+// - Block is remembered (no second prompt), Reset forgets it, Allow grants it, Escape refuses once and saves nothing;
+// - our own pages are refused without a prompt and cannot be navigated away.
+// Uses notifications: camera and microphone requests can wait on a macOS system dialog, which a test cannot answer.
 // usage: npm run build && node e2e/permission-check.mjs
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
@@ -11,50 +14,128 @@ const outDir = process.env.E2E_OUTPUT_DIR || path.join(appDir, "e2e", "output");
 const userDataDir = path.join(outDir, "user-data-permissions");
 fs.rmSync(userDataDir, { recursive: true, force: true });
 
+const results = [];
+function check(name, ok, detail = "") {
+  results.push({ name, ok: Boolean(ok), detail });
+  console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  — " + detail : ""}`);
+}
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const app = await _electron.launch({
   executablePath: createRequire(import.meta.url)("electron"),
   args: [`--user-data-dir=${userDataDir}`, appDir],
   timeout: 30000,
 });
-// Pick the sidebar page by URL: a restored tab's page can open first.
-let page;
-for (let attempt = 0; attempt < 150 && !page; attempt++) {
-  page = app.windows().find((candidate) => candidate.url().endsWith("/renderer/index.html"));
-  if (!page) await new Promise((resolve) => setTimeout(resolve, 200));
+// Pick our pages by URL: a restored tab's page can open first.
+async function findPage(urlEnding) {
+  for (let attempt = 0; attempt < 150; attempt++) {
+    const found = app.windows().find((candidate) => candidate.url().endsWith(urlEnding));
+    if (found) return found;
+    await sleep(200);
+  }
+  throw new Error(`${urlEnding} did not open`);
 }
+const page = await findPage("/renderer/index.html");
 await page.waitForSelector(".space-title");
-// Tabs run in the profile's own session partition, so this proves the lockdown reaches profile sessions too.
-await page.evaluate(() => window.browserApi.dispatch({ type: "openTab", typedText: "example.com" }));
-await page.waitForTimeout(3000);
+const overlay = await findPage("/overlay/overlay.html");
+const getState = () => page.evaluate(() => window.browserApi.getState());
 
-const answers = await app.evaluate(async ({ webContents }) => {
-  const tab = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith("https://example.com"));
-  return tab.executeJavaScript(`(async () => {
-    const out = {};
-    for (const name of ["geolocation", "camera", "microphone", "notifications"]) {
-      try { out[name] = (await navigator.permissions.query({ name })).state; } catch (error) { out[name] = "error: " + error.message; }
-    }
-    try { await navigator.mediaDevices.getUserMedia({ video: true }); out.getUserMedia = "GRANTED"; } catch (error) { out.getUserMedia = "refused: " + error.name; }
-    return out;
-  })()`);
-});
-console.log("permission answers:", JSON.stringify(answers));
+// Tabs run in the profile's own session partition, so this proves the rules reach profile sessions too.
+await page.evaluate(() => window.browserApi.dispatch({ type: "openTab", typedText: "example.com" }));
+await sleep(3000);
+const inTab = (script) =>
+  app.evaluate(({ webContents }, code) => {
+    const tab = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith("https://example.com"));
+    return tab.executeJavaScript(code);
+  }, script);
+
 const usesProfilePartition = await app.evaluate(({ webContents, session }) => {
   const tab = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith("https://example.com"));
   return tab.session !== session.defaultSession;
 });
-console.log("tab uses a profile session:", usesProfilePartition);
+check("a tab runs in its profile's session", usesProfilePartition);
+
+const answers = await inTab(`(async () => {
+  const out = {};
+  for (const name of ["geolocation", "camera", "microphone", "notifications"]) {
+    try { out[name] = (await navigator.permissions.query({ name })).state; } catch (error) { out[name] = "error: " + error.message; }
+  }
+  return out;
+})()`);
+check("a site that never asked is granted nothing", Object.values(answers).every((state) => state !== "granted"), JSON.stringify(answers));
+
+// A request shows the prompt; the answer reaches the page.
+const askForNotifications = () => inTab("window.permissionAnswer = null; Notification.requestPermission().then((answer) => { window.permissionAnswer = answer; }); true");
+async function waitForPageAnswer() {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const answer = await inTab("window.permissionAnswer");
+    if (answer !== null) return answer;
+    await sleep(150);
+  }
+  return null;
+}
+const promptText = async () => {
+  const prompt = await overlay.waitForSelector(".permission-prompt", { timeout: 5000 }).catch(() => null);
+  return prompt === null ? null : (await prompt.textContent()).replace(/\s+/g, " ").trim();
+};
+// The overlay page keeps its last drawing after it closes; whether it is on screen is decided by the main window.
+const isOverlayOnScreen = () =>
+  app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+    return win.contentView.children.some((child) => child.webContents?.getURL().endsWith("/overlay/overlay.html"));
+  });
+const savedNotificationAnswers = async () =>
+  ((await getState()).sitePermissions ?? []).filter((answer) => answer.origin === "https://example.com" && answer.kind === "notifications");
+
+await askForNotifications();
+const firstPrompt = await promptText();
+check("a site asking for notifications gets a prompt", firstPrompt?.includes("example.com wants to show notifications"), firstPrompt ?? "no prompt");
+await overlay.click(".permission-button:not(.is-primary)");
+check("Block refuses it", (await waitForPageAnswer()) === "denied");
+check("and is remembered for the site", (await savedNotificationAnswers()).some((answer) => answer.isAllowed === false));
+
+await askForNotifications();
+const secondAnswer = await waitForPageAnswer();
+const promptShownAgain = await isOverlayOnScreen();
+check("a blocked site is refused again without a prompt", secondAnswer === "denied" && !promptShownAgain);
+
+await page.evaluate(() => window.browserApi.dispatch({ type: "removeSitePermission", profileId: "profile-default", origin: "https://example.com", kind: "notifications" }));
+await askForNotifications();
+check("Reset makes the site ask again", (await promptText()) !== null);
+await overlay.click(".permission-button.is-primary");
+check("Allow grants it", (await waitForPageAnswer()) === "granted");
+const queryAfterAllow = await inTab("navigator.permissions.query({ name: 'notifications' }).then((status) => status.state)");
+check("and the site sees it as granted", queryAfterAllow === "granted" && (await inTab("Notification.permission")) === "granted", queryAfterAllow);
+
+await page.evaluate(() => window.browserApi.dispatch({ type: "removeSitePermission", profileId: "profile-default", origin: "https://example.com", kind: "notifications" }));
+await askForNotifications();
+await promptText();
+await overlay.keyboard.press("Escape");
+check("Escape refuses this once", (await waitForPageAnswer()) === "denied");
+check("and saves nothing", (await savedNotificationAnswers()).length === 0);
+
+// Our own pages never get a prompt.
+const sidebarAnswer = await page.evaluate(() => Notification.requestPermission());
+await sleep(500);
+const promptForSidebar = await isOverlayOnScreen();
+check("our own pages are refused without a prompt", sidebarAnswer === "denied" && !promptForSidebar, sidebarAnswer);
 
 const sidebarUrlBefore = page.url();
-await page.evaluate(() => { window.location.href = "https://example.org"; });
-await page.waitForTimeout(1500);
-const navigationBlocked = page.url() === sidebarUrlBefore;
-console.log("sidebar navigation blocked:", navigationBlocked);
+await page.evaluate(() => {
+  window.location.href = "https://example.org";
+});
+await sleep(1500);
+check("the sidebar page cannot be navigated away", page.url() === sidebarUrlBefore);
 
-await app.close();
+// Quitting while a prompt waits must not stop on an error (the closing page settles the prompt as the window goes).
+await askForNotifications();
+await promptText();
+const appPid = app.process().pid;
+const quitResult = await Promise.race([app.close().then(() => "quit"), sleep(15000).then(() => "still running")]);
+check("the app quits while a prompt is open", quitResult === "quit", quitResult);
+if (quitResult !== "quit") process.kill(appPid);
 fs.rmSync(userDataDir, { recursive: true, force: true });
 
-const allDenied = ["geolocation", "camera", "microphone", "notifications"].every((name) => answers[name] === "denied");
-const passed = allDenied && answers.getUserMedia !== "GRANTED" && navigationBlocked && usesProfilePartition;
-console.log(passed ? "PASS  permissions locked down" : "FAIL  permissions");
-process.exit(passed ? 0 : 1);
+const failed = results.filter((result) => !result.ok);
+console.log(failed.length === 0 ? "PASS  permissions locked down" : "FAIL  permissions");
+process.exit(failed.length === 0 ? 0 : 1);

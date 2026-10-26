@@ -373,11 +373,34 @@ function buildImageItems(host: MenuHost, contents: WebContents, params: ContextM
 }
 
 /**
+ * Builds the spelling part of the menu for a misspelled word in a field: the spellchecker's suggestions and
+ * "Learn Spelling". Empty when the word under the pointer is spelled right.
+ */
+function buildSpellingItems(contents: WebContents, params: ContextMenuParams): MenuItemConstructorOptions[] {
+  if (params.misspelledWord === "") {
+    return [];
+  }
+  const suggestions: MenuItemConstructorOptions[] = params.dictionarySuggestions.map((suggestion) => ({
+    label: suggestion,
+    click: () => contents.replaceMisspelling(suggestion),
+  }));
+  if (suggestions.length === 0) {
+    suggestions.push({ label: "No Guesses Found", enabled: false });
+  }
+  return [
+    ...suggestions,
+    { label: "Learn Spelling", click: () => contents.session.addWordToSpellCheckerDictionary(params.misspelledWord) },
+    { type: "separator" },
+  ];
+}
+
+/**
  * Builds the text part of the page menu: editing commands in fields, Copy and Search for selected text.
  */
-function buildTextItems(host: MenuHost, params: ContextMenuParams): MenuItemConstructorOptions[] {
+function buildTextItems(host: MenuHost, contents: WebContents, params: ContextMenuParams): MenuItemConstructorOptions[] {
   if (params.isEditable) {
     return [
+      ...buildSpellingItems(contents, params),
       { role: "undo", enabled: params.editFlags.canUndo },
       { role: "redo", enabled: params.editFlags.canRedo },
       { type: "separator" },
@@ -410,7 +433,7 @@ export function showPageContextMenu(host: MenuHost, contents: WebContents, param
   const template: (MenuItemConstructorOptions | MenuItem)[] = [
     ...buildLinkItems(host, params),
     ...buildImageItems(host, contents, params),
-    ...buildTextItems(host, params),
+    ...buildTextItems(host, contents, params),
     ...extensionPart,
     { label: "Back", enabled: history.canGoBack(), click: () => history.goBack() },
     { label: "Forward", enabled: history.canGoForward(), click: () => history.goForward() },

@@ -156,6 +156,13 @@ function isAnchor(value: unknown): boolean {
   return isWholeNumber(value.x) && isWholeNumber(value.y) && isWholeNumber(value.width) && isWholeNumber(value.height);
 }
 
+/** The permission kinds a site can be allowed or refused (types.ts SitePermissionKind). */
+const SITE_PERMISSION_KINDS = ["camera", "microphone", "notifications", "location", "clipboard"];
+
+function isSitePermissionKind(value: unknown): boolean {
+  return typeof value === "string" && SITE_PERMISSION_KINDS.includes(value);
+}
+
 /** The fields each action type must carry, and how to check them. */
 const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> = {
   openTab: { typedText: isText },
@@ -213,6 +220,8 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   loadUnpackedExtension: {},
   importFromArc: {},
   showExtensionsMenu: { anchor: isAnchor },
+  answerPermissionPrompt: { requestId: isText, isAllowed: isBoolean },
+  removeSitePermission: { profileId: isText, origin: isText, kind: isSitePermissionKind },
 };
 
 /**

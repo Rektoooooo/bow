@@ -19,6 +19,7 @@ import { renderFindBar } from "./findBar.js";
 import { renderLibrary } from "./library.js";
 import { renderBoostEditor } from "./boostEditor.js";
 import { renderPeekFrame } from "./peekFrame.js";
+import { renderPermissionPrompt } from "./permissionPrompt.js";
 import { renderThemeEditor } from "./themeEditor.js";
 import { renderSiteControls } from "./siteControls.js";
 import { buildSiteSearchUrl, findSiteSearch } from "../shared/siteSearch.js";
@@ -317,8 +318,8 @@ function showPanel(message: OverlayShowMessage): void {
   }
   document.body.classList.toggle("dark", message.isDark);
   document.body.dataset.panel = message.panel.kind;
-  // The Find bar's overlay is only as big as the bar, so it needs no backdrop.
-  backdrop.hidden = message.panel.kind === "find";
+  // The Find bar's and a permission prompt's overlay is only as big as the card, so it needs no backdrop.
+  backdrop.hidden = message.panel.kind === "find" || message.panel.kind === "permission";
 
   if (message.panel.kind === "commandBar") {
     renderCommandBar(host, message.panel.mode, message.panel.initialText);
@@ -343,6 +344,9 @@ function showPanel(message: OverlayShowMessage): void {
   }
   if (message.panel.kind === "boost") {
     renderBoostEditor(host, message.panel);
+  }
+  if (message.panel.kind === "permission") {
+    renderPermissionPrompt(host, message.panel);
   }
 }
 

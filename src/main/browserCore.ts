@@ -98,8 +98,12 @@ export function getState(): BrowserState {
   return currentState;
 }
 
+/**
+ * Returns the main window, or null before it exists and once it is destroyed (while quitting, page events still
+ * arrive; touching a destroyed window throws, and an uncaught error's dialog would stop the app from quitting).
+ */
 export function getWindow(): BrowserWindow | null {
-  return mainWindow;
+  return mainWindow !== null && !mainWindow.isDestroyed() ? mainWindow : null;
 }
 
 export function getRecentTabIds(): ItemId[] {
@@ -154,7 +158,7 @@ function rememberSelectedTab(): void {
  * Makes the web views match the state and keeps the overlay above any view that was just added.
  */
 export function syncViews(): void {
-  if (mainWindow === null || tabViewEvents === null) {
+  if (mainWindow === null || mainWindow.isDestroyed() || tabViewEvents === null) {
     return;
   }
   const previouslyShownTabIds = [...getShownTabIds()];

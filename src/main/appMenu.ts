@@ -48,6 +48,7 @@ export interface AppMenuCommands {
   openPrivateWindow(): void;
   zapElements(): void;
   setAsDefaultBrowser(): void;
+  printPage(): void;
 }
 
 /** Where the Help menu points. */
@@ -104,6 +105,8 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
         { label: "Reopen Closed Tab", accelerator: "CommandOrControl+Shift+T", click: () => commands.reopenClosedTab() },
         { type: "separator" },
         { label: "Import from Arc…", click: () => commands.importFromArc() },
+        { type: "separator" },
+        { label: "Print…", accelerator: "CommandOrControl+P", click: () => commands.printPage() },
       ],
     },
     {
