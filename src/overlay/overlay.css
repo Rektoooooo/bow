@@ -178,6 +178,27 @@ button:disabled {
   color: var(--muted);
 }
 
+.command-site-chip {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 7px;
+  background: var(--chip-active);
+  color: var(--chip-active-ink);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.command-site-hint {
+  flex: none;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .command-lines {
   max-height: 60vh;
   overflow-y: auto;

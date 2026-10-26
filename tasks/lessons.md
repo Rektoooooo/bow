@@ -29,6 +29,11 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   Playwright's separate `fill` and `press` calls are slower than our IPC, so "fast typing" races need same-tick
   events, and a stale result only matters if its id also exists in the new results.
 
+- Load-dependent races: reproduce them with `for n in $(seq 1 12); do (yes > /dev/null &); done` around the run
+  (then `pkill -x yes`), and record the observed value in the check's detail so a failure says what it saw.
+- Electron's session `extension-ready` fires in the same tick `loadExtension` resolves; neither means the content
+  scripts are ready. Test what we guarantee (loaded before the window), not Chromium's internal timing.
+
 ## Dependencies
 - Check a package's license **per version** and diff a just-published release against the previous one before
   adding it (electron-chrome-extensions 4.9 was GPL with a runtime license check; 4.10, one day old, is MIT and only

@@ -443,6 +443,26 @@ await openFromAnotherApp("https://example.com/not-routed");
 const routedLittle = await findPage("/little/little.html").catch(() => null);
 check("a link that matches no rule opens in a Little Window", routedLittle !== null);
 
+// Tab to search a site, like Arc: "youtu" offers it, Tab turns the input into a YouTube search, Backspace on the
+// empty input leaves it, Enter opens the site's results in a new tab.
+await dispatch({ type: "openCommandBar", mode: "newTab" });
+await overlay.waitForSelector(".command-input", { timeout: 5000 });
+await overlay.fill(".command-input", "youtu");
+const siteHint = await overlay.textContent(".command-site-hint");
+check("typing a site's name offers Tab to search it", siteHint === "Tab: Search YouTube" && (await overlay.isVisible(".command-site-hint")), siteHint);
+await overlay.press(".command-input", "Tab");
+const siteChip = await overlay.textContent(".command-site-chip");
+check("Tab turns the input into a search of that site", siteChip === "YouTube" && (await overlay.isVisible(".command-site-chip")) && (await overlay.inputValue(".command-input")) === "", siteChip);
+await overlay.press(".command-input", "Backspace");
+check("Backspace on the empty input leaves the site search", !(await overlay.isVisible(".command-site-chip")));
+await overlay.fill(".command-input", "youtu");
+await overlay.press(".command-input", "Tab");
+await overlay.fill(".command-input", "lofi beats");
+await overlay.press(".command-input", "Enter");
+await waitForSelectedUrl("youtube.com/results");
+state = await getState();
+check("Enter opens the site's search results in a new tab", selectedTab(state)?.url === "https://www.youtube.com/results?search_query=lofi%20beats", selectedTab(state)?.url);
+
 await app.close();
 const failed = results.filter((result) => !result.ok).length;
 console.log(`\n${results.length - failed}/${results.length} overlay checks passed.`);

@@ -9,6 +9,9 @@
  * Data source:
  *   BrowserState.extensions (extensionList.ts), the tab views (tabViews.ts), the main window (browserCore.ts).
  *   Tested against Electron 44: MV3 service workers and content scripts run; popups need the library's tab APIs.
+ *   Known limit: loadExtension resolves before Chromium has read the content-script files, and Electron has no
+ *   "scripts ready" signal (Chrome holds navigations until then; Electron does not). Under heavy disk load the page
+ *   restored at startup can therefore miss a content script; reloading it fixes that.
  *
  * Data flow:
  *   startup → prepareExtensions() (before any page loads) → loadExtension for each enabled extension

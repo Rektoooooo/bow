@@ -61,6 +61,10 @@ in Arc). Running it twice adds nothing twice.
   ("New Space", "Toggle Sidebar", "Copy URL", "Theme: Mint", …), ranked by how well title and address match plus
   boosts for open tabs, Favorites and recent use, the way Arc ranks.
 
+- **Tab to search a site**: type "youtube" (or "wiki", "gh", "maps", "claude", …), press Tab, type your search, Enter.
+  Backspace in the empty field goes back. The sites and their search addresses are listed in
+  `src/shared/siteSearch.ts`.
+
 ![The Command Bar: typing "wiki" offers the open Wikipedia Favorite first](docs/screenshot-command-bar.png)
 
 **Pages**

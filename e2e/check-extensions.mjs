@@ -1,7 +1,7 @@
 // End-to-end check of Chrome extension support with a synthetic extension (e2e/fixtures/extension-marker):
 // Load Unpacked adds it to the profile, its content script marks pages, the toolbar's extensions menu opens its popup
-// (which sees the selected tab through chrome.tabs), turning it off unloads it, it loads again before the first page
-// after a relaunch, and Remove takes it out. A profile without extensions keeps pages free of preload scripts.
+// (which sees the selected tab through chrome.tabs), turning it off unloads it, it is loaded before the window after
+// a relaunch, and Remove takes it out. A profile without extensions keeps pages free of preload scripts.
 // usage: npm run e2e   (or: npm run build && node e2e/check-extensions.mjs)
 // Uses a throwaway --user-data-dir folder, so your real browser state is never touched.
 import { _electron } from "playwright-core";
@@ -134,7 +134,16 @@ await app.close();
 
 // ---------- second run: loads before the first page, then Remove ----------
 ({ app, sidebar, pageErrors } = await launch());
-check("after a relaunch, the restored page has the content script without a reload", (await waitFor(() => pageMarker(app), (value) => value === "on")) === "on");
+// Startup loads extensions before it creates the window, so the extension is there the moment the window is.
+check("after a relaunch, the extension is loaded before the window appears", (await loadedNames(app)).includes("Fixture Marker"));
+// The restored page itself can miss the content script under heavy disk load: Chromium reads the script files after
+// loadExtension resolves and Electron has no "scripts ready" signal (see extensionHost.ts). A reload always has it.
+await app.evaluate(({ BrowserWindow }) => {
+  const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  win?.contentView.children.find((child) => child.webContents?.getURL().startsWith("https://"))?.webContents.reload();
+});
+const markerAfterRelaunch = await waitFor(() => pageMarker(app), (value) => value === "on");
+check("and its content script runs in the restored page after a reload", markerAfterRelaunch === "on", markerAfterRelaunch);
 await dispatch(sidebar, { type: "removeExtension", profileId: "profile-default", extensionId });
 state = await waitFor(() => getState(sidebar), (value) => (value.extensions ?? []).length === 0);
 check("Remove takes it out of the profile", (state.extensions ?? []).length === 0);

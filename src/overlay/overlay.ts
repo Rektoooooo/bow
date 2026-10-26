@@ -9,6 +9,7 @@
  * Data flow:
  *   "overlay:show" → showPanel() → renderCommandBar / renderLibrary / renderSiteControls / renderFindBar
  *   typing → overlayApi.query → lines → drawn; Enter → overlayApi.choose(line id)
+ *   a site's name + Tab → site search mode (siteSearch.ts) → Enter → overlayApi.choose(null, that site's search address)
  */
 import type { CommandBarLine, CommandBarMode, OverlayApi, OverlayShowMessage } from "../shared/overlay";
 import { createElement, createFavicon } from "../renderer/dom.js";
@@ -20,6 +21,8 @@ import { renderBoostEditor } from "./boostEditor.js";
 import { renderPeekFrame } from "./peekFrame.js";
 import { renderThemeEditor } from "./themeEditor.js";
 import { renderSiteControls } from "./siteControls.js";
+import { buildSiteSearchUrl, findSiteSearch } from "../shared/siteSearch.js";
+import type { SiteSearch } from "../shared/siteSearch.js";
 
 declare global {
   interface Window {
@@ -60,6 +63,13 @@ let commandInput: HTMLInputElement | null = null;
 
 /** Counts queries, so a slow answer to an old query does not replace a newer one. */
 let queryCounter = 0;
+
+/** The site being searched after Tab (Arc's "search YouTube"), or null for the normal Command Bar. */
+let siteSearch: SiteSearch | null = null;
+
+/** The chip that shows the site being searched, and the "Tab: Search …" hint. Made with the Command Bar. */
+let siteChip: HTMLElement | null = null;
+let siteHint: HTMLElement | null = null;
 
 /**
  * Closes the overlay.
@@ -120,12 +130,88 @@ function drawCommandLines(): void {
 }
 
 /**
- * Picks a line (or, with no lines, what was typed).
+ * Picks a line (or, with no lines, what was typed). In site search mode it opens the site's search for the text.
  */
 function chooseLine(index: number): void {
-  const line = commandLines[index];
   const typedText = commandInput === null ? "" : commandInput.value;
+  if (siteSearch !== null) {
+    if (typedText.trim() !== "") {
+      window.overlayApi.choose(null, buildSiteSearchUrl(siteSearch, typedText), commandMode);
+    }
+    return;
+  }
+  const line = commandLines[index];
   window.overlayApi.choose(line === undefined ? null : line.id, typedText, commandMode);
+}
+
+/**
+ * Shows "Tab: Search YouTube" while the typed text names a searchable site.
+ */
+function updateSiteHint(text: string): void {
+  if (siteHint === null) {
+    return;
+  }
+  const site = siteSearch === null ? findSiteSearch(text) : null;
+  siteHint.hidden = site === null;
+  siteHint.textContent = site === null ? "" : `Tab: Search ${site.name}`;
+}
+
+/**
+ * In site search mode the only line is the search itself: "Search YouTube for “lofi”".
+ */
+function drawSiteSearchLine(text: string): void {
+  const query = text.trim();
+  commandLines =
+    siteSearch === null || query === ""
+      ? []
+      : [{ id: "site-search", kind: "search", title: `Search ${siteSearch.name} for “${query}”`, subtitle: "", url: null, faviconUrl: null }];
+  highlightedIndex = 0;
+  drawCommandLines();
+}
+
+/**
+ * Tab on a site's name: the input now searches that site, shown as a chip before it.
+ */
+function enterSiteSearch(site: SiteSearch): void {
+  siteSearch = site;
+  // Answers to queries sent before this point are for the site's name, not for the search.
+  queryCounter = queryCounter + 1;
+  if (siteChip !== null) {
+    siteChip.textContent = site.name;
+    siteChip.hidden = false;
+  }
+  if (commandInput !== null) {
+    commandInput.value = "";
+    commandInput.placeholder = `Search ${site.name}…`;
+  }
+  updateSiteHint("");
+  drawSiteSearchLine("");
+}
+
+/**
+ * Backspace in the empty input: back to the normal Command Bar.
+ */
+function leaveSiteSearch(): void {
+  siteSearch = null;
+  if (siteChip !== null) {
+    siteChip.hidden = true;
+  }
+  if (commandInput !== null) {
+    commandInput.placeholder = PLACEHOLDERS[commandMode];
+  }
+  runQuery("");
+}
+
+/**
+ * Typing: rank results for the text, or in site search mode just show the search line.
+ */
+function handleCommandInput(text: string): void {
+  if (siteSearch !== null) {
+    drawSiteSearchLine(text);
+    return;
+  }
+  updateSiteHint(text);
+  runQuery(text);
 }
 
 /**
@@ -144,9 +230,23 @@ async function runQuery(text: string): Promise<void> {
 }
 
 /**
- * Arrow keys move the highlight, Enter chooses, Escape closes.
+ * Arrow keys move the highlight, Enter chooses, Tab starts a site search, Backspace leaves it, Escape closes.
  */
 function handleCommandKeys(event: KeyboardEvent): void {
+  if (event.key === "Tab") {
+    // Keep the focus in the input either way.
+    event.preventDefault();
+    const site = siteSearch === null && commandInput !== null ? findSiteSearch(commandInput.value) : null;
+    if (site !== null) {
+      enterSiteSearch(site);
+    }
+    return;
+  }
+  if (event.key === "Backspace" && siteSearch !== null && commandInput !== null && commandInput.value === "") {
+    event.preventDefault();
+    leaveSiteSearch();
+    return;
+  }
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
     const step = event.key === "ArrowDown" ? 1 : -1;
@@ -168,6 +268,7 @@ function renderCommandBar(host: HTMLElement, mode: CommandBarMode, initialText: 
   commandMode = mode;
   commandLines = [];
   highlightedIndex = 0;
+  siteSearch = null;
 
   const panel = createElement("div", "panel command-bar");
   panel.setAttribute("role", "dialog");
@@ -182,10 +283,16 @@ function renderCommandBar(host: HTMLElement, mode: CommandBarMode, initialText: 
   input.placeholder = PLACEHOLDERS[mode];
   input.value = initialText;
   input.setAttribute("aria-label", PLACEHOLDERS[mode]);
-  input.addEventListener("input", () => runQuery(input.value));
+  input.addEventListener("input", () => handleCommandInput(input.value));
   input.addEventListener("keydown", handleCommandKeys);
-  inputRow.append(input);
+  const chip = createElement("span", "command-site-chip");
+  chip.hidden = true;
+  const hint = createElement("span", "command-site-hint");
+  hint.hidden = true;
+  inputRow.append(chip, input, hint);
   commandInput = input;
+  siteChip = chip;
+  siteHint = hint;
 
   const list = createElement("div", "command-lines");
   list.id = "command-lines";
@@ -245,7 +352,7 @@ function showPanel(message: OverlayShowMessage): void {
 function startOverlay(): void {
   window.overlayApi.onShow(showPanel);
   window.overlayApi.onResults((query, lines) => {
-    if (commandInput === null || commandInput.value !== query) {
+    if (commandInput === null || commandInput.value !== query || siteSearch !== null) {
       return;
     }
     const highlightedId = commandLines[highlightedIndex]?.id;
