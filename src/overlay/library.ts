@@ -12,6 +12,7 @@
  */
 import type { ExtensionLine, HistoryLine, LibraryBoost, LibraryData, LibrarySection, LibrarySpace, MediaLine } from "../shared/overlay";
 import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS } from "../shared/settings.js";
+import { APP_ICON_VARIANTS } from "../shared/appIconDrawing.js";
 import type { ArchiveReason, ArchivedTab } from "../shared/types";
 import { createElement, createFavicon, createIconButton, createTextButton, dispatch, getDisplayHost } from "../renderer/dom.js";
 
@@ -523,12 +524,37 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
     createElement("span", "library-setting-label", "Sound effects"),
     createTextButton(areSoundsOn ? "On" : "Off", areSoundsOn ? "library-chip is-active" : "library-chip", () => dispatch({ type: "setSoundEffects", isOn: !areSoundsOn })),
   );
+  const adBlockRow = createElement("div", "library-setting-row");
+  const adBlock = data.adBlock;
+  adBlockRow.append(
+    createElement("span", "library-setting-label", "Block ads and trackers"),
+    createTextButton(adBlock.isOn ? "On" : "Off", adBlock.isOn ? "library-chip is-active" : "library-chip", () => dispatch({ type: "setAdBlock", isOn: !adBlock.isOn })),
+  );
+  const adBlockStatus: Record<typeof adBlock.status, string> = {
+    off: "Uses the public EasyList and EasyPrivacy lists, downloaded from easylist.to when you turn this on and refreshed every 4 days.",
+    loading: "Downloading the EasyList and EasyPrivacy lists…",
+    ready: `EasyList and EasyPrivacy: ${adBlock.filterCount.toLocaleString()} filters. Turn it off for one site in the Control Center.`,
+    failed: "The lists could not be downloaded. Check the connection and turn it off and on again.",
+  };
+  const adBlockNote = createElement("p", "library-setting-note", adBlockStatus[adBlock.status]);
+  const iconRow = createElement("div", "library-setting-row");
+  const iconChoices = createElement("div", "app-icon-choices");
+  for (const variant of APP_ICON_VARIANTS) {
+    const choice = createTextButton("", "app-icon-choice", () => dispatch({ type: "setAppIcon", variantId: variant.id }));
+    choice.title = variant.label;
+    choice.setAttribute("aria-label", `${variant.label} app icon`);
+    choice.classList.toggle("is-active", variant.id === data.appIcon);
+    const [firstColor, middleColor, lastColor] = variant.gradient;
+    choice.style.background = `linear-gradient(135deg, ${firstColor}, ${middleColor} 50%, ${lastColor})`;
+    iconChoices.append(choice);
+  }
+  iconRow.append(createElement("span", "library-setting-label", "App icon in the Dock"), iconChoices);
   const importRow = createElement("div", "library-setting-row");
   importRow.append(
     createElement("span", "library-setting-label", "Bookmarks and history from another browser"),
     createTextButton("Import…", "library-chip", () => dispatch({ type: "showMenu", request: { menu: "import" } })),
   );
-  settings.append(row, explanation, soundRow, importRow, renderRoutingSettings(data));
+  settings.append(row, explanation, soundRow, adBlockRow, adBlockNote, iconRow, importRow, renderRoutingSettings(data));
   body.replaceChildren(settings);
 }
 

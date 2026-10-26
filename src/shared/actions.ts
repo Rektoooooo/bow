@@ -108,7 +108,10 @@ export type BrowserAction =
   | { type: "openDeveloperTool"; tool: DeveloperTool }
   | { type: "runSiteCommand"; command: ToolbarSiteCommand }
   | { type: "importFromBrowser"; sourceId: string }
-  | { type: "setSoundEffects"; isOn: boolean };
+  | { type: "setSoundEffects"; isOn: boolean }
+  | { type: "setAdBlock"; isOn: boolean }
+  | { type: "setAdBlockForSite"; site: string; isOn: boolean }
+  | { type: "setAppIcon"; variantId: string };
 
 /** Every action type, for checking an incoming `type` string. */
 export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
@@ -176,4 +179,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "runSiteCommand",
   "importFromBrowser",
   "setSoundEffects",
+  "setAdBlock",
+  "setAdBlockForSite",
+  "setAppIcon",
 ];

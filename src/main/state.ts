@@ -728,6 +728,39 @@ export function setSoundEffects(state: BrowserState, isOn: boolean): BrowserStat
 }
 
 /**
+ * Picks the app icon variant shown in the Dock.
+ */
+export function setAppIcon(state: BrowserState, variantId: string): BrowserState {
+  if ((state.settings.appIcon ?? "classic") === variantId) {
+    return state;
+  }
+  return { ...state, settings: { ...state.settings, appIcon: variantId } };
+}
+
+/**
+ * Turns ad and tracker blocking on or off.
+ */
+export function setAdBlock(state: BrowserState, isOn: boolean): BrowserState {
+  if ((state.settings.isAdBlockOn ?? false) === isOn) {
+    return state;
+  }
+  return { ...state, settings: { ...state.settings, isAdBlockOn: isOn } };
+}
+
+/**
+ * Turns ad blocking off (or back on) for one site.
+ */
+export function setAdBlockForSite(state: BrowserState, site: string, isOn: boolean): BrowserState {
+  const offSites = state.adBlockOffSites ?? [];
+  const isOffNow = offSites.includes(site);
+  if (isOffNow !== isOn) {
+    return state;
+  }
+  const changedOffSites = isOn ? offSites.filter((offSite) => offSite !== site) : [...offSites, site];
+  return { ...state, adBlockOffSites: changedOffSites };
+}
+
+/**
  * Sets the sidebar's width, kept between SIDEBAR_MIN_WIDTH_PX and SIDEBAR_MAX_WIDTH_PX.
  */
 export function setSidebarWidth(state: BrowserState, width: number): BrowserState {

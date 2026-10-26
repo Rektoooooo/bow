@@ -155,6 +155,19 @@ function collectSettingLines(site: SiteInfo): SettingLine[] {
       run: () => window.overlayApi.siteCommand("toggleMute"),
     },
   );
+  const adBlock = site.adBlock;
+  const adBlockSite = site.site;
+  if (adBlock !== null && adBlockSite !== null) {
+    const blocked = adBlock.blockedCount === 1 ? "1 blocked" : `${adBlock.blockedCount} blocked`;
+    lines.push({
+      icon: "shield",
+      title: "Ads and Trackers",
+      state: adBlock.isOnForSite ? `Blocked · ${blocked}` : "Allowed on this site",
+      isOn: adBlock.isOnForSite,
+      hint: adBlock.isOnForSite ? "Allow ads and trackers on this site (reload to see it)" : "Block ads and trackers on this site again",
+      run: () => dispatch({ type: "setAdBlockForSite", site: adBlockSite, isOn: !adBlock.isOnForSite }),
+    });
+  }
   if (site.zoomPercent !== 100) {
     lines.push({ icon: "zoomIn", title: "Zoom", state: `${site.zoomPercent}%`, isOn: true, hint: "Back to 100%", run: () => window.overlayApi.siteCommand("zoomReset") });
   }

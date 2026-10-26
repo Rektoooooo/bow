@@ -10,6 +10,7 @@
  * Data flow:
  *   click in sidebar → preload sends "browser:dispatch" { type: "selectTab", tabId } → parseAction() → handlers.runAction()
  */
+import { APP_ICON_VARIANTS } from "../shared/appIconDrawing";
 import { ipcMain } from "electron";
 import type { WebContents } from "electron";
 import type { BrowserAction } from "../shared/actions";
@@ -70,6 +71,10 @@ const IMPORT_SOURCE_PATTERN = /^(safari|chromium:[a-z]+:(Default|Profile \d+))$/
 
 function isImportSource(value: unknown): boolean {
   return typeof value === "string" && IMPORT_SOURCE_PATTERN.test(value);
+}
+
+function isAppIconVariant(value: unknown): boolean {
+  return APP_ICON_VARIANTS.some((variant) => variant.id === value);
 }
 
 function isToolbarSiteCommand(value: unknown): boolean {
@@ -254,6 +259,9 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   runSiteCommand: { command: isToolbarSiteCommand },
   importFromBrowser: { sourceId: isImportSource },
   setSoundEffects: { isOn: isBoolean },
+  setAdBlock: { isOn: isBoolean },
+  setAdBlockForSite: { site: isSite, isOn: isBoolean },
+  setAppIcon: { variantId: isAppIconVariant },
 };
 
 /**

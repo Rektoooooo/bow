@@ -30,6 +30,9 @@ import {
   unpinTab,
   updateTabPage,
   setSoundEffects,
+  setAdBlock,
+  setAdBlockForSite,
+  setAppIcon,
 } from "../src/main/state";
 import { findLocation, findTab } from "../src/main/tree";
 import { getSiteKey, isSameSite, normalizeTypedInput } from "../src/main/urls";
@@ -443,5 +446,25 @@ describe("sound effects setting", () => {
     expect(state.settings.areSoundEffectsOn ?? true).toBe(true);
     expect(off.settings.areSoundEffectsOn).toBe(false);
     expect(setSoundEffects(state, true)).toBe(state);
+  });
+});
+
+describe("ad blocking and app icon settings", () => {
+  it("ad blocking is off until turned on, and can be turned off per site and back", () => {
+    const on = setAdBlock(createInitialState(), true);
+    const offForSite = setAdBlockForSite(on, "example.com", false);
+
+    expect(createInitialState().settings.isAdBlockOn ?? false).toBe(false);
+    expect(on.settings.isAdBlockOn).toBe(true);
+    expect(offForSite.adBlockOffSites).toEqual(["example.com"]);
+    expect(setAdBlockForSite(offForSite, "example.com", false)).toBe(offForSite);
+    expect(setAdBlockForSite(offForSite, "example.com", true).adBlockOffSites).toEqual([]);
+  });
+
+  it("remembers the chosen app icon, classic by default", () => {
+    const state = createInitialState();
+
+    expect(setAppIcon(state, "classic")).toBe(state);
+    expect(setAppIcon(state, "mint").settings.appIcon).toBe("mint");
   });
 });

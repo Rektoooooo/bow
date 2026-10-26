@@ -296,6 +296,14 @@ check(
   `${importedFolder?.title} › ${barFolder?.title} › ${barChildren.map((item) => item.title).join(",")}`,
 );
 
+// Another app icon: our own drawing in other colors, drawn for the Dock (errors would show in the main log below).
+await dispatch(page, { type: "setAppIcon", variantId: "mint" });
+await page.waitForTimeout(1500);
+state = await getState(page);
+check("choosing another app icon is saved and drawn for the Dock", state.settings.appIcon === "mint", String(state.settings.appIcon));
+await dispatch(page, { type: "setAppIcon", variantId: "classic" });
+await page.waitForTimeout(1000);
+
 // A site without /favicon.ico answers 404; Chromium logs that as a console error, but it is expected, not a bug.
 const realErrors = consoleErrors.filter((message) => !message.startsWith("Failed to load resource"));
 check("no errors in the sidebar console", realErrors.length === 0, realErrors.join(" | "));

@@ -46,6 +46,7 @@ import { findProfileIdOfItem, findTab, getActiveSpace } from "./tree";
 import { getPermissionOrigin, getSitePermissions } from "./sitePermissions";
 import { looksLikeWebAddress, normalizeTypedInput } from "./urls";
 import { isDeveloperModeOn } from "../shared/developerMode";
+import { describeAdBlock, getBlockedCount, isAdBlockActiveFor } from "./adBlock";
 
 /** DuckDuckGo's suggestion service; it is also the browser's search engine (urls.ts). */
 const SUGGESTION_URL_PREFIX = "https://duckduckgo.com/ac/?type=list&q=";
@@ -195,6 +196,8 @@ function buildLibraryData(state: BrowserState): LibraryData {
     })),
     archiveAfterMs: state.settings.archiveAfterMs,
     areSoundEffectsOn: state.settings.areSoundEffectsOn !== false,
+    appIcon: state.settings.appIcon ?? "classic",
+    adBlock: describeAdBlock(state),
     routingRules: state.routingRules ?? [],
     extensions: (state.extensions ?? []).map((extension) => ({
       id: extension.id,
@@ -246,6 +249,7 @@ function buildSiteInfo(state: BrowserState): SiteInfo | null {
     origin: origin,
     permissions: permissions,
     isDeveloperMode: isDeveloperModeOn(state, tab.url),
+    adBlock: state.settings.isAdBlockOn === true ? { isOnForSite: isAdBlockActiveFor(state, tab.url), blockedCount: contents === null ? 0 : getBlockedCount(contents) } : null,
     extensions: listExtensionTiles(state, profileId),
   };
 }

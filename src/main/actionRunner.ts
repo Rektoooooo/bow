@@ -19,6 +19,8 @@ import { deleteBoost, setBoostCss, setBoostEnabled } from "./boosts";
 import { reapplyBoostsToAllPages } from "./boostPages";
 import { importFromArc } from "./arcImportController";
 import { importFromBrowser } from "./browserImportController";
+import { applyCosmeticFilters, ensureFilterLists } from "./adBlock";
+import { applyAppIcon } from "./appIcon";
 import { showExtensionsMenu } from "./extensionHost";
 import { setExtensionEnabled } from "./extensionList";
 import { checkForExtensionUpdatesNow, installFromWebStore, loadUnpackedExtension, removeExtensionAndCopy } from "./extensionsController";
@@ -29,7 +31,6 @@ import type { MenuHost } from "./menus";
 import { openBoostEditor, openCommandBar, openLibrary, openSiteControls, openThemeEditor, runSiteCommand } from "./overlayController";
 import { setDeveloperMode } from "../shared/developerMode";
 import { openDeveloperTool } from "./pageCommands";
-import { getFocusedContents } from "./tabViews";
 import { setSplitOrientation, separateTabFromSplit, splitTabs, unsplit } from "./split";
 import {
   addToFavorites,
@@ -45,6 +46,9 @@ import {
   selectTab,
   setArchiveAfter,
   setSoundEffects,
+  setAdBlock,
+  setAdBlockForSite,
+  setAppIcon,
   setPinnedSectionOpen,
   setSidebarVisible,
   setSidebarWidth,
@@ -65,7 +69,7 @@ import {
   switchSpaceByOffset,
 } from "./spaces";
 import { closeTabByUser, navigateFocusedPage, openLinkInNewTab, resetTabToHome, setMuted } from "./tabActions";
-import { getTabContents } from "./tabViews";
+import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
 import { normalizeTypedInput } from "./urls";
 
 /** What menus.ts needs from the rest of the app. */
@@ -104,6 +108,15 @@ function createSpaceAndRename(name: string, icon: string, theme: SpaceTheme): vo
   const activeSpaceAfter = getState().activeSpaceId;
   if (activeSpaceAfter !== activeSpaceBefore) {
     sendSidebarCommand({ kind: "beginSpaceRename", spaceId: activeSpaceAfter });
+  }
+}
+
+/**
+ * Puts the ad-blocking CSS into every loaded page again (or takes it out), after the setting changed.
+ */
+function reapplyCosmeticFiltersToAllPages(): void {
+  for (const view of getTabViews().values()) {
+    applyCosmeticFilters(view.webContents).catch(() => undefined);
   }
 }
 
@@ -261,6 +274,24 @@ export function runAction(action: BrowserAction): void {
     }
     case "runSiteCommand":
       return runSiteCommand(action.command);
+    case "setAdBlock":
+      applyChange((state) => setAdBlock(state, action.isOn));
+      if (action.isOn) {
+        ensureFilterLists()
+          .then(() => reapplyCosmeticFiltersToAllPages())
+          .catch(() => undefined);
+      } else {
+        reapplyCosmeticFiltersToAllPages();
+      }
+      return;
+    case "setAdBlockForSite":
+      applyChange((state) => setAdBlockForSite(state, action.site, action.isOn));
+      reapplyCosmeticFiltersToAllPages();
+      return;
+    case "setAppIcon":
+      applyChange((state) => setAppIcon(state, action.variantId));
+      applyAppIcon(action.variantId).catch((error) => console.error("Changing the app icon failed:", error));
+      return;
     case "setSoundEffects":
       return applyChange((state) => setSoundEffects(state, action.isOn));
     case "importFromBrowser":

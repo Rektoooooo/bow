@@ -13,6 +13,10 @@ const outDir = process.env.E2E_OUTPUT_DIR || path.join(appDir, "e2e", "output");
 const userDataDir = path.join(outDir, "user-data-overlay");
 fs.rmSync(userDataDir, { recursive: true, force: true });
 fs.mkdirSync(userDataDir, { recursive: true });
+// A tiny made-up filter list in place of the downloaded EasyList, so the ad-blocking check needs no network.
+fs.mkdirSync(path.join(userDataDir, "adblock"), { recursive: true });
+fs.writeFileSync(path.join(userDataDir, "adblock", "easylist.txt"), "! Test list\n/ads/banner.js\n##.ad-banner\n");
+fs.writeFileSync(path.join(userDataDir, "adblock", "easyprivacy.txt"), "! Test list\n");
 
 const results = [];
 function check(name, ok, detail = "") {
@@ -260,6 +264,16 @@ const server = http.createServer((request, response) => {
     response.end(toneWav);
     return;
   }
+  if (request.url === "/adpage") {
+    response.writeHead(200, { "Content-Type": "text/html" });
+    response.end('<!doctype html><title>Ad page</title><div class="ad-banner">Buy now</div><p>Article</p><script src="/ads/banner.js"></script>');
+    return;
+  }
+  if (request.url === "/ads/banner.js") {
+    response.writeHead(200, { "Content-Type": "text/javascript" });
+    response.end("window.adScriptRan = true;");
+    return;
+  }
   if (request.url === "/news") {
     response.writeHead(200, { "Content-Type": "text/html" });
     // Like a mail app: the title changes a moment later, when "new mail" arrives.
@@ -307,6 +321,35 @@ await dispatch({ type: "selectTab", tabId: newsTabId });
 await sidebar.waitForTimeout(400);
 state = await getState();
 check("opening it clears the dot", state.items[newsTabId]?.isUnread === false);
+// Ad blocking (off until turned on): the list's ad script is stopped and its ad element hidden; the Control Center
+// counts it, and turning it off for the site lets the ad through after a reload.
+await dispatch({ type: "setAdBlock", isOn: true });
+await sidebar.waitForTimeout(600);
+const adPageUrl = `http://127.0.0.1:${server.address().port}/adpage`;
+await dispatch({ type: "openTab", typedText: adPageUrl });
+await waitForSelectedUrl("/adpage");
+await sidebar.waitForTimeout(1500);
+const adPage = await findPage("/adpage");
+const readAdPage = () => adPage.evaluate(() => ({ ran: window.adScriptRan === true, hidden: getComputedStyle(document.querySelector(".ad-banner")).display === "none" }));
+const blockedResult = await readAdPage();
+check("ad blocking stops the list's ad script and hides its ad element", !blockedResult.ran && blockedResult.hidden, JSON.stringify(blockedResult));
+await dispatch({ type: "openSiteControls" });
+await overlay.waitForSelector(".control-center", { timeout: 5000 });
+const adSetting = '.control-setting:has(.control-setting-title:text-is("Ads and Trackers"))';
+const adState = await overlay.textContent(`${adSetting} .control-setting-state`).catch(() => null);
+check("the Control Center counts what was blocked on the page", adState === "Blocked · 1 blocked", String(adState));
+await overlay.click(adSetting);
+await sidebar.waitForTimeout(300);
+await overlay.press("body", "Escape");
+await sidebar.waitForTimeout(300);
+await app.evaluate(({ webContents }) => webContents.getAllWebContents().find((contents) => contents.getURL().includes("/adpage")).reload());
+await sidebar.waitForTimeout(1500);
+const allowedResult = await readAdPage();
+check("turning it off for the site lets the ad through after a reload", allowedResult.ran && !allowedResult.hidden, JSON.stringify(allowedResult));
+await dispatch({ type: "setAdBlock", isOn: false });
+// The checks below expect the news page on screen, as before this block.
+await dispatch({ type: "selectTab", tabId: newsTabId });
+await sidebar.waitForTimeout(600);
 server.close();
 
 // Profiles: moving the Space to a new profile reloads its pages in that profile's own session.

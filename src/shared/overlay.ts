@@ -144,6 +144,8 @@ export interface LibraryData {
   media: MediaLine[];
   archiveAfterMs: number | null;
   areSoundEffectsOn: boolean;
+  appIcon: string;
+  adBlock: { isOn: boolean; status: "off" | "loading" | "ready" | "failed"; filterCount: number };
   routingRules: RoutingRule[];
   extensions: ExtensionLine[];
 }
@@ -166,6 +168,8 @@ export interface SiteInfo {
   permissions: { kind: SitePermissionKind; isAllowed: boolean }[];
   /** Arc's per-site Developer Mode (shared/developerMode.ts). */
   isDeveloperMode: boolean;
+  /** Ad blocking for this page: null while it is off in Library › Settings. */
+  adBlock: { isOnForSite: boolean; blockedCount: number } | null;
   /** The profile's turned-on extensions, for the Control Center's grid. */
   extensions: { id: string; name: string; iconUrl: string | null }[];
 }

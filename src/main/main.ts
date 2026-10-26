@@ -52,7 +52,7 @@ import { createStatusBubble, showLinkStatus } from "./statusBubble";
 import { initializePeek, openPeek, relayoutPeek } from "./peek";
 import { createOverlayView, getOverlayContents } from "./overlay";
 import { refreshOpenPanel, registerOverlayIpc, relayoutOverlay, setCommandActionRegistry } from "./overlayController";
-import { restrictWebPermissions, useChromeUserAgent } from "./profiles";
+import { onProfileSessionCreated, restrictWebPermissions, useChromeUserAgent } from "./profiles";
 import { moveTabsToArchive, updateTabFavicon, updateTabPage } from "./state";
 import { getStateFilePath } from "./store";
 import { loadWindowBounds, rememberWindowBounds } from "./windowState";
@@ -60,6 +60,8 @@ import { openLinkInNewTab } from "./tabActions";
 import { getShownTabIds, getTabViews, layoutShownTabViews, refreshShownSnapshots } from "./tabViews";
 import { SNAPSHOT_REFRESH_MS } from "./tabSnapshots";
 import { loadCaptures } from "./captures";
+import { applyCosmeticFilters, initializeAdBlocking, installAdBlocker } from "./adBlock";
+import { applyAppIcon } from "./appIcon";
 import { findRootLocation, findTab } from "./tree";
 import { isSameSite } from "./urls";
 import type { TabViewEvents } from "./tabViews";
@@ -119,6 +121,7 @@ const tabViewEvents: TabViewEvents = {
   onContextMenu: (_tabId, contents, params) => showPageContextMenu(menuHost, contents, params, getExtensionMenuItems(contents, params)),
   onDomReady: (_tabId, contents) => {
     applyBoostToPage(contents, getState()).catch(() => undefined);
+    applyCosmeticFilters(contents).catch(() => undefined);
   },
   onLinkHover: (url) => {
     showLinkStatus(url).catch(() => undefined);
@@ -279,6 +282,9 @@ async function handleAppReady(): Promise<void> {
   restrictWebPermissions(session.defaultSession);
   // Sites ask before using the camera, microphone, location, notifications or the clipboard.
   initializePermissionPrompts();
+  // Ad blocking checks requests in every profile session; the lists load now when it is on.
+  initializeAdBlocking(app.getPath("userData"), getState, () => refreshOpenPanel());
+  onProfileSessionCreated(installAdBlocker);
   startTrackingDownloads(() => {
     scheduleRuntimePush();
     refreshOpenPanel();
@@ -302,6 +308,7 @@ async function handleAppReady(): Promise<void> {
   await prepareExtensions();
 
   mainWindow = createMainWindow();
+  applyAppIcon(getState().settings.appIcon).catch((error) => console.warn("Could not show the chosen app icon:", error));
   // Little Windows cannot live without the main window; closing it ends the app.
   mainWindow.on("closed", () => app.quit());
   attachWindow(mainWindow, tabViewEvents);
