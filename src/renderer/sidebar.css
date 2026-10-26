@@ -839,6 +839,42 @@ button:disabled {
   -webkit-app-region: drag;
 }
 
+/* Loading glow: a soft moving line just above the page card while the page loads. */
+.toolbar {
+  position: relative;
+}
+
+.toolbar.is-loading::after {
+  content: "";
+  position: absolute;
+  left: var(--card-inset);
+  right: var(--card-inset);
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, transparent, var(--ink), transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  opacity: 0.55;
+  animation: loading-glow 1.1s ease-in-out infinite;
+}
+
+@keyframes loading-glow {
+  from {
+    background-position: -40% 0;
+  }
+  to {
+    background-position: 140% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbar.is-loading::after {
+    animation: none;
+    background: var(--faint);
+  }
+}
+
 /* With the sidebar hidden, the toolbar starts under the traffic lights. */
 .sidebar-hidden .toolbar {
   padding-left: 76px;

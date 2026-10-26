@@ -356,6 +356,46 @@ const offBackground = await pageStyle("getComputedStyle(document.body).backgroun
 const offLinkDisplay = await pageStyle("getComputedStyle(document.querySelector('a')).display");
 check("turning the Boost off restores the site", offBackground !== "rgb(1, 2, 3)" && offLinkDisplay !== "none", `${offBackground} ${offLinkDisplay}`);
 
+// Link status: hovering a link shows where it goes at the bottom of the page; leaving hides it.
+const boostPage = await findPage("example.com/boost");
+const linkPoint = await boostPage.evaluate(() => {
+  const link = document.querySelector("a");
+  link.style.setProperty("display", "inline", "important");
+  const box = link.getBoundingClientRect();
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+});
+await boostPage.mouse.move(5, 5);
+await boostPage.mouse.move(linkPoint.x, linkPoint.y, { steps: 3 });
+await sidebar.waitForTimeout(600);
+const bubbleText = await app.evaluate(async ({ BrowserWindow }) => {
+  const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  const bubble = win.contentView.children.find((child) => child.webContents?.getURL().endsWith("/status/status.html"));
+  return bubble === undefined ? null : bubble.webContents.executeJavaScript("document.getElementById('status').textContent");
+});
+await boostPage.mouse.move(5, 5, { steps: 3 });
+await sidebar.waitForTimeout(600);
+const bubbleGone = await app.evaluate(({ BrowserWindow }) => {
+  const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  return !win.contentView.children.some((child) => child.webContents?.getURL().endsWith("/status/status.html"));
+});
+check("hovering a link shows where it goes, and leaving hides it", bubbleText?.startsWith("iana.org") && bubbleGone, `${bubbleText} gone=${bubbleGone}`);
+
+// A crashed page shows our crash page; the tab keeps its address; Reload brings the page back.
+await app.evaluate(({ webContents }) => {
+  webContents.getAllWebContents().find((contents) => contents.getURL().includes("example.com/boost")).forcefullyCrashRenderer();
+});
+await sidebar.waitForTimeout(2500);
+state = await getState();
+const crashPage = app.windows().find((page) => page.url().includes("/crash/crash.html"));
+check("a crashed page shows the crash page, and the tab keeps its address", crashPage !== undefined && selectedTab(state)?.url.startsWith("https://example.com/boost"), `${crashPage?.url().slice(-60)} tab=${selectedTab(state)?.url}`);
+// Playwright still sees the crashed page object, so the link is clicked from the main process instead.
+await app.evaluate(({ webContents }) => {
+  const crashContents = webContents.getAllWebContents().find((contents) => contents.getURL().includes("/crash/crash.html"));
+  return crashContents?.executeJavaScript("document.getElementById('crash-reload').click()");
+});
+await sidebar.waitForTimeout(2500);
+check("Reload on the crash page opens the page again", app.windows().some((page) => page.url().startsWith("https://example.com/boost")));
+
 // Theme editor: light appearance, a second color (gradient) and grain apply to the Space.
 state = await getState();
 await dispatch({ type: "openThemeEditor", spaceId: state.activeSpaceId });

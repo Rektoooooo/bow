@@ -78,4 +78,6 @@ export function renderToolbar(state: BrowserState, runtime: RuntimeState, select
   rightGroup.append(siteButton, splitButton);
 
   toolbar.replaceChildren(leftGroup, centerGroup, rightGroup);
+  // Arc's loading glow: a moving line along the top of the page while it loads.
+  toolbar.classList.toggle("is-loading", isLoading);
 }

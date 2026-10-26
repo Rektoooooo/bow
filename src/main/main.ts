@@ -37,6 +37,7 @@ import { registerIpcHandlers } from "./ipc";
 import { archiveIdleLittleWindows, handleExternalUrl, registerLittleWindowIpc } from "./littleWindow";
 import { showPageContextMenu } from "./menus";
 import { applyBoostToPage } from "./boostPages";
+import { createStatusBubble, showLinkStatus } from "./statusBubble";
 import { initializePeek, openPeek, relayoutPeek } from "./peek";
 import { createOverlayView, getOverlayContents } from "./overlay";
 import { refreshOpenPanel, registerOverlayIpc, relayoutOverlay, setCommandActionRegistry } from "./overlayController";
@@ -95,6 +96,9 @@ const tabViewEvents: TabViewEvents = {
   onContextMenu: (_tabId, contents, params) => showPageContextMenu(menuHost, contents, params),
   onDomReady: (_tabId, contents) => {
     applyBoostToPage(contents, getState()).catch(() => undefined);
+  },
+  onLinkHover: (url) => {
+    showLinkStatus(url).catch(() => undefined);
   },
 };
 
@@ -258,6 +262,7 @@ function handleAppReady(): void {
   attachWindow(mainWindow, tabViewEvents);
   initializePeek(tabViewEvents);
   createOverlayView();
+  createStatusBubble();
   syncViews();
 
   const startupUrl = findUrlArgument(process.argv.slice(1));

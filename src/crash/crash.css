@@ -1,0 +1,46 @@
+/*
+  WHY this file exists:
+    Look of the crashed-tab page.
+*/
+:root {
+  color-scheme: light dark;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: grid;
+  place-items: center;
+  background: light-dark(#f5f4f7, #1f1f22);
+  color: light-dark(#1d1d1f, #f2f2f4);
+  font: 14px/1.4 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+.crash {
+  text-align: center;
+}
+
+.crash h1 {
+  margin: 0 0 6px;
+  font-size: 20px;
+}
+
+.crash-detail {
+  margin: 0 0 18px;
+  color: light-dark(rgba(0, 0, 0, 0.55), rgba(255, 255, 255, 0.55));
+  word-break: break-all;
+}
+
+.crash-reload {
+  display: inline-block;
+  padding: 8px 18px;
+  border-radius: 9px;
+  background: light-dark(#1d1d1f, #f2f2f4);
+  color: light-dark(#fff, #111);
+  font-weight: 600;
+  text-decoration: none;
+}

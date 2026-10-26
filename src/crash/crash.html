@@ -1,0 +1,27 @@
+<!doctype html>
+<!--
+  WHY this file exists:
+    Shown in a tab whose page crashed (its renderer process died), instead of a blank card, with a way back.
+
+  Data source:
+    The address and reason passed in the query string by tabViews.ts.
+
+  Data flow:
+    page crashes → tabViews.ts loads this file → crash.ts fills in the address → "Reload" opens it again
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'">
+    <title>Page crashed</title>
+    <link rel="stylesheet" href="./crash.css">
+  </head>
+  <body>
+    <main class="crash">
+      <h1>This page crashed</h1>
+      <p id="crash-detail" class="crash-detail"></p>
+      <a id="crash-reload" class="crash-reload" href="about:blank">Reload</a>
+    </main>
+    <script type="module" src="./crash.js"></script>
+  </body>
+</html>

@@ -18,6 +18,7 @@
  * stay unloaded until you click them, which keeps memory low when you have many tabs.
  */
 import { WebContentsView } from "electron";
+import * as path from "node:path";
 import type { BrowserWindow, ContextMenuParams, HandlerDetails, WebContents } from "electron";
 import { CARD_RADIUS_PX } from "../shared/settings";
 import type { BrowserState, ItemId, TabItem, TabRuntimeInfo } from "../shared/types";
@@ -54,6 +55,8 @@ export interface TabViewEvents {
   onContextMenu(tabId: ItemId, contents: WebContents, params: ContextMenuParams): void;
   /** The page's document is ready (Boost CSS goes in now). */
   onDomReady(tabId: ItemId, contents: WebContents): void;
+  /** The pointer moved onto a link (its address) or off it (""). */
+  onLinkHover(url: string): void;
 }
 
 /** One web view per loaded tab, keyed by tab id. Lives only in memory. */
@@ -143,13 +146,33 @@ function handleWindowOpen(tabId: ItemId, contents: WebContents, details: Handler
   return { action: "deny" as const };
 }
 
+/** The crashed-tab page (a local file). Tabs never record local file addresses, so this page never ends up saved. */
+const CRASH_PAGE_PATH = path.join(__dirname, "..", "..", "web", "crash", "crash.html");
+
 /**
- * Listens to a tab's page: navigation, titles, icons, loading, sound, links and right-clicks.
+ * True for addresses a tab may record: web pages. Our crashed-tab page and other local pages are left out.
+ */
+function isRecordableTabUrl(url: string): boolean {
+  return !url.startsWith("file://");
+}
+
+/**
+ * Listens to a tab's page: navigation, titles, icons, loading, sound, links, right-clicks and crashes.
  */
 function watchTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvents): void {
   const contents = view.webContents;
   contents.on("page-title-updated", (_event, title) => {
-    events.onPageChanged(tabId, contents.getURL(), title);
+    if (isRecordableTabUrl(contents.getURL())) {
+      events.onPageChanged(tabId, contents.getURL(), title);
+    }
+  });
+  contents.on("update-target-url", (_event, url) => events.onLinkHover(url));
+  contents.on("render-process-gone", (_event, details) => {
+    if (details.reason === "clean-exit") {
+      return;
+    }
+    const crashedUrl = contents.getURL();
+    contents.loadFile(CRASH_PAGE_PATH, { query: { url: crashedUrl, reason: details.reason } }).catch(ignoreLoadFailure);
   });
   contents.on("input-event", (_event, input) => {
     if (input.type === "mouseDown" || input.type === "keyDown") {
@@ -167,13 +190,18 @@ function watchTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvent
     }
   });
   contents.on("did-navigate", (_event, url) => {
+    events.onRuntimeChanged();
+    if (!isRecordableTabUrl(url)) {
+      return;
+    }
     events.onPageChanged(tabId, url, contents.getTitle());
     events.onNavigated(url, contents.getTitle());
-    events.onRuntimeChanged();
   });
   contents.on("did-navigate-in-page", (_event, url) => {
-    events.onPageChanged(tabId, url, contents.getTitle());
     events.onRuntimeChanged();
+    if (isRecordableTabUrl(url)) {
+      events.onPageChanged(tabId, url, contents.getTitle());
+    }
   });
   contents.on("page-favicon-updated", (_event, faviconUrls) => {
     const firstFaviconUrl = faviconUrls[0];
