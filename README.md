@@ -1,61 +1,106 @@
 # Sidebar Browser
 
-A desktop browser built with Electron and TypeScript, modeled on how Arc works: tabs in a vertical sidebar,
-Spaces, the page shown as an inset card, and auto-archive for tabs you stop using.
+A desktop browser built with Electron and TypeScript that works like Arc: tabs in a vertical sidebar, Spaces,
+Favorites, pinned folders, the page shown as an inset card, a Command Bar, Peek, Split View, Little Windows and
+auto-archive for tabs you stop using. It can import your Arc sidebar, archive and history.
 
-![The browser in dark mode: Personal Space with a pinned Wikipedia tab, one tab today, the Archive, and a page in the inset card](docs/screenshot-dark.png)
+Arc is being shut down. Before it goes, we studied how it behaves (from its app bundle and the files it writes;
+see [docs/research](docs/research)) and rebuilt that behavior in our own code. No Arc code, icons or assets are used.
+
+![Dark mode: Favorites tiles, a Space with a pinned folder, Today tabs, and a Wikipedia page in the inset card](docs/screenshot-dark.png)
 
 ## Run it
 
 ```bash
+nvm use        # Node 24 (see .nvmrc); Node 22.12+ also works
 npm install
 npm start      # builds, then opens the window
 npm test       # unit tests (Vitest)
-npm run e2e    # drives the real app with Playwright (opens windows briefly; uses a throwaway profile)
+npm run e2e    # drives the real app with Playwright (opens windows briefly; throwaway profiles)
 ```
 
-Needs Node.js 22.23+ or 24.22+.
+To bring over your Arc setup: **File › Import from Arc…** reads Arc's files on this Mac (read-only) and adds your
+Spaces, Favorites, pinned folders and tabs, Today tabs, Space themes, Arc's cached icons, your archive (newest 250)
+and your browsing history. Running it twice adds nothing twice.
 
 ## What works
 
-- **Sidebar** with a Space heading, Pinned and Today sections, and an address box that takes a URL or a search.
-- **Spaces**: Personal and Work, each with its own tabs, selection and frame color.
-- **Pin / unpin**. A pinned tab remembers its home URL and never auto-archives.
-- **Close, Clear and Archive**. Closed and cleared tabs go to the Archive, and each one can be restored.
-- **Auto-archive**. Unpinned tabs move to the Archive after the chosen time without use: 1 hour, 6 hours,
-  12 hours (default), 24 hours, 7 days, 30 days, or never.
-- **Saved between runs** in `~/Library/Application Support/sidebar-browser/browser-state.json`.
+**Sidebar**
+- Favorites as tiles at the top, shared by every Space that uses the same profile (up to 12, like Arc).
+- A Space title (click to collapse Pinned), Pinned tabs and nested folders, a divider with **Clear**, **+ New Tab**,
+  and the Today list. A closed folder still shows the tab you are on.
+- A Pinned tab that left its page shows Arc's "/" and a button back to its pinned address. ⌘W on a Pinned tab
+  puts its page away but keeps the tab.
+- Drag and drop: reorder, pin, make a Favorite, drop into a folder, move to another Space, or drop a link to open it.
+- Bottom bar: Library, the Space switcher (emoji for the active Space, dots for the others), and a **+** menu.
+- ⌘S hides the sidebar; touching the window's left edge shows it again for a moment.
+- A small player for a tab playing sound in the background.
 
-## How auto-archive decides
+**Spaces and profiles**
+- Create, rename, change the emoji, pick a theme (one to three colors as a gradient, light / dark / automatic,
+  film grain), reorder, delete. Two-finger swipe on the sidebar or ⌃1–⌃9 switches Spaces.
+- Each profile has its own cookies and logins (an Electron session partition).
 
-A tab counts as **in use** while it is visible, playing sound, or in picture-in-picture. Those tabs get their
-last-active time refreshed every minute. Every 5 minutes, any unpinned tab unused for longer than the threshold
-is archived. Time while the app was closed does not count: inactivity is measured from the later of the tab's
-last use and the app's launch. Archive entries are deleted after 30 days.
+**Command Bar** (⌘T, ⌘L)
+- Open tabs ("Switch to Tab"), history, what you typed, search suggestions and about 40 browser actions
+  ("New Space", "Toggle Sidebar", "Copy URL", "Theme: Mint", …), ranked by how well title and address match plus
+  boosts for open tabs, Favorites and recent use, the way Arc ranks.
 
-These intervals are our own choices. The threshold menu copies the options Arc offers.
+![The Command Bar: typing "wiki" offers the open Wikipedia Favorite first](docs/screenshot-command-bar.png)
+
+**Pages**
+- **Peek**: a link from a Pinned tab or Favorite to another site, or any Shift-clicked link, opens in a floating
+  card. ⌘O makes it a tab without reloading, Split puts it next to the page, Esc closes it.
+- **Split View**: two to four tabs side by side or stacked, one row in the sidebar.
+- **Little Window**: links from other apps (and ⌥⌘N) open in a small window; "Open in Space" moves the page into the
+  sidebar. A Little Window left alone for 6 hours goes to the Archive.
+- Site controls (copy link, screenshot, mute, inspect, zoom, clear site data), Find in page, downloads, a
+  right-click menu in pages, and automatic Picture-in-Picture when you leave a tab playing a video.
+
+**Library** (⇧⌘L): the Archive (search, filter by reason, click to restore), History, Downloads and Settings.
+
+## Auto-archive, like Arc
+
+A Today tab you have not used for 12 hours (the default; 1 hour to 30 days, or never) moves to the Archive. Pinned
+tabs and Favorites never do. A tab counts as used while it is on screen, playing sound or in Picture-in-Picture.
+These timings match what we measured on a real Arc install. The sweep runs every 5 minutes, the tab on screen is
+refreshed every minute, time while the app is closed does not count, and the Archive keeps the newest 250 tabs.
+The evidence is in [docs/research/arc-findings.md](docs/research/arc-findings.md#2-auto-archive).
+
+## Keyboard shortcuts
+
+Same keys as Arc. ⌘T new tab, ⌘L edit address, ⌘W close, ⇧⌘T reopen, ⌘D pin/unpin, ⇧⌘C copy URL
+(⌥⇧⌘C as Markdown), ⌘S sidebar, ⌘[ / ⌘] back/forward, ⌘R reload, ⌥⌘↑ / ⌥⌘↓ previous/next tab, ⌘1–⌘9 tab N,
+⌃Tab recent tab, ⌥⌘← / ⌥⌘→ previous/next Space, ⌃1–⌃9 Space N, ⇧⌘K clear Today, ⌃⇧= split view, ⌃⇧- close pane,
+⌘O open Peek as tab, ⌥⌘N Little Window, ⌘F find, ⇧⌘L Library, ⌘+ / ⌘- / ⌘0 zoom, ⌥⌘I developer tools.
 
 ## How the code is organized
 
 | Folder | Runs in | What it holds |
 |---|---|---|
-| `src/main` | Electron's main process | State changes (`state.ts`, `autoArchive.ts`), tab web views, saving, IPC, timers |
-| `src/preload` | The sidebar page, before it loads | The one safe bridge, `window.browserApi` |
-| `src/renderer` | The sidebar page | Drawing the sidebar from the current state |
-| `src/shared` | Both | Data types, named settings, IPC channel names |
-| `tests` | Vitest | Rules for state changes and auto-archive |
-| `e2e` | Playwright + Electron | End-to-end checks of the real app, the permission check, the README screenshot |
-| `docs` | — | Screenshot, `arc-teardown.html` (map of Arc's features), and `research/` (findings and reverse-engineering setup) |
-| `tools` | Node / Python | `rea-driver` (keeps one REA + Ghidra session open), `swift-reflstr.py` (Swift field names from a binary) |
+| `src/main` | Electron's main process | State rules (pure functions), web views, menus, overlay panels, Peek, Little Windows, import from Arc |
+| `src/renderer` | The sidebar page | The sidebar and toolbar, drawn from the state |
+| `src/overlay` | The overlay page | Command Bar, Library, site controls, Find, the Peek frame |
+| `src/little` | A Little Window's bar | Address, Copy Link, Open in Space |
+| `src/preload` | Before each of our pages loads | The only bridges between our pages and the app |
+| `src/shared` | Both | Data types, settings with their sources, message names |
+| `tests` | Vitest | Rules for state, Spaces, splits, auto-archive, ranking, history, the Arc importers |
+| `e2e` | Playwright + Electron | The real app driven end to end, the permission check, the README screenshots |
+| `docs` | — | Screenshots, `arc-teardown.html` (Arc's 52 features), `research/` (findings, Arc's data model, RE setup) |
 
 Three ideas keep it simple:
 
-1. **Pure state functions.** `state.ts` and `autoArchive.ts` take data in and return a changed copy. No Electron, no clock.
-2. **One way to change state.** `applyChange()` in `main.ts` saves, updates the web views and redraws the sidebar.
-3. **Reconcile, then render.** `syncTabViews()` makes the web views match the state, and the sidebar redraws from the newest state.
+1. **Pure state functions.** `state.ts`, `spaces.ts`, `split.ts`, `tree.ts` and `autoArchive.ts` take data in and
+   return a changed copy. No Electron, no clock.
+2. **One way to change state.** `applyChange()` in `browserCore.ts` saves, updates the web views and redraws.
+3. **Reconcile, then render.** `syncTabViews()` makes the web views match the state; each page redraws from the
+   newest state.
 
 ## Security
 
-- Web pages run sandboxed with no preload and cannot talk to the app.
-- Website permission requests are refused except fullscreen and clipboard writes, until a permission prompt exists.
-- The sidebar page cannot navigate away or open windows, and only loads its own script.
+- Web pages run sandboxed with no preload and cannot talk to the app. Our own pages only accept their own messages,
+  and every message field is checked.
+- Every profile's session refuses website permissions (camera, microphone, location, notifications) except full
+  screen and clipboard writes, until a permission prompt exists. `e2e/permission-check.mjs` proves it.
+- Our pages cannot navigate away or open windows, and only load their own scripts.
+- Import from Arc only reads Arc's files (its history database through a temporary copy) and never changes them.

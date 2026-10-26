@@ -313,7 +313,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
     <section id="archive" data-spy="archive">
       <h2>Auto-archive teardown</h2>
-      <p class="intro">Traced in the arm64 slice of Arc 1.170.0 (SHA-256 <code>77be289e…</code>) from its strings and Swift type metadata, which keep source file names, field names and enum cases. Ghidra decompilation stopped because the Mac ran out of memory, so the timer intervals and exclusion rules are still open.</p>
+      <p class="intro">Traced in the arm64 slice of Arc 1.170.0 (SHA-256 <code>77be289e…</code>) from its strings and Swift type metadata, which keep source file names, field names and enum cases. Ghidra decompilation stopped because the Mac ran out of memory. On 2026-10-26 most open questions were answered instead by measuring a real Arc install: its archive file (250 entries with archive times and last-use times), its settings, and its sidebar file sampled live (see <code>docs/research/arc-findings.md</code>).</p>
       <div class="tablewrap">
         <table>
           <thead><tr><th>Question</th><th>Finding</th><th>Status</th></tr></thead>
@@ -323,25 +323,26 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
             <tr><td>Lifecycle</td><td>Actions <code>didLaunch</code>, <code>runAutoArchive</code>, <code>autoArchiveItems</code>, <code>removeExpiredItems</code> and <code>willTerminate</code>, plus a debug <code>simulateAutoArchive</code>. Two cancellable timers: <code>autoArchiveTimer</code> and <code>cleanupTimer</code>.</td><td><span class="state done">Observed</span></td></tr>
             <tr><td>Thresholds</td><td>1 hour, 6 hours, 12 hours, 24 hours, 7 days, 30 days and never, plus a 20-second debug value. "Never" and the debug value sit behind <code>allowNeverArchivePreference</code> and <code>allowDebugArchivePreference</code>.</td><td><span class="state done">Observed</span></td></tr>
             <tr><td>Scopes</td><td>Today tabs and Little Arc windows have separate thresholds. Tab thresholds can differ per profile and sync between devices.</td><td><span class="state done">Observed</span></td></tr>
-            <tr><td>What counts as use</td><td>Each window keeps <code>itemLastActiveDates</code> and <code>lastActiveTabsPerSpace</code>, refreshed by <code>itemLastActiveDateUpdateTimer</code>. Which tabs that timer refreshes is not in the metadata.</td><td><span class="state done">Observed</span></td></tr>
+            <tr><td>What counts as use</td><td>Each window keeps <code>itemLastActiveDates</code> and <code>lastActiveTabsPerSpace</code>, refreshed by <code>itemLastActiveDateUpdateTimer</code>. Sampled live for 25 minutes: only the tab on screen was refreshed, every 60.0 s. Whether sound or picture-in-picture count was not observed.</td><td><span class="state done">Measured</span></td></tr>
+            <tr><td>Default threshold</td><td>12 hours for tabs, 6 hours for Little Arc windows. The user's settings were never changed, their auto-archived tabs had been idle 12.000–12.05 h (Little Arc: 6.0 h), and the help center states the same.</td><td><span class="state done">Measured</span></td></tr>
             <tr><td>Exclusions</td><td>The auto-archive state carries <code>itemsToExclude</code>. What goes into it needs decompilation.</td><td><span class="state open">Unknown</span></td></tr>
-            <tr><td>After launch</td><td><code>autoArchiveStartTime</code> sits beside <code>didLaunch</code>. Most likely the countdown restarts at launch, so a Mac that was off for a week does not empty the sidebar.</td><td><span class="state todo">Inferred</span></td></tr>
+            <tr><td>After launch</td><td>The countdown restarts at launch: tabs idle for days were archived 11.96 h after the last activity, not at the first sweep. <code>autoArchiveStartTime</code> itself is a one-time date (February 2024), so the launch time is kept in memory.</td><td><span class="state done">Measured</span></td></tr>
             <tr><td>Archive record</td><td>Stores <code>sidebarItem</code>, <code>reason</code>, <code>archivedAt</code>, <code>source</code>, <code>version</code> and child <code>items</code>. Reasons: auto, manual, clear button, clear tab group.</td><td><span class="state done">Observed</span></td></tr>
             <tr><td>Storage</td><td><code>StorableArchive.json</code> and <code>StorableArchiveItems.json</code>, plus cached page snapshots and favicons for the Archive view.</td><td><span class="state done">Observed</span></td></tr>
-            <tr><td>Pruning</td><td><code>removeExpiredItems</code> runs on <code>cleanupTimer</code>. How long archived tabs are kept is in code.</td><td><span class="state open">Unknown</span></td></tr>
+            <tr><td>Pruning</td><td><code>removeExpiredItems</code> runs on <code>cleanupTimer</code>. The archive held exactly 250 entries (oldest 60 days), so most likely the newest 250 are kept.</td><td><span class="state todo">Inferred</span></td></tr>
             <tr><td>Keepalive list</td><td>The 21 <code>keepaliveAllowList</code> patterns (Slack, Gmail, Calendar, Notion, Spotify, WhatsApp, Figma, Google Docs) live in web-content config, and no archive field refers to them. They most likely keep those pages running in the background rather than exempt them from archiving.</td><td><span class="state todo">Inferred</span></td></tr>
-            <tr><td>Timer intervals</td><td>How often each of the three timers fires.</td><td><span class="state open">Unknown</span></td></tr>
+            <tr><td>Timer intervals</td><td>Sweep every 5 minutes (the 97 auto-archive batches are exact multiples of 5.0 minutes apart); last-active refresh every 60 s. The cleanup timer's interval is still unknown.</td><td><span class="state done">Measured</span></td></tr>
           </tbody>
         </table>
       </div>
       <h3 class="sub-h">Rebuild it</h3>
-      <p class="intro">A design for your browser that follows Arc's structure. The interval values are suggestions, not Arc's numbers.</p>
+      <p class="intro">A design for your browser that follows Arc's structure, with Arc's measured values. Sidebar Browser implements exactly this (<code>src/main/autoArchive.ts</code>).</p>
       <ul class="design">
         <li><b>Track use.</b> Store <code>lastActiveAt</code> per unpinned tab. Set it when a tab is selected or left, and refresh visible tabs on a one-minute tick.</li>
         <li><b>Sweep.</b> Every few minutes, archive unpinned tabs older than the Space's threshold. Skip visible, audible and picture-in-picture tabs.</li>
         <li><b>Start fair.</b> On launch, measure from the later of <code>lastActiveAt</code> and the launch time.</li>
         <li><b>Record why.</b> Write an archive record with the reason and time, and keep it searchable.</li>
-        <li><b>Prune.</b> On a slower timer, delete archive records past your retention period.</li>
+        <li><b>Prune.</b> Keep the newest 250 archive records.</li>
       </ul>
     </section>
 
@@ -371,7 +372,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           <h3>Trace the Binary features</h3>
           <p>Ranked by how much each shapes the feel of Arc:</p>
           <ul>
-            <li><b>Auto-archive</b>: design mapped (see above); timer intervals, exclusions and retention still need Ghidra</li>
+            <li><b>Auto-archive</b>: answered from runtime evidence (see above); only <code>itemsToExclude</code> and the cleanup interval still need Ghidra</li>
             <li><b>Command Bar ranking</b>: source weights and duplicate rules</li>
             <li><b>Peek triggers</b>: which tabs and links open a Peek</li>
             <li><b>Sidebar sync</b>: how concurrent edits merge</li>

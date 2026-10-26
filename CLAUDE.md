@@ -5,7 +5,8 @@ Public repo: https://github.com/Rektoooooo/sidebar-browser
 
 ## Start here
 
-1. Read the newest file in `.handoffs/`. It has the full history, decisions, status and next steps.
+1. Read the newest file in `.handoffs/` (`2026-10-26-arc-parity.md`, then the older one). It has the history,
+   decisions, status and next steps.
 2. Arc research: `docs/research/arc-findings.md` (text), `docs/research/arc-data-model.md` (how Arc stores the
    sidebar and archive on disk) and `docs/arc-teardown.html` (feature map, all 52 features).
 3. Reverse-engineering tools and how to resume the Ghidra pass: `docs/research/reverse-engineering-setup.md`.
@@ -17,31 +18,45 @@ Public repo: https://github.com/Rektoooooo/sidebar-browser
 source ~/.nvm/nvm.sh && nvm use   # Arc account only: Node 24 from .nvmrc
 npm install
 npm start            # build + open the browser
-npm test             # 20 Vitest unit tests (state + auto-archive rules)
-npm run e2e          # build + drive the real app with Playwright (23 checks + permission check)
-node e2e/window-shot.mjs   # dark-mode README screenshot → e2e/output/real-window-dark.png
+npm test             # Vitest unit tests (pure state rules, ranking, importers)
+npm run e2e          # build + drive the real app: check-app.mjs, check-overlay.mjs, permission-check.mjs
+node e2e/window-shot.mjs   # README screenshots from sample data → docs/screenshot-*.png
 ```
 
-`npm run e2e` opens real windows on screen for about a minute and uses a throwaway `--user-data-dir` under
+`npm run e2e` opens real windows on screen for a few minutes and uses throwaway `--user-data-dir` folders under
 `e2e/output/`, so the real state in `~/Library/Application Support/sidebar-browser/` is never touched.
+Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electron; see `tasks/lessons.md`.
 
 ## Architecture rules (keep them)
 
-- **Pure core.** `src/main/state.ts` and `src/main/autoArchive.ts` take state in and return a changed copy.
-  No Electron, no `Date.now()` inside; `now` is a parameter. Return the *same object* when nothing changed.
-- **One way to change state.** Only `applyChange()` in `src/main/main.ts` replaces the state; it saves,
-  calls `syncTabViews()` and pushes the state to the sidebar.
-- **Reconcile.** `syncTabViews()` (`src/main/tabViews.ts`) makes the web views match the state. Views are lazy:
-  a tab gets a `WebContentsView` the first time it is shown. Closed tabs call `webContents.close()`.
-- **Render from state.** `src/renderer/sidebar.ts` rebuilds `#sidebar-content` and `#sidebar-footer` on every state.
-  The address box lives in `index.html` so a redraw never wipes typing.
-- **Constants** live in `src/shared/settings.ts` with a comment on where each value comes from.
-- **IPC channel names** live in `src/shared/ipcChannels.ts`. The sandboxed preload cannot import our files,
-  so `src/preload/sidebarPreload.ts` repeats them typed as `typeof IPC_CHANNELS` (the build fails on a mismatch).
-- **Security:** web pages get no preload and stay sandboxed; website permissions are refused except
-  `fullscreen` and `clipboard-sanitized-write`; the sidebar page blocks `will-navigate` and `window.open`.
-  `e2e/permission-check.mjs` proves it. Keep it passing.
-- Build output: `dist/node` (main + preload, CommonJS) and `dist/web` (sidebar page, ES modules).
+- **Pure core.** `state.ts`, `spaces.ts`, `split.ts`, `tree.ts`, `autoArchive.ts`, `commandBar.ts`, `history.ts`,
+  `layout.ts`, `migrate.ts` and the Arc importers take data in and return a changed copy. No Electron, no
+  `Date.now()` inside; `now` is a parameter. Return the *same object* when nothing changed.
+- **Data model** (`src/shared/types.ts`, version 2) follows Arc's: every sidebar object is an item; order lives only
+  in ordered id lists (profile Favorites, Space Pinned / Today, folder and split children). No parent pointers.
+  A saved-shape change needs a version bump and an upgrade step in `migrate.ts`.
+- **One way to change state.** Only `applyChange()` in `src/main/browserCore.ts` replaces the state; it saves, calls
+  `syncTabViews()`, keeps floating layers (overlay, Peek) on top and pushes state to the sidebar. Runtime facts that
+  are not saved (loading, sound, downloads, media, sidebar peek) go out separately as `RuntimeState`.
+- **Actions.** The sidebar sends one `BrowserAction` (`src/shared/actions.ts`) on one channel; `ipc.ts` checks every
+  field (`parseAction`) and only from our own pages; `actionRunner.ts` runs it. Menu items live in `appMenu.ts`
+  (accelerators = Arc's shortcuts) and `appMenuCommands.ts`; the Command Bar's actions reuse them.
+- **Reconcile.** `syncTabViews()` (`tabViews.ts`) makes the web views match the state. Views are lazy: a tab gets a
+  `WebContentsView` the first time it is shown, in its profile's session partition (`profiles.ts`).
+- **Floating UI** lives in one transparent overlay view (`overlay.ts` / `overlayController.ts`, pages in
+  `src/overlay`): Command Bar, Library, site controls, Find, the Peek frame. Peek's page is its own view above it
+  (`peek.ts`). Little Windows are separate windows (`littleWindow.ts`, bar page in `src/little`).
+- **Render from state.** `src/renderer/sidebar.ts` redraws the sidebar and toolbar on every state; redraws wait while
+  a drag is in progress.
+- **Constants** live in `src/shared/settings.ts` with a comment on where each value comes from (measured from Arc,
+  Arc's help center, or "our choice").
+- **Channel names** live in `src/shared/ipcChannels.ts` and `src/shared/overlay.ts`. Sandboxed preloads cannot import
+  our files, so they repeat the names typed as `typeof …` (the build fails on a mismatch).
+- **Security:** web pages get no preload and stay sandboxed; every profile session refuses website permissions
+  except `fullscreen` and `clipboard-sanitized-write` (`profiles.ts`, installed when the session is created); our
+  pages block `will-navigate` and `window.open`. `e2e/permission-check.mjs` proves it. Keep it passing.
+- Build output: `dist/node` (main + preloads, CommonJS) and `dist/web` (sidebar, overlay and Little Window pages,
+  ES modules).
 
 ## Code style
 
