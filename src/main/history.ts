@@ -82,3 +82,73 @@ export function searchHistory(entries: HistoryEntry[], query: string, limit: num
   }
   return matches;
 }
+
+/** Chromium stores visit times as microseconds since 1601-01-01 UTC (Windows FILETIME epoch). */
+const MICROSECONDS_PER_MILLISECOND = 1000;
+/** Milliseconds between 1601-01-01 and 1970-01-01: 11644473600 seconds. */
+const CHROMIUM_EPOCH_OFFSET_MILLISECONDS = 11644473600000;
+
+/**
+ * Merges imported history into the existing one: one entry per address, visit counts added up, the newest visit
+ * kept together with the title of the newest entry that has one. Newest first, capped at HISTORY_LIMIT.
+ * Returns the same list when there is nothing to import.
+ */
+export function mergeHistory(entries: HistoryEntry[], imported: HistoryEntry[]): HistoryEntry[] {
+  if (imported.length === 0) {
+    return entries;
+  }
+  const entryByUrl = new Map<string, HistoryEntry>();
+  for (const entry of [...entries, ...imported]) {
+    const knownEntry = entryByUrl.get(entry.url);
+    if (knownEntry === undefined) {
+      entryByUrl.set(entry.url, entry);
+      continue;
+    }
+    const newerEntry = entry.lastVisitAt > knownEntry.lastVisitAt ? entry : knownEntry;
+    const olderEntry = newerEntry === entry ? knownEntry : entry;
+    const title = newerEntry.title.trim() === "" ? olderEntry.title : newerEntry.title;
+    entryByUrl.set(entry.url, {
+      url: entry.url,
+      title: title,
+      visitCount: knownEntry.visitCount + entry.visitCount,
+      lastVisitAt: newerEntry.lastVisitAt,
+    });
+  }
+  const mergedEntries = [...entryByUrl.values()];
+  mergedEntries.sort((first, second) => second.lastVisitAt - first.lastVisitAt);
+  return mergedEntries.slice(0, HISTORY_LIMIT);
+}
+
+/**
+ * Turns rows of Chromium's `urls` table ({ url, title, visit_count, last_visit_time }) into history entries.
+ * Rows that are not web pages or are malformed are left out.
+ * Example: last_visit_time 13400000000000000 µs → 13400000000000 ms − 11644473600000 = 1755526400000 (Unix ms)
+ */
+export function convertChromiumHistoryRows(rows: unknown): HistoryEntry[] {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+  const convertedEntries: HistoryEntry[] = [];
+  for (const row of rows) {
+    if (typeof row !== "object" || row === null) {
+      continue;
+    }
+    const { url, title, visit_count: visitCount, last_visit_time: lastVisitTime } = row as Record<string, unknown>;
+    const hasValidFields =
+      typeof url === "string" &&
+      typeof visitCount === "number" &&
+      Number.isFinite(visitCount) &&
+      typeof lastVisitTime === "number" &&
+      Number.isFinite(lastVisitTime);
+    if (!hasValidFields || !isRecordableUrl(url)) {
+      continue;
+    }
+    convertedEntries.push({
+      url: url,
+      title: typeof title === "string" ? title : "",
+      visitCount: Math.max(1, visitCount),
+      lastVisitAt: lastVisitTime / MICROSECONDS_PER_MILLISECOND - CHROMIUM_EPOCH_OFFSET_MILLISECONDS,
+    });
+  }
+  return convertedEntries;
+}

@@ -13,7 +13,7 @@
 import { app } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { recordVisit, updateHistoryTitle } from "./history";
+import { mergeHistory, recordVisit, updateHistoryTitle } from "./history";
 import type { HistoryEntry } from "./history";
 
 const HISTORY_FILE_NAME = "history.json";
@@ -103,6 +103,21 @@ export function setVisitTitle(url: string, title: string): void {
 
 export function getHistory(): HistoryEntry[] {
   return entries;
+}
+
+/**
+ * Adds history from another browser. Returns how many addresses were not in the history before.
+ */
+export function importHistoryEntries(imported: HistoryEntry[]): number {
+  const mergedEntries = mergeHistory(entries, imported);
+  if (mergedEntries === entries) {
+    return 0;
+  }
+  const knownUrls = new Set(entries.map((entry) => entry.url));
+  const newUrls = new Set(imported.map((entry) => entry.url).filter((url) => !knownUrls.has(url)));
+  entries = mergedEntries;
+  saveHistoryNow();
+  return newUrls.size;
 }
 
 /**

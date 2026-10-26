@@ -1,27 +1,37 @@
 /**
  * WHY this file exists:
- *   File › Import from Arc… brings the user's Arc sidebar into this browser. The pure reader (arcImport.ts) does the
+ *   File › Import from Arc… brings the user's Arc sidebar, archive and history into this browser. The pure reader (arcImport.ts) does the
  *   translating; this file does the parts around it: find or ask for the file, read it, attach Arc's cached icons,
  *   replace the empty starter Spaces, switch to the first imported Space and report what happened.
  *
  * Data source:
- *   ~/Library/Application Support/Arc/StorableSidebar.json (or a file the user picks) and the
- *   SidebarItemsFaviconCache folder next to it.
+ *   ~/Library/Application Support/Arc/StorableSidebar.json (or a file the user picks), StorableArchiveItems.json and
+ *   the favicon cache folders next to it, and the History databases under Arc's User Data folder.
  *
  * Data flow:
- *   menu → importFromArc() → importArcSidebar() → attachArcFavicons() → applyChange() → summary dialog
+ *   menu → importFromArc() → importArcSidebar() → importArcArchive() → attachArcFavicons() → applyChange()
+ *   → readArcHistory() → importHistoryEntries() → summary dialog
  */
 import { app, dialog } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { attachArcFavicons } from "./arcFavicons";
+import { importArcArchive } from "./arcArchiveImport";
+import type { ArcArchiveImportReport } from "./arcArchiveImport";
+import { attachArcArchiveFavicons, attachArcFavicons } from "./arcFavicons";
+import { readArcHistory } from "./arcHistoryImport";
 import { importArcSidebar } from "./arcImport";
 import type { ArcImportReport } from "./arcImport";
 import { applyChange, getState, getWindow } from "./browserCore";
+import { importHistoryEntries } from "./historyStore";
 import { removeEmptySpaces, switchSpace } from "./spaces";
 
 /** Where Arc keeps its sidebar on the account that uses it (docs/research/arc-data-model.md). */
 const ARC_SIDEBAR_FILE = path.join(app.getPath("home"), "Library", "Application Support", "Arc", "StorableSidebar.json");
+
+/** Arc's own folder; its History databases are below it (arcHistoryImport.ts). */
+const ARC_FOLDER = path.join(app.getPath("home"), "Library", "Application Support", "Arc");
+
+const ARCHIVE_FILE_NAME = "StorableArchiveItems.json";
 
 /** The two Spaces a fresh install starts with; an import replaces them while they are still empty. */
 const STARTER_SPACE_IDS = ["space-personal", "space-work"];
@@ -55,7 +65,7 @@ async function chooseSidebarFile(): Promise<string | null> {
 /**
  * Builds the summary shown after an import.
  */
-function describeReport(report: ArcImportReport): string {
+function describeReport(report: ArcImportReport, archiveReport: ArcArchiveImportReport | undefined, historyPagesImported: number): string {
   const skippedCount = Object.values(report.skippedByKind).reduce((sum, count) => sum + count, 0);
   const lines = [
     `Spaces: ${report.spacesImported} (already imported before: ${report.spacesAlreadyImported})`,
@@ -71,7 +81,28 @@ function describeReport(report: ArcImportReport): string {
   if (skippedCount > 0) {
     lines.push(`${skippedCount} item(s) this browser cannot show yet were left out (easels, notes, …).`);
   }
+  if (archiveReport !== undefined) {
+    lines.push(`Archived tabs: ${archiveReport.archivedImported}`);
+  }
+  lines.push(`History: ${historyPagesImported} pages`);
   return lines.join("\n");
+}
+
+/**
+ * Reads Arc's archive file next to the sidebar file. Null when it is missing or cannot be parsed (the archive is
+ * optional: the sidebar import stands on its own).
+ */
+function readArchiveFile(sidebarFilePath: string): unknown {
+  const archiveFilePath = path.join(path.dirname(sidebarFilePath), ARCHIVE_FILE_NAME);
+  if (!fs.existsSync(archiveFilePath)) {
+    return null;
+  }
+  try {
+    return JSON.parse(fs.readFileSync(archiveFilePath, "utf8"));
+  } catch (error) {
+    console.warn("Could not read Arc's archive; importing without it:", error);
+    return null;
+  }
 }
 
 /**
@@ -102,8 +133,18 @@ export async function importFromArc(): Promise<void> {
   const existingSpaceIds = new Set(stateBefore.spaces.map((space) => space.id));
   const firstNewSpace = result.state.spaces.find((space) => space.id.startsWith(IMPORTED_SPACE_PREFIX) && !existingSpaceIds.has(space.id));
   const faviconFolder = path.join(path.dirname(filePath), "SidebarItemsFaviconCache");
+  const archiveFaviconFolder = path.join(path.dirname(filePath), "ArchiveItemsFaviconCache");
+  const arcArchiveFile = readArchiveFile(filePath);
+  // A list, because the callback below fills it and TypeScript cannot see assignments to a plain variable there.
+  const archiveReports: ArcArchiveImportReport[] = [];
   applyChange(() => {
-    const withIcons = attachArcFavicons(result.state, faviconFolder);
+    let sidebarAndArchiveState = result.state;
+    if (arcArchiveFile !== null) {
+      const archiveResult = importArcArchive(arcArchiveFile, result.state, Date.now());
+      archiveReports.push(archiveResult.report);
+      sidebarAndArchiveState = attachArcArchiveFavicons(archiveResult.state, archiveFaviconFolder);
+    }
+    const withIcons = attachArcFavicons(sidebarAndArchiveState, faviconFolder);
     const withoutStarters = result.report.spacesImported > 0 ? removeEmptySpaces(withIcons, STARTER_SPACE_IDS) : withIcons;
     if (firstNewSpace === undefined) {
       return withoutStarters;
@@ -111,9 +152,11 @@ export async function importFromArc(): Promise<void> {
     return switchSpace(withoutStarters, firstNewSpace.id, Date.now());
   });
 
+  const historyPagesImported = importHistoryEntries(await readArcHistory(ARC_FOLDER));
+
   await dialog.showMessageBox(window, {
     type: "info",
     message: result.report.spacesImported > 0 ? "Imported your Arc sidebar" : "Nothing new to import",
-    detail: describeReport(result.report),
+    detail: describeReport(result.report, archiveReports[0], historyPagesImported),
   });
 }

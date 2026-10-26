@@ -4,16 +4,17 @@
  *   on disk; reusing those makes the imported sidebar look right before any page loads.
  *
  * Data source:
- *   Arc's SidebarItemsFaviconCache folder. Each file is a PNG named after the MD5 hash of the Arc item id
+ *   Arc's SidebarItemsFaviconCache folder, and ArchiveItemsFaviconCache for archived tabs (same naming). Each file is a PNG named after the MD5 hash of the Arc item id
  *   (found on 2026-10-26: 23 of 26 tabs matched md5(item id), none matched the URL or host).
  *
  * Data flow:
- *   main.ts importFromArc() → attachArcFavicons(state, folder) → tabs with "arc-<id>" ids get data: URL icons
+ *   main.ts importFromArc() → attachArcFavicons() / attachArcArchiveFavicons(state, folder) → tabs with "arc-<id>"
+ *   ids get data: URL icons
  */
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { BrowserState, TabItem } from "../shared/types";
+import type { ArchivedTab, BrowserState, TabItem } from "../shared/types";
 
 /** Imported item ids are "arc-" + Arc's own id (arcImport.ts). */
 const IMPORTED_ITEM_PREFIX = "arc-";
@@ -65,4 +66,29 @@ export function attachArcFavicons(state: BrowserState, cacheFolder: string): Bro
     items = { ...items, [item.id]: tabWithIcon };
   }
   return items === state.items ? state : { ...state, items: items };
+}
+
+/**
+ * Gives every imported archived tab without an icon the icon Arc cached for it in ArchiveItemsFaviconCache.
+ * Returns the same state when none was found.
+ */
+export function attachArcArchiveFavicons(state: BrowserState, cacheFolder: string): BrowserState {
+  if (!fs.existsSync(cacheFolder)) {
+    return state;
+  }
+  let hasChanged = false;
+  const archive: ArchivedTab[] = state.archive.map((archivedTab) => {
+    const tab = archivedTab.tab;
+    if (tab.faviconUrl !== null || !tab.id.startsWith(IMPORTED_ITEM_PREFIX)) {
+      return archivedTab;
+    }
+    const arcItemId = tab.id.slice(IMPORTED_ITEM_PREFIX.length);
+    const dataUrl = readIconAsDataUrl(getCachedIconPath(cacheFolder, arcItemId));
+    if (dataUrl === null) {
+      return archivedTab;
+    }
+    hasChanged = true;
+    return { ...archivedTab, tab: { ...tab, faviconUrl: dataUrl } };
+  });
+  return hasChanged ? { ...state, archive: archive } : state;
 }
