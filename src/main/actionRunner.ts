@@ -17,7 +17,7 @@ import { dismissMedia, toggleMediaPlayback } from "./media";
 import { addRoutingRule, removeRoutingRule } from "./routing";
 import { showMenuRequest } from "./menus";
 import type { MenuHost } from "./menus";
-import { openCommandBar, openLibrary, openSiteControls } from "./overlayController";
+import { openCommandBar, openLibrary, openSiteControls, openThemeEditor } from "./overlayController";
 import { setSplitOrientation, separateTabFromSplit, splitTabs, unsplit } from "./split";
 import {
   addToFavorites,
@@ -199,6 +199,8 @@ export function runAction(action: BrowserAction): void {
       return openLibrary();
     case "openSiteControls":
       return openSiteControls();
+    case "openThemeEditor":
+      return openThemeEditor(action.spaceId);
     case "showMenu":
       return showMenuRequest(menuHost, action.request);
   }

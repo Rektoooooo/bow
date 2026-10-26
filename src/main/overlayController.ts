@@ -27,6 +27,8 @@ import { getDownloads, showDownloadInFolder } from "./downloads";
 import { searchHistory } from "./history";
 import { clearHistory, getHistory } from "./historyStore";
 import { computeCardBounds } from "./layout";
+import { THEME_PRESETS } from "./themePresets";
+import { SIDEBAR_WIDTH_PX } from "../shared/settings";
 import type { Bounds } from "./layout";
 import { getOverlayContents, hideOverlay, sendToOverlay, setOverlayBounds, showOverlay } from "./overlay";
 import { closePeek, isPeekOpen, openPeekAsTab, openPeekInSplit } from "./peek";
@@ -191,6 +193,20 @@ export function openCommandBar(mode: CommandBarMode): void {
 
 export function openLibrary(section: LibrarySection = "archive"): void {
   openPanel({ kind: "library", section: section });
+}
+
+/**
+ * Opens the theme editor for a Space, next to the sidebar so the change shows while you edit.
+ */
+export function openThemeEditor(spaceId: string): void {
+  const state = getState();
+  const space = state.spaces.find((candidate) => candidate.id === spaceId);
+  if (space === undefined) {
+    return;
+  }
+  const presets = THEME_PRESETS.map((preset) => ({ label: preset.label, colors: preset.colors, appearance: preset.appearance }));
+  const sidebarWidth = getLayoutOptions().sidebarWidth ?? SIDEBAR_WIDTH_PX;
+  openPanel({ kind: "theme", spaceId: space.id, spaceName: space.name, spaceIcon: space.icon, theme: space.theme, sidebarWidth: sidebarWidth, presets: presets });
 }
 
 export function openSiteControls(): void {

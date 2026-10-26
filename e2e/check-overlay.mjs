@@ -320,6 +320,24 @@ await app.evaluate(({ BrowserWindow }) => {
 await sidebar.waitForTimeout(500);
 check("closing a private window archives nothing", (await getState()).archive.length === archiveCountBefore);
 
+// Theme editor: light appearance, a second color (gradient) and grain apply to the Space.
+state = await getState();
+await dispatch({ type: "openThemeEditor", spaceId: state.activeSpaceId });
+await overlay.waitForSelector(".theme-editor", { timeout: 5000 });
+await overlay.click(".theme-segment:has-text('Light')");
+await overlay.click(".theme-colors .theme-round-button[aria-label^='Add a color']");
+await overlay.evaluate(() => {
+  const slider = document.querySelector(".theme-grain input");
+  slider.value = "0.5";
+  slider.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await overlay.waitForTimeout(500);
+state = await getState();
+const editedTheme = activeSpace(state).theme;
+check("the theme editor changes the Space's appearance, colors and grain", editedTheme.appearance === "light" && editedTheme.colors.length === 2 && editedTheme.grain === 0.5, JSON.stringify(editedTheme));
+await overlay.press("body", "Escape");
+await sidebar.waitForTimeout(300);
+
 // Air Traffic Control: a second launch with a link hands it to this app (the path links from other apps take).
 // A matching rule sends it to its Space; without one it opens in a Little Window.
 const { spawn } = await import("node:child_process");

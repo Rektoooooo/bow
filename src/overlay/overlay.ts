@@ -17,6 +17,7 @@ import type { IconName } from "../renderer/icons.js";
 import { renderFindBar } from "./findBar.js";
 import { renderLibrary } from "./library.js";
 import { renderPeekFrame } from "./peekFrame.js";
+import { renderThemeEditor } from "./themeEditor.js";
 import { renderSiteControls } from "./siteControls.js";
 
 declare global {
@@ -228,6 +229,9 @@ function showPanel(message: OverlayShowMessage): void {
   }
   if (message.panel.kind === "peek") {
     renderPeekFrame(host, message.panel);
+  }
+  if (message.panel.kind === "theme") {
+    renderThemeEditor(host, message.panel);
   }
 }
 

@@ -261,7 +261,8 @@ function buildSpaceMenu(host: MenuHost, space: Space): MenuItemConstructorOption
         app.showEmojiPanel();
       },
     },
-    { label: "Theme", submenu: themeMenu },
+    { label: "Edit Theme…", click: () => host.runAction({ type: "openThemeEditor", spaceId: space.id }) },
+    { label: "Theme Presets", submenu: themeMenu },
     { label: "Appearance", submenu: appearanceMenu },
     { label: "Grain", submenu: grainMenu },
     { label: "Profile (cookies, logins, Favorites)", submenu: profileMenu },

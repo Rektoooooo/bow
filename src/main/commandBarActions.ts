@@ -45,6 +45,7 @@ function buildFixedActions(host: CommandActionHost): FixedAction[] {
   return [
     { entry: { id: "new-space", title: "New Space", keywords: ["create space", "add space"] }, run: () => commands.newSpace() },
     { entry: { id: "new-folder", title: "New Folder", keywords: ["create folder"] }, run: () => commands.newFolder() },
+    { entry: { id: "edit-theme", title: "Edit Theme", keywords: ["space color", "gradient", "appearance"] }, run: () => host.runAction({ type: "openThemeEditor", spaceId: host.getState().activeSpaceId }) },
     { entry: { id: "toggle-sidebar", title: "Toggle Sidebar", keywords: ["hide sidebar", "show sidebar"] }, run: () => commands.toggleSidebar() },
     { entry: { id: "copy-url", title: "Copy URL", keywords: ["copy link", "copy address"] }, run: () => commands.copySelectedUrl("plain") },
     { entry: { id: "copy-markdown", title: "Copy URL as Markdown", keywords: ["markdown link"] }, run: () => commands.copySelectedUrl("markdown") },

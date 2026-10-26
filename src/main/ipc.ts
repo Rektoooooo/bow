@@ -178,6 +178,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   openCommandBar: { mode: isCommandBarMode },
   openLibrary: {},
   openSiteControls: {},
+  openThemeEditor: { spaceId: isText },
   showMenu: { request: isMenuRequest },
 };
 

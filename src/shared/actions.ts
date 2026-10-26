@@ -77,6 +77,7 @@ export type BrowserAction =
   | { type: "openCommandBar"; mode: "newTab" | "editUrl" }
   | { type: "openLibrary" }
   | { type: "openSiteControls" }
+  | { type: "openThemeEditor"; spaceId: SpaceId }
   | { type: "showMenu"; request: MenuRequest };
 
 /** Every action type, for checking an incoming `type` string. */
@@ -125,5 +126,6 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "openCommandBar",
   "openLibrary",
   "openSiteControls",
+  "openThemeEditor",
   "showMenu",
 ];

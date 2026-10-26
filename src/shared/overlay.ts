@@ -11,7 +11,7 @@
  *   main.ts openOverlay(panel) → "overlay:show" → overlay.ts draws the panel
  *   overlay.ts → overlayApi.query / choose / siteCommand / find → main.ts
  */
-import type { ArchivedTab, ItemId, RoutingRule } from "./types";
+import type { ArchivedTab, ItemId, RoutingRule, SpaceTheme, ThemeAppearance } from "./types";
 
 /** What a Command Bar line does when chosen. */
 export type CommandBarResultKind = "navigate" | "search" | "tab" | "history" | "action";
@@ -26,6 +26,7 @@ export type OverlayPanel =
   | { kind: "library"; section: LibrarySection }
   | { kind: "siteControls" }
   | { kind: "find" }
+  | { kind: "theme"; spaceId: string; spaceName: string; spaceIcon: string; theme: SpaceTheme; sidebarWidth: number; presets: { label: string; colors: string[]; appearance: ThemeAppearance }[] }
   | { kind: "peek"; frame: { x: number; y: number; width: number; height: number }; url: string; title: string };
 
 /** The Peek header's buttons. */
