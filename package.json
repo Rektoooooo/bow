@@ -7,11 +7,13 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.renderer.json && cp src/renderer/index.html src/renderer/sidebar.css dist/web/renderer/",
     "start": "npm run build && electron .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "npm run build && node e2e/check-app.mjs && node e2e/permission-check.mjs"
   },
   "devDependencies": {
     "@types/node": "24.19.2",
     "electron": "44.9.3",
+    "playwright-core": "1.64.0",
     "typescript": "6.0.3",
     "vitest": "5.0.5"
   }

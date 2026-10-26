@@ -1,14 +1,22 @@
-# Arc rebuild
+# Sidebar Browser — to-do
 
-- [x] Map Arc's bundle, features and architecture (arc-teardown.html)
+## Done
+
+- [x] Map Arc's bundle, features and architecture (`docs/arc-teardown.html`, `docs/research/arc-findings.md`)
 - [x] Choose a build path: Electron + TypeScript
-- [x] Install Node 24 LTS and run REA setup (Node 24.22.1 in ~/.local; REA 6.8.0 registered; restart pending)
-- [x] Set up a decompiler: Ghidra 12.1.4 + JDK 21 in ~/.local/share, connected to REA, test decompile OK
-- [ ] Back up and inspect StorableSidebar.json on the account that uses Arc
-- [~] Auto-archive: design mapped from metadata; Ghidra pass blocked on free RAM (intervals, exclusions, retention open)
-- [ ] Trace remaining Binary features: Command Bar ranking, Peek triggers, sync merge, Easel captures, BlockListClient
-- [x] Build milestone 1 (sidebar, Spaces, auto-archive): done, 20 unit tests + 23 end-to-end checks passing
-- [ ] Then: Command Bar, Peek, Little Arc, split view
+- [x] Node 24 + REA 6.8.0 installed and registered with Claude Code
+- [x] Ghidra 12.1.4 + JDK 21 installed, Apple Silicon decompiler built, connected to REA, test decompile OK
+- [x] Auto-archive design mapped from Arc's Swift metadata (5 questions still open, need Ghidra)
+- [x] Milestone 1: sidebar, Spaces, pinned/today tabs, inset card, Archive, auto-archive, saving, permission lockdown
+- [x] Tests: 20 unit, 23 end-to-end + permission check
+- [x] Public repo: https://github.com/Rektoooooo/sidebar-browser
 
-## Review
-- Feature map published: https://claude.ai/code/artifact/e8ba659b-13e9-4f46-b52a-d157ccb8a345
+## Next
+
+- [ ] Milestone 2: keyboard shortcuts and app menu (menu accelerators in the main process)
+- [ ] Favicons, back/forward/reload, open links in a new tab
+- [ ] Create / rename / recolor Spaces; drag-and-drop ordering; folders in Pinned
+- [ ] Command Bar, Peek, Little Arc, Split View
+- [ ] Ghidra pass on auto-archive when RAM allows (timers, exclusions, refreshed tabs, retention, default)
+- [ ] Trace remaining Binary features: Command Bar ranking, Peek triggers, sync merge, Easel captures, BlockListClient
+- [ ] Back up `StorableSidebar.json` from the macOS account that uses Arc

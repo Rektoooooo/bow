@@ -11,6 +11,7 @@ Spaces, the page shown as an inset card, and auto-archive for tabs you stop usin
 npm install
 npm start      # builds, then opens the window
 npm test       # unit tests (Vitest)
+npm run e2e    # drives the real app with Playwright (opens windows briefly; uses a throwaway profile)
 ```
 
 Needs Node.js 22.23+ or 24.22+.
@@ -43,7 +44,9 @@ These intervals are our own choices. The threshold menu copies the options Arc o
 | `src/renderer` | The sidebar page | Drawing the sidebar from the current state |
 | `src/shared` | Both | Data types, named settings, IPC channel names |
 | `tests` | Vitest | Rules for state changes and auto-archive |
-| `docs` | — | Screenshot, and `arc-teardown.html`: the map of Arc's features this project works from |
+| `e2e` | Playwright + Electron | End-to-end checks of the real app, the permission check, the README screenshot |
+| `docs` | — | Screenshot, `arc-teardown.html` (map of Arc's features), and `research/` (findings and reverse-engineering setup) |
+| `tools` | Node / Python | `rea-driver` (keeps one REA + Ghidra session open), `swift-reflstr.py` (Swift field names from a binary) |
 
 Three ideas keep it simple:
 
