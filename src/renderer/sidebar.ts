@@ -1,71 +1,56 @@
 /**
  * WHY this file exists:
- *   Draws the sidebar: Space heading, pinned tabs, today tabs, the archive, the
- *   "Archive tabs after" setting and the Space switcher. It holds no data of its own;
- *   it redraws from each new state.
+ *   Draws the window's own page: the sidebar (Favorites, Space title, Pinned, the divider with Clear, New Tab, Today,
+ *   and the bottom bar with Library, Space switcher and +) and the toolbar above the page. It holds almost no data
+ *   of its own; it redraws from each new state.
  *
  * Data source:
- *   BrowserState from window.browserApi (getState on load, onStateChanged after every change).
+ *   BrowserState and RuntimeState from window.browserApi (fetched on load, pushed after every change), plus two
+ *   pieces of page-only state: which row is being renamed, and whether a drag is in progress.
  *
  * Data flow:
- *   state arrives → renderSidebar() → rebuilds #sidebar-content and #sidebar-footer → click → window.browserApi.<action>()
+ *   state arrives → renderAll() → favorites / space content / bottom bar / toolbar → clicks → dispatch(action)
  *
  * Pattern: "render from state". We never patch one row by hand; we redraw from the newest state.
  * The sidebar has at most a few hundred rows, so redrawing everything stays fast.
  */
-import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS } from "../shared/settings.js";
-import type { ArchiveReason, ArchivedTab, BrowserApi, BrowserState, ItemId, TabItem } from "../shared/types";
+import type { SidebarCommand } from "../shared/actions.js";
+import type { BrowserState, ItemId, ItemLocation, RuntimeState, Space, SpaceId, TabItem } from "../shared/types";
+import { createElement, createIconButton, createTextButton, dispatch } from "./dom.js";
+import { makeListDropZone, onDragStateChanged } from "./dragDrop.js";
+import { renderFavoriteTile, renderItemRows } from "./rows.js";
+import type { RowContext } from "./rows.js";
+import { applySpaceTheme } from "./theme.js";
+import { renderToolbar } from "./toolbar.js";
 
-declare global {
-  interface Window {
-    browserApi: BrowserApi;
-  }
-}
+/** Horizontal scroll distance (in wheel delta units) that counts as a swipe to the next Space. Our choice. */
+const SWIPE_THRESHOLD = 60;
 
-/** How many archive entries to draw. Older ones stay saved; drawing thousands of rows would slow the sidebar. */
-const MAX_ARCHIVE_ROWS = 50;
+/** After a swipe, ignore further wheel events for this long, so one gesture moves one Space. */
+const SWIPE_COOLDOWN_MS = 450;
 
-/** Words shown next to each archive entry. */
-const ARCHIVE_REASON_LABELS: Record<ArchiveReason, string> = {
-  auto: "Auto-archived",
-  manual: "Closed",
-  "clear-button": "Cleared",
-};
+/** The newest state and runtime facts received. */
+let currentState: BrowserState | null = null;
+let currentRuntime: RuntimeState = {};
 
-/** Shown instead of a letter when a tab's URL has no readable host name. */
-const FALLBACK_SITE_INITIAL = "•";
+/** The sidebar item, Space name or Space icon being edited inline, or null. */
+let renamingItemId: ItemId | null = null;
+let renamingSpaceId: SpaceId | null = null;
+let editingIconSpaceId: SpaceId | null = null;
 
-/** Remembers whether the Archive section is open, because every redraw builds it again from scratch. */
-let isArchiveOpen = false;
+/** True while a row is being dragged: redraws wait until the drop, so the dragged row is not replaced mid-drag. */
+let isDragging = false;
+let hasPendingRedraw = false;
 
-/**
- * Creates an element with a class and optional text. Almost every element below starts here.
- */
-function createElement(tagName: string, className: string, text: string = ""): HTMLElement {
-  const element = document.createElement(tagName);
-  element.className = className;
-  element.textContent = text;
-  return element;
-}
+/** The Space shown in the last redraw, to slide the content when it changes. */
+let lastRenderedSpaceId: SpaceId | null = null;
 
-/**
- * Creates a button that runs onClick. The click does not reach the row underneath,
- * so pressing "Close" on a tab does not also select that tab.
- */
-function createButton(label: string, className: string, onClick: () => void): HTMLButtonElement {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = className;
-  button.textContent = label;
-  button.addEventListener("click", (event) => {
-    event.stopPropagation();
-    onClick();
-  });
-  return button;
-}
+/** Accumulated horizontal wheel distance of the current swipe, and when the last swipe fired. */
+let swipeDistance = 0;
+let lastSwipeAt = 0;
 
 /**
- * Returns the selected tab id of the active Space, or null when the Space is empty.
+ * Returns the selected tab of the active Space, or null.
  */
 function getSelectedTabId(state: BrowserState): ItemId | null {
   // "?? null" turns a missing entry (undefined) into null, so both mean "nothing selected".
@@ -73,236 +58,278 @@ function getSelectedTabId(state: BrowserState): ItemId | null {
 }
 
 /**
- * Returns the first letter of a tab's site, used as a simple stand-in for a favicon.
- * Example: "https://www.github.com/x" → "G"
+ * Returns the active Space. The main process guarantees it exists.
  */
-function getSiteInitial(url: string): string {
-  let hostname = "";
-  try {
-    hostname = new URL(url).hostname;
-  } catch {
-    return FALLBACK_SITE_INITIAL;
-  }
-
-  const wwwPrefix = "www.";
-  if (hostname.startsWith(wwwPrefix)) {
-    hostname = hostname.slice(wwwPrefix.length);
-  }
-  const firstLetter = hostname.charAt(0);
-  if (firstLetter === "") {
-    return FALLBACK_SITE_INITIAL;
-  }
-  return firstLetter.toUpperCase();
+function getActiveSpace(state: BrowserState): Space | undefined {
+  return state.spaces.find((space) => space.id === state.activeSpaceId);
 }
 
 /**
- * Turns an archive time into short text for the archive list.
- * Example: archived 2 hours ago → "2 h ago"; 3 days ago → "3 d ago"
+ * Builds the shared context every row needs.
  */
-function formatTimeAgo(archivedAt: number, now: number): string {
-  const elapsedMs = now - archivedAt;
-  if (elapsedMs < MINUTE_MS) {
-    return "just now";
-  }
-  if (elapsedMs < HOUR_MS) {
-    const minutes = Math.floor(elapsedMs / MINUTE_MS);
-    return `${minutes} min ago`;
-  }
-  if (elapsedMs < DAY_MS) {
-    const hours = Math.floor(elapsedMs / HOUR_MS);
-    return `${hours} h ago`;
-  }
-  const days = Math.floor(elapsedMs / DAY_MS);
-  return `${days} d ago`;
+function createRowContext(state: BrowserState): RowContext {
+  return {
+    state: state,
+    runtime: currentRuntime,
+    selectedTabId: getSelectedTabId(state),
+    renamingItemId: renamingItemId,
+    onRenameFinished: () => {
+      renamingItemId = null;
+      renderAll();
+    },
+  };
 }
 
 /**
- * Pins an unpinned tab, or unpins a pinned one.
+ * Draws the sidebar header buttons next to the traffic lights.
  */
-function togglePin(tab: TabItem, isPinned: boolean): void {
-  if (isPinned) {
-    window.browserApi.dispatch({ type: "unpinTab", tabId: tab.id });
+function renderHeader(): void {
+  const header = document.getElementById("sidebar-header-buttons");
+  if (header === null) {
     return;
   }
-  window.browserApi.dispatch({ type: "pinTab", tabId: tab.id });
+  const hideButton = createIconButton("sidebar", "Hide sidebar (⌘S)", "header-button", () => {
+    dispatch({ type: "setSidebarVisible", isVisible: false });
+  });
+  header.replaceChildren(hideButton);
 }
 
 /**
- * Builds one tab row: site letter, title, and hover buttons for pin/unpin and close.
+ * Draws the Favorites tiles of the active Space's profile, and a drop zone for adding more.
  */
-function renderTabRow(tab: TabItem, isSelected: boolean, isPinned: boolean): HTMLElement {
-  const row = createElement("div", "tab-row");
+function renderFavorites(state: BrowserState, space: Space, context: RowContext): void {
+  const container = document.getElementById("favorites");
+  if (container === null) {
+    return;
+  }
+  const profile = state.profiles.find((candidate) => candidate.id === space.profileId);
+  const favoriteIds = profile === undefined ? [] : profile.favoriteIds;
+  const location: ItemLocation = { kind: "favorites", profileId: space.profileId };
+
+  const tiles: HTMLElement[] = [];
+  favoriteIds.forEach((tabId, index) => {
+    const tab = state.items[tabId];
+    if (tab !== undefined && tab.kind === "tab") {
+      tiles.push(renderFavoriteTile(tab, location, index, context));
+    }
+  });
+  // A fresh end zone on every redraw, so drops always target the current Space's profile.
+  const endZone = createElement("div", "favorites-end-zone");
+  endZone.title = "Drop a tab here to make it a Favorite";
+  makeListDropZone(endZone, location, "end");
+  container.replaceChildren(...tiles, endZone);
+  container.classList.toggle("is-empty", tiles.length === 0);
+}
+
+/**
+ * Builds the inline field used to rename a Space or change its emoji.
+ */
+function createSpaceEditInput(space: Space, field: "name" | "icon"): HTMLInputElement {
+  const input = document.createElement("input");
+  input.className = field === "name" ? "rename-input" : "rename-input icon-input";
+  input.value = field === "name" ? space.name : space.icon;
+  input.setAttribute("aria-label", field === "name" ? "Space name" : "Space icon");
+  let isFinished = false;
+
+  const finish = (shouldSave: boolean): void => {
+    if (isFinished) {
+      return;
+    }
+    isFinished = true;
+    if (shouldSave && field === "name") {
+      dispatch({ type: "renameSpace", spaceId: space.id, name: input.value });
+    }
+    if (shouldSave && field === "icon") {
+      dispatch({ type: "setSpaceIcon", spaceId: space.id, icon: input.value });
+    }
+    renamingSpaceId = null;
+    editingIconSpaceId = null;
+    renderAll();
+  };
+
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      finish(true);
+    }
+    if (event.key === "Escape") {
+      finish(false);
+    }
+  });
+  input.addEventListener("blur", () => finish(true));
+  requestAnimationFrame(() => {
+    input.focus();
+    input.select();
+  });
+  return input;
+}
+
+/**
+ * Builds the Space title row: emoji and name. Clicking collapses or expands Pinned; double-click renames;
+ * right-click opens the Space menu. It is also a drop zone for the top of Pinned.
+ */
+function renderSpaceTitle(space: Space): HTMLElement {
+  const row = createElement("div", "space-title");
+  row.setAttribute("role", "button");
+  row.setAttribute("aria-expanded", String(space.isPinnedOpen));
+  row.tabIndex = 0;
+
+  const icon = createElement("span", "space-title-icon", space.icon);
+  if (editingIconSpaceId === space.id) {
+    icon.replaceChildren(createSpaceEditInput(space, "icon"));
+  }
+  const name = createElement("span", "space-title-name", space.name);
+  if (renamingSpaceId === space.id) {
+    name.replaceChildren(createSpaceEditInput(space, "name"));
+  }
+  const moreButton = createIconButton("more", "Space menu", "row-action space-more", () => {
+    dispatch({ type: "showMenu", request: { menu: "space", spaceId: space.id } });
+  });
+  row.append(icon, name, moreButton);
+
+  row.addEventListener("click", () => dispatch({ type: "setPinnedSectionOpen", spaceId: space.id, isOpen: !space.isPinnedOpen }));
+  row.addEventListener("dblclick", (event) => {
+    event.preventDefault();
+    renamingSpaceId = space.id;
+    renderAll();
+  });
+  row.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    dispatch({ type: "showMenu", request: { menu: "space", spaceId: space.id } });
+  });
+  makeListDropZone(row, { kind: "pinned", spaceId: space.id }, "start");
+  return row;
+}
+
+/**
+ * Builds the divider between Pinned and Today, with Arc's "Clear" button that archives every Today tab.
+ */
+function renderDivider(space: Space): HTMLElement {
+  const divider = createElement("div", "today-divider");
+  divider.append(createElement("span", "divider-line"));
+  if (space.todayIds.length > 0) {
+    const clearButton = createTextButton("↓ Clear", "divider-clear", () => dispatch({ type: "clearTodayTabs" }));
+    clearButton.title = "Move all Today tabs to the Archive (⇧⌘K)";
+    divider.append(clearButton);
+  }
+  // Dropping on the divider puts an item at the end of Pinned.
+  makeListDropZone(divider, { kind: "pinned", spaceId: space.id }, "end");
+  return divider;
+}
+
+/**
+ * Builds the "+ New Tab" row. It opens the Command Bar, like ⌘T. Dropping on it puts an item at the top of Today.
+ */
+function renderNewTabRow(space: Space): HTMLElement {
+  const row = createElement("div", "row new-tab-row");
   row.setAttribute("role", "button");
   row.tabIndex = 0;
-  row.title = tab.url;
-  if (isSelected) {
-    row.classList.add("is-selected");
-    row.setAttribute("aria-current", "page");
-  }
-
-  let pinLabel = "Pin";
-  if (isPinned) {
-    pinLabel = "Unpin";
-  }
-  const icon = createElement("span", "tab-icon", getSiteInitial(tab.url));
-  const title = createElement("span", "tab-title", tab.customTitle ?? tab.title);
-  const pinButton = createButton(pinLabel, "tab-action", () => togglePin(tab, isPinned));
-  const closeButton = createButton("×", "tab-action tab-close", () => window.browserApi.dispatch({ type: "closeTab", tabId: tab.id }));
-  closeButton.setAttribute("aria-label", "Close tab");
-  closeButton.title = "Close (moves the tab to the Archive)";
-
-  row.append(icon, title, pinButton, closeButton);
-  row.addEventListener("click", () => window.browserApi.dispatch({ type: "selectTab", tabId: tab.id }));
-  row.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      window.browserApi.dispatch({ type: "selectTab", tabId: tab.id });
-    }
-  });
+  const iconSlot = createElement("span", "row-icon-slot", "+");
+  row.append(iconSlot, createElement("span", "row-title", "New Tab"));
+  row.addEventListener("click", () => dispatch({ type: "openCommandBar", mode: "newTab" }));
+  makeListDropZone(row, { kind: "today", spaceId: space.id }, "start");
   return row;
 }
 
 /**
- * Builds one titled list of tabs. Used twice: "Pinned" and "Today".
- * The "Today" list also gets a "Clear" button that archives all its tabs.
+ * Draws the active Space: title, Pinned (when open), divider, New Tab and Today.
  */
-function renderTabList(title: string, tabs: TabItem[], selectedTabId: ItemId | null, emptyMessage: string, showClearButton: boolean): HTMLElement {
-  const section = createElement("section", "tab-list");
-  const header = createElement("div", "section-header");
-  header.append(createElement("h2", "section-title", title));
-  if (showClearButton && tabs.length > 0) {
-    const clearButton = createButton("Clear", "text-button", () => window.browserApi.dispatch({ type: "clearTodayTabs" }));
-    clearButton.title = "Move all of today's tabs to the Archive";
-    header.append(clearButton);
-  }
-  section.append(header);
-
-  if (tabs.length === 0) {
-    section.append(createElement("p", "list-empty", emptyMessage));
-    return section;
-  }
-  for (const tab of tabs) {
-    const isSelected = tab.id === selectedTabId;
-    section.append(renderTabRow(tab, isSelected, !showClearButton));
-  }
-  return section;
-}
-
-/**
- * Builds one archive entry: title, why and when it was archived, and a Restore button.
- */
-function renderArchiveRow(entry: ArchivedTab, now: number): HTMLElement {
-  const row = createElement("div", "archive-row");
-  row.title = entry.tab.url;
-
-  const reasonLabel = ARCHIVE_REASON_LABELS[entry.reason];
-  const timeAgo = formatTimeAgo(entry.archivedAt, now);
-  const text = createElement("div", "archive-text");
-  text.append(createElement("span", "archive-title", entry.tab.customTitle ?? entry.tab.title));
-  text.append(createElement("span", "archive-meta", `${reasonLabel} · ${timeAgo}`));
-
-  const restoreButton = createButton("Restore", "text-button archive-restore", () => {
-    window.browserApi.dispatch({ type: "restoreArchivedTab", tabId: entry.tab.id });
-  });
-  row.append(text, restoreButton);
-  return row;
-}
-
-/**
- * Builds the collapsible "Archive" section, newest first. Only the newest MAX_ARCHIVE_ROWS are drawn.
- */
-function renderArchiveSection(archive: ArchivedTab[]): HTMLElement {
-  const details = document.createElement("details");
-  details.className = "archive";
-  details.open = isArchiveOpen;
-  details.addEventListener("toggle", () => {
-    isArchiveOpen = details.open;
-  });
-  details.append(createElement("summary", "section-title archive-summary", `Archive · ${archive.length}`));
-
-  if (archive.length === 0) {
-    details.append(createElement("p", "list-empty", "Closed and auto-archived tabs land here."));
-    return details;
-  }
-
-  const now = Date.now();
-  const visibleEntries = archive.slice(0, MAX_ARCHIVE_ROWS);
-  for (const entry of visibleEntries) {
-    details.append(renderArchiveRow(entry, now));
-  }
-  const hiddenCount = archive.length - visibleEntries.length;
-  if (hiddenCount > 0) {
-    details.append(createElement("p", "list-empty", `${hiddenCount} older entries not shown.`));
-  }
-  return details;
-}
-
-/**
- * Sends the newly chosen "Archive tabs after" value to the main process.
- */
-function handleArchiveSettingChange(select: HTMLSelectElement): void {
-  // The options were added in the same order as ARCHIVE_THRESHOLD_OPTIONS, so the index finds the choice.
-  const chosenOption = ARCHIVE_THRESHOLD_OPTIONS[select.selectedIndex];
-  if (chosenOption === undefined) {
+function renderSpaceContent(state: BrowserState, space: Space, context: RowContext): void {
+  const content = document.getElementById("space-content");
+  if (content === null) {
     return;
   }
-  window.browserApi.dispatch({ type: "setArchiveAfter", archiveAfterMs: chosenOption.valueMs });
-}
 
-/**
- * Builds the "Archive tabs after" dropdown from ARCHIVE_THRESHOLD_OPTIONS, with the current setting selected.
- */
-function renderArchiveSetting(state: BrowserState): HTMLElement {
-  const wrapper = createElement("label", "archive-setting");
-  const caption = createElement("span", "archive-setting-label", "Archive tabs after");
+  const pinnedLocation: ItemLocation = { kind: "pinned", spaceId: space.id };
+  const todayLocation: ItemLocation = { kind: "today", spaceId: space.id };
+  const children: HTMLElement[] = [renderSpaceTitle(space)];
 
-  const select = document.createElement("select");
-  select.id = "archive-after";
-  for (const option of ARCHIVE_THRESHOLD_OPTIONS) {
-    const optionElement = document.createElement("option");
-    optionElement.textContent = option.label;
-    optionElement.selected = option.valueMs === state.settings.archiveAfterMs;
-    select.append(optionElement);
+  if (space.isPinnedOpen) {
+    const pinnedSection = createElement("div", "item-list pinned-list");
+    pinnedSection.append(...renderItemRows(space.pinnedIds, pinnedLocation, 0, context));
+    children.push(pinnedSection);
   }
-  select.addEventListener("change", () => handleArchiveSettingChange(select));
+  children.push(renderDivider(space));
+  children.push(renderNewTabRow(space));
 
-  wrapper.append(caption, select);
-  return wrapper;
+  const todaySection = createElement("div", "item-list today-list");
+  todaySection.append(...renderItemRows(space.todayIds, todayLocation, 0, context));
+  const todayEnd = createElement("div", "list-end-zone");
+  makeListDropZone(todayEnd, todayLocation, "end");
+  todaySection.append(todayEnd);
+  children.push(todaySection);
+
+  content.replaceChildren(...children);
+  slideIfSpaceChanged(state, content);
 }
 
 /**
- * Builds the row of Space icons. The active Space is highlighted; clicking another one switches to it.
+ * Plays a short slide when the active Space changes, in the direction of the new Space, like Arc's swipe.
  */
-function renderSpaceSwitcher(state: BrowserState): HTMLElement {
+function slideIfSpaceChanged(state: BrowserState, content: HTMLElement): void {
+  const previousSpaceId = lastRenderedSpaceId;
+  lastRenderedSpaceId = state.activeSpaceId;
+  if (previousSpaceId === null || previousSpaceId === state.activeSpaceId) {
+    return;
+  }
+  const previousIndex = state.spaces.findIndex((space) => space.id === previousSpaceId);
+  const newIndex = state.spaces.findIndex((space) => space.id === state.activeSpaceId);
+  const slideClass = newIndex > previousIndex ? "slide-from-right" : "slide-from-left";
+  content.classList.remove("slide-from-right", "slide-from-left");
+  // Reading offsetWidth restarts the CSS animation when the same class is added again.
+  void content.offsetWidth;
+  content.classList.add(slideClass);
+}
+
+/**
+ * Builds one Space switcher button: the active Space shows its emoji, the others a dot (their emoji on hover).
+ * Dropping a sidebar item on it moves the item to that Space.
+ */
+function renderSpaceButton(space: Space, isActive: boolean): HTMLElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = isActive ? "space-button is-active" : "space-button";
+  button.title = space.name;
+  button.setAttribute("aria-label", space.name);
+  button.setAttribute("aria-pressed", String(isActive));
+  button.append(createElement("span", "space-button-icon", space.icon));
+  button.append(createElement("span", "space-button-dot"));
+  button.addEventListener("click", () => dispatch({ type: "switchSpace", spaceId: space.id }));
+  button.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    dispatch({ type: "showMenu", request: { menu: "space", spaceId: space.id } });
+  });
+  button.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    button.classList.add("drop-into");
+  });
+  button.addEventListener("dragleave", () => button.classList.remove("drop-into"));
+  button.addEventListener("drop", (event) => {
+    event.preventDefault();
+    button.classList.remove("drop-into");
+    const itemId = event.dataTransfer?.getData("application/x-sidebar-item") ?? "";
+    if (itemId !== "") {
+      dispatch({ type: "moveItemToSpace", itemId: itemId, spaceId: space.id });
+    }
+  });
+  return button;
+}
+
+/**
+ * Draws the bottom bar: Library on the left, the Space switcher in the middle, the + menu on the right.
+ */
+function renderBottomBar(state: BrowserState): void {
+  const bar = document.getElementById("bottom-bar");
+  if (bar === null) {
+    return;
+  }
+  const libraryButton = createIconButton("archive", "Library and Archive (⇧⌘L)", "bottom-button", () => dispatch({ type: "openLibrary" }));
   const switcher = createElement("nav", "space-switcher");
   switcher.setAttribute("aria-label", "Spaces");
-
   for (const space of state.spaces) {
-    const button = createButton(space.icon, "space-button", () => window.browserApi.dispatch({ type: "switchSpace", spaceId: space.id }));
-    button.title = space.name;
-    button.setAttribute("aria-label", space.name);
-    if (space.id === state.activeSpaceId) {
-      button.classList.add("is-active");
-      button.setAttribute("aria-pressed", "true");
-    }
-    switcher.append(button);
+    switcher.append(renderSpaceButton(space, space.id === state.activeSpaceId));
   }
-  return switcher;
-}
-
-/**
- * Builds the heading with the active Space's icon and name, and paints the window frame in its color.
- */
-function renderSpaceHeading(state: BrowserState): HTMLElement {
-  const heading = createElement("h1", "space-heading");
-  const activeSpace = state.spaces.find((space) => space.id === state.activeSpaceId);
-  if (activeSpace === undefined) {
-    return heading;
-  }
-
-  heading.textContent = `${activeSpace.icon}  ${activeSpace.name}`;
-  const frameColor = activeSpace.theme.colors[0] ?? "#e9d8d4";
-  document.documentElement.style.setProperty("--frame-color", frameColor);
-  return heading;
+  const plusButton = createIconButton("plus", "New Space, folder or tab", "bottom-button", () => dispatch({ type: "showMenu", request: { menu: "plus" } }));
+  bar.replaceChildren(libraryButton, switcher, plusButton);
 }
 
 /**
@@ -310,89 +337,118 @@ function renderSpaceHeading(state: BrowserState): HTMLElement {
  */
 function updateEmptyCard(selectedTabId: ItemId | null): void {
   const emptyCard = document.getElementById("empty-card");
-  if (emptyCard === null) {
+  if (emptyCard !== null) {
+    emptyCard.hidden = selectedTabId !== null;
+  }
+}
+
+/**
+ * Updates the window title (shown in Mission Control and the Window menu) to the selected page's name.
+ */
+function updateDocumentTitle(state: BrowserState, selectedTabId: ItemId | null): void {
+  const selectedItem = selectedTabId === null ? undefined : state.items[selectedTabId];
+  const selectedTab = selectedItem !== undefined && selectedItem.kind === "tab" ? (selectedItem as TabItem) : null;
+  document.title = selectedTab === null ? "Sidebar Browser" : selectedTab.customTitle ?? selectedTab.title;
+}
+
+/**
+ * Redraws everything from the newest state. While a drag is in progress, waits until it ends.
+ */
+function renderAll(): void {
+  const state = currentState;
+  if (state === null) {
     return;
   }
-  emptyCard.hidden = selectedTabId !== null;
-}
-
-/**
- * Returns the tabs under a list of items in sidebar order, looking inside folders and split views.
- */
-function collectTabs(state: BrowserState, itemIds: ItemId[]): TabItem[] {
-  const tabs: TabItem[] = [];
-  for (const itemId of itemIds) {
-    const item = state.items[itemId];
-    if (item === undefined) {
-      continue;
-    }
-    if (item.kind === "tab") {
-      tabs.push(item);
-      continue;
-    }
-    tabs.push(...collectTabs(state, item.childIds));
+  if (isDragging) {
+    hasPendingRedraw = true;
+    return;
   }
-  return tabs;
-}
-
-/**
- * Redraws the sidebar from the given state.
- */
-function renderSidebar(state: BrowserState): void {
-  const content = document.getElementById("sidebar-content");
-  const footer = document.getElementById("sidebar-footer");
-  if (content === null || footer === null) {
+  const space = getActiveSpace(state);
+  if (space === undefined) {
     return;
   }
 
-  const activeSpace = state.spaces.find((space) => space.id === state.activeSpaceId);
-  const pinnedTabs = collectTabs(state, activeSpace === undefined ? [] : activeSpace.pinnedIds);
-  const todayTabs = collectTabs(state, activeSpace === undefined ? [] : activeSpace.todayIds);
-
-  const selectedTabId = getSelectedTabId(state);
-  content.replaceChildren(
-    renderSpaceHeading(state),
-    renderTabList("Pinned", pinnedTabs, selectedTabId, "Pin tabs you keep coming back to.", false),
-    renderTabList("Today", todayTabs, selectedTabId, "New tabs show up here.", true),
-    renderArchiveSection(state.archive),
-  );
-  footer.replaceChildren(renderArchiveSetting(state), renderSpaceSwitcher(state));
-  updateEmptyCard(selectedTabId);
+  const context = createRowContext(state);
+  document.body.classList.toggle("sidebar-hidden", !state.settings.isSidebarVisible);
+  applySpaceTheme(space.theme);
+  renderHeader();
+  renderFavorites(state, space, context);
+  renderSpaceContent(state, space, context);
+  renderBottomBar(state);
+  renderToolbar(state, currentRuntime, context.selectedTabId);
+  updateEmptyCard(context.selectedTabId);
+  updateDocumentTitle(state, context.selectedTabId);
 }
 
 /**
- * Opens what was typed in the address box as a new tab, then empties the box.
+ * Turns a two-finger horizontal swipe on the sidebar into "next / previous Space", like Arc.
  */
-function handleAddressSubmit(input: HTMLInputElement): void {
-  const typedText = input.value;
-  input.value = "";
-  window.browserApi.dispatch({ type: "openTab", typedText: typedText });
-}
-
-/**
- * Connects the address box, which lives in index.html and is never redrawn.
- */
-function setUpAddressBox(): void {
-  const form = document.getElementById("address-form");
-  const input = document.getElementById("address-input");
-  if (!(form instanceof HTMLFormElement) || !(input instanceof HTMLInputElement)) {
+function handleSidebarWheel(event: WheelEvent): void {
+  const isHorizontal = Math.abs(event.deltaX) > Math.abs(event.deltaY);
+  if (!isHorizontal) {
+    swipeDistance = 0;
     return;
   }
-
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    handleAddressSubmit(input);
-  });
+  const now = Date.now();
+  if (now - lastSwipeAt < SWIPE_COOLDOWN_MS) {
+    return;
+  }
+  swipeDistance = swipeDistance + event.deltaX;
+  if (Math.abs(swipeDistance) < SWIPE_THRESHOLD) {
+    return;
+  }
+  const offset = swipeDistance > 0 ? 1 : -1;
+  swipeDistance = 0;
+  lastSwipeAt = now;
+  dispatch({ type: "switchSpaceByOffset", offset: offset });
 }
 
 /**
- * Entry point: connects the address box, then draws the first state and every state after it.
+ * Handles requests from the main process that only this page can carry out (inline editing).
+ */
+function handleSidebarCommand(command: SidebarCommand): void {
+  if (command.kind === "beginRename") {
+    renamingItemId = command.itemId;
+  }
+  if (command.kind === "beginSpaceRename") {
+    renamingSpaceId = command.spaceId;
+  }
+  if (command.kind === "beginSpaceIconEdit") {
+    editingIconSpaceId = command.spaceId;
+  }
+  renderAll();
+}
+
+/**
+ * Entry point: subscribes to state and runtime pushes, wires page-wide events, and draws the first state.
  */
 async function startSidebar(): Promise<void> {
-  setUpAddressBox();
-  window.browserApi.onStateChanged(renderSidebar);
-  const firstState = await window.browserApi.getState();
-  renderSidebar(firstState);
+  window.browserApi.onStateChanged((state) => {
+    currentState = state;
+    renderAll();
+  });
+  window.browserApi.onRuntimeChanged((runtime) => {
+    currentRuntime = runtime;
+    renderAll();
+  });
+  window.browserApi.onSidebarCommand(handleSidebarCommand);
+  onDragStateChanged((dragging) => {
+    isDragging = dragging;
+    document.body.classList.toggle("is-dragging", dragging);
+    if (!dragging && hasPendingRedraw) {
+      hasPendingRedraw = false;
+      renderAll();
+    }
+  });
+  document.addEventListener("begin-rename", (event) => {
+    renamingItemId = (event as CustomEvent<ItemId>).detail;
+    renderAll();
+  });
+  document.getElementById("sidebar")?.addEventListener("wheel", handleSidebarWheel, { passive: true });
+
+  currentRuntime = await window.browserApi.getRuntimeState();
+  currentState = await window.browserApi.getState();
+  renderAll();
 }
 
 startSidebar();

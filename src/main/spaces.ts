@@ -233,3 +233,25 @@ export function moveItemToSpace(state: BrowserState, itemId: ItemId, targetSpace
   const movedState = insertIntoLocation(stateWithoutItem, targetLocation, itemId, insertIndex);
   return repairSelections(movedState);
 }
+
+/**
+ * Removes the listed Spaces when they hold nothing at all, keeping at least one Space. Used after an import, so the
+ * two empty starter Spaces of a fresh install do not sit next to the user's imported ones.
+ */
+export function removeEmptySpaces(state: BrowserState, spaceIds: SpaceId[]): BrowserState {
+  let changedState = state;
+  for (const spaceId of spaceIds) {
+    const space = findSpace(changedState, spaceId);
+    const isEmpty = space !== undefined && space.pinnedIds.length === 0 && space.todayIds.length === 0;
+    if (!isEmpty || changedState.spaces.length <= 1) {
+      continue;
+    }
+    const remainingSpaces = changedState.spaces.filter((candidate) => candidate.id !== spaceId);
+    const selectedTabIdBySpace = { ...changedState.selectedTabIdBySpace };
+    delete selectedTabIdBySpace[spaceId];
+    const firstSpace = remainingSpaces[0] as Space;
+    const activeSpaceId = changedState.activeSpaceId === spaceId ? firstSpace.id : changedState.activeSpaceId;
+    changedState = { ...changedState, spaces: remainingSpaces, selectedTabIdBySpace: selectedTabIdBySpace, activeSpaceId: activeSpaceId };
+  }
+  return changedState;
+}

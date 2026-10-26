@@ -18,4 +18,5 @@ export const IPC_CHANNELS = {
   stateChanged: "browser:state-changed",
   runtimeChanged: "browser:runtime-changed",
   dispatch: "browser:dispatch",
+  sidebarCommand: "browser:sidebar-command",
 } as const;

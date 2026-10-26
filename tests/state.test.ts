@@ -11,6 +11,8 @@ import {
   createInitialState,
   deleteItem,
   duplicateTab,
+  findNeighbourTabId,
+  findTabIdByNumber,
   getSelectedTabId,
   listVisibleTabIds,
   moveItem,
@@ -348,5 +350,33 @@ describe("normalizeTypedInput", () => {
 
   it("turns plain words into a search URL", () => {
     expect(normalizeTypedInput("best pizza")).toBe("https://duckduckgo.com/?q=best%20pizza");
+  });
+});
+
+describe("moveItem within one list", () => {
+  it("uses positions as seen before the move, so dropping below the next row moves down by one", () => {
+    // Today shows [C, B, A].
+    const { state: withTabs, tabIds } = openTabs(["https://a.example", "https://b.example", "https://c.example"]);
+    const today = { kind: "today" as const, spaceId: PERSONAL_SPACE_ID };
+
+    const movedDown = moveItem(withTabs, tabIds[2] as ItemId, today, 2, FIVE_PM);
+    const toTheEnd = moveItem(withTabs, tabIds[2] as ItemId, today, -1, FIVE_PM);
+
+    expect(getTodayIds(movedDown)).toEqual([tabIds[1], tabIds[2], tabIds[0]]);
+    expect(getTodayIds(toTheEnd)).toEqual([tabIds[1], tabIds[0], tabIds[2]]);
+    expect(moveItem(withTabs, tabIds[2] as ItemId, today, 1, FIVE_PM)).toBe(withTabs);
+  });
+});
+
+describe("tab shortcuts", () => {
+  it("cycles through visible tabs with wrap-around, and ⌘9 means the last tab", () => {
+    // Today shows [C, B, A] with C selected.
+    const { state, tabIds } = openTabs(["https://a.example", "https://b.example", "https://c.example"]);
+
+    expect(findNeighbourTabId(state, 1)).toBe(tabIds[1]);
+    expect(findNeighbourTabId(state, -1)).toBe(tabIds[0]);
+    expect(findTabIdByNumber(state, 1)).toBe(tabIds[2]);
+    expect(findTabIdByNumber(state, 9)).toBe(tabIds[0]);
+    expect(findTabIdByNumber(state, 5)).toBeNull();
   });
 });

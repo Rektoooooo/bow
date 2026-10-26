@@ -13,7 +13,7 @@
  *   store.ts loads a BrowserState → state.ts / spaces.ts / autoArchive.ts return changed copies → sidebar.ts draws it
  */
 
-import type { BrowserAction } from "./actions";
+import type { BrowserAction, SidebarCommand } from "./actions";
 
 /** Any sidebar item's unique id, for example "tab-1793020000000-3". */
 export type ItemId = string;
@@ -173,4 +173,5 @@ export interface BrowserApi {
   onStateChanged(listener: (state: BrowserState) => void): void;
   onRuntimeChanged(listener: (runtimeState: RuntimeState) => void): void;
   dispatch(action: BrowserAction): Promise<void>;
+  onSidebarCommand(listener: (command: SidebarCommand) => void): void;
 }

@@ -1,5 +1,5 @@
 // Checks that a website in a tab is refused camera, microphone, location and notifications,
-// and that the sidebar page cannot be navigated away.
+// that the tab runs in a profile partition (not the default session), and that the sidebar page cannot be navigated away.
 // usage: npm run build && node e2e/permission-check.mjs
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
@@ -16,10 +16,15 @@ const app = await _electron.launch({
   args: [`--user-data-dir=${userDataDir}`, appDir],
   timeout: 30000,
 });
-const page = await app.firstWindow();
-await page.waitForSelector(".space-heading");
-await page.fill("#address-input", "example.com");
-await page.press("#address-input", "Enter");
+// Pick the sidebar page by URL: a restored tab's page can open first.
+let page;
+for (let attempt = 0; attempt < 150 && !page; attempt++) {
+  page = app.windows().find((candidate) => candidate.url().endsWith("/renderer/index.html"));
+  if (!page) await new Promise((resolve) => setTimeout(resolve, 200));
+}
+await page.waitForSelector(".space-title");
+// Tabs run in the profile's own session partition, so this proves the lockdown reaches profile sessions too.
+await page.evaluate(() => window.browserApi.dispatch({ type: "openTab", typedText: "example.com" }));
 await page.waitForTimeout(3000);
 
 const answers = await app.evaluate(async ({ webContents }) => {
@@ -34,6 +39,11 @@ const answers = await app.evaluate(async ({ webContents }) => {
   })()`);
 });
 console.log("permission answers:", JSON.stringify(answers));
+const usesProfilePartition = await app.evaluate(({ webContents, session }) => {
+  const tab = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith("https://example.com"));
+  return tab.session !== session.defaultSession;
+});
+console.log("tab uses a profile session:", usesProfilePartition);
 
 const sidebarUrlBefore = page.url();
 await page.evaluate(() => { window.location.href = "https://example.org"; });
@@ -45,6 +55,6 @@ await app.close();
 fs.rmSync(userDataDir, { recursive: true, force: true });
 
 const allDenied = ["geolocation", "camera", "microphone", "notifications"].every((name) => answers[name] === "denied");
-const passed = allDenied && answers.getUserMedia !== "GRANTED" && navigationBlocked;
+const passed = allDenied && answers.getUserMedia !== "GRANTED" && navigationBlocked && usesProfilePartition;
 console.log(passed ? "PASS  permissions locked down" : "FAIL  permissions");
 process.exit(passed ? 0 : 1);

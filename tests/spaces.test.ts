@@ -8,6 +8,7 @@ import {
   deleteSpace,
   moveItemToSpace,
   moveSpace,
+  removeEmptySpaces,
   renameSpace,
   SPACES_LIMIT,
   switchSpaceByNumber,
@@ -109,5 +110,17 @@ describe("moveItemToSpace", () => {
     const state = moveItemToSpace(selectedBefore, tabIds[1] as ItemId, WORK_SPACE_ID);
 
     expect(getSelectedTabId(state)).toBe(tabIds[0]);
+  });
+});
+
+describe("removeEmptySpaces", () => {
+  it("removes only the listed Spaces that are empty, and never the last one", () => {
+    const { state: withTab } = openTabs(["https://a.example"]);
+
+    const state = removeEmptySpaces(withTab, [PERSONAL_SPACE_ID, WORK_SPACE_ID]);
+    const onlyOneLeft = removeEmptySpaces(createInitialState(), [PERSONAL_SPACE_ID, WORK_SPACE_ID]);
+
+    expect(state.spaces.map((space) => space.id)).toEqual([PERSONAL_SPACE_ID]);
+    expect(onlyOneLeft.spaces).toHaveLength(1);
   });
 });

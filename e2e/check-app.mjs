@@ -1,6 +1,7 @@
-// End-to-end check of the real app: launch it, drive the sidebar, take screenshots, relaunch to check saving.
+// End-to-end check of the real app: launch it, drive the sidebar, take screenshots, relaunch to check saving,
+// and open a version 1 state file to check the upgrade.
 // usage: npm run e2e        (builds first; output in e2e/output, or set E2E_OUTPUT_DIR)
-// Uses a throwaway --user-data-dir, so your real browser state is never touched.
+// Uses throwaway --user-data-dir folders, so your real browser state is never touched.
 // Playwright emulates light mode by default, so screenshots here are light.
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
@@ -16,7 +17,7 @@ fs.mkdirSync(userDataDir, { recursive: true });
 
 const results = [];
 function check(name, ok, detail = "") {
-  results.push({ name, ok, detail });
+  results.push({ name, ok: Boolean(ok), detail });
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  — " + detail : ""}`);
 }
 
@@ -32,10 +33,10 @@ async function findSidebarPage(app) {
   throw new Error("Sidebar page did not open within 30 s");
 }
 
-async function launch() {
+async function launch(dataDir) {
   const app = await _electron.launch({
     executablePath: electronBinary,
-    args: [`--user-data-dir=${userDataDir}`, appDir],
+    args: [`--user-data-dir=${dataDir}`, appDir],
     timeout: 30000,
   });
   const mainLog = [];
@@ -63,88 +64,156 @@ async function windowShot(app, name) {
 }
 
 const getState = (page) => page.evaluate(() => window.browserApi.getState());
+const dispatch = (page, action) => page.evaluate((value) => window.browserApi.dispatch(value), action);
 // Version 2 state: tabs live in state.items; each Space lists its Pinned and Today ids.
-const personalSpace = (state) => state.spaces[0];
-const todayTabs = (state) => personalSpace(state).todayIds.map((id) => state.items[id]);
-const pinnedTabs = (state) => personalSpace(state).pinnedIds.map((id) => state.items[id]);
+const activeSpace = (state) => state.spaces.find((space) => space.id === state.activeSpaceId);
+const todayTabs = (state) => activeSpace(state).todayIds.map((id) => state.items[id]);
+const pinnedItems = (state) => activeSpace(state).pinnedIds.map((id) => state.items[id]);
+const favorites = (state) => state.profiles[0].favoriteIds.map((id) => state.items[id]);
 const itemCount = (state) => Object.keys(state.items).length;
+const tabViewBounds = (app) => app.evaluate(({ BrowserWindow }) => {
+  const win = BrowserWindow.getAllWindows()[0];
+  return win.contentView.children
+    .filter((child) => child.webContents && child.webContents !== win.webContents)
+    .map((child) => child.getBounds());
+});
+
+// Playwright's dragAndDrop starts a real macOS drag inside Electron that never completes, so the drag is simulated
+// in the page: the same dragstart / dragover / drop / dragend events, sharing one DataTransfer, at a point inside
+// the target (verticalFraction 0.5 = middle, which for a folder row means "inside").
+async function simulateDrag(page, sourceSelector, targetSelector, verticalFraction = 0.5) {
+  return page.evaluate(({ sourceSelector, targetSelector, verticalFraction }) => {
+    const source = document.querySelector(sourceSelector);
+    const dataTransfer = new DataTransfer();
+    source.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer }));
+    // The drop target may only appear once the drag has started (the Favorites end zone does).
+    const target = document.querySelector(targetSelector);
+    const rectangle = target.getBoundingClientRect();
+    const point = { clientX: rectangle.left + rectangle.width / 2, clientY: rectangle.top + rectangle.height * verticalFraction };
+    target.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer, ...point }));
+    target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer, ...point }));
+    source.dispatchEvent(new DragEvent("dragend", { bubbles: true, cancelable: true, dataTransfer }));
+    return target.className;
+  }, { sourceSelector, targetSelector, verticalFraction });
+}
 
 // ---------- first run ----------
-let { app, page, mainLog, consoleErrors } = await launch();
-await page.waitForSelector(".space-heading", { timeout: 15000 });
+let { app, page, mainLog, consoleErrors } = await launch(userDataDir);
+await page.waitForSelector(".space-title", { timeout: 15000 });
 check("preload exposes window.browserApi", (await page.evaluate(() => typeof window.browserApi)) === "object");
-check("sidebar renders the Personal Space", (await page.textContent(".space-heading")).includes("Personal"));
+check("sidebar shows the Personal Space title", (await page.textContent(".space-title-name")).includes("Personal"));
 check("empty card shows with no tabs", await page.isVisible("#empty-card"));
+check("bottom bar has Library, two Spaces and +", (await page.locator(".bottom-bar .space-button").count()) === 2 && (await page.locator(".bottom-bar .bottom-button").count()) === 2);
 await windowShot(app, "01-empty");
 
-await page.fill("#address-input", "example.com");
-await page.press("#address-input", "Enter");
-await page.waitForSelector(".tab-row", { timeout: 10000 });
+await dispatch(page, { type: "openTab", typedText: "example.com" });
+await page.waitForSelector(".today-list .tab-row", { timeout: 10000 });
 let titleOk = true;
 try {
-  await page.waitForFunction(() => document.querySelector(".tab-row .tab-title")?.textContent?.includes("Example"), null, { timeout: 15000 });
+  await page.waitForFunction(() => document.querySelector(".today-list .tab-row .row-title")?.textContent?.includes("Example"), null, { timeout: 15000 });
 } catch { titleOk = false; }
 let state = await getState(page);
-check("typing example.com opens a tab with https://", todayTabs(state)[0]?.url.startsWith("https://example.com"), todayTabs(state)[0]?.url);
+check("opening example.com adds a Today tab with https://", todayTabs(state)[0]?.url.startsWith("https://example.com"), todayTabs(state)[0]?.url);
 check("page title flows back into the sidebar", titleOk, todayTabs(state)[0]?.title);
-const contents = await app.evaluate(({ webContents }) => webContents.getAllWebContents().map((contents) => contents.getURL()));
-check("a web view exists for the tab", contents.some((url) => url.startsWith("https://example.com")), contents.join(", "));
+check("toolbar shows the page's host", (await page.textContent(".address-text")) === "example.com");
+const bounds = await tabViewBounds(app);
+check("tab view sits right of the sidebar and below the toolbar", bounds[0]?.x === 248 && bounds[0]?.y === 40, JSON.stringify(bounds));
 check("empty card hidden while a tab is open", !(await page.isVisible("#empty-card")));
-const bounds = await app.evaluate(({ BrowserWindow }) => {
-  const win = BrowserWindow.getAllWindows()[0];
-  const child = win.contentView.children.find((candidate) => candidate.webContents && candidate.webContents !== win.webContents);
-  return { bounds: child?.getBounds(), content: win.getContentSize() };
-});
-check("tab view sits right of the sidebar as an inset card", bounds.bounds?.x === 248 && bounds.bounds?.y === 8, JSON.stringify(bounds));
+await page.waitForFunction(() => document.querySelector(".toolbar-left .toolbar-button:nth-child(3)")?.getAttribute("aria-label") === "Reload (⌘R)", null, { timeout: 15000 }).catch(() => undefined);
 await windowShot(app, "02-tab-open");
 
-await page.evaluate(() => [...document.querySelectorAll(".tab-row .tab-action")].find((button) => button.textContent === "Pin").click());
-await page.waitForFunction(() => document.querySelectorAll(".tab-list")[0].querySelector(".tab-row") !== null, null, { timeout: 5000 });
+const exampleTabId = todayTabs(state)[0].id;
+await dispatch(page, { type: "pinTab", tabId: exampleTabId });
+await page.waitForSelector(".pinned-list .tab-row", { timeout: 5000 });
 state = await getState(page);
-check("Pin moves the tab into Pinned with a home URL", pinnedTabs(state).length === 1 && pinnedTabs(state)[0]?.homeUrl?.startsWith("https://example.com"));
+check("Pin moves the tab into Pinned with a home URL", pinnedItems(state)[0]?.homeUrl?.startsWith("https://example.com"));
 
-await page.fill("#address-input", "best pizza");
-await page.press("#address-input", "Enter");
-await page.waitForFunction(() => document.querySelectorAll(".tab-row").length === 2, null, { timeout: 10000 });
+await dispatch(page, { type: "openTab", typedText: "best pizza" });
+await page.waitForSelector(".today-list .tab-row", { timeout: 10000 });
 state = await getState(page);
-const searchTab = todayTabs(state)[0];
-check("plain words open a search tab", searchTab?.url.startsWith("https://duckduckgo.com/?q=best%20pizza"), searchTab?.url);
-await page.evaluate(() => document.querySelectorAll(".tab-list")[1].querySelector(".tab-close").click());
-await page.waitForFunction(() => document.querySelectorAll(".tab-row").length === 1, null, { timeout: 5000 });
+check("plain words open a search tab", todayTabs(state)[0]?.url.startsWith("https://duckduckgo.com/?q=best%20pizza"), todayTabs(state)[0]?.url);
+
+// Real drag and drop: the Today tab onto the empty Favorites strip.
+await simulateDrag(page, ".today-list .tab-row", ".favorites-end-zone");
+await page.waitForTimeout(400);
 state = await getState(page);
-check("Close moves the tab to the Archive as 'manual'", state.archive.length === 1 && state.archive[0].reason === "manual");
-check("selection falls back to the remaining tab", state.selectedTabIdBySpace[state.activeSpaceId] === pinnedTabs(state)[0]?.id);
+check("dragging a Today tab to the top makes it a Favorite", favorites(state).length === 1 && todayTabs(state).length === 0, JSON.stringify(favorites(state).map((tab) => tab?.url)));
+check("the Favorite shows as a tile", (await page.locator(".favorite-tile").count()) === 1);
+await dispatch(page, { type: "unpinTab", tabId: favorites(state)[0].id });
+await page.waitForTimeout(300);
+
+state = await getState(page);
+await dispatch(page, { type: "closeTab", tabId: todayTabs(state)[0].id });
+await page.waitForFunction(() => document.querySelectorAll(".today-list .tab-row").length === 0, null, { timeout: 5000 });
+state = await getState(page);
+check("closing a Today tab moves it to the Archive as 'manual'", state.archive.length === 1 && state.archive[0].reason === "manual");
+check("selection falls back to the remaining tab", state.selectedTabIdBySpace[state.activeSpaceId] === exampleTabId);
 const viewsAfterClose = await app.evaluate(({ webContents }) => webContents.getAllWebContents().map((contents) => contents.getURL()));
 check("closed tab's web view is destroyed", !viewsAfterClose.some((url) => url.includes("duckduckgo")), viewsAfterClose.join(", "));
 
-await page.evaluate(() => { document.querySelector(".archive").open = true; });
-await page.evaluate(() => document.querySelector(".archive-restore").click());
-await page.waitForFunction(() => document.querySelectorAll(".tab-row").length === 2, null, { timeout: 5000 });
+await dispatch(page, { type: "restoreArchivedTab", tabId: state.archive[0].tab.id });
+await page.waitForSelector(".today-list .tab-row", { timeout: 5000 });
 state = await getState(page);
 check("Restore brings the tab back and empties the Archive", state.archive.length === 0 && itemCount(state) === 2);
 
-await page.selectOption("#archive-after", { label: "1 hour" });
+// Folders: create one, drag the pinned tab into it, then collapse it.
+await dispatch(page, { type: "createFolder", title: "Reading" });
+await page.waitForSelector(".folder-row", { timeout: 5000 });
+await simulateDrag(page, ".pinned-list .tab-row", ".folder-row");
+await page.waitForTimeout(400);
+state = await getState(page);
+const folder = pinnedItems(state).find((item) => item?.kind === "folder");
+check("dropping a pinned tab on a folder puts it inside", folder?.childIds.length === 1, JSON.stringify(pinnedItems(state).map((item) => item?.kind)));
+await page.click(".folder-row");
 await page.waitForTimeout(300);
+state = await getState(page);
+const collapsedFolder = pinnedItems(state).find((item) => item?.kind === "folder");
+check("clicking a folder collapses it", collapsedFolder?.isOpen === false);
+
+// Split view: two Today tabs side by side.
+await dispatch(page, { type: "openTab", typedText: "example.net" });
+await page.waitForFunction(() => document.querySelectorAll(".today-list .tab-row").length === 2, null, { timeout: 10000 });
+state = await getState(page);
+await dispatch(page, { type: "splitTabs", firstTabId: todayTabs(state)[0].id, secondTabId: todayTabs(state)[1].id });
+await page.waitForSelector(".split-row", { timeout: 5000 });
+await page.waitForTimeout(500);
+const splitBounds = await tabViewBounds(app);
+check("a split view shows two pages side by side", splitBounds.length === 2 && splitBounds[0].x < splitBounds[1].x && splitBounds[0].y === splitBounds[1].y, JSON.stringify(splitBounds));
+check("the split shows as one row with two panes", (await page.locator(".split-row .split-pane").count()) === 2);
+await windowShot(app, "03-split-view");
+state = await getState(page);
+const splitItem = Object.values(state.items).find((item) => item.kind === "split");
+await dispatch(page, { type: "unsplit", splitId: splitItem.id });
+await page.waitForTimeout(300);
+
+await dispatch(page, { type: "setArchiveAfter", archiveAfterMs: 3600000 });
+await page.waitForTimeout(200);
 state = await getState(page);
 check("'Archive tabs after' setting saves 1 hour", state.settings.archiveAfterMs === 3600000, String(state.settings.archiveAfterMs));
 
-await page.evaluate(() => [...document.querySelectorAll(".text-button")].find((button) => button.textContent === "Clear").click());
+await dispatch(page, { type: "clearTodayTabs" });
 await page.waitForTimeout(300);
 state = await getState(page);
-check("Clear archives today's tabs, keeps pinned", itemCount(state) === 1 && pinnedTabs(state).length === 1 && state.archive[0]?.reason === "clear-button");
+check("Clear archives Today tabs and keeps Pinned ones", todayTabs(state).length === 0 && state.archive[0]?.reason === "clear-button" && pinnedItems(state).length === 1);
 
-await page.evaluate(() => document.querySelectorAll(".space-button")[1].click());
-await page.waitForFunction(() => document.querySelector(".space-heading")?.textContent?.includes("Work"), null, { timeout: 5000 });
-await page.waitForTimeout(400); // the frame color fades over 200 ms
-const frameColor = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-check("switching to Work shows an empty Space", await page.isVisible("#empty-card"));
-check("frame color changes with the Space", frameColor === "rgb(212, 223, 233)", frameColor);
-await windowShot(app, "03-work-space");
-await page.evaluate(() => document.querySelectorAll(".space-button")[0].click());
+await dispatch(page, { type: "setSidebarVisible", isVisible: false });
 await page.waitForTimeout(400);
-await windowShot(app, "04-back-to-personal");
+const hiddenBounds = await tabViewBounds(app);
+check("hiding the sidebar widens the page card", hiddenBounds.length === 1 && hiddenBounds[0].x === 8, JSON.stringify(hiddenBounds));
+await dispatch(page, { type: "setSidebarVisible", isVisible: true });
 
-check("no errors in the sidebar console", consoleErrors.length === 0, consoleErrors.join(" | "));
+await page.click(".space-button:nth-child(2)");
+await page.waitForFunction(() => document.querySelector(".space-title-name")?.textContent?.includes("Work"), null, { timeout: 5000 });
+const frameColor = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--frame-color-1").trim());
+check("switching to Work shows an empty Space", await page.isVisible("#empty-card"));
+check("the frame takes the Work Space's color", frameColor === "#d4dfe9", frameColor);
+await windowShot(app, "04-work-space");
+await page.click(".space-button:nth-child(1)");
+await page.waitForTimeout(400);
+
+// A site without /favicon.ico answers 404; Chromium logs that as a console error, but it is expected, not a bug.
+const realErrors = consoleErrors.filter((message) => !message.startsWith("Failed to load resource"));
+check("no errors in the sidebar console", realErrors.length === 0, realErrors.join(" | "));
 const firstRunLog = mainLog.join("");
 await app.close();
 // Give the old process a moment to release its profile lock, or the relaunch can stall.
@@ -153,15 +222,37 @@ await new Promise((resolve) => setTimeout(resolve, 1500));
 // ---------- second run: persistence ----------
 const stateFile = path.join(userDataDir, "browser-state.json");
 check("state saved under the test data folder", fs.existsSync(stateFile), stateFile);
-({ app, page, mainLog, consoleErrors } = await launch());
-await page.waitForSelector(".space-heading", { timeout: 30000 });
-await page.waitForSelector(".tab-row", { timeout: 30000 });
+({ app, page, mainLog, consoleErrors } = await launch(userDataDir));
+await page.waitForSelector(".space-title", { timeout: 30000 });
 state = await getState(page);
-check("pinned tab and setting survive a restart", itemCount(state) === 1 && pinnedTabs(state).length === 1 && state.settings.archiveAfterMs === 3600000);
-check("archive survives a restart", state.archive.length === 1);
-await page.waitForTimeout(1500);
+const savedFolder = pinnedItems(state).find((item) => item?.kind === "folder");
+check("folder, pinned tab and setting survive a restart", savedFolder?.childIds.length === 1 && state.settings.archiveAfterMs === 3600000);
+check("archive survives a restart", state.archive.length >= 1);
+await page.waitForTimeout(1000);
 await windowShot(app, "05-after-restart");
 await app.close();
+await new Promise((resolve) => setTimeout(resolve, 1500));
+
+// ---------- third run: a version 1 file from milestone 1 is upgraded ----------
+const upgradeDir = path.join(outDir, "user-data-upgrade");
+fs.rmSync(upgradeDir, { recursive: true, force: true });
+fs.mkdirSync(upgradeDir, { recursive: true });
+const versionOneFile = {
+  version: 1,
+  spaces: [{ id: "space-personal", name: "Personal", icon: "🏠", color: "#e9d8d4" }],
+  tabs: [{ id: "tab-old", spaceId: "space-personal", url: "https://example.org/", title: "Old pinned tab", isPinned: true, homeUrl: "https://example.org/", lastActiveAt: 1 }],
+  activeSpaceId: "space-personal",
+  selectedTabIdBySpace: { "space-personal": null },
+  archive: [],
+  settings: { archiveAfterMs: 21600000 },
+};
+fs.writeFileSync(path.join(upgradeDir, "browser-state.json"), JSON.stringify(versionOneFile));
+const upgraded = await launch(upgradeDir);
+await upgraded.page.waitForSelector(".pinned-list .tab-row", { timeout: 30000 });
+state = await getState(upgraded.page);
+check("a milestone 1 (version 1) file opens and is upgraded", state.version === 2 && state.spaces[0].pinnedIds[0] === "tab-old" && state.settings.archiveAfterMs === 21600000);
+await upgraded.app.close();
+
 // Chromium prints its own internal log lines ("[pid:date/time:ERROR:base/…]"); only our app's output counts.
 const appLogLines = (firstRunLog + mainLog.join("")).split("\n").filter((line) => !/^\[\d+:\d+\/\d+\.\d+:/.test(line));
 const appErrorLines = appLogLines.filter((line) => /error/i.test(line) && !line.startsWith("Debugger"));

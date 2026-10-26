@@ -308,7 +308,16 @@ function canPlace(state: BrowserState, itemId: ItemId, target: ItemLocation): bo
 }
 
 /**
+ * True when two locations name the same list.
+ */
+function isSameLocation(first: ItemLocation, second: ItemLocation): boolean {
+  return JSON.stringify(first) === JSON.stringify(second);
+}
+
+/**
  * Moves an item to a position in another (or the same) list: the drag-and-drop action.
+ * `index` counts positions in the target list as it is now, before the item leaves its old place
+ * (what the user sees while dragging). A negative index means "at the end".
  * Tabs that enter Pinned or Favorites get a home URL; tabs that enter Today lose it and count as used now.
  * Returns the same state when the move breaks a rule (see canPlace) or the target is full.
  */
@@ -316,14 +325,28 @@ export function moveItem(state: BrowserState, itemId: ItemId, target: ItemLocati
   if (!canPlace(state, itemId, target)) {
     return state;
   }
+  const currentLocation = findLocation(state, itemId);
+  const isAlreadyFavorite = currentLocation !== null && currentLocation.kind === "favorites";
   const favoritesAreFull = target.kind === "favorites" && getIdsAt(state, target).length >= FAVORITES_LIMIT;
-  const isAlreadyFavorite = findLocation(state, itemId)?.kind === "favorites";
   if (favoritesAreFull && !isAlreadyFavorite) {
     return state;
   }
 
+  const targetLength = getIdsAt(state, target).length;
+  let insertIndex = index < 0 ? targetLength : index;
+  if (currentLocation !== null && isSameLocation(currentLocation, target)) {
+    const currentIndex = getIdsAt(state, currentLocation).indexOf(itemId);
+    // Taking the item out first shifts every later position up by one.
+    if (currentIndex < insertIndex) {
+      insertIndex = insertIndex - 1;
+    }
+    if (currentIndex === insertIndex) {
+      return state;
+    }
+  }
+
   const stateWithoutItem = removeFromLocation(state, itemId);
-  let changedState = insertIntoLocation(stateWithoutItem, target, itemId, index);
+  let changedState = insertIntoLocation(stateWithoutItem, target, itemId, insertIndex);
 
   const targetRoot = target.kind === "folder" || target.kind === "split" ? findRootLocation(changedState, itemId) : target;
   const tabIds = collectTabIds(changedState, itemId);
@@ -724,4 +747,35 @@ function collectOpenTabIds(state: BrowserState, itemIds: ItemId[]): ItemId[] {
     tabIds.push(...childTabIds);
   }
   return tabIds;
+}
+
+/**
+ * Returns the tab `offset` places away from the selected one in sidebar order (⌥⌘↓ is +1, ⌥⌘↑ is -1), wrapping
+ * around at the ends. Returns null when the Space shows no tabs.
+ */
+export function findNeighbourTabId(state: BrowserState, offset: number): ItemId | null {
+  const visibleTabIds = listVisibleTabIds(state);
+  if (visibleTabIds.length === 0) {
+    return null;
+  }
+  const selectedTabId = getSelectedTabId(state);
+  const currentIndex = selectedTabId === null ? -1 : visibleTabIds.indexOf(selectedTabId);
+  const count = visibleTabIds.length;
+  // Adding count before the remainder keeps the result positive when moving backwards from the top.
+  const targetIndex = (((currentIndex + offset) % count) + count) % count;
+  return visibleTabIds[targetIndex] ?? null;
+}
+
+/** ⌘9 always means the last tab, as in other browsers. */
+const LAST_TAB_NUMBER = 9;
+
+/**
+ * Returns the tab at a 1-based position in sidebar order (⌘1 … ⌘8), or the last tab for ⌘9. Null when there is none.
+ */
+export function findTabIdByNumber(state: BrowserState, tabNumber: number): ItemId | null {
+  const visibleTabIds = listVisibleTabIds(state);
+  if (tabNumber === LAST_TAB_NUMBER) {
+    return visibleTabIds[visibleTabIds.length - 1] ?? null;
+  }
+  return visibleTabIds[tabNumber - 1] ?? null;
 }

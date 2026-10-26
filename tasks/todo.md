@@ -33,19 +33,19 @@ and every Arc behavior we can observe is written down before Arc shuts down.
 - [x] Migration v1 → v2, tested; runtime-only state (loading, audible, can go back) kept out of the saved file
 
 ### 2.3 Arc-style window
-- [ ] Sidebar: traffic lights + sidebar toggle, Favorites grid, Space title, Pinned tree with folders,
+- [x] Sidebar: traffic lights + sidebar toggle, Favorites grid, Space title, Pinned tree with folders,
       divider with Clear, "+ New Tab", Today list, bottom bar (Library, Space icons, + menu)
-- [ ] Top toolbar like the user's Arc (`topBarURLEnabled`): back / forward / reload, domain, site controls
-- [ ] Real favicons, loading state, audio indicator + mute, pinned "navigated away" slash + reset
-- [ ] Per-Space themes (color, gradient, grain), light / dark / auto
+- [x] Top toolbar like the user's Arc (`topBarURLEnabled`): back / forward / reload, domain, site controls
+- [x] Real favicons, loading state, audio indicator + mute, pinned "navigated away" slash + reset
+- [x] Per-Space themes (color, gradient, grain), light / dark / auto
 
 ### 2.4 Overlay layer
 - [ ] Transparent overlay view above the page for: Command Bar (⌘T new tab, ⌘L edit URL; tabs, history,
       suggestions, actions), Find in page, Library (archive with filters + search, downloads), Site controls
 
 ### 2.5 Browser basics
-- [ ] App menu with Arc's shortcuts (table in `docs/research/arc-findings.md`), Edit roles for copy/paste
-- [ ] Context menus: tab, folder, page (open link in new tab, copy link, inspect, …)
+- [x] App menu with Arc's shortcuts (table in `docs/research/arc-findings.md`), Edit roles for copy/paste
+- [x] Context menus: tab, folder, page (open link in new tab, copy link, inspect, …)
 - [ ] Links: target=_blank → new tab; real popup windows for sign-in flows; downloads
 - [ ] History store (bounded) for the Command Bar
 
@@ -55,7 +55,7 @@ and every Arc behavior we can observe is written down before Arc shuts down.
 - [ ] Split View (up to 4 panes)
 - [ ] Hide sidebar (⌘S)
 - [ ] Little Arc-style small window (⌥⌘N, links from other apps), archives after 6 h
-- [ ] Import from Arc: Spaces, Favorites, Pinned folders/tabs, Today tabs, themes (from `StorableSidebar.json`)
+- [x] Import from Arc: Spaces, Favorites, Pinned folders/tabs, Today tabs, themes, cached favicons (File › Import from Arc…)
 
 ### 2.7 Wrap-up
 - [ ] Unit tests for every pure module; e2e rewritten for the new UI; permission check still passing

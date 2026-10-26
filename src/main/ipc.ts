@@ -122,7 +122,7 @@ function isMenuRequest(value: unknown): boolean {
   if (value.menu === "space") {
     return isText(value.spaceId);
   }
-  return value.menu === "plus" || value.menu === "sidebar";
+  return value.menu === "plus" || value.menu === "sidebar" || value.menu === "split";
 }
 
 /** The fields each action type must carry, and how to check them. */

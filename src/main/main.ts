@@ -14,16 +14,24 @@
  * Pattern: "single source of truth". Only applyChange() replaces the state, so every change
  * is saved and shown the same way.
  */
-import { app, BrowserWindow, session } from "electron";
+import { app, BrowserWindow, dialog, session } from "electron";
+import * as fs from "node:fs";
 import * as path from "node:path";
-import type { BrowserAction, NavigationCommand } from "../shared/actions";
+import type { BrowserAction, NavigationCommand, SidebarCommand } from "../shared/actions";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
 import { ARCHIVE_PRUNE_INTERVAL_MS, ARCHIVE_SWEEP_INTERVAL_MS, IN_USE_REFRESH_INTERVAL_MS } from "../shared/settings";
 import type { BrowserState, ItemId } from "../shared/types";
 import { findTabsInUse, markTabsActive } from "./activity";
+import { installAppMenu } from "./appMenu";
+import type { AppMenuCommands } from "./appMenu";
+import { attachArcFavicons } from "./arcFavicons";
+import { importArcSidebar } from "./arcImport";
 import { findTabsToArchive, pruneArchive } from "./autoArchive";
 import { registerIpcHandlers } from "./ipc";
 import type { CardLayoutOptions } from "./layout";
+import { showMenuRequest, showPageContextMenu } from "./menus";
+import type { MenuHost } from "./menus";
+import { copyTabUrl, toggleDevTools, zoomPage } from "./pageCommands";
 import { restrictWebPermissions, useChromeUserAgent } from "./profiles";
 import { setSplitOrientation, separateTabFromSplit, splitTabs, unsplit } from "./split";
 import {
@@ -33,6 +41,9 @@ import {
   createFolder,
   deleteItem,
   duplicateTab,
+  findNeighbourTabId,
+  findTabIdByNumber,
+  getSelectedTabId,
   moveItem,
   moveTabsToArchive,
   openTab,
@@ -40,6 +51,7 @@ import {
   renameItem,
   resetPinnedTab,
   restoreArchivedTab,
+  restoreLastArchivedTab,
   selectTab,
   setArchiveAfter,
   setPinnedSectionOpen,
@@ -57,10 +69,12 @@ import {
   deleteSpace,
   moveItemToSpace,
   moveSpace,
+  removeEmptySpaces,
   renameSpace,
   setSpaceIcon,
   setSpaceTheme,
   switchSpace,
+  switchSpaceByNumber,
   switchSpaceByOffset,
 } from "./spaces";
 import { getStateFilePath, loadState, saveState } from "./store";
@@ -75,7 +89,7 @@ import {
   syncTabViews,
 } from "./tabViews";
 import type { OpenDisposition, TabViewEvents } from "./tabViews";
-import { findTab, isInToday } from "./tree";
+import { findSplitOfTab, findTab, isInToday } from "./tree";
 import { normalizeTypedInput } from "./urls";
 
 /** Starting window size in pixels. Our choice: fits a 13-inch laptop screen. */
@@ -107,11 +121,23 @@ const launchedAt = Date.now();
 /** A pending runtime push, so a burst of page events sends one message. */
 let runtimePushTimer: NodeJS.Timeout | null = null;
 
+/** Recently selected tabs, newest first, for ⌃Tab ("Recent Tab"). Lives only in memory. */
+let recentTabIds: ItemId[] = [];
+
+/** How many recent tabs ⌃Tab remembers. */
+const RECENT_TABS_LIMIT = 20;
+
+/** Where Arc keeps its sidebar on the account that uses it (docs/research/arc-data-model.md). */
+const ARC_SIDEBAR_FILE = path.join(app.getPath("home"), "Library", "Application Support", "Arc", "StorableSidebar.json");
+
+/** The two Spaces a fresh install starts with; an import replaces them while they are still empty. */
+const STARTER_SPACE_IDS = ["space-personal", "space-work"];
+
 /**
- * The card's layout depends on the sidebar setting; the toolbar row comes with the Arc-style window.
+ * The card sits right of the sidebar (unless hidden) and below the toolbar.
  */
 function getLayoutOptions(): CardLayoutOptions {
-  return { isSidebarVisible: currentState.settings.isSidebarVisible, isToolbarVisible: false };
+  return { isSidebarVisible: currentState.settings.isSidebarVisible, isToolbarVisible: true };
 }
 
 /**
@@ -167,6 +193,7 @@ function applyChange(change: (state: BrowserState) => BrowserState): void {
   }
 
   currentState = newState;
+  rememberSelectedTab();
   saveState(stateFilePath, currentState);
   if (mainWindow === null) {
     return;
@@ -174,6 +201,28 @@ function applyChange(change: (state: BrowserState) => BrowserState): void {
   syncTabViews(mainWindow, currentState, getLayoutOptions(), tabViewEvents);
   pushStateToSidebar();
   scheduleRuntimePush();
+}
+
+/**
+ * Puts the selected tab at the front of the recent-tabs list, for ⌃Tab.
+ */
+function rememberSelectedTab(): void {
+  const selectedTabId = getSelectedTabId(currentState);
+  if (selectedTabId === null || recentTabIds[0] === selectedTabId) {
+    return;
+  }
+  const others = recentTabIds.filter((tabId) => tabId !== selectedTabId);
+  recentTabIds = [selectedTabId, ...others].slice(0, RECENT_TABS_LIMIT);
+}
+
+/**
+ * Sends a request to the sidebar page that only it can carry out (inline renaming).
+ */
+function sendSidebarCommand(command: SidebarCommand): void {
+  if (mainWindow === null) {
+    return;
+  }
+  mainWindow.webContents.send(IPC_CHANNELS.sidebarCommand, command);
 }
 
 /**
@@ -216,9 +265,17 @@ const tabViewEvents: TabViewEvents = {
   onFaviconChanged: (tabId, faviconUrl) => applyChange((state) => updateTabFavicon(state, tabId, faviconUrl)),
   onRuntimeChanged: () => scheduleRuntimePush(),
   onOpenInNewTab: (_tabId, url, disposition) => openLinkInNewTab(url, disposition),
-  onContextMenu: () => {
-    // The page context menu arrives with the Arc-style window (contextMenus.ts).
-  },
+  onContextMenu: (_tabId, contents, params) => showPageContextMenu(menuHost, contents, params),
+};
+
+/** What menus.ts needs from this file. */
+const menuHost: MenuHost = {
+  getState: () => currentState,
+  getWindow: () => mainWindow,
+  runAction: (action) => runAction(action),
+  sendSidebarCommand: sendSidebarCommand,
+  openInNewTab: (url, inBackground) => openLinkInNewTab(url, inBackground ? "background" : "foreground"),
+  isTabLoaded: (tabId) => getTabContents(tabId) !== null,
 };
 
 /**
@@ -367,14 +424,167 @@ function runAction(action: BrowserAction): void {
       return applyChange((state) => setSidebarVisible(state, action.isVisible));
     case "navigate":
       return navigateFocusedPage(action.command);
+    case "showMenu":
+      return showMenuRequest(menuHost, action.request);
     case "openCommandBar":
     case "openLibrary":
     case "openSiteControls":
-    case "showMenu":
-      // These open overlay panels and native menus, which arrive with the Arc-style window.
+      // These open overlay panels (overlay.ts), wired in the next step.
       return;
   }
 }
+
+/**
+ * Selects a tab when there is one. Used by the keyboard commands that pick a tab by position.
+ */
+function selectTabIfAny(tabId: ItemId | null): void {
+  if (tabId !== null) {
+    applyChange((state) => selectTab(state, tabId, Date.now()));
+  }
+}
+
+/**
+ * Reads Arc's sidebar file and adds the user's Arc Spaces, Favorites, Pinned and Today tabs. The two empty starter
+ * Spaces are removed afterwards. Asks for the file when Arc's usual one is missing, and reports what happened.
+ */
+async function importFromArc(): Promise<void> {
+  if (mainWindow === null) {
+    return;
+  }
+  let filePath = ARC_SIDEBAR_FILE;
+  if (!fs.existsSync(filePath)) {
+    const choice = await dialog.showOpenDialog(mainWindow, {
+      title: "Choose Arc's StorableSidebar.json",
+      properties: ["openFile"],
+      filters: [{ name: "Arc sidebar", extensions: ["json"] }],
+    });
+    const chosenPath = choice.filePaths[0];
+    if (choice.canceled || chosenPath === undefined) {
+      return;
+    }
+    filePath = chosenPath;
+  }
+
+  let parsedFile: unknown = null;
+  try {
+    parsedFile = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch (error) {
+    dialog.showErrorBox("Import from Arc", `The file could not be read: ${String(error)}`);
+    return;
+  }
+
+  const result = importArcSidebar(parsedFile, currentState, Date.now());
+  if (result.report.error !== null) {
+    dialog.showErrorBox("Import from Arc", result.report.error);
+    return;
+  }
+  const firstImportedSpace = result.state.spaces.find((space) => space.id.startsWith("arc-space-") && currentState.spaces.every((existing) => existing.id !== space.id));
+  const arcFaviconFolder = path.join(path.dirname(filePath), "SidebarItemsFaviconCache");
+  applyChange(() => {
+    const withIcons = attachArcFavicons(result.state, arcFaviconFolder);
+    const withoutStarters = result.report.spacesImported > 0 ? removeEmptySpaces(withIcons, STARTER_SPACE_IDS) : withIcons;
+    if (firstImportedSpace === undefined) {
+      return withoutStarters;
+    }
+    return switchSpace(withoutStarters, firstImportedSpace.id, Date.now());
+  });
+
+  const report = result.report;
+  const skippedCount = Object.values(report.skippedByKind).reduce((sum, count) => sum + count, 0);
+  await dialog.showMessageBox(mainWindow, {
+    type: "info",
+    message: report.spacesImported > 0 ? "Imported your Arc sidebar" : "Nothing new to import",
+    detail:
+      `Spaces: ${report.spacesImported} (already imported: ${report.spacesAlreadyImported})\n` +
+      `Tabs: ${report.tabsImported}, folders: ${report.foldersImported}, split views: ${report.splitViewsImported}\n` +
+      `Favorites: ${report.favoritesImported}` +
+      (report.favoritesDropped > 0 ? ` (${report.favoritesDropped} over the limit of 12 left out)` : "") +
+      (skippedCount > 0 ? `\nLeft out: ${skippedCount} item(s) this browser cannot show yet` : ""),
+  });
+}
+
+/** What the application menu's items do. */
+const appMenuCommands: AppMenuCommands = {
+  openCommandBar: (mode) => runAction({ type: "openCommandBar", mode: mode }),
+  closeSelectedTab: () => {
+    const selectedTabId = getSelectedTabId(currentState);
+    if (selectedTabId !== null) {
+      closeTabByUser(selectedTabId);
+    }
+  },
+  reopenClosedTab: () => applyChange((state) => restoreLastArchivedTab(state, Date.now())),
+  togglePinSelected: () => {
+    const selectedTabId = getSelectedTabId(currentState);
+    if (selectedTabId === null) {
+      return;
+    }
+    if (isInToday(currentState, selectedTabId)) {
+      applyChange((state) => pinTab(state, selectedTabId));
+      return;
+    }
+    applyChange((state) => unpinTab(state, selectedTabId, Date.now()));
+  },
+  copySelectedUrl: (format) => {
+    const selectedTabId = getSelectedTabId(currentState);
+    const tab = selectedTabId === null ? undefined : findTab(currentState, selectedTabId);
+    if (tab !== undefined) {
+      copyTabUrl(tab, format);
+    }
+  },
+  duplicateSelected: () => {
+    const selectedTabId = getSelectedTabId(currentState);
+    if (selectedTabId !== null) {
+      applyChange((state) => duplicateTab(state, selectedTabId, Date.now()));
+    }
+  },
+  cycleTab: (offset) => selectTabIfAny(findNeighbourTabId(currentState, offset)),
+  selectTabNumber: (tabNumber) => selectTabIfAny(findTabIdByNumber(currentState, tabNumber)),
+  selectRecentTab: () => {
+    const previousTabId = recentTabIds.find((tabId) => tabId !== getSelectedTabId(currentState) && findTab(currentState, tabId) !== undefined);
+    selectTabIfAny(previousTabId ?? null);
+  },
+  clearTodayTabs: () => applyChange((state) => clearTodayTabs(state, Date.now())),
+  addSplitPane: () => {
+    const selectedTabId = getSelectedTabId(currentState);
+    const partnerTabId = recentTabIds.find((tabId) => tabId !== selectedTabId && findTab(currentState, tabId) !== undefined);
+    if (selectedTabId !== null && partnerTabId !== undefined) {
+      applyChange((state) => splitTabs(state, selectedTabId, partnerTabId, Date.now()));
+    }
+  },
+  closeSplitPane: () => {
+    const selectedTabId = getSelectedTabId(currentState);
+    if (selectedTabId !== null && findSplitOfTab(currentState, selectedTabId) !== null) {
+      closeTabByUser(selectedTabId);
+    }
+  },
+  switchSpaceByOffset: (offset) => applyChange((state) => switchSpaceByOffset(state, offset, Date.now())),
+  switchSpaceByNumber: (spaceNumber) => applyChange((state) => switchSpaceByNumber(state, spaceNumber, Date.now())),
+  newSpace: () => showMenuRequest(menuHost, { menu: "plus" }),
+  newFolder: () => applyChange((state) => createFolder(state, "New Folder", Date.now())),
+  toggleSidebar: () => applyChange((state) => setSidebarVisible(state, !state.settings.isSidebarVisible)),
+  navigate: (command) => navigateFocusedPage(command),
+  forceReload: () => getFocusedContents()?.reloadIgnoringCache(),
+  zoom: (direction) => {
+    const contents = getFocusedContents();
+    if (contents !== null) {
+      zoomPage(contents, direction);
+    }
+  },
+  toggleDevTools: () => {
+    const contents = getFocusedContents();
+    if (contents !== null) {
+      toggleDevTools(contents);
+    }
+  },
+  openFind: () => undefined,
+  findNext: () => undefined,
+  openLibrary: () => runAction({ type: "openLibrary" }),
+  openLittleWindow: () => undefined,
+  importFromArc: () => {
+    importFromArc().catch((error) => console.error("Import from Arc failed:", error));
+  },
+  openUrlInNewTab: (url) => openLinkInNewTab(url, "foreground"),
+};
 
 /**
  * Refreshes lastActiveAt for tabs in use and returns their ids. Runs more often than the sweep,
@@ -447,8 +657,10 @@ function handleAppReady(): void {
     getRuntimeState: () => collectRuntimeState(),
     runAction: runAction,
   });
+  installAppMenu(appMenuCommands);
   mainWindow = createMainWindow();
   syncTabViews(mainWindow, currentState, getLayoutOptions(), tabViewEvents);
+  rememberSelectedTab();
 
   pruneOldArchiveEntries();
   startAutoArchiveTimers();

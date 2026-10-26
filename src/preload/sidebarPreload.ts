@@ -12,6 +12,7 @@
  */
 import { contextBridge, ipcRenderer } from "electron";
 import type { IpcRendererEvent } from "electron";
+import type { SidebarCommand } from "../shared/actions";
 import type { IPC_CHANNELS } from "../shared/ipcChannels";
 import type { BrowserApi, BrowserState, RuntimeState } from "../shared/types";
 
@@ -26,6 +27,7 @@ const CHANNELS: typeof IPC_CHANNELS = {
   stateChanged: "browser:state-changed",
   runtimeChanged: "browser:runtime-changed",
   dispatch: "browser:dispatch",
+  sidebarCommand: "browser:sidebar-command",
 };
 
 /**
@@ -46,6 +48,11 @@ function createBrowserApi(): BrowserApi {
       });
     },
     dispatch: (action) => ipcRenderer.invoke(CHANNELS.dispatch, action),
+    onSidebarCommand: (listener) => {
+      ipcRenderer.on(CHANNELS.sidebarCommand, (_event: IpcRendererEvent, command: SidebarCommand) => {
+        listener(command);
+      });
+    },
   };
 }
 

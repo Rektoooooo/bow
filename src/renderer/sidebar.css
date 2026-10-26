@@ -1,47 +1,59 @@
 /*
   WHY this file exists:
-    Look of the sidebar and the window frame. Sizes must match shared/settings.ts,
-    because main.ts places the web page card using those same numbers.
+    Look of the window's own page: the sidebar, the toolbar and the colored frame around the page card.
+    Sizes must match shared/settings.ts, because main.ts places the page card using those same numbers.
 
-  Layout: two columns, sidebar | card slot, both sitting on a frame painted in the active Space's color.
+  Data source:
+    CSS variables set by theme.ts from the active Space's theme (--frame-color-1…3, --grain-opacity,
+    data-appearance on <html>).
+
+  Layout: two columns (sidebar | main column); the main column is the toolbar row above the card slot.
+  Colors are defined once with light-dark(), and data-appearance picks light, dark or the system setting.
 */
 
 :root {
   --sidebar-width: 240px; /* = SIDEBAR_WIDTH_PX */
-  --card-inset: 8px;      /* = CARD_INSET_PX */
-  --card-radius: 10px;    /* = CARD_RADIUS_PX */
-  --frame-color: #e9d8d4; /* replaced per Space by renderSpaceHeading() */
+  --card-inset: 8px; /* = CARD_INSET_PX */
+  --card-radius: 10px; /* = CARD_RADIUS_PX */
+  --toolbar-height: 40px; /* = TOOLBAR_HEIGHT_PX */
+  --row-height: 32px;
+  --row-radius: 8px;
 
-  --frame: var(--frame-color);
-  --ink: #241a1c;
-  --muted: rgba(36, 26, 28, 0.56);
-  --line: rgba(36, 26, 28, 0.1);
-  --row-hover: rgba(255, 255, 255, 0.42);
-  --row-selected: rgba(255, 255, 255, 0.9);
-  --row-shadow: 0 1px 2px rgba(40, 20, 25, 0.12);
-  --field: rgba(255, 255, 255, 0.55);
-  --field-focus: rgba(255, 255, 255, 0.95);
-  --icon-background: rgba(36, 26, 28, 0.09);
-  --card-empty: rgba(255, 255, 255, 0.35);
+  --frame-color-1: #e9d8d4; /* replaced per Space by theme.ts */
+  --frame-color-2: #e9d8d4;
+  --frame-color-3: #e9d8d4;
+  --grain-opacity: 0;
+
+  /* Dark frames keep a hint of the Space color over a near-black base, like Arc's dark themes. */
+  --dark-base: #1c1c1e;
+  --frame-1: light-dark(var(--frame-color-1), color-mix(in oklab, var(--frame-color-1) 20%, var(--dark-base)));
+  --frame-2: light-dark(var(--frame-color-2), color-mix(in oklab, var(--frame-color-2) 20%, var(--dark-base)));
+  --frame-3: light-dark(var(--frame-color-3), color-mix(in oklab, var(--frame-color-3) 20%, var(--dark-base)));
+
+  --ink: light-dark(rgba(0, 0, 0, 0.86), rgba(255, 255, 255, 0.92));
+  --muted: light-dark(rgba(0, 0, 0, 0.5), rgba(255, 255, 255, 0.5));
+  --faint: light-dark(rgba(0, 0, 0, 0.3), rgba(255, 255, 255, 0.28));
+  --line: light-dark(rgba(0, 0, 0, 0.1), rgba(255, 255, 255, 0.1));
+  --row-hover: light-dark(rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.07));
+  --row-selected: light-dark(rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.14));
+  --row-shadow: light-dark(0 1px 2px rgba(0, 0, 0, 0.1), none);
+  --tile: light-dark(rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.08));
+  --tile-selected: light-dark(rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.2));
+  --field: light-dark(rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.09));
+  --letter-icon: light-dark(rgba(0, 0, 0, 0.1), rgba(255, 255, 255, 0.14));
+  --drop-line: light-dark(rgba(0, 0, 0, 0.55), rgba(255, 255, 255, 0.7));
+  --card-empty: light-dark(rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.04));
+  --focus-ring: light-dark(rgba(0, 0, 0, 0.4), rgba(255, 255, 255, 0.5));
+
+  color-scheme: light dark;
+}
+
+:root[data-appearance="light"] {
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    /* A dark frame that still carries a hint of the Space's color. */
-    --frame: color-mix(in oklab, var(--frame-color) 16%, #161113);
-    --ink: #f2eaeb;
-    --muted: rgba(242, 234, 235, 0.55);
-    --line: rgba(255, 255, 255, 0.09);
-    --row-hover: rgba(255, 255, 255, 0.06);
-    --row-selected: rgba(255, 255, 255, 0.13);
-    --row-shadow: none;
-    --field: rgba(255, 255, 255, 0.07);
-    --field-focus: rgba(255, 255, 255, 0.14);
-    --icon-background: rgba(255, 255, 255, 0.1);
-    --card-empty: rgba(255, 255, 255, 0.04);
-  }
+:root[data-appearance="dark"] {
+  color-scheme: dark;
 }
 
 * {
@@ -55,25 +67,38 @@ body {
 }
 
 body {
+  position: relative;
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-  background: var(--frame);
+  background: linear-gradient(165deg, var(--frame-1), var(--frame-2) 55%, var(--frame-3));
   color: var(--ink);
-  font: 13px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font: 13px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   user-select: none;
   overflow: hidden;
-  transition: background-color 200ms ease;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  body {
-    transition: none;
-  }
+/* Film grain over the frame. Our own noise, drawn by an SVG filter. */
+body::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='grain'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23grain)'/></svg>");
+}
+
+body.sidebar-hidden {
+  grid-template-columns: 0 minmax(0, 1fr);
+}
+
+body.sidebar-hidden .sidebar {
+  visibility: hidden;
 }
 
 :focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--ink) 45%, transparent);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
 }
 
@@ -83,295 +108,647 @@ button {
   cursor: default;
 }
 
-/* Sidebar column */
+button:disabled {
+  opacity: 0.35;
+}
+
+.icon {
+  display: block;
+  flex: none;
+}
+
+/* ---------- Sidebar ---------- */
 
 .sidebar {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 0 8px 10px 10px;
+  min-width: 0;
+  padding: 0 6px 6px 8px;
 }
 
-/* Leaves room for the traffic-light buttons and lets you drag the window by its top edge. */
-.drag-strip {
+/* The top strip holds the traffic lights; it also drags the window. */
+.sidebar-header {
   flex: none;
-  height: 44px;
+  display: flex;
+  align-items: center;
+  height: var(--toolbar-height);
   -webkit-app-region: drag;
 }
 
-.address-form {
+.traffic-light-space {
+  width: 68px;
   flex: none;
 }
 
-.address-input {
+.header-buttons {
+  display: flex;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+
+.header-button,
+.toolbar-button,
+.bottom-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--muted);
+}
+
+.header-button:hover:not(:disabled),
+.toolbar-button:hover:not(:disabled),
+.bottom-button:hover:not(:disabled) {
+  background: var(--row-hover);
+  color: var(--ink);
+}
+
+/* Favorites: big tiles in a grid at the top, like Arc. */
+.favorites {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 7px;
+  padding: 2px 2px 10px;
+}
+
+.favorite-tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--tile);
+  opacity: 0.8;
+}
+
+.favorite-tile.is-loaded {
+  opacity: 1;
+}
+
+.favorite-tile:hover {
+  opacity: 1;
+  filter: brightness(1.06);
+}
+
+.favorite-tile.is-selected {
+  background: var(--tile-selected);
+  box-shadow: var(--row-shadow);
+  opacity: 1;
+}
+
+.tile-audio-dot {
+  position: absolute;
+  bottom: 5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+/* The space after the tiles: a drop target that only takes room while something is dragged. */
+.favorites-end-zone {
+  display: none;
+  min-height: 44px;
+  border-radius: 10px;
+}
+
+.is-dragging .favorites-end-zone {
+  display: block;
+}
+
+.favorites.is-empty {
+  grid-template-columns: 1fr;
+  padding-bottom: 4px;
+}
+
+/* No Favorites yet: a thin strip, growing into a full target while dragging. */
+.favorites.is-empty .favorites-end-zone {
+  display: block;
+  min-height: 4px;
+}
+
+.is-dragging .favorites.is-empty .favorites-end-zone {
+  min-height: 44px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.sidebar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* A thin scrollbar that appears on hover, close to macOS overlay scrollbars. */
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: transparent;
+}
+
+.sidebar-scroll:hover::-webkit-scrollbar-thumb {
+  background: var(--faint);
+}
+
+.space-content {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 12px;
+}
+
+.space-content.slide-from-right {
+  animation: slide-from-right 220ms ease-out;
+}
+
+.space-content.slide-from-left {
+  animation: slide-from-left 220ms ease-out;
+}
+
+@keyframes slide-from-right {
+  from {
+    transform: translateX(28px);
+    opacity: 0;
+  }
+}
+
+@keyframes slide-from-left {
+  from {
+    transform: translateX(-28px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .space-content.slide-from-right,
+  .space-content.slide-from-left {
+    animation: none;
+  }
+}
+
+.space-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 4px 0 9px;
+  border-radius: var(--row-radius);
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.space-title:hover {
+  background: var(--row-hover);
+}
+
+.space-title-icon {
+  width: 16px;
+  text-align: center;
+  font-size: 13px;
+}
+
+.space-title-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* ---------- Rows ---------- */
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: var(--row-height);
+  padding-right: 4px;
+  border-radius: var(--row-radius);
+  font-weight: 500;
+}
+
+.row:hover {
+  background: var(--row-hover);
+}
+
+.row.is-selected {
+  background: var(--row-selected);
+  box-shadow: var(--row-shadow);
+}
+
+.row.is-dragging,
+.favorite-tile.is-dragging {
+  opacity: 0.4;
+}
+
+.row-icon-slot {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+}
+
+.folder-icon {
+  color: var(--ink);
+}
+
+.favicon {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  overflow: hidden;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.favicon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.favicon.is-letter {
+  background: var(--letter-icon);
+}
+
+.favicon-large {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  font-size: 11px;
+}
+
+.favicon.is-loading {
+  animation: loading-pulse 1s ease-in-out infinite;
+}
+
+@keyframes loading-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* The "back to pinned URL" button covers the favicon on hover. */
+.row-reset {
+  position: absolute;
+  inset: -3px;
+  display: none;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: var(--row-selected);
+  color: var(--ink);
+}
+
+.row:hover .row-reset {
+  display: grid;
+}
+
+.row-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.away-slash {
+  color: var(--faint);
+}
+
+.row-action {
+  flex: none;
+  display: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+}
+
+.row:hover .row-action,
+.row:focus-within .row-action,
+.space-title:hover .row-action,
+.row-action.is-visible {
+  display: grid;
+}
+
+.row-action:hover {
+  background: var(--row-hover);
+  color: var(--ink);
+}
+
+.rename-input {
   width: 100%;
   border: 0;
-  border-radius: 9px;
-  padding: 8px 10px;
+  border-radius: 5px;
+  padding: 3px 5px;
   background: var(--field);
   color: var(--ink);
   font: inherit;
   outline: none;
+  user-select: text;
 }
 
-.address-input::placeholder {
-  color: var(--muted);
+.icon-input {
+  width: 30px;
+  text-align: center;
 }
 
-.address-input:focus {
-  background: var(--field-focus);
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ink) 16%, transparent);
-}
-
-.sidebar-content {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding-block: 14px;
-}
-
-.space-heading {
-  margin: 0;
-  padding: 0 6px;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: pre;
-}
-
-.tab-list {
-  display: flex;
-  flex-direction: column;
+/* Split view: one row, panes side by side. */
+.split-row {
   gap: 2px;
+  padding-top: 3px;
+  padding-bottom: 3px;
 }
 
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 6px 4px;
-}
-
-.section-title {
-  margin: 0;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.text-button {
-  border: 0;
-  border-radius: 5px;
-  padding: 2px 5px;
-  background: none;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.text-button:hover {
-  background: var(--row-hover);
-  color: var(--ink);
-}
-
-.list-empty {
-  margin: 0;
-  padding: 4px 8px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-/* Tab rows */
-
-.tab-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 4px 0 8px;
-  border-radius: 8px;
-}
-
-.tab-row:hover {
-  background: var(--row-hover);
-}
-
-.tab-row.is-selected {
-  background: var(--row-selected);
-  box-shadow: var(--row-shadow);
-}
-
-.tab-icon {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  background: var(--icon-background);
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.tab-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tab-action {
-  flex: none;
-  border: 0;
-  border-radius: 5px;
-  padding: 2px 5px;
-  background: none;
-  color: var(--muted);
-  font-size: 11px;
-  opacity: 0;
-}
-
-.tab-row:hover .tab-action,
-.tab-row:focus-within .tab-action {
-  opacity: 1;
-}
-
-.tab-action:hover {
-  background: var(--row-hover);
-  color: var(--ink);
-}
-
-.tab-close {
-  font-size: 15px;
-  line-height: 1;
-}
-
-/* Archive */
-
-.archive {
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
-}
-
-.archive-summary {
-  padding: 0 6px 6px;
-  list-style: none;
-}
-
-.archive-summary::-webkit-details-marker {
-  display: none;
-}
-
-.archive-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 4px 5px 8px;
-  border-radius: 8px;
-}
-
-.archive-row:hover {
-  background: var(--row-hover);
-}
-
-.archive-text {
+.split-pane {
   flex: 1;
   min-width: 0;
   display: flex;
-  flex-direction: column;
-}
-
-.archive-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.archive-meta {
-  color: var(--muted);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-
-.archive-restore {
-  opacity: 0;
-}
-
-.archive-row:hover .archive-restore,
-.archive-row:focus-within .archive-restore {
-  opacity: 1;
-}
-
-/* Footer: setting + Space switcher */
-
-.sidebar-footer {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--line);
-}
-
-.archive-setting {
-  display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
+  height: 26px;
   padding: 0 6px;
-  color: var(--muted);
-  font-size: 11px;
+  border-radius: 6px;
 }
 
-.archive-setting select {
+.split-pane + .split-pane {
+  border-left: 1px solid var(--line);
+  border-radius: 0 6px 6px 0;
+}
+
+.split-pane.is-focused {
+  background: var(--row-hover);
+}
+
+.split-pane-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Divider between Pinned and Today, with Clear on hover. */
+.today-divider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 22px;
+  margin: 6px 6px 2px;
+}
+
+.divider-line {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.divider-clear {
+  position: absolute;
+  right: 0;
   border: 0;
   border-radius: 6px;
-  padding: 3px 6px;
-  background: var(--field);
+  padding: 1px 6px;
+  background: var(--frame-1);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0;
+}
+
+.today-divider:hover .divider-clear,
+.divider-clear:focus-visible {
+  opacity: 1;
+}
+
+.divider-clear:hover {
   color: var(--ink);
-  font: inherit;
+}
+
+.new-tab-row {
+  color: var(--muted);
+  padding-left: 8px;
+}
+
+.new-tab-row .row-icon-slot {
+  font-size: 17px;
+  font-weight: 400;
+}
+
+.list-end-zone {
+  min-height: 40px;
+  border-radius: var(--row-radius);
+}
+
+/* ---------- Drag and drop feedback ---------- */
+
+.drop-before::before,
+.drop-after::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--drop-line);
+  pointer-events: none;
+}
+
+.drop-before::before {
+  top: -1px;
+}
+
+.drop-after::after {
+  bottom: -1px;
+}
+
+.favorite-tile.drop-before::before,
+.favorite-tile.drop-after::after {
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  height: auto;
+}
+
+.favorite-tile.drop-before::before {
+  left: -4px;
+  right: auto;
+}
+
+.favorite-tile.drop-after::after {
+  right: -4px;
+  left: auto;
+}
+
+.drop-into {
+  background: var(--row-selected) !important;
+  box-shadow: inset 0 0 0 1px var(--drop-line);
+}
+
+/* ---------- Bottom bar ---------- */
+
+.bottom-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding-top: 6px;
 }
 
 .space-switcher {
+  flex: 1;
   display: flex;
   justify-content: center;
-  gap: 6px;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
 }
 
 .space-button {
-  width: 30px;
-  height: 30px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   background: none;
-  font-size: 15px;
-  opacity: 0.55;
 }
 
 .space-button:hover {
   background: var(--row-hover);
-  opacity: 0.9;
 }
 
-.space-button.is-active {
-  background: var(--row-selected);
-  box-shadow: var(--row-shadow);
-  opacity: 1;
+.space-button-icon {
+  display: none;
+  font-size: 13px;
 }
 
-/* Card slot: covered by the tab's web view whenever a tab is open */
+.space-button-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--faint);
+}
 
+/* The active Space shows its emoji; the others show a dot, and their emoji while the switcher is hovered. */
+.space-button.is-active .space-button-icon,
+.space-switcher:hover .space-button-icon {
+  display: block;
+}
+
+.space-button.is-active .space-button-dot,
+.space-switcher:hover .space-button-dot {
+  display: none;
+}
+
+.space-switcher:hover .space-button:not(.is-active) .space-button-icon {
+  opacity: 0.6;
+}
+
+/* ---------- Main column: toolbar + card ---------- */
+
+.main-column {
+  display: grid;
+  grid-template-rows: var(--toolbar-height) minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, auto) 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 0 var(--card-inset) 0 calc(var(--card-inset) - 2px);
+  -webkit-app-region: drag;
+}
+
+/* With the sidebar hidden, the toolbar starts under the traffic lights. */
+.sidebar-hidden .toolbar {
+  padding-left: 76px;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.toolbar-group > * {
+  -webkit-app-region: no-drag;
+}
+
+.toolbar-right {
+  justify-content: flex-end;
+}
+
+.address-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 460px;
+  height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink);
+  font-weight: 500;
+  -webkit-app-region: no-drag;
+}
+
+.address-pill:hover {
+  background: var(--row-hover);
+}
+
+.address-icon {
+  color: var(--muted);
+  width: 13px;
+  height: 13px;
+}
+
+.address-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Card slot: covered by the tab's web view whenever a tab is open. */
 .card-slot {
   display: grid;
   place-items: center;
-  margin: var(--card-inset);
+  margin: 0 var(--card-inset) var(--card-inset) var(--card-inset);
   border-radius: var(--card-radius);
   background: var(--card-empty);
-  -webkit-app-region: drag;
 }
 
 .empty-card {

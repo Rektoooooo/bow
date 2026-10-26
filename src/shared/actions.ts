@@ -20,7 +20,17 @@ export type MenuRequest =
   | { menu: "item"; itemId: ItemId }
   | { menu: "space"; spaceId: SpaceId }
   | { menu: "plus" }
-  | { menu: "sidebar" };
+  | { menu: "sidebar" }
+  | { menu: "split" };
+
+/**
+ * Requests from the main process to the sidebar page, for things only the page can do (inline editing).
+ * Example: the tab menu's "Rename…" sends { kind: "beginRename", itemId }.
+ */
+export type SidebarCommand =
+  | { kind: "beginRename"; itemId: ItemId }
+  | { kind: "beginSpaceRename"; spaceId: SpaceId }
+  | { kind: "beginSpaceIconEdit"; spaceId: SpaceId };
 
 export type BrowserAction =
   | { type: "openTab"; typedText: string }
