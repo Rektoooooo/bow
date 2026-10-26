@@ -23,6 +23,8 @@ export interface ExtensionManifestInfo {
   iconPath: string | null;
   /** action.default_popup (MV3) or browser_action.default_popup (MV2), or null. */
   popupPath: string | null;
+  /** Where the extension says its updates come from ("update_url"), or null. Web Store extensions use Google's. */
+  updateUrl: string | null;
 }
 
 type JsonObject = Record<string, unknown>;
@@ -176,5 +178,6 @@ export function readExtensionManifestInfo(folderPath: string): ExtensionManifest
     manifestVersion: typeof manifestVersion === "number" ? manifestVersion : FALLBACK_MANIFEST_VERSION,
     iconPath: readIconPath(manifest),
     popupPath: readPopupPath(manifest),
+    updateUrl: typeof manifest["update_url"] === "string" ? manifest["update_url"] : null,
   };
 }

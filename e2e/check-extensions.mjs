@@ -148,6 +148,11 @@ await dispatch(sidebar, { type: "removeExtension", profileId: "profile-default",
 state = await waitFor(() => getState(sidebar), (value) => (value.extensions ?? []).length === 0);
 check("Remove takes it out of the profile", (state.extensions ?? []).length === 0);
 check("and out of the session", (await waitFor(() => loadedNames(app), (names) => names.length === 0)).length === 0);
+// A Chrome Web Store extension page gets "Add Extension" in the toolbar (shown from the address alone; not clicked,
+// which would download from the Web Store).
+await dispatch(sidebar, { type: "openTab", typedText: "https://chromewebstore.google.com/detail/made-up-name/abcdefghijklmnopabcdefghijklmnop" });
+const addPill = await sidebar.waitForSelector(".toolbar-pill", { timeout: 5000 }).catch(() => null);
+check("a Web Store extension page offers Add Extension in the toolbar", (await addPill?.textContent())?.includes("Add Extension"));
 check("no page errors in the sidebar (second run)", pageErrors.length === 0, pageErrors.join(" | "));
 await app.close();
 fs.rmSync(userDataDir, { recursive: true, force: true });

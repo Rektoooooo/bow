@@ -12,7 +12,13 @@
  */
 import { app, BrowserWindow, session } from "electron";
 import * as path from "node:path";
-import { ARCHIVE_PRUNE_INTERVAL_MS, ARCHIVE_SWEEP_INTERVAL_MS, IN_USE_REFRESH_INTERVAL_MS } from "../shared/settings";
+import {
+  ARCHIVE_PRUNE_INTERVAL_MS,
+  ARCHIVE_SWEEP_INTERVAL_MS,
+  EXTENSION_UPDATE_FIRST_CHECK_MS,
+  EXTENSION_UPDATE_INTERVAL_MS,
+  IN_USE_REFRESH_INTERVAL_MS,
+} from "../shared/settings";
 import type { ItemId } from "../shared/types";
 import { menuHost, runAction } from "./actionRunner";
 import { findTabsInUse, markTabsActive } from "./activity";
@@ -33,6 +39,7 @@ import { createCommandActionRegistry } from "./commandBarActions";
 import { startTrackingDownloads } from "./downloads";
 import { getExtensionMenuItems, initializeExtensionHost, prepareExtensions } from "./extensionHost";
 import { initializePermissionPrompts } from "./permissionPrompts";
+import { updateExtensionsFromWebStore } from "./extensionsController";
 import { isRecordableUrl } from "./history";
 import { addVisit, loadHistory, saveHistoryNow, setVisitTitle } from "./historyStore";
 import { registerIpcHandlers } from "./ipc";
@@ -227,6 +234,17 @@ function startAutoArchiveTimers(): void {
 }
 
 /**
+ * Keeps Web Store extensions current: a first check shortly after startup, then every few hours, like Chrome.
+ */
+function startExtensionUpdates(): void {
+  const runUpdates = (): void => {
+    updateExtensionsFromWebStore().catch((error) => console.error("Extension updates failed:", error));
+  };
+  setTimeout(runUpdates, EXTENSION_UPDATE_FIRST_CHECK_MS);
+  setInterval(runUpdates, EXTENSION_UPDATE_INTERVAL_MS);
+}
+
+/**
  * Returns the first web address in a list of command-line arguments, or null.
  */
 function findUrlArgument(argumentList: string[]): string | null {
@@ -289,6 +307,7 @@ async function handleAppReady(): Promise<void> {
 
   pruneOldArchiveEntries();
   startAutoArchiveTimers();
+  startExtensionUpdates();
 }
 
 /**

@@ -287,6 +287,13 @@ function renderDownloadsSection(body: HTMLElement, data: LibraryData): void {
   body.replaceChildren(list);
 }
 
+/** Where an extension came from, as its line says it. */
+const EXTENSION_ORIGINS: Record<ExtensionLine["source"], string> = {
+  arc: "from Arc",
+  webstore: "from Chrome Web Store",
+  unpacked: "unpacked",
+};
+
 /**
  * Builds one extension line: icon, name, version and where it came from, an On/Off switch and Remove.
  */
@@ -301,7 +308,7 @@ function createExtensionLine(extension: ExtensionLine): HTMLElement {
   }
   const text = createElement("span", "library-line-text");
   text.append(createElement("span", "library-line-title", extension.name));
-  const origin = extension.source === "arc" ? "from Arc" : "unpacked";
+  const origin = EXTENSION_ORIGINS[extension.source];
   const meta = extension.loadError === null ? `${extension.version} · ${origin}` : `Could not load: ${extension.loadError}`;
   text.append(createElement("span", "library-line-meta", meta));
   const switchButton = createTextButton(extension.isEnabled ? "On" : "Off", extension.isEnabled ? "library-chip is-active" : "library-chip", () =>
@@ -324,13 +331,15 @@ function renderExtensionsSection(body: HTMLElement, data: LibraryData): void {
   toolbar.append(
     createTextButton("Load Unpacked…", "library-chip", () => dispatch({ type: "loadUnpackedExtension" })),
     createTextButton("Import from Arc…", "library-chip", () => dispatch({ type: "importFromArc" })),
+    createTextButton("Check for Updates", "library-chip", () => dispatch({ type: "checkExtensionUpdates" })),
   );
   section.append(toolbar);
   section.append(
     createElement(
       "p",
       "library-setting-note",
-      "Chrome extensions run per profile, like in Arc. Open one from the puzzle button in the toolbar. " +
+      "Chrome extensions run per profile, like in Arc. Open one from the puzzle button in the toolbar; add more with " +
+        "Add Extension on a Chrome Web Store page. Web Store extensions update by themselves. " +
         "Reload open pages after adding or turning one on. Extensions that need Chrome features this browser lacks may only partly work.",
     ),
   );

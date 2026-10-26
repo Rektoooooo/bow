@@ -80,3 +80,9 @@ export const SPLIT_GAP_PX = 6;
 
 /** Corner radius of the web page card, in pixels. */
 export const CARD_RADIUS_PX = 10;
+
+/** The first extension update check runs this long after startup, so it never slows the start. Our choice. */
+export const EXTENSION_UPDATE_FIRST_CHECK_MS = 60 * 1000;
+
+/** Then extensions are checked for updates this often. Chrome's default interval is about 5 hours. */
+export const EXTENSION_UPDATE_INTERVAL_MS = 5 * 60 * 60 * 1000;

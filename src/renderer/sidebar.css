@@ -956,3 +956,29 @@ button:disabled {
   margin: 0;
   color: var(--muted);
 }
+
+/* "Add Extension" on a Chrome Web Store extension page. */
+.toolbar-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--row-hover);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+}
+
+.toolbar-pill:hover:not(:disabled) {
+  background: var(--row-selected, var(--row-hover));
+}
+
+.toolbar-pill:disabled {
+  opacity: 0.6;
+}

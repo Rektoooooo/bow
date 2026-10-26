@@ -63,6 +63,19 @@ export function setExtensionEnabled(state: BrowserState, profileId: ProfileId, e
 }
 
 /**
+ * Points every profile's copy of an updated Web Store extension at its new folder and version. Unpacked extensions
+ * are never changed. Returns the same state when no extension has that id.
+ */
+export function updateExtensionFolder(state: BrowserState, extensionId: string, name: string, version: string, folder: string): BrowserState {
+  const extensions = state.extensions ?? [];
+  const isUpdated = (extension: InstalledExtension): boolean => extension.id === extensionId && extension.source !== "unpacked";
+  if (!extensions.some(isUpdated)) {
+    return state;
+  }
+  return { ...state, extensions: extensions.map((extension) => (isUpdated(extension) ? { ...extension, name: name, version: version, path: folder } : extension)) };
+}
+
+/**
  * Removes an extension from a profile. Returns the same state when it is not there.
  */
 export function removeExtension(state: BrowserState, profileId: ProfileId, extensionId: string): BrowserState {

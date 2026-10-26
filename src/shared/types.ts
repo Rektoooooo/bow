@@ -173,7 +173,7 @@ export interface InstalledExtension {
   version: string;
   path: string;
   isEnabled: boolean;
-  source: "arc" | "unpacked";
+  source: "arc" | "webstore" | "unpacked";
 }
 
 /** What a site can ask for. A request for camera and microphone together is two kinds. */

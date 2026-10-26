@@ -19,8 +19,8 @@ import { deleteBoost, setBoostCss, setBoostEnabled } from "./boosts";
 import { reapplyBoostsToAllPages } from "./boostPages";
 import { importFromArc } from "./arcImportController";
 import { showExtensionsMenu } from "./extensionHost";
-import { removeExtension, setExtensionEnabled } from "./extensionList";
-import { loadUnpackedExtension } from "./extensionsController";
+import { setExtensionEnabled } from "./extensionList";
+import { checkForExtensionUpdatesNow, installFromWebStore, loadUnpackedExtension, removeExtensionAndCopy } from "./extensionsController";
 import { answerPermissionPrompt } from "./permissionPrompts";
 import { removePermissionAnswer } from "./sitePermissions";
 import { showMenuRequest } from "./menus";
@@ -225,7 +225,8 @@ export function runAction(action: BrowserAction): void {
     case "setExtensionEnabled":
       return applyChange((state) => setExtensionEnabled(state, action.profileId, action.extensionId, action.isEnabled));
     case "removeExtension":
-      return applyChange((state) => removeExtension(state, action.profileId, action.extensionId));
+      removeExtensionAndCopy(action.profileId, action.extensionId).catch((error) => console.error("Removing the extension failed:", error));
+      return;
     case "loadUnpackedExtension":
       loadUnpackedExtension().catch((error) => console.error("Load Unpacked failed:", error));
       return;
@@ -238,5 +239,11 @@ export function runAction(action: BrowserAction): void {
       return answerPermissionPrompt(action.requestId, action.isAllowed);
     case "removeSitePermission":
       return applyChange((state) => removePermissionAnswer(state, action.profileId, action.origin, action.kind));
+    case "installWebStoreExtension":
+      installFromWebStore(action.extensionId).catch((error) => console.error("Adding the extension failed:", error));
+      return;
+    case "checkExtensionUpdates":
+      checkForExtensionUpdatesNow().catch((error) => console.error("Checking for extension updates failed:", error));
+      return;
   }
 }

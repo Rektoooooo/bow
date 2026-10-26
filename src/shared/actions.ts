@@ -89,7 +89,9 @@ export type BrowserAction =
   | { type: "importFromArc" }
   | { type: "showExtensionsMenu"; anchor: { x: number; y: number; width: number; height: number } }
   | { type: "answerPermissionPrompt"; requestId: string; isAllowed: boolean }
-  | { type: "removeSitePermission"; profileId: string; origin: string; kind: SitePermissionKind };
+  | { type: "removeSitePermission"; profileId: string; origin: string; kind: SitePermissionKind }
+  | { type: "installWebStoreExtension"; extensionId: string }
+  | { type: "checkExtensionUpdates" };
 
 /** Every action type, for checking an incoming `type` string. */
 export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
@@ -150,4 +152,6 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "showExtensionsMenu",
   "answerPermissionPrompt",
   "removeSitePermission",
+  "installWebStoreExtension",
+  "checkExtensionUpdates",
 ];

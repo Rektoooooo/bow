@@ -61,7 +61,10 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   the first page at startup. Electron runs content scripts and MV3 service workers; `electron-chrome-extensions`
   (MIT since 4.10.0, pinned; 4.9 and older are GPL with a license check) adds tabs, popups and context menus. Its
   `api` is private in the typings; we call `api.browserAction.activateClick` for our own toolbar menu. Test
-  extensions are synthetic (`e2e/fixtures/`), never copied from a real profile.
+  extensions are synthetic (`e2e/fixtures/`), never copied from a real profile. Web Store installs and updates are
+  our own (`crx.ts` verifies CRX3 signatures, `webStoreInstall.ts` unpacks with `/usr/bin/unzip`, refuses symlinks
+  and non-Chrome versions, writes the key so the id stays the Web Store id); copies live in
+  `<userData>/Extensions/<id>/<version>/` and are deleted only one by one when nothing uses them.
 - **Security:** web pages stay sandboxed and get no preload, except in a profile that has extensions: there the
   extension library's preload runs in an isolated world (page scripts see nothing new); website permissions are
   installed per session in `profiles.ts`: `fullscreen` and `clipboard-sanitized-write` are allowed, camera,

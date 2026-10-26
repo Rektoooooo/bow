@@ -69,6 +69,8 @@ and every Arc behavior we can observe is written down before Arc shuts down.
       Library › Extensions (on/off, remove), toolbar extensions menu with action popups
 - [x] Permission prompts (camera, microphone, location, notifications, clipboard; per profile and site), Print,
       spelling suggestions
+- [x] Links to apps ask first (mailto:, zoommtg:, steam:)
+- [x] Chrome Web Store: Add Extension on its pages, verified CRX3 install, updates every 5 hours
 - [x] Command Bar: Tab to search a site (YouTube, Wikipedia, GitHub, …)
 
 ### 2.7 Wrap-up

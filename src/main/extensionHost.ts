@@ -111,6 +111,13 @@ export async function prepareExtensions(): Promise<void> {
 }
 
 /**
+ * Resolves once every queued load and unload has run (before deleting an old copy's files, say).
+ */
+export async function whenExtensionsSettled(): Promise<void> {
+  await Promise.all(Array.from(hostsByProfile.values()).map((host) => host.pendingWork));
+}
+
+/**
  * Returns why an extension failed to load, or null.
  */
 export function getExtensionLoadError(profileId: ProfileId, extensionId: string): string | null {

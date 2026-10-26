@@ -72,7 +72,7 @@ export interface ExtensionLine {
   name: string;
   version: string;
   isEnabled: boolean;
-  source: "arc" | "unpacked";
+  source: "arc" | "webstore" | "unpacked";
   /** The extension's icon as a data: URL, or null when it has none. */
   iconUrl: string | null;
   /** Why it failed to load, or null. */

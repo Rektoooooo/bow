@@ -156,6 +156,11 @@ function isAnchor(value: unknown): boolean {
   return isWholeNumber(value.x) && isWholeNumber(value.y) && isWholeNumber(value.width) && isWholeNumber(value.height);
 }
 
+/** A Chrome extension id: 32 letters a–p. */
+function isExtensionId(value: unknown): boolean {
+  return typeof value === "string" && /^[a-p]{32}$/.test(value);
+}
+
 /** The permission kinds a site can be allowed or refused (types.ts SitePermissionKind). */
 const SITE_PERMISSION_KINDS = ["camera", "microphone", "notifications", "location", "clipboard"];
 
@@ -222,6 +227,8 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   showExtensionsMenu: { anchor: isAnchor },
   answerPermissionPrompt: { requestId: isText, isAllowed: isBoolean },
   removeSitePermission: { profileId: isText, origin: isText, kind: isSitePermissionKind },
+  installWebStoreExtension: { extensionId: isExtensionId },
+  checkExtensionUpdates: {},
 };
 
 /**

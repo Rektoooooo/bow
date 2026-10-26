@@ -86,8 +86,10 @@ in Arc). Running it twice adds nothing twice.
   you leave a tab playing a video.
 
 **Extensions**
-- Chrome extensions per profile, like Arc: imported from Arc or loaded from a folder (Library › Extensions ›
-  Load Unpacked…). Content scripts and Manifest V3 service workers run in Electron itself; the
+- Chrome extensions per profile, like Arc: imported from Arc, added from the Chrome Web Store (open an extension's
+  page and click **Add Extension** in the toolbar), or loaded from a folder (Library › Extensions › Load Unpacked…).
+  Web Store extensions update by themselves (a minute after start, then every 5 hours, or Check for Updates).
+  Each download is checked like Chrome checks it: signed by the extension's own key, before anything is unpacked. Content scripts and Manifest V3 service workers run in Electron itself; the
   [electron-chrome-extensions](https://github.com/samuelmaddock/electron-browser-shell) library (MIT) adds the
   browser parts: the puzzle button in the toolbar opens an extension's popup, `chrome.tabs` knows the selected tab,
   extensions can open tabs, and their items appear in the page's right-click menu.

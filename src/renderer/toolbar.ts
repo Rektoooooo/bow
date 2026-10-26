@@ -14,6 +14,7 @@
 import type { BrowserState, ItemId, RuntimeState } from "../shared/types";
 import { createElement, createIconButton, dispatch, getDisplayHost } from "./dom.js";
 import { createIcon } from "./icons.js";
+import { findWebStoreExtensionId } from "../shared/webStore.js";
 
 /**
  * Builds the address pill: a lock for https pages (a globe otherwise) and the host name. Clicking edits the address.
@@ -44,6 +45,30 @@ function createAddressPill(url: string | null): HTMLElement {
 function hasActiveExtensions(state: BrowserState): boolean {
   const activeSpace = state.spaces.find((space) => space.id === state.activeSpaceId);
   return (state.extensions ?? []).some((extension) => extension.profileId === activeSpace?.profileId && extension.isEnabled);
+}
+
+/**
+ * On a Chrome Web Store extension page whose extension this profile does not have yet: an "Add Extension" pill,
+ * our stand-in for the page's own "Add to Chrome" button. Null everywhere else.
+ */
+function createAddExtensionPill(state: BrowserState, url: string | null): HTMLButtonElement | null {
+  const extensionId = url === null ? null : findWebStoreExtensionId(url);
+  const activeSpace = state.spaces.find((space) => space.id === state.activeSpaceId);
+  const isAdded = (state.extensions ?? []).some((extension) => extension.id === extensionId && extension.profileId === activeSpace?.profileId && extension.isEnabled);
+  if (extensionId === null || isAdded) {
+    return null;
+  }
+  const pill = document.createElement("button");
+  pill.type = "button";
+  pill.className = "toolbar-pill";
+  pill.title = "Download this extension from the Chrome Web Store and add it to this profile";
+  pill.append(createIcon("puzzle"), createElement("span", "toolbar-pill-text", "Add Extension"));
+  pill.addEventListener("click", () => {
+    pill.disabled = true;
+    pill.querySelector(".toolbar-pill-text")?.replaceChildren("Adding…");
+    dispatch({ type: "installWebStoreExtension", extensionId: extensionId });
+  });
+  return pill;
 }
 
 /**
@@ -97,6 +122,10 @@ export function renderToolbar(state: BrowserState, runtime: RuntimeState, select
   siteButton.disabled = selectedTab === null;
   const splitButton = createIconButton("split", "Split view", "toolbar-button", () => dispatch({ type: "showMenu", request: { menu: "split" } }));
   splitButton.disabled = selectedTab === null;
+  const addExtensionPill = createAddExtensionPill(state, selectedTab === null ? null : selectedTab.url);
+  if (addExtensionPill !== null) {
+    rightGroup.append(addExtensionPill);
+  }
   if (hasActiveExtensions(state)) {
     rightGroup.append(createExtensionsButton());
   }

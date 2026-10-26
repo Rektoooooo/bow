@@ -13,6 +13,7 @@ import {
   MAX_EXTENSIONS_PER_PROFILE,
   removeExtension,
   setExtensionEnabled,
+  updateExtensionFolder,
 } from "../src/main/extensionList";
 import { createInitialState } from "../src/main/state";
 
@@ -54,6 +55,20 @@ describe("extension list", () => {
       full = addExtension(full, makeExtension(`id${index}`));
     }
     expect(addExtension(full, makeExtension("one-more"))).toBe(full);
+  });
+
+  it("moves every profile's copy of an updated extension to the new folder, never an unpacked one", () => {
+    const state = addExtension(
+      addExtension(addExtension(stateWithTwoProfiles(), makeExtension("aaaa", { source: "arc" })), makeExtension("aaaa", { profileId: WORK_PROFILE_ID, source: "webstore" })),
+      makeExtension("bbbb"),
+    );
+    const updated = updateExtensionFolder(state, "aaaa", "Renamed", "2.0", "/extensions/aaaa/2.0");
+
+    expect((updated.extensions ?? []).filter((extension) => extension.id === "aaaa").map((extension) => `${extension.name} ${extension.version} ${extension.path}`)).toEqual([
+      "Renamed 2.0 /extensions/aaaa/2.0",
+      "Renamed 2.0 /extensions/aaaa/2.0",
+    ]);
+    expect(updateExtensionFolder(state, "bbbb", "X", "9.0", "/x")).toBe(state);
   });
 
   it("turns extensions off and on, and removes them", () => {
