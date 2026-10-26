@@ -47,6 +47,9 @@ export const ARCHIVE_PRUNE_INTERVAL_MS = 1 * HOUR_MS;
 /** How long archived tabs are kept before they are deleted. Our choice: Arc instead appears to keep the newest 250. */
 export const ARCHIVE_RETENTION_MS = 30 * DAY_MS;
 
+/** A Little Window left alone this long is archived and closed. Same as Arc's Little Arc default (6 h, measured). */
+export const LITTLE_WINDOW_ARCHIVE_AFTER_MS = 6 * HOUR_MS;
+
 /** Most Favorites a profile can have. Same as Arc (help center: raised from 8 to 12 in 2023). */
 export const FAVORITES_LIMIT = 12;
 

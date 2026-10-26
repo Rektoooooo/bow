@@ -11,6 +11,7 @@
  *   click in sidebar → preload sends "browser:dispatch" { type: "selectTab", tabId } → parseAction() → handlers.runAction()
  */
 import { ipcMain } from "electron";
+import type { WebContents } from "electron";
 import type { BrowserAction } from "../shared/actions";
 import { BROWSER_ACTION_TYPES } from "../shared/actions";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
@@ -19,6 +20,8 @@ import type { BrowserState, RuntimeState } from "../shared/types";
 
 /** What main.ts must provide so the handlers have something to call. */
 export interface IpcHandlers {
+  /** True for our own pages (the sidebar and the overlay). Messages from anything else are ignored. */
+  isTrustedSender(sender: WebContents): boolean;
   getState(): BrowserState;
   getRuntimeState(): RuntimeState;
   runAction(action: BrowserAction): void;
@@ -189,16 +192,20 @@ export function parseAction(value: unknown): BrowserAction | null {
 }
 
 /**
- * Registers the three IPC handlers: read the state, read the runtime facts, and run an action.
+ * Registers the three IPC handlers: read the state, read the runtime facts, and run an action. Each one first checks
+ * that the message comes from one of our own pages.
  */
 export function registerIpcHandlers(handlers: IpcHandlers): void {
-  ipcMain.handle(IPC_CHANNELS.getState, () => {
-    return handlers.getState();
+  ipcMain.handle(IPC_CHANNELS.getState, (event) => {
+    return handlers.isTrustedSender(event.sender) ? handlers.getState() : null;
   });
-  ipcMain.handle(IPC_CHANNELS.getRuntimeState, () => {
-    return handlers.getRuntimeState();
+  ipcMain.handle(IPC_CHANNELS.getRuntimeState, (event) => {
+    return handlers.isTrustedSender(event.sender) ? handlers.getRuntimeState() : null;
   });
-  ipcMain.handle(IPC_CHANNELS.dispatch, (_event, value: unknown) => {
+  ipcMain.handle(IPC_CHANNELS.dispatch, (event, value: unknown) => {
+    if (!handlers.isTrustedSender(event.sender)) {
+      return;
+    }
     const action = parseAction(value);
     if (action === null) {
       return;

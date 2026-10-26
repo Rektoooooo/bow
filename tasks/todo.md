@@ -40,21 +40,21 @@ and every Arc behavior we can observe is written down before Arc shuts down.
 - [x] Per-Space themes (color, gradient, grain), light / dark / auto
 
 ### 2.4 Overlay layer
-- [ ] Transparent overlay view above the page for: Command Bar (⌘T new tab, ⌘L edit URL; tabs, history,
+- [x] Transparent overlay view above the page for: Command Bar (⌘T new tab, ⌘L edit URL; tabs, history,
       suggestions, actions), Find in page, Library (archive with filters + search, downloads), Site controls
 
 ### 2.5 Browser basics
 - [x] App menu with Arc's shortcuts (table in `docs/research/arc-findings.md`), Edit roles for copy/paste
 - [x] Context menus: tab, folder, page (open link in new tab, copy link, inspect, …)
-- [ ] Links: target=_blank → new tab; real popup windows for sign-in flows; downloads
-- [ ] History store (bounded) for the Command Bar
+- [x] Links: target=_blank → new tab; real popup windows for sign-in flows; downloads
+- [x] History store (bounded) for the Command Bar
 
 ### 2.6 Arc features
 - [ ] Spaces: create / rename / icon / theme / delete, swipe and ⌃1–9 to switch
 - [ ] Peek for links from Favorites and Pinned tabs (⌘O expand, Esc close)
 - [ ] Split View (up to 4 panes)
 - [ ] Hide sidebar (⌘S)
-- [ ] Little Arc-style small window (⌥⌘N, links from other apps), archives after 6 h
+- [x] Little Arc-style small window (⌥⌘N, links from other apps), archives after 6 h
 - [x] Import from Arc: Spaces, Favorites, Pinned folders/tabs, Today tabs, themes, cached favicons (File › Import from Arc…)
 
 ### 2.7 Wrap-up

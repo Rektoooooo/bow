@@ -161,6 +161,23 @@ button:disabled {
   color: var(--muted);
 }
 
+/* A download in progress: a small dot on the Library button. */
+.bottom-button.has-activity {
+  position: relative;
+}
+
+.bottom-button.has-activity::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink);
+  animation: loading-pulse 1s ease-in-out infinite;
+}
+
 .header-button:hover:not(:disabled),
 .toolbar-button:hover:not(:disabled),
 .bottom-button:hover:not(:disabled) {

@@ -1,0 +1,25 @@
+<!doctype html>
+<!--
+  WHY this file exists:
+    The overlay page: a transparent page laid over the whole window (or just the Find bar's corner) while a panel
+    is open. It draws one panel at a time: Command Bar, Library, site controls or Find.
+
+  Data source:
+    overlay.ts fills #panel from the "overlay:show" message.
+
+  Data flow:
+    overlayController.ts → "overlay:show" → overlay.ts → #panel
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' https: http: data:">
+    <title>Overlay</title>
+    <link rel="stylesheet" href="./overlay.css">
+  </head>
+  <body>
+    <div id="backdrop" class="backdrop" hidden></div>
+    <div id="panel" class="panel-host"></div>
+    <script type="module" src="./overlay.js"></script>
+  </body>
+</html>

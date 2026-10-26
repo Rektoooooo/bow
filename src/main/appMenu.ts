@@ -17,7 +17,7 @@ import type { NavigationCommand } from "../shared/actions";
 
 /** What the menu items do. main.ts implements each one. */
 export interface AppMenuCommands {
-  openCommandBar(mode: "newTab" | "editUrl"): void;
+  openCommandBar(mode: "newTab" | "editUrl" | "splitWith"): void;
   closeSelectedTab(): void;
   reopenClosedTab(): void;
   togglePinSelected(): void;

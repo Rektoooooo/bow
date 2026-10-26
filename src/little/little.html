@@ -1,0 +1,24 @@
+<!doctype html>
+<!--
+  WHY this file exists:
+    The slim bar at the top of a Little Window: back, the page's address (click to edit), Copy Link and
+    "Open in Space". The page itself is a separate view below this bar.
+
+  Data source:
+    little.ts fills #little-bar from the page info littleWindow.ts sends.
+
+  Data flow:
+    littleWindow.ts → "little:info" → little.ts → #little-bar
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'">
+    <title>Little Window</title>
+    <link rel="stylesheet" href="./little.css">
+  </head>
+  <body>
+    <header id="little-bar" class="little-bar"></header>
+    <script type="module" src="./little.js"></script>
+  </body>
+</html>

@@ -20,7 +20,7 @@
 import { WebContentsView } from "electron";
 import type { BrowserWindow, ContextMenuParams, HandlerDetails, WebContents } from "electron";
 import { CARD_RADIUS_PX } from "../shared/settings";
-import type { BrowserState, ItemId, RuntimeState, TabItem } from "../shared/types";
+import type { BrowserState, ItemId, TabItem, TabRuntimeInfo } from "../shared/types";
 import { computeCardBounds, computePaneBounds } from "./layout";
 import type { CardLayoutOptions } from "./layout";
 import { getProfileSession } from "./profiles";
@@ -35,6 +35,8 @@ export type OpenDisposition = "foreground" | "background";
 export interface TabViewEvents {
   /** The page navigated or its title changed. */
   onPageChanged(tabId: ItemId, url: string, title: string): void;
+  /** The page loaded a new address (for history). */
+  onNavigated(url: string, title: string): void;
   /** The page reported its icon. */
   onFaviconChanged(tabId: ItemId, faviconUrl: string): void;
   /** Loading, sound or history changed; the sidebar and toolbar should redraw their indicators. */
@@ -135,6 +137,7 @@ export function createTabView(state: BrowserState, tab: TabItem, events: TabView
   });
   contents.on("did-navigate", (_event, url) => {
     events.onPageChanged(tab.id, url, contents.getTitle());
+    events.onNavigated(url, contents.getTitle());
     events.onRuntimeChanged();
   });
   contents.on("did-navigate-in-page", (_event, url) => {
@@ -274,8 +277,8 @@ export function syncTabViews(window: BrowserWindow, state: BrowserState, layoutO
 /**
  * Collects the live facts the sidebar and toolbar show for every loaded tab: loading, sound, back/forward.
  */
-export function collectRuntimeState(): RuntimeState {
-  const runtimeState: RuntimeState = {};
+export function collectTabRuntime(): Record<ItemId, TabRuntimeInfo> {
+  const runtimeState: Record<ItemId, TabRuntimeInfo> = {};
   for (const [tabId, view] of tabViews) {
     const contents = view.webContents;
     if (contents.isDestroyed()) {

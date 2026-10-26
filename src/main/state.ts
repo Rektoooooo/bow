@@ -779,3 +779,24 @@ export function findTabIdByNumber(state: BrowserState, tabNumber: number): ItemI
   }
   return visibleTabIds[tabNumber - 1] ?? null;
 }
+
+/** What addPageToArchive needs to know about a page that never was in the sidebar. */
+export interface LoosePage {
+  url: string;
+  title: string;
+  faviconUrl: string | null;
+}
+
+/**
+ * Puts a page that never lived in the sidebar (a closed Little Window) at the top of the archive, so it can be
+ * found and restored like any closed tab. Pages that are not web pages are not kept.
+ */
+export function addPageToArchive(state: BrowserState, page: LoosePage, now: number, reason: ArchiveReason): BrowserState {
+  const isWebPage = page.url.startsWith("https://") || page.url.startsWith("http://");
+  if (!isWebPage) {
+    return state;
+  }
+  const tab: TabItem = { ...createTab(page.url, now), title: page.title.trim() === "" ? page.url : page.title, faviconUrl: page.faviconUrl };
+  const entry: ArchivedTab = { tab: tab, fromSpaceId: null, archivedAt: now, reason: reason };
+  return { ...state, archive: [entry, ...state.archive] };
+}

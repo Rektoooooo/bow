@@ -31,7 +31,7 @@ const SWIPE_COOLDOWN_MS = 450;
 
 /** The newest state and runtime facts received. */
 let currentState: BrowserState | null = null;
-let currentRuntime: RuntimeState = {};
+let currentRuntime: RuntimeState = { tabs: {}, activeDownloadCount: 0 };
 
 /** The sidebar item, Space name or Space icon being edited inline, or null. */
 let renamingItemId: ItemId | null = null;
@@ -323,6 +323,7 @@ function renderBottomBar(state: BrowserState): void {
     return;
   }
   const libraryButton = createIconButton("archive", "Library and Archive (⇧⌘L)", "bottom-button", () => dispatch({ type: "openLibrary" }));
+  libraryButton.classList.toggle("has-activity", currentRuntime.activeDownloadCount > 0);
   const switcher = createElement("nav", "space-switcher");
   switcher.setAttribute("aria-label", "Spaces");
   for (const space of state.spaces) {

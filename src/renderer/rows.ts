@@ -124,7 +124,7 @@ function createTabTitle(tab: TabItem, context: RowContext): HTMLElement {
  * Pinned tabs only show the close button while their page is loaded, because closing puts the page away.
  */
 export function renderTabRow(tab: TabItem, location: ItemLocation, index: number, depth: number, context: RowContext): HTMLElement {
-  const runtimeInfo = context.runtime[tab.id];
+  const runtimeInfo = context.runtime.tabs[tab.id];
   const isLoaded = runtimeInfo !== undefined;
   const isSelected = tab.id === context.selectedTabId;
   const isToday = location.kind === "today" || location.kind === "split";
@@ -340,10 +340,10 @@ export function renderFavoriteTile(tab: TabItem, location: ItemLocation, index: 
   tile.setAttribute("aria-label", getTabDisplayName(tab));
   tile.tabIndex = 0;
   tile.classList.toggle("is-selected", tab.id === context.selectedTabId);
-  tile.classList.toggle("is-loaded", context.runtime[tab.id] !== undefined);
+  tile.classList.toggle("is-loaded", context.runtime.tabs[tab.id] !== undefined);
   tile.append(createFavicon(tab.faviconUrl, tab.url, "favicon favicon-large"));
 
-  const isAudible = context.runtime[tab.id]?.isAudible === true;
+  const isAudible = context.runtime.tabs[tab.id]?.isAudible === true;
   if (isAudible) {
     tile.append(createElement("span", "tile-audio-dot"));
   }

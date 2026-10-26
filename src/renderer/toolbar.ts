@@ -48,7 +48,7 @@ export function renderToolbar(state: BrowserState, runtime: RuntimeState, select
 
   const selectedItem = selectedTabId === null ? undefined : state.items[selectedTabId];
   const selectedTab = selectedItem !== undefined && selectedItem.kind === "tab" ? selectedItem : null;
-  const runtimeInfo = selectedTabId === null ? undefined : runtime[selectedTabId];
+  const runtimeInfo = selectedTabId === null ? undefined : runtime.tabs[selectedTabId];
 
   const leftGroup = createElement("div", "toolbar-group toolbar-left");
   if (!state.settings.isSidebarVisible) {

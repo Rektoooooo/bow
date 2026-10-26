@@ -1,0 +1,105 @@
+/*
+  WHY this file exists:
+    Look of the Little Window's bar. The bar height must match BAR_HEIGHT_PX in littleWindow.ts.
+*/
+
+:root {
+  --bar-height: 40px; /* = BAR_HEIGHT_PX */
+  --frame: light-dark(#ecebf0, #1f1f22);
+  --ink: light-dark(rgba(0, 0, 0, 0.86), rgba(255, 255, 255, 0.92));
+  --muted: light-dark(rgba(0, 0, 0, 0.5), rgba(255, 255, 255, 0.5));
+  --hover: light-dark(rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.08));
+  --field: light-dark(rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.08));
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--frame);
+  color: var(--ink);
+  font: 13px/1.3 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: default;
+}
+
+button:disabled {
+  opacity: 0.35;
+}
+
+.icon {
+  display: block;
+  flex: none;
+}
+
+/* Leaves room for the traffic lights and drags the window. */
+.little-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--bar-height);
+  padding: 0 10px 0 78px;
+  -webkit-app-region: drag;
+}
+
+.little-bar > * {
+  -webkit-app-region: no-drag;
+}
+
+.little-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.little-button:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.little-address {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  border: 0;
+  border-radius: 7px;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 500;
+  text-align: center;
+  outline: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: text;
+}
+
+.little-address:focus {
+  background: var(--field);
+  text-align: left;
+}
+
+.little-move {
+  color: var(--ink);
+  font-weight: 600;
+}

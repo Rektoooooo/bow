@@ -155,8 +155,13 @@ export interface TabRuntimeInfo {
   canGoForward: boolean;
 }
 
-/** Runtime facts for every loaded tab, by tab id. Tabs that are not loaded are missing. */
-export type RuntimeState = Record<ItemId, TabRuntimeInfo>;
+/** Live facts main.ts sends next to the state. Nothing here is saved. */
+export interface RuntimeState {
+  /** Facts for every loaded tab, by tab id. Tabs that are not loaded are missing. */
+  tabs: Record<ItemId, TabRuntimeInfo>;
+  /** Downloads still in progress; the Library button shows a dot while it is above zero. */
+  activeDownloadCount: number;
+}
 
 /** Where an item lives. Exactly one list in the state contains each item's id. */
 export type ItemLocation =

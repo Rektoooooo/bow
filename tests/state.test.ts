@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  addPageToArchive,
   addToFavorites,
   clearTodayTabs,
   closeTab,
@@ -378,5 +379,15 @@ describe("tab shortcuts", () => {
     expect(findTabIdByNumber(state, 1)).toBe(tabIds[2]);
     expect(findTabIdByNumber(state, 9)).toBe(tabIds[0]);
     expect(findTabIdByNumber(state, 5)).toBeNull();
+  });
+});
+
+describe("addPageToArchive", () => {
+  it("archives a web page from outside the sidebar and ignores other pages", () => {
+    const state = addPageToArchive(createInitialState(), { url: "https://news.example/", title: "News", faviconUrl: null }, ONE_PM, "auto");
+
+    expect(state.archive[0]).toMatchObject({ fromSpaceId: null, reason: "auto", archivedAt: ONE_PM });
+    expect(state.archive[0]?.tab.title).toBe("News");
+    expect(addPageToArchive(state, { url: "about:blank", title: "", faviconUrl: null }, ONE_PM, "manual")).toBe(state);
   });
 });
