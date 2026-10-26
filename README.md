@@ -65,7 +65,7 @@ in Arc). Running it twice adds nothing twice.
   Backspace in the empty field goes back. The sites and their search addresses are listed in
   `src/shared/siteSearch.ts`.
 
-![The Command Bar: typing "wiki" offers the open Wikipedia Favorite first](docs/screenshot-command-bar.png)
+![The Command Bar: typing "wiki" offers the open Wikipedia Favorite first, and Tab to search Wikipedia](docs/screenshot-command-bar.png)
 
 **Pages**
 - **Peek**: a link from a Pinned tab or Favorite to another site, or any Shift-clicked link, opens in a floating
@@ -127,7 +127,7 @@ Same keys as Arc. ⌘T new tab, ⌘L edit address, ⌘W close, ⇧⌘T reopen, �
 | `tests` | Vitest | Rules for state, Spaces, splits, auto-archive, ranking, history, the Arc importers |
 | `e2e` | Playwright + Electron | The real app driven end to end, extensions (with a synthetic test extension), the permission check, the packaged app, the README screenshots |
 | `build`, `tools` | — | The app icon (our own drawing) and Info.plist additions; scripts that draw the icon and package the app |
-| `docs` | — | Screenshots, `arc-teardown.html` (Arc's 52 features), `research/` (findings, Arc's data model, RE setup) |
+| `docs` | — | Screenshots, `arc-teardown.html` (Arc's 53 features and which are built here), `research/` (findings, Arc's data model, RE setup) |
 
 Three ideas keep it simple:
 

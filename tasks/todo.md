@@ -74,9 +74,21 @@ and every Arc behavior we can observe is written down before Arc shuts down.
 - [x] Command Bar: Tab to search a site (YouTube, Wikipedia, GitHub, …)
 
 ### 2.7 Wrap-up
-- [ ] Unit tests for every pure module; e2e rewritten for the new UI; permission check still passing
-- [ ] README screenshot, CLAUDE.md (this Mac's facts), new handoff, commit + push
+- [x] Unit tests for every pure module (166); e2e for the app, overlay, extensions, permissions, packaged app
+- [x] README screenshots regenerated, CLAUDE.md, handoff, teardown page marks what is built (27 of 53, 4 partly)
+
+## Review (2026-10-26, end of the Arc-parity session)
+- **Works and verified:** everything in README "What works". Suites: `npm test` 166, `check-app` 36,
+  `check-overlay` 40, `check-extensions` 19, `permission-check` 17, `check-package` 12 (after `npm run package`).
+- **Verified on real data, read-only:** Arc import (3 Spaces, 22 tabs, 243 archived, 1,279 history pages,
+  15 extensions with Arc's on/off); a Web Store install whose key matches Arc's copy byte for byte; a real update
+  check that downloads, verifies and unpacks.
+- **Known limits:** content scripts can miss the page restored at startup under heavy disk load (Electron has no
+  "scripts ready" signal; reload fixes it). `navigator.permissions.query` says "denied" for sites that have not
+  asked (Electron has no "prompt" state); real requests still prompt. Some extensions need Chrome-only APIs (side
+  panel, tab capture). Screen sharing (getDisplayMedia) is not wired up.
 
 ## Later
 - [ ] Ghidra pass when RAM allows (Command Bar ranking, Peek triggers, sync merge, Easel captures)
-- [ ] Easels, Notes, multiple main windows, tab hover previews, built-in ad blocking
+- [ ] Easels, Notes, multiple main windows, tab hover previews, built-in ad blocking, screen sharing
+- [ ] Sign and notarize the app (needs a Developer ID) so it runs on other Macs

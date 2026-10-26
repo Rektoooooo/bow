@@ -7,8 +7,11 @@ control". Their Arc screenshots are the visual reference (`reference/arc-ui/`, g
 
 ## Where things stand
 
-- **All green at the last commit:** `npm run build`, `npm test` (117+ unit tests), `npm run e2e`
-  (`check-app.mjs` 34 checks, `check-overlay.mjs` 22 checks, `permission-check.mjs`).
+- **All green at the last commit:** `npm run build`, `npm test` (166 unit tests), `npm run e2e` (`check-app` 36,
+  `check-overlay` 40, `check-extensions` 19, `permission-check` 17), and after `npm run package`,
+  `node e2e/check-package.mjs` (12).
+- **A real app:** `npm run package` builds `release/Sidebar Browser-darwin-arm64/Sidebar Browser.app` (ad-hoc
+  signed, our own icon). App menu › Set as Default Browser…; macOS lists it for web links.
 - **Research:** the five open auto-archive questions are answered from runtime evidence (no Ghidra needed): default
   12 h (Little Arc 6 h), sweep every 5 min, visible tab refreshed every 60 s, archive capped at 250, inactivity
   restarts at launch. Arc's on-disk data model is written up. See `docs/research/arc-findings.md` §2–§4 and
@@ -45,6 +48,21 @@ control". Their Arc screenshots are the visual reference (`reference/arc-ui/`, g
 9. **main.ts split** into `browserCore.ts` (the one state + `applyChange`), `actionRunner.ts`,
    `appMenuCommands.ts`, `tabActions.ts`, `overlayController.ts`, `peek.ts`, `littleWindow.ts`, `media.ts`,
    `arcImportController.ts`.
+10. **Packaging** with `@electron/packager` (`tools/package-mac.sh`): only runtime dependencies go in, Electron's
+    cached zip is reused (works offline), Info.plist declares http/https and camera/microphone/location texts.
+    Links that launch the app wait until it is ready.
+11. **Chrome extensions.** Spiked first: Electron 44 runs MV3 service workers and content scripts; popups need tab
+    APIs Electron lacks, so `electron-chrome-extensions` 4.10.0 (relicensed MIT the day before; 4.9 was GPL with a
+    license check; diffed before adopting) adds them, only in profiles that have extensions. Our own state model
+    (`extensionList.ts`) drives `extensionHost.ts`. Arc's Web Store extensions import with their on/off.
+12. **Chrome Web Store** installs and updates are our own (`crx.ts`, `webStoreInstall.ts`), not the library's
+    package, which would reload extensions behind the host. Checked against the real store (key identical to
+    Arc's copy).
+13. **Permission prompts** per profile and site (`permissionPrompts.ts`), app links (mailto:, zoommtg:) ask every
+    time. Found and fixed: quitting with a prompt open threw on the destroyed window and the error dialog blocked
+    quitting; `getWindow()` now returns null for a destroyed window.
+14. **Command Bar Tab-to-search** (`src/shared/siteSearch.ts`), Print (⌘P), spelling suggestions.
+15. `docs/arc-teardown.html` now marks what is built: 27 of 53 features, 4 partly.
 
 ## Lessons (also in `tasks/lessons.md`)
 
@@ -53,13 +71,18 @@ control". Their Arc screenshots are the visual reference (`reference/arc-ui/`, g
   navigation we cancel hangs (use real mouse events); `capturePage` is how screenshots work without Screen Recording.
 - Chromium keeps a paused background tab "audible" for a while; the media player trusts the page's answer.
 - Electron 44's clipboard API is async and W3C-style (`clipboard.write([new ClipboardItem(...)])`).
+- `addAfterSyncHook` runs only when the shown views change; follow the state with `onStateChanged`.
+- An uncaught main-process error shows a modal dialog that blocks quitting; never touch a destroyed window.
+- On macOS `getUserMedia` waits on the system's camera/microphone dialog first; e2e uses notifications.
 
 ## Next steps (pick in this order)
 
-1. Done since this handoff was first written: profiles UI (Space menu › Profile), private windows (⇧⌘N), resizable
-   sidebar (drag the edge; far left hides it), unread dot (Arc's `isUnread`), window bounds remembered.
-2. Boosts (per-site CSS), Air Traffic Control (link routing rules to Spaces), Command Bar site search (Tab).
-3. Ghidra pass when RAM allows: `itemsToExclude`, cleanup timer interval, Command Bar weights.
+1. Use it day to day and fix what hurts: install the packaged app in /Applications, make it the default browser,
+   import from Arc there (the import reads `~/Library/Application Support/Arc`).
+2. Screen sharing (`session.setDisplayMediaRequestHandler` with the macOS system picker), tab hover previews,
+   multiple main windows.
+3. Sign and notarize with a Developer ID so the app runs on other Macs.
+4. Ghidra pass when RAM allows: `itemsToExclude`, cleanup timer interval, Command Bar weights.
 
 ## How to verify quickly
 

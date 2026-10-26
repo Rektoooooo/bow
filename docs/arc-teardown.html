@@ -131,6 +131,9 @@ h2{font-weight:700;font-size:30px;line-height:1.1;letter-spacing:-.012em}
 .chip.observe{color:var(--obs-fg);background:var(--obs-bg)}
 .chip.static{color:var(--sta-fg);background:var(--sta-bg)}
 .chip.binary{color:var(--bin-fg);background:var(--bin-bg)}
+.chip.built{color:var(--obs-fg);background:var(--obs-bg);margin-top:6px;display:inline-block}
+.chip.partly{color:var(--sta-fg);background:var(--sta-bg);margin-top:6px;display:inline-block}
+.built-summary{margin:0 0 12px;color:var(--muted, inherit)}
 
 /* Feature map controls */
 .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;position:sticky;top:env(safe-area-inset-top, 0px);background:var(--card);padding-block:10px;z-index:2;border-bottom:1px solid var(--line)}
@@ -307,6 +310,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         <input id="q" type="search" placeholder="Search features, modules, files…" aria-label="Search features" autocomplete="off">
         <div class="filters" role="group" aria-label="Filter by analysis depth" id="filters"></div>
       </div>
+      <p class="built-summary" id="built-summary"></p>
       <div class="groups" id="groups"></div>
       <p id="empty" hidden>No features match. Clear the search or choose another filter.</p>
     </section>
@@ -498,6 +502,20 @@ const FEATURES = [
   ["acct","Updates, flags & crash reports","","Auto-updates, remote feature flags and crash reporting.","Sparkle for updates. The rest is optional.","Sparkle, LaunchDarkly, Sentry, Datadog","static"]
 ];
 
+// What Sidebar Browser (this repo) has rebuilt so far. "partly": the core works, some of Arc's version is missing.
+const BUILT = {
+  "Vertical sidebar":"built", "Inset web card":"built", "Split View":"built", "Space themes & grain":"built",
+  "Glow loading indicator":"built", "Link status text":"built", "Crashed-tab page":"built",
+  "Spaces":"built", "Profiles per Space":"built", "Favorites":"built", "Pinned tabs & folders":"built",
+  "Today tabs & auto-archive":"built", "Archive":"built", "Sidebar restore":"built",
+  "Command Bar":"built", "Recent-tab switcher":"partly", "Copy URL":"built", "Context menus":"built",
+  "Little Arc":"built", "Peek":"built", "Auto picture-in-picture":"built", "Media controls":"built",
+  "Capture":"partly", "Library":"built", "Boosts":"partly", "Zap":"built", "Space style editor":"built",
+  "Site Control Center":"built", "Chrome extensions":"built", "Default browser & URL scheme":"built",
+  "Import from other browsers":"partly"
+};
+const BUILT_LABEL = {built:"Built here", partly:"Partly built"};
+
 const DEPTHS = [["all","All"],["observe","Observe"],["static","Static"],["binary","Binary"]];
 const LABEL = {observe:"Observe",static:"Static",binary:"Binary"};
 
@@ -520,6 +538,7 @@ function render(){
       row.dataset.text = [name, keys, what, rebuild, ev, LABEL[depth]].join(" ").toLowerCase();
       const c1 = el("div","f-name"); c1.append(el("h4", null, name));
       if (keys) c1.append(el("kbd", null, keys));
+      if (BUILT[name]) { c1.append(document.createElement("br"), el("span","chip " + BUILT[name], BUILT_LABEL[BUILT[name]])); }
       const c2 = el("div","f-body"); c2.append(el("p", null, what));
       const rb = el("p","rb"); rb.append(el("b", null, "Rebuild"), document.createTextNode(rebuild)); c2.append(rb);
       const c3 = el("div","f-ev"); c3.append(el("span","chip " + depth, LABEL[depth]));
@@ -529,6 +548,9 @@ function render(){
     groupsEl.append(sec);
     const a = el("a","tab", gname); a.href = "#g-" + gid; a.dataset.for = "g-" + gid; subnav.append(a);
   }
+  const builtCount = Object.values(BUILT).filter(v => v === "built").length;
+  const partlyCount = Object.values(BUILT).filter(v => v === "partly").length;
+  document.getElementById("built-summary").textContent = `Sidebar Browser has rebuilt ${builtCount} of these ${FEATURES.length} features, and ${partlyCount} more in part.`;
   const filters = document.getElementById("filters");
   for (const [id, label] of DEPTHS){
     const count = id === "all" ? FEATURES.length : FEATURES.filter(f => f[6] === id).length;
