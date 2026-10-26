@@ -92,6 +92,15 @@ limit, UI-test until perfect." Skip Arc Max (AI) and server features (sync, shar
 - [ ] SF Symbols rendered by macOS for every icon (CSS mask, tintable); native menu icons
 - [ ] Palette engine (frame #313131 for black/dark, white/black overlay alphas) + Arc theme import (windowTheme)
 - [ ] Card with the toolbar inside, hairline, per-site toolbar tint (50-site cache), "Show full URL" option
+      **Waits on the clipping spike** (needs Screen Recording for Claude, granted by the user; works after a Claude
+      restart): a `View` at (50,50,400,300) with `setBorderRadius(40)`, child `WebContentsView` filling it with a red
+      page, `screencapture -l <window id>`, read the corners. Clips → card = parent View with the toolbar as its own
+      WebContentsView + page views (square top corners, round bottom). Doesn't clip → keep the toolbar in the sidebar
+      page, uniform page radius, toolbar tinted from the page's top strip (notches invisible), hairline.
+      Measurements (Arc, user's screenshots, 0.985 px/pt): sidebar padding 8, width 247, card gap 7 left, insets 10
+      top/right/bottom, radius 10, toolbar 32 + 1 px hairline, soft card shadow (≈8 px gradient right/bottom),
+      Favorites tiles 45 tall / 8 gap / radius 10, title row 30, rows 36 + 5 gap, text 13.5/500 (folders 600),
+      divider 20, bottom icons centered 25 pt above the bottom, traffic lights at ≈(13,18).
 - [ ] Sidebar to the measurements (tiles, rows, Space title, divider/Clear, New Tab, bottom bar)
 - [ ] Command Bar (shot 3), Control Center (shot 4), Library, Peek frame, Find, prompts, editors, Little Window
 
