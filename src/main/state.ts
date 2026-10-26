@@ -728,6 +728,16 @@ export function setSoundEffects(state: BrowserState, isOn: boolean): BrowserStat
 }
 
 /**
+ * Turns tidy titles for pinned tabs on or off.
+ */
+export function setTidyTitles(state: BrowserState, isOn: boolean): BrowserState {
+  if ((state.settings.areTitlesTidy ?? true) === isOn) {
+    return state;
+  }
+  return { ...state, settings: { ...state.settings, areTitlesTidy: isOn } };
+}
+
+/**
  * Picks the app icon variant shown in the Dock.
  */
 export function setAppIcon(state: BrowserState, variantId: string): BrowserState {

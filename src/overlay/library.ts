@@ -537,6 +537,12 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
     failed: "The lists could not be downloaded. Check the connection and turn it off and on again.",
   };
   const adBlockNote = createElement("p", "library-setting-note", adBlockStatus[adBlock.status]);
+  const tidyRow = createElement("div", "library-setting-row");
+  const areTitlesTidy = data.areTitlesTidy;
+  tidyRow.append(
+    createElement("span", "library-setting-label", "Tidy titles for pinned tabs"),
+    createTextButton(areTitlesTidy ? "On" : "Off", areTitlesTidy ? "library-chip is-active" : "library-chip", () => dispatch({ type: "setTidyTitles", isOn: !areTitlesTidy })),
+  );
   const iconRow = createElement("div", "library-setting-row");
   const iconChoices = createElement("div", "app-icon-choices");
   for (const variant of APP_ICON_VARIANTS) {
@@ -554,7 +560,7 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
     createElement("span", "library-setting-label", "Bookmarks and history from another browser"),
     createTextButton("Import…", "library-chip", () => dispatch({ type: "showMenu", request: { menu: "import" } })),
   );
-  settings.append(row, explanation, soundRow, adBlockRow, adBlockNote, iconRow, importRow, renderRoutingSettings(data));
+  settings.append(row, explanation, soundRow, tidyRow, adBlockRow, adBlockNote, iconRow, importRow, renderRoutingSettings(data));
   body.replaceChildren(settings);
 }
 

@@ -140,6 +140,8 @@ export interface BrowserSettings {
   isAdBlockOn?: boolean;
   /** The app icon variant shown in the Dock (shared/appIconDrawing.ts). Optional: missing means "classic". */
   appIcon?: string;
+  /** Pinned tabs show tidy titles (shared/tidyTitles.ts). Optional: missing means on, like Arc. */
+  areTitlesTidy?: boolean;
 }
 
 /** How a link-routing rule compares an address. */
@@ -167,6 +169,15 @@ export interface Boost {
   css: string;
   zappedSelectors: string[];
   isEnabled: boolean;
+  /** Every color on the site shifted round the color wheel, in degrees (pictures keep theirs). Optional: none. */
+  hueShift?: number;
+  /** Light turned dark and dark turned light, pictures kept as they are. Optional: off. */
+  isInverted?: boolean;
+  /** A font for the site's text (shared/boostFonts.ts id). Optional: the site's own. */
+  fontId?: string;
+  /** JavaScript run in each page of the site once loaded, only while isJavaScriptOn. Optional: none. */
+  javascript?: string;
+  isJavaScriptOn?: boolean;
 }
 
 /**

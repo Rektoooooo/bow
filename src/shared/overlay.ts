@@ -41,12 +41,13 @@ export type OverlayPanel =
   | { kind: "library"; section: LibrarySection }
   | { kind: "siteControls" }
   | { kind: "find" }
-  | { kind: "boost"; site: string; css: string }
+  | { kind: "boost"; site: string; css: string; hueShift: number; isInverted: boolean; fontId: string; javascript: string; isJavaScriptOn: boolean; zapCount: number }
   | { kind: "theme"; spaceId: string; spaceName: string; spaceIcon: string; theme: SpaceTheme; sidebarWidth: number; presets: { label: string; colors: string[]; appearance: ThemeAppearance }[] }
   | { kind: "peek"; frame: { x: number; y: number; width: number; height: number }; url: string; title: string }
   | { kind: "permission"; requestId: string; host: string; kinds: SitePermissionKind[]; appName: string | null }
   | { kind: "capture"; frame: { x: number; y: number; width: number; height: number } }
-  | { kind: "switcher"; tabs: SwitcherTab[]; index: number };
+  | { kind: "switcher"; tabs: SwitcherTab[]; index: number }
+  | { kind: "preview"; frame: OverlayRect; tabId: string; title: string; url: string; faviconUrl: string | null; snapshotUrl: string };
 
 /** One card of the recent-tab switcher (⌃Tab): most recently used first, the selected tab at index 0. */
 export interface SwitcherTab {
@@ -145,6 +146,7 @@ export interface LibraryData {
   archiveAfterMs: number | null;
   areSoundEffectsOn: boolean;
   appIcon: string;
+  areTitlesTidy: boolean;
   adBlock: { isOn: boolean; status: "off" | "loading" | "ready" | "failed"; filterCount: number };
   routingRules: RoutingRule[];
   extensions: ExtensionLine[];

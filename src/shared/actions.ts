@@ -85,6 +85,8 @@ export type BrowserAction =
   | { type: "removeRoutingRule"; ruleId: string }
   | { type: "setBoostCss"; site: string; css: string }
   | { type: "setBoostEnabled"; site: string; isEnabled: boolean }
+  | { type: "setBoostStyle"; site: string; hueShift: number; isInverted: boolean; fontId: string }
+  | { type: "setBoostJavaScript"; site: string; javascript: string; isOn: boolean }
   | { type: "deleteBoost"; site: string }
   | { type: "openBoostEditor"; site?: string }
   | { type: "toggleMediaPlayback" }
@@ -111,7 +113,10 @@ export type BrowserAction =
   | { type: "setSoundEffects"; isOn: boolean }
   | { type: "setAdBlock"; isOn: boolean }
   | { type: "setAdBlockForSite"; site: string; isOn: boolean }
-  | { type: "setAppIcon"; variantId: string };
+  | { type: "setAppIcon"; variantId: string }
+  | { type: "showTabPreview"; tabId: ItemId; anchor: { x: number; y: number; width: number; height: number } }
+  | { type: "hideTabPreview" }
+  | { type: "setTidyTitles"; isOn: boolean };
 
 /** Every action type, for checking an incoming `type` string. */
 export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
@@ -155,6 +160,8 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "removeRoutingRule",
   "setBoostCss",
   "setBoostEnabled",
+  "setBoostStyle",
+  "setBoostJavaScript",
   "deleteBoost",
   "openBoostEditor",
   "toggleMediaPlayback",
@@ -182,4 +189,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setAdBlock",
   "setAdBlockForSite",
   "setAppIcon",
+  "showTabPreview",
+  "hideTabPreview",
+  "setTidyTitles",
 ];

@@ -391,6 +391,23 @@ await app.evaluate(({ webContents }) => webContents.getAllWebContents().find((co
 await sidebar.waitForTimeout(2500);
 const backgroundAfterReload = await pageStyle("getComputedStyle(document.body).backgroundColor");
 check("a Boost's CSS changes the site, also after a reload", boostedBackground === "rgb(1, 2, 3)" && backgroundAfterReload === "rgb(1, 2, 3)", `${boostedBackground} / ${backgroundAfterReload}`);
+// Colors and fonts apply at once; JavaScript runs in the site's pages only once switched on.
+await dispatch({ type: "setBoostStyle", site: "example.com", hueShift: 90, isInverted: false, fontId: "mono" });
+await sidebar.waitForTimeout(800);
+const boostStyle = await pageStyle("[getComputedStyle(document.documentElement).filter, getComputedStyle(document.body).fontFamily].join(' | ')");
+check("a Boost's colors and font apply to the site", boostStyle.includes("hue-rotate(90deg)") && boostStyle.includes("ui-monospace"), boostStyle);
+await dispatch({ type: "setBoostJavaScript", site: "example.com", javascript: "document.body.dataset.boosted = 'yes';", isOn: false });
+await app.evaluate(({ webContents }) => webContents.getAllWebContents().find((contents) => contents.getURL().includes("example.com/boost")).reload());
+await sidebar.waitForTimeout(2000);
+const scriptWhileOff = await pageStyle("document.body.dataset.boosted ?? 'no'");
+await dispatch({ type: "setBoostJavaScript", site: "example.com", javascript: "document.body.dataset.boosted = 'yes';", isOn: true });
+await app.evaluate(({ webContents }) => webContents.getAllWebContents().find((contents) => contents.getURL().includes("example.com/boost")).reload());
+await sidebar.waitForTimeout(2000);
+const scriptWhileOn = await pageStyle("document.body.dataset.boosted ?? 'no'");
+check("a Boost's JavaScript runs on the site only once switched on", scriptWhileOff === "no" && scriptWhileOn === "yes", `${scriptWhileOff} / ${scriptWhileOn}`);
+await dispatch({ type: "setBoostStyle", site: "example.com", hueShift: 0, isInverted: false, fontId: "" });
+await dispatch({ type: "setBoostJavaScript", site: "example.com", javascript: "", isOn: false });
+await sidebar.waitForTimeout(400);
 
 await dispatch({ type: "openBoostEditor" });
 await overlay.waitForSelector(".boost-zap", { timeout: 5000 });
@@ -678,7 +695,26 @@ await overlay.press(".command-input", "Backspace");
 await overlay.waitForTimeout(400);
 const afterBackspace = await overlay.inputValue(".command-input");
 check("deleting removes the completion instead of completing again", afterBackspace === "exam", afterBackspace);
+await overlay.fill(".command-input", "");
+await overlay.locator(".command-input").pressSequentially("netfl", { delay: 40 });
+await overlay.waitForTimeout(600);
+const popularCompletion = await overlay.inputValue(".command-input");
+const highlightedLines = await overlay.$$eval(".command-line.is-highlighted", (lines) => lines.length);
+check("a well-known site completes before it was ever visited, and Return would open it", popularCompletion === "netflix.com" && highlightedLines === 0, `${popularCompletion} highlighted=${highlightedLines}`);
 await overlay.press(".command-input", "Escape");
+
+// Tab previews: resting the pointer on a tab that is not on screen shows a card with a picture of its page next to
+// the sidebar; moving away hides it. The card never takes the keyboard.
+await sidebar.waitForTimeout(500);
+const otherTabRow = sidebar.locator(".tab-row:not(.is-selected)").first();
+await otherTabRow.hover();
+await overlay.waitForSelector(".tab-preview img", { timeout: 4000 }).catch(() => undefined);
+const previewShown = (await overlay.$(".tab-preview img")) !== null && (await overlayIsShown());
+const keyboardOwner = await app.evaluate(({ webContents }) => webContents.getFocusedWebContents()?.getURL() ?? "");
+check("resting on a tab shows its preview card, without taking the keyboard", previewShown && !keyboardOwner.endsWith("/overlay/overlay.html"), keyboardOwner.slice(-40));
+await sidebar.mouse.move(60, 20);
+await sidebar.waitForTimeout(500);
+check("moving away hides the preview", !(await overlayIsShown()));
 
 await app.close();
 const failed = results.filter((result) => !result.ok).length;

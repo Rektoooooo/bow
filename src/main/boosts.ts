@@ -12,6 +12,7 @@
  */
 import type { Boost, BrowserState } from "../shared/types";
 import { createId } from "./tree";
+import { findBoostFont } from "../shared/boostFonts";
 import { getSiteKey } from "./urls";
 
 /** Longest CSS a Boost may hold. Our choice: far more than hand-written tweaks need; bounds what a message can store. */
@@ -41,6 +42,14 @@ export function buildBoostCss(boost: Boost): string {
     return "";
   }
   const parts: string[] = [];
+  const colorCss = buildColorCss(boost.hueShift ?? 0, boost.isInverted === true);
+  if (colorCss !== "") {
+    parts.push(colorCss);
+  }
+  const font = findBoostFont(boost.fontId);
+  if (font !== undefined) {
+    parts.push(`${FONT_TARGETS} { font-family: ${font.stack} !important; }`);
+  }
   if (boost.css.trim() !== "") {
     parts.push(boost.css);
   }
@@ -48,6 +57,26 @@ export function buildBoostCss(boost: Boost): string {
     parts.push(`${boost.zappedSelectors.join(",\n")} { display: none !important; }`);
   }
   return parts.join("\n");
+}
+
+/** Pictures and video keep their own colors: the page's filter is undone on them. */
+const MEDIA_SELECTOR = "img, video, picture, canvas, iframe, svg image";
+
+/** Text a Boost font applies to. Code keeps a fixed-width font; icon fonts (often <i> or "icon" classes) keep theirs. */
+const FONT_TARGETS = "body, body *:not(code):not(pre):not(kbd):not(samp):not(i):not([class*='icon']):not([class*='Icon'])";
+
+/**
+ * The color part of a Boost: a hue shift and/or an inversion on the whole page, undone on pictures and video.
+ */
+function buildColorCss(hueShift: number, isInverted: boolean): string {
+  if (hueShift === 0 && !isInverted) {
+    return "";
+  }
+  const pageFilter = isInverted ? `invert(1) hue-rotate(${180 + hueShift}deg)` : `hue-rotate(${hueShift}deg)`;
+  const mediaFilter = isInverted ? `hue-rotate(${-(180 + hueShift)}deg) invert(1)` : `hue-rotate(${-hueShift}deg)`;
+  // An inverted page needs a white canvas to turn dark; many pages leave it transparent.
+  const canvas = isInverted ? " background-color: #fff !important;" : "";
+  return `html { filter: ${pageFilter} !important;${canvas} }\n${MEDIA_SELECTOR} { filter: ${mediaFilter} !important; }`;
 }
 
 /**
@@ -104,6 +133,47 @@ export function setBoostEnabled(state: BrowserState, site: string, isEnabled: bo
     return state;
   }
   return { ...state, boosts: boosts.map((boost) => (boost === existing ? { ...boost, isEnabled: isEnabled } : boost)) };
+}
+
+/** The largest hue shift, in degrees (a full turn). */
+export const MAX_HUE_SHIFT = 359;
+
+/**
+ * Sets a site's colors and font (creating its Boost when needed). An unknown font means the site's own.
+ */
+export function setBoostStyle(state: BrowserState, site: string, style: { hueShift: number; isInverted: boolean; fontId: string }, now: number): BrowserState {
+  if (site.trim() === "") {
+    return state;
+  }
+  const hueShift = Math.min(Math.max(Math.round(style.hueShift), 0), MAX_HUE_SHIFT);
+  const fontId = findBoostFont(style.fontId) === undefined ? undefined : style.fontId;
+  return changeBoost(state, site, now, (boost) => {
+    const isSame = (boost.hueShift ?? 0) === hueShift && (boost.isInverted ?? false) === style.isInverted && boost.fontId === fontId;
+    return isSame ? boost : { ...boost, hueShift: hueShift, isInverted: style.isInverted, fontId: fontId, isEnabled: true };
+  });
+}
+
+/**
+ * Sets a site's JavaScript and whether it runs (too long code is refused).
+ */
+export function setBoostJavaScript(state: BrowserState, site: string, javascript: string, isOn: boolean, now: number): BrowserState {
+  if (javascript.length > MAX_BOOST_CSS_LENGTH || site.trim() === "") {
+    return state;
+  }
+  return changeBoost(state, site, now, (boost) => {
+    const isSame = (boost.javascript ?? "") === javascript && (boost.isJavaScriptOn ?? false) === isOn;
+    return isSame ? boost : { ...boost, javascript: javascript, isJavaScriptOn: isOn };
+  });
+}
+
+/**
+ * The JavaScript to run in a page of this Boost's site, or "" (Boost off, code switched off, or none).
+ */
+export function getBoostJavaScript(boost: Boost): string {
+  if (!boost.isEnabled || boost.isJavaScriptOn !== true) {
+    return "";
+  }
+  return (boost.javascript ?? "").trim();
 }
 
 /**

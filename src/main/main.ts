@@ -47,7 +47,7 @@ import { addVisit, loadHistory, saveHistoryNow, setVisitTitle } from "./historyS
 import { registerIpcHandlers } from "./ipc";
 import { archiveIdleLittleWindows, handleExternalUrl, registerLittleWindowIpc } from "./littleWindow";
 import { showPageContextMenu } from "./menus";
-import { applyBoostToPage } from "./boostPages";
+import { applyBoostToPage, runBoostJavaScript } from "./boostPages";
 import { createStatusBubble, showLinkStatus } from "./statusBubble";
 import { initializePeek, openPeek, relayoutPeek } from "./peek";
 import { createOverlayView, getOverlayContents } from "./overlay";
@@ -121,6 +121,7 @@ const tabViewEvents: TabViewEvents = {
   onContextMenu: (_tabId, contents, params) => showPageContextMenu(menuHost, contents, params, getExtensionMenuItems(contents, params)),
   onDomReady: (_tabId, contents) => {
     applyBoostToPage(contents, getState()).catch(() => undefined);
+    runBoostJavaScript(contents, getState());
     applyCosmeticFilters(contents).catch(() => undefined);
   },
   onLinkHover: (url) => {

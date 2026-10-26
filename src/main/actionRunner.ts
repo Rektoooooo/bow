@@ -15,7 +15,7 @@ import type { SpaceTheme } from "../shared/types";
 import { applyChange, getState, getWindow, previewSidebarWidthWhileDragging, scheduleRuntimePush, sendSidebarCommand, setSidebarPeek } from "./browserCore";
 import { dismissMedia, toggleMediaPlayback } from "./media";
 import { addRoutingRule, removeRoutingRule } from "./routing";
-import { deleteBoost, setBoostCss, setBoostEnabled } from "./boosts";
+import { deleteBoost, setBoostCss, setBoostEnabled, setBoostJavaScript, setBoostStyle } from "./boosts";
 import { reapplyBoostsToAllPages } from "./boostPages";
 import { importFromArc } from "./arcImportController";
 import { importFromBrowser } from "./browserImportController";
@@ -28,7 +28,7 @@ import { answerPermissionPrompt } from "./permissionPrompts";
 import { removePermissionAnswer } from "./sitePermissions";
 import { showMenuRequest } from "./menus";
 import type { MenuHost } from "./menus";
-import { openBoostEditor, openCommandBar, openLibrary, openSiteControls, openThemeEditor, runSiteCommand } from "./overlayController";
+import { hideTabPreview, openBoostEditor, openCommandBar, openLibrary, openSiteControls, openThemeEditor, runSiteCommand, showTabPreview } from "./overlayController";
 import { setDeveloperMode } from "../shared/developerMode";
 import { openDeveloperTool } from "./pageCommands";
 import { setSplitOrientation, separateTabFromSplit, splitTabs, unsplit } from "./split";
@@ -49,6 +49,7 @@ import {
   setAdBlock,
   setAdBlockForSite,
   setAppIcon,
+  setTidyTitles,
   setPinnedSectionOpen,
   setSidebarVisible,
   setSidebarWidth,
@@ -209,6 +210,13 @@ export function runAction(action: BrowserAction): void {
     case "setBoostCss":
       applyChange((state) => setBoostCss(state, action.site, action.css, now));
       return reapplyBoostsToAllPages(getState());
+    case "setBoostStyle":
+      applyChange((state) => setBoostStyle(state, action.site, { hueShift: action.hueShift, isInverted: action.isInverted, fontId: action.fontId }, now));
+      reapplyBoostsToAllPages(getState());
+      return;
+    case "setBoostJavaScript":
+      applyChange((state) => setBoostJavaScript(state, action.site, action.javascript, action.isOn, now));
+      return;
     case "setBoostEnabled":
       applyChange((state) => setBoostEnabled(state, action.site, action.isEnabled));
       return reapplyBoostsToAllPages(getState());
@@ -288,6 +296,12 @@ export function runAction(action: BrowserAction): void {
       applyChange((state) => setAdBlockForSite(state, action.site, action.isOn));
       reapplyCosmeticFiltersToAllPages();
       return;
+    case "setTidyTitles":
+      return applyChange((state) => setTidyTitles(state, action.isOn));
+    case "showTabPreview":
+      return showTabPreview(action.tabId, action.anchor);
+    case "hideTabPreview":
+      return hideTabPreview();
     case "setAppIcon":
       applyChange((state) => setAppIcon(state, action.variantId));
       applyAppIcon(action.variantId).catch((error) => console.error("Changing the app icon failed:", error));

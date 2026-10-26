@@ -58,9 +58,10 @@ export function createOverlayView(): void {
 }
 
 /**
- * Shows a panel: places the overlay, puts it on top, tells the page what to draw and gives it the keyboard.
+ * Shows a panel: places the overlay, puts it on top, tells the page what to draw and gives it the keyboard (except
+ * for panels that must not take it, like a tab preview).
  */
-export async function showOverlay(window: BrowserWindow, bounds: Bounds, message: OverlayShowMessage): Promise<void> {
+export async function showOverlay(window: BrowserWindow, bounds: Bounds, message: OverlayShowMessage, takesKeyboard: boolean = true): Promise<void> {
   await overlayReady;
   if (overlayView === null) {
     return;
@@ -74,7 +75,9 @@ export async function showOverlay(window: BrowserWindow, bounds: Bounds, message
   window.contentView.addChildView(overlayView);
   isShown = true;
   overlayView.webContents.send(OVERLAY_CHANNELS.show, message);
-  overlayView.webContents.focus();
+  if (takesKeyboard) {
+    overlayView.webContents.focus();
+  }
 }
 
 /**

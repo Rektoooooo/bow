@@ -146,6 +146,9 @@ function computeOverlayBounds(panel: OverlayPanel): Bounds | null {
   const contentSize = window.getContentSize();
   const contentWidth = contentSize[0] ?? 0;
   const contentHeight = contentSize[1] ?? 0;
+  if (panel.kind === "preview") {
+    return panel.frame;
+  }
   if (panel.kind === "permission") {
     // Under the toolbar at the page's top left, like Chromium's permission bubble; the page stays usable around it.
     const pageCard = computeCardBounds(contentWidth, contentHeight, getLayoutOptions());
@@ -197,6 +200,7 @@ function buildLibraryData(state: BrowserState): LibraryData {
     archiveAfterMs: state.settings.archiveAfterMs,
     areSoundEffectsOn: state.settings.areSoundEffectsOn !== false,
     appIcon: state.settings.appIcon ?? "classic",
+    areTitlesTidy: state.settings.areTitlesTidy !== false,
     adBlock: describeAdBlock(state),
     routingRules: state.routingRules ?? [],
     extensions: (state.extensions ?? []).map((extension) => ({
@@ -264,7 +268,17 @@ export function openBoostEditor(requestedSite?: string): void {
     return;
   }
   const boost = (state.boosts ?? []).find((candidate) => candidate.site === site);
-  openPanel({ kind: "boost", site: site, css: boost === undefined ? "" : boost.css });
+  openPanel({
+    kind: "boost",
+    site: site,
+    css: boost?.css ?? "",
+    hueShift: boost?.hueShift ?? 0,
+    isInverted: boost?.isInverted ?? false,
+    fontId: boost?.fontId ?? "",
+    javascript: boost?.javascript ?? "",
+    isJavaScriptOn: boost?.isJavaScriptOn ?? false,
+    zapCount: boost?.zappedSelectors.length ?? 0,
+  });
 }
 
 /**
@@ -296,7 +310,8 @@ function openPanel(panel: OverlayPanel): void {
   }
   const library = panel.kind === "library" ? buildLibraryData(state) : null;
   const site = panel.kind === "siteControls" ? buildSiteInfo(state) : null;
-  showOverlay(window, bounds, { panel: panel, isDark: isActiveSpaceDark(state), library: library, site: site }).catch((error) => {
+  const takesKeyboard = panel.kind !== "preview";
+  showOverlay(window, bounds, { panel: panel, isDark: isActiveSpaceDark(state), library: library, site: site }, takesKeyboard).catch((error) => {
     console.error("Could not open the overlay:", error);
   });
 }
@@ -345,6 +360,39 @@ export function openThemeEditor(spaceId: string): void {
   const presets = THEME_PRESETS.map((preset) => ({ label: preset.label, colors: preset.colors, appearance: preset.appearance }));
   const sidebarWidth = getLayoutOptions().sidebarWidth ?? SIDEBAR_WIDTH_PX;
   openPanel({ kind: "theme", spaceId: space.id, spaceName: space.name, spaceIcon: space.icon, theme: space.theme, sidebarWidth: sidebarWidth, presets: presets });
+}
+
+/** The tab preview card: its size, and its distance from the sidebar's row. Our choice. */
+const PREVIEW_WIDTH_PX = 290;
+const PREVIEW_HEIGHT_PX = 250;
+const PREVIEW_GAP_PX = 10;
+
+/**
+ * Shows the preview card of a tab next to its row in the sidebar, when we have a picture of the page and no other
+ * panel is open. The card does not take the keyboard.
+ */
+export function showTabPreview(tabId: string, anchor: OverlayRect): void {
+  const window = getWindow();
+  const tab = findTab(getState(), tabId);
+  const snapshotUrl = getSnapshot(tabId);
+  const isOtherPanelOpen = shownPanel !== null && shownPanel.kind !== "preview";
+  if (window === null || tab === undefined || snapshotUrl === null || isOtherPanelOpen) {
+    return;
+  }
+  const contentHeight = window.getContentSize()[1] ?? 0;
+  const centeredTop = anchor.y + anchor.height / 2 - PREVIEW_HEIGHT_PX / 2;
+  const top = Math.max(PREVIEW_GAP_PX, Math.min(centeredTop, contentHeight - PREVIEW_HEIGHT_PX - PREVIEW_GAP_PX));
+  const frame = { x: anchor.x + anchor.width + PREVIEW_GAP_PX, y: Math.round(top), width: PREVIEW_WIDTH_PX, height: PREVIEW_HEIGHT_PX };
+  openPanel({ kind: "preview", frame: frame, tabId: tab.id, title: tab.customTitle ?? tab.title, url: tab.url, faviconUrl: tab.faviconUrl, snapshotUrl: snapshotUrl });
+}
+
+/**
+ * Hides the tab preview card (nothing else).
+ */
+export function hideTabPreview(): void {
+  if (shownPanel?.kind === "preview") {
+    closeOverlay();
+  }
 }
 
 /** Most tabs the recent-tab switcher shows. Our choice: a row that fits a laptop screen. */
@@ -451,6 +499,10 @@ export function closeOverlay(): void {
   hideOverlay(window);
   if (closedPanel !== null) {
     notifyPanelEnded(closedPanel, "closed");
+  }
+  // A preview never had the keyboard, so there is nothing to give back.
+  if (closedPanel?.kind === "preview") {
+    return;
   }
   // Give the keyboard back to the page, or to the sidebar when no page is open.
   const pageContents = getFocusedContents();

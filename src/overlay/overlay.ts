@@ -24,10 +24,12 @@ import { renderThemeEditor } from "./themeEditor.js";
 import { renderSiteControls } from "./siteControls.js";
 import { renderCapture } from "./capture.js";
 import { handleSwitcherKey, installSwitcherMessages, renderSwitcher } from "./switcher.js";
+import { renderTabPreview } from "./tabPreview.js";
 import { buildSiteSearchUrl, findSiteSearch } from "../shared/siteSearch.js";
 import type { SiteSearch } from "../shared/siteSearch.js";
 import { findInlineCompletion } from "../shared/inlineCompletion.js";
 import type { CompletionCandidate } from "../shared/inlineCompletion.js";
+import { POPULAR_SITE_URLS } from "../shared/popularSites.js";
 
 declare global {
   interface Window {
@@ -86,6 +88,9 @@ let typedText = "";
 
 /** True after typing a character; deleting turns completion off until the next character, like Chrome and Arc. */
 let isCompletionAllowed = false;
+
+/** While a completion shows: the result it came from ("" for a well-known site), so late results keep it chosen. */
+let completionLineId: string | null = null;
 
 /** Lines whose address can be completed to (searches cannot). */
 const COMPLETABLE_KINDS: CommandBarLine["kind"][] = ["tab", "history", "navigate"];
@@ -325,14 +330,21 @@ function showInlineCompletion(): void {
       candidates.push({ lineId: line.id, url: line.url });
     }
   }
+  // Well-known sites come last, so "you" finishes to youtube.com even before you have been there.
+  for (const url of POPULAR_SITE_URLS) {
+    candidates.push({ lineId: "", url: url });
+  }
   const completion = findInlineCompletion(typedText, candidates);
   if (completion === null) {
     return;
   }
   input.value = completion.text;
   input.setSelectionRange(typedText.length, completion.text.length);
+  // From a result: highlight it, Return opens it. From the well-known sites: no result is highlighted, so Return
+  // opens the completed address.
+  completionLineId = completion.lineId;
   const lineIndex = commandLines.findIndex((line) => line.id === completion.lineId);
-  highlightLine(lineIndex === -1 ? 0 : lineIndex, false);
+  highlightLine(lineIndex, false);
 }
 
 /**
@@ -356,6 +368,7 @@ function handleCommandKeys(event: KeyboardEvent): void {
   }
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
+    completionLineId = null;
     const step = event.key === "ArrowDown" ? 1 : -1;
     const count = commandLines.length;
     const nextIndex = count === 0 ? 0 : (highlightedIndex + step + count) % count;
@@ -379,6 +392,7 @@ function renderCommandBar(host: HTMLElement, mode: CommandBarMode, initialText: 
   isShowingTips = false;
   typedText = initialText;
   isCompletionAllowed = false;
+  completionLineId = null;
 
   const panel = createElement("div", "panel command-bar");
   panel.setAttribute("role", "dialog");
@@ -395,6 +409,7 @@ function renderCommandBar(host: HTMLElement, mode: CommandBarMode, initialText: 
   input.setAttribute("aria-label", PLACEHOLDERS[mode]);
   input.addEventListener("input", (event) => {
     isCompletionAllowed = (event as InputEvent).inputType === "insertText";
+    completionLineId = null;
     typedText = input.value;
     handleCommandInput(input.value);
   });
@@ -441,7 +456,8 @@ function showPanel(message: OverlayShowMessage): void {
   document.body.dataset.panel = message.panel.kind;
   // The Find bar's and a permission prompt's overlay is only as big as the card, so it needs no backdrop; Capture
   // draws its own dimming.
-  backdrop.hidden = message.panel.kind === "find" || message.panel.kind === "permission" || message.panel.kind === "capture";
+  const hasOwnBackground = ["find", "permission", "capture", "preview"].includes(message.panel.kind);
+  backdrop.hidden = hasOwnBackground;
 
   if (message.panel.kind === "commandBar") {
     renderCommandBar(host, message.panel.mode, message.panel.initialText);
@@ -475,6 +491,9 @@ function showPanel(message: OverlayShowMessage): void {
   }
   if (message.panel.kind === "switcher") {
     renderSwitcher(host, message.panel);
+  }
+  if (message.panel.kind === "preview") {
+    renderTabPreview(host, message.panel);
   }
 }
 
@@ -513,6 +532,10 @@ function startOverlay(): void {
     commandLines = lines;
     const sameLineIndex = lines.findIndex((line) => line.id === highlightedId);
     highlightedIndex = sameLineIndex === -1 ? 0 : sameLineIndex;
+    // A completion in the input keeps its own result chosen (none for a well-known site).
+    if (completionLineId !== null) {
+      highlightedIndex = lines.findIndex((line) => line.id === completionLineId);
+    }
     drawCommandLines();
   });
   document.getElementById("backdrop")?.addEventListener("mousedown", () => closeOverlay());

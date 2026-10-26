@@ -19,6 +19,7 @@ import { createActionButton, createElement, createFavicon, dispatch, getDisplayH
 import { createIcon } from "./icons.js";
 import { encodeLocation, markDraggable, markDropTarget } from "./dragDrop.js";
 import { isDeveloperModeOn } from "../shared/developerMode.js";
+import { tidyTitle } from "../shared/tidyTitles.js";
 
 /** Everything a row needs to know to draw itself. */
 export interface RowContext {
@@ -115,8 +116,9 @@ function createTabIconSlot(tab: TabItem, isLoading: boolean): HTMLElement {
 
 /**
  * Builds the title of a tab row: the inline rename field, or the name with Arc's "/" when the tab left home.
+ * Pinned tabs without a name of the user's own show a tidy title (shared/tidyTitles.ts) unless that is turned off.
  */
-function createTabTitle(tab: TabItem, context: RowContext): HTMLElement {
+function createTabTitle(tab: TabItem, context: RowContext, isPinned: boolean): HTMLElement {
   const title = createElement("span", "row-title");
   if (context.renamingItemId === tab.id) {
     title.append(createRenameInput(tab.id, getTabDisplayName(tab), context));
@@ -125,7 +127,8 @@ function createTabTitle(tab: TabItem, context: RowContext): HTMLElement {
   if (hasLeftHome(tab)) {
     title.append(createElement("span", "away-slash", "/ "));
   }
-  title.append(document.createTextNode(getTabDisplayName(tab)));
+  const isTidy = isPinned && tab.customTitle === null && context.state.settings.areTitlesTidy !== false;
+  title.append(document.createTextNode(isTidy ? tidyTitle(tab.title, tab.url) : getTabDisplayName(tab)));
   return title;
 }
 
@@ -168,10 +171,10 @@ export function renderTabRow(tab: TabItem, location: ItemLocation, index: number
   row.classList.toggle("is-developer", isDeveloper);
   if (isDeveloper) {
     const textStack = createElement("span", "row-text-stack");
-    textStack.append(createTabTitle(tab, context), createElement("span", "row-subtitle", getDisplayHost(tab.url)));
+    textStack.append(createTabTitle(tab, context, !isToday), createElement("span", "row-subtitle", getDisplayHost(tab.url)));
     row.append(textStack);
   } else {
-    row.append(createTabTitle(tab, context));
+    row.append(createTabTitle(tab, context, !isToday));
   }
   if (tab.isUnread === true && !isSelected) {
     const unreadDot = createElement("span", "unread-dot");

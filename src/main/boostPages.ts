@@ -15,11 +15,14 @@
  */
 import type { WebContents } from "electron";
 import type { BrowserState, ItemId } from "../shared/types";
-import { buildBoostCss, findBoostForUrl } from "./boosts";
+import { buildBoostCss, findBoostForUrl, getBoostJavaScript } from "./boosts";
 import { getTabContents, getTabViews } from "./tabViews";
 
 /** An isolated world of our own inside the page (any number above 0; media.ts uses another). */
 const ZAP_WORLD_ID = 1032;
+
+/** The isolated world a Boost's JavaScript runs in: it sees the page's DOM, not the page's own scripts. */
+const BOOST_SCRIPT_WORLD_ID = 1033;
 
 /**
  * Waits for one click on the page and resolves to a CSS selector for the clicked element (null on Escape).
@@ -130,6 +133,21 @@ export function applyBoostToPage(contents: WebContents, state: BrowserState): Pr
   const update = previousUpdate.then(() => replaceBoostCss(contents, state)).catch(() => undefined);
   pendingUpdates.set(contents.id, update);
   return update;
+}
+
+/**
+ * Runs the site's Boost JavaScript in a page that has just loaded, when the user switched it on. It runs in an
+ * isolated world, like an extension's content script, so it cannot reach the page's own variables.
+ */
+export function runBoostJavaScript(contents: WebContents, state: BrowserState): void {
+  const boost = findBoostForUrl(state, contents.getURL());
+  const javascript = boost === undefined ? "" : getBoostJavaScript(boost);
+  if (javascript === "" || contents.isDestroyed()) {
+    return;
+  }
+  contents.executeJavaScriptInIsolatedWorld(BOOST_SCRIPT_WORLD_ID, [{ code: javascript }]).catch((error) => {
+    console.warn("A Boost's JavaScript failed:", error);
+  });
 }
 
 /**

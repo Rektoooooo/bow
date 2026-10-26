@@ -30,6 +30,7 @@ import { createIcon, installSymbols } from "./icons.js";
 import { applySpaceTheme, onSystemAppearanceChange } from "./theme.js";
 import { createNavigationButtons, renderToolbar } from "./toolbar.js";
 import { playSound } from "./sounds.js";
+import { installTabPreviewHover } from "./tabPreviewHover.js";
 import { isDeveloperModeOn } from "../shared/developerMode.js";
 
 /** Horizontal scroll distance (in wheel delta units) that counts as a swipe to the next Space. Our choice. */
@@ -702,6 +703,7 @@ async function startSidebar(): Promise<void> {
   const toolbar = document.getElementById("toolbar");
   if (sidebar !== null) {
     installSidebarEvents(sidebar, callbacks);
+    installTabPreviewHover(sidebar);
     installDragAndDrop(sidebar);
     sidebar.addEventListener("wheel", handleSidebarWheel, { passive: true });
   }

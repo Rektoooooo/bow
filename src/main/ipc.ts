@@ -11,6 +11,8 @@
  *   click in sidebar → preload sends "browser:dispatch" { type: "selectTab", tabId } → parseAction() → handlers.runAction()
  */
 import { APP_ICON_VARIANTS } from "../shared/appIconDrawing";
+import { BOOST_FONTS } from "../shared/boostFonts";
+import { MAX_HUE_SHIFT } from "./boosts";
 import { ipcMain } from "electron";
 import type { WebContents } from "electron";
 import type { BrowserAction } from "../shared/actions";
@@ -71,6 +73,15 @@ const IMPORT_SOURCE_PATTERN = /^(safari|chromium:[a-z]+:(Default|Profile \d+))$/
 
 function isImportSource(value: unknown): boolean {
   return typeof value === "string" && IMPORT_SOURCE_PATTERN.test(value);
+}
+
+function isHueShift(value: unknown): boolean {
+  return isWholeNumber(value) && (value as number) >= 0 && (value as number) <= MAX_HUE_SHIFT;
+}
+
+/** A Boost font id, or "" for the site's own font. */
+function isBoostFontId(value: unknown): boolean {
+  return value === "" || BOOST_FONTS.some((font) => font.id === value);
 }
 
 function isAppIconVariant(value: unknown): boolean {
@@ -234,6 +245,8 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   addRoutingRule: { matchType: isRoutingMatchType, value: isText, spaceId: isText },
   removeRoutingRule: { ruleId: isText },
   setBoostCss: { site: isSite, css: isBoostCss },
+  setBoostStyle: { site: isSite, hueShift: isHueShift, isInverted: isBoolean, fontId: isBoostFontId },
+  setBoostJavaScript: { site: isSite, javascript: isBoostCss, isOn: isBoolean },
   setBoostEnabled: { site: isSite, isEnabled: isBoolean },
   deleteBoost: { site: isSite },
   openBoostEditor: { site: isOptionalSite },
@@ -262,6 +275,9 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   setAdBlock: { isOn: isBoolean },
   setAdBlockForSite: { site: isSite, isOn: isBoolean },
   setAppIcon: { variantId: isAppIconVariant },
+  showTabPreview: { tabId: isText, anchor: isAnchor },
+  hideTabPreview: {},
+  setTidyTitles: { isOn: isBoolean },
 };
 
 /**
