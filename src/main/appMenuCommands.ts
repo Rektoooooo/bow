@@ -11,6 +11,7 @@
  */
 import type { AppMenuCommands } from "./appMenu";
 import { importFromArc } from "./arcImportController";
+import { setAsDefaultBrowser } from "./defaultBrowser";
 import { applyChange, getRecentTabIds, getState } from "./browserCore";
 import { openLittleWindow } from "./littleWindow";
 import { findNextMatch, openCommandBar, openFind, openLibrary, runSiteCommand } from "./overlayController";
@@ -127,4 +128,7 @@ export const appMenuCommands: AppMenuCommands = {
   openPeekAsTab: () => openPeekAsTab(),
   openPrivateWindow: () => openLittleWindow(null, { isPrivate: true }),
   zapElements: () => runSiteCommand("zap"),
+  setAsDefaultBrowser: () => {
+    setAsDefaultBrowser().catch((error) => console.error("Set as default browser failed:", error));
+  },
 };

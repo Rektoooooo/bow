@@ -47,6 +47,7 @@ export interface AppMenuCommands {
   openPeekAsTab(): void;
   openPrivateWindow(): void;
   zapElements(): void;
+  setAsDefaultBrowser(): void;
 }
 
 /** Where the Help menu points. */
@@ -74,7 +75,22 @@ function buildNumberedItems(labelPrefix: string, modifier: string, onSelect: (nu
  */
 function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] {
   return [
-    { role: "appMenu" },
+    {
+      role: "appMenu",
+      submenu: [
+        { role: "about" },
+        { type: "separator" },
+        { label: "Set as Default Browser…", click: () => commands.setAsDefaultBrowser() },
+        { type: "separator" },
+        { role: "services" },
+        { type: "separator" },
+        { role: "hide" },
+        { role: "hideOthers" },
+        { role: "unhide" },
+        { type: "separator" },
+        { role: "quit" },
+      ],
+    },
     {
       label: "File",
       submenu: [

@@ -21,10 +21,14 @@ npm start            # build + open the browser
 npm test             # Vitest unit tests (pure state rules, ranking, importers)
 npm run e2e          # build + drive the real app: check-app.mjs, check-overlay.mjs, permission-check.mjs
 node e2e/window-shot.mjs   # README screenshots from sample data → docs/screenshot-*.png
+npm run package      # release/Sidebar Browser-darwin-arm64/Sidebar Browser.app (ad-hoc signed, git-ignored)
+node e2e/check-package.mjs # checks that packaged app (Info.plist, menu, links from other apps)
+tools/make-icon.sh   # redraws build/icon.icns from tools/make-icon.cjs (our own icon design)
 ```
 
 `npm run e2e` opens real windows on screen for a few minutes and uses throwaway `--user-data-dir` folders under
-`e2e/output/`, so the real state in `~/Library/Application Support/sidebar-browser/` is never touched.
+`e2e/output/`, so the real state in `~/Library/Application Support/Sidebar Browser/` is never touched (the folder
+is named after `productName`; `npm start` and the packaged app share it).
 Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electron; see `tasks/lessons.md`.
 
 ## Architecture rules (keep them)

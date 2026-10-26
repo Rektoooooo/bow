@@ -49,6 +49,17 @@ const overlayIsShown = () =>
     return win.contentView.children.some((child) => child.webContents?.getURL().endsWith("/overlay/overlay.html"));
   });
 
+// Waits (up to 15 s) until the selected tab's address contains the text: a ⌘L address only lands in the state once
+// the page has navigated, which depends on the network.
+async function waitForSelectedUrl(text) {
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    const url = selectedTab(await getState())?.url ?? "";
+    if (url.includes(text)) return;
+    await sidebar.waitForTimeout(200);
+  }
+}
+
 // Type into the Command Bar and press Enter, like a user.
 async function commandBar(mode, text) {
   await dispatch({ type: "openCommandBar", mode });
@@ -67,7 +78,7 @@ check("⌘T, type an address, Enter: opens it in a new tab", selectedTab(state)?
 check("the overlay closes after choosing", !(await overlayIsShown()));
 
 await commandBar("editUrl", "example.org");
-await sidebar.waitForTimeout(1500);
+await waitForSelectedUrl("https://example.org");
 state = await getState();
 check("⌘L edits the current tab's address instead of opening a tab", activeSpace(state).todayIds.length === 1 && selectedTab(state)?.url.startsWith("https://example.org"), selectedTab(state)?.url);
 

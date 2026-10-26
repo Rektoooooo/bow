@@ -5,3 +5,4 @@ e2e/output/
 reference/
 __pycache__/
 .claude/worktrees/
+release/

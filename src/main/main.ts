@@ -68,6 +68,9 @@ const launchedAt = Date.now();
 /** The browser window. */
 let mainWindow: BrowserWindow | null = null;
 
+/** Links from other apps that arrived before the app was ready; null once they have been opened. */
+let pendingExternalUrls: string[] | null = [];
+
 /** What tabViews.ts calls when a page does something. */
 const tabViewEvents: TabViewEvents = {
   onPageChanged: (tabId, url, title) => {
@@ -270,6 +273,12 @@ function handleAppReady(): void {
     openLinkInNewTab(startupUrl, "foreground");
   }
 
+  const waitingUrls = pendingExternalUrls ?? [];
+  pendingExternalUrls = null;
+  for (const url of waitingUrls) {
+    handleExternalUrl(url);
+  }
+
   pruneOldArchiveEntries();
   startAutoArchiveTimers();
 }
@@ -294,10 +303,18 @@ function startApp(): void {
     mainWindow?.show();
     mainWindow?.focus();
   });
-  // Links from other apps (when this browser is the default) open in a Little Window, like Arc.
+  // Links from other apps (when this browser is the default) open in a Little Window, like Arc. A link that
+  // launched the app arrives before it is ready and waits in pendingExternalUrls.
   app.on("open-url", (event, url) => {
     event.preventDefault();
-    handleExternalUrl(url);
+    if (!isRecordableUrl(url)) {
+      return;
+    }
+    if (pendingExternalUrls === null) {
+      handleExternalUrl(url);
+      return;
+    }
+    pendingExternalUrls.push(url);
   });
   app.whenReady().then(handleAppReady);
   app.on("before-quit", () => saveHistoryNow());

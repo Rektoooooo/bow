@@ -19,6 +19,17 @@ npm test       # unit tests (Vitest)
 npm run e2e    # drives the real app with Playwright (opens windows briefly; throwaway profiles)
 ```
 
+To use it as your everyday browser, build the app and make it the default:
+
+```bash
+npm run package   # → release/Sidebar Browser-darwin-arm64/Sidebar Browser.app
+```
+
+Move **Sidebar Browser.app** to Applications, open it, and choose **Sidebar Browser › Set as Default Browser…**
+(or type "default" in the Command Bar). macOS asks you to confirm. Links from other apps then open in a Little
+Window, or in a Space when an Air Traffic Control rule matches. The app is signed ad hoc for this Mac, not
+notarized, so copy the built app rather than downloading it elsewhere.
+
 To bring over your Arc setup: **File › Import from Arc…** reads Arc's files on this Mac (read-only) and adds your
 Spaces, Favorites, pinned folders and tabs, Today tabs, Space themes, Arc's cached icons, your archive (newest 250)
 and your browsing history. Running it twice adds nothing twice.
@@ -92,7 +103,8 @@ Same keys as Arc. ⌘T new tab, ⌘L edit address, ⌘W close, ⇧⌘T reopen, �
 | `src/preload` | Before each of our pages loads | The only bridges between our pages and the app |
 | `src/shared` | Both | Data types, settings with their sources, message names |
 | `tests` | Vitest | Rules for state, Spaces, splits, auto-archive, ranking, history, the Arc importers |
-| `e2e` | Playwright + Electron | The real app driven end to end, the permission check, the README screenshots |
+| `e2e` | Playwright + Electron | The real app driven end to end, the permission check, the packaged app, the README screenshots |
+| `build`, `tools` | — | The app icon (our own drawing) and Info.plist additions; scripts that draw the icon and package the app |
 | `docs` | — | Screenshots, `arc-teardown.html` (Arc's 52 features), `research/` (findings, Arc's data model, RE setup) |
 
 Three ideas keep it simple:
