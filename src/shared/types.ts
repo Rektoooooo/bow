@@ -42,6 +42,11 @@ export interface TabItem {
   lastActiveAt: number;
   /** True when the user muted the tab. */
   isMuted: boolean;
+  /**
+   * A Pinned tab or Favorite whose page changed while you were elsewhere (a new mail count in the title), like Arc's
+   * `isUnread`. Cleared when you open the tab. Optional, so files saved before it existed still load.
+   */
+  isUnread?: boolean;
 }
 
 /** A folder in the Pinned section. Folders can hold tabs, split views and other folders. */
@@ -124,6 +129,8 @@ export interface BrowserSettings {
   archiveAfterMs: number | null;
   /** False after ⌘S hides the sidebar. */
   isSidebarVisible: boolean;
+  /** The sidebar's width in pixels, set by dragging its edge. Optional: missing means SIDEBAR_WIDTH_PX. */
+  sidebarWidth?: number;
 }
 
 /** Everything the browser saves to disk. */

@@ -14,7 +14,7 @@
  *   - When nothing changes, return the same state object, so main.ts can skip saving.
  *   - `now` is always a parameter; nothing here reads the clock.
  */
-import { ARCHIVE_LIMIT, DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_LIMIT } from "../shared/settings";
+import { ARCHIVE_LIMIT, DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_LIMIT, SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX } from "../shared/settings";
 import type { ArchiveReason, ArchivedTab, BrowserState, FolderItem, ItemId, ItemLocation, Space, SpaceId, TabItem } from "../shared/types";
 import {
   collectTabIds,
@@ -180,7 +180,8 @@ export function selectTab(state: BrowserState, tabId: ItemId, now: number): Brow
   if (previousTabId !== null) {
     changedState = updateTab(changedState, previousTabId, { lastActiveAt: now });
   }
-  changedState = updateTab(changedState, tabId, { lastActiveAt: now });
+  // Opening a tab reads its news.
+  changedState = updateTab(changedState, tabId, { lastActiveAt: now, isUnread: false });
 
   return {
     ...changedState,
@@ -192,7 +193,7 @@ export function selectTab(state: BrowserState, tabId: ItemId, now: number): Brow
 /**
  * Records a tab's new URL and title after the page navigates. An empty title falls back to the URL.
  */
-export function updateTabPage(state: BrowserState, tabId: ItemId, url: string, title: string): BrowserState {
+export function updateTabPage(state: BrowserState, tabId: ItemId, url: string, title: string, isOnScreen: boolean = true): BrowserState {
   const tab = findTab(state, tabId);
   if (tab === undefined) {
     return state;
@@ -205,7 +206,11 @@ export function updateTabPage(state: BrowserState, tabId: ItemId, url: string, t
   if (tab.url === url && tab.title === displayTitle) {
     return state;
   }
-  return updateTab(state, tabId, { url: url, title: displayTitle });
+  // A Pinned tab or Favorite whose title changes off screen, on the same page, has news (Arc's unread dot).
+  const root = findRootLocation(state, tabId);
+  const isPinnedOrFavorite = root !== null && root.kind !== "today";
+  const becameUnread = !isOnScreen && isPinnedOrFavorite && tab.url === url;
+  return updateTab(state, tabId, { url: url, title: displayTitle, isUnread: becameUnread || tab.isUnread === true });
 }
 
 /**
@@ -710,6 +715,17 @@ export function setArchiveAfter(state: BrowserState, archiveAfterMs: number | nu
     return state;
   }
   return { ...state, settings: { ...state.settings, archiveAfterMs: archiveAfterMs } };
+}
+
+/**
+ * Sets the sidebar's width, kept between SIDEBAR_MIN_WIDTH_PX and SIDEBAR_MAX_WIDTH_PX.
+ */
+export function setSidebarWidth(state: BrowserState, width: number): BrowserState {
+  const clampedWidth = Math.round(Math.max(SIDEBAR_MIN_WIDTH_PX, Math.min(width, SIDEBAR_MAX_WIDTH_PX)));
+  if (state.settings.sidebarWidth === clampedWidth) {
+    return state;
+  }
+  return { ...state, settings: { ...state.settings, sidebarWidth: clampedWidth } };
 }
 
 /**

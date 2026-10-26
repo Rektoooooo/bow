@@ -99,6 +99,24 @@ button:disabled {
   text-align: left;
 }
 
+/* Private windows are always dark, like other browsers' private windows. */
+body.is-private {
+  color-scheme: dark;
+  --frame: #232029;
+}
+
+.little-private {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(160, 120, 255, 0.25);
+  color: #e7dcff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .little-move {
   color: var(--ink);
   font-weight: 600;

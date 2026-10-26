@@ -16,6 +16,7 @@
 import type { BrowserWindow } from "electron";
 import type { SidebarCommand } from "../shared/actions";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
+import { SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_WIDTH_PX } from "../shared/settings";
 import type { BrowserState, ItemId, RuntimeState } from "../shared/types";
 import { getActiveDownloadCount } from "./downloads";
 import { findMediaInfo, handleShownTabsChanged } from "./media";
@@ -52,6 +53,9 @@ let recentTabIds: ItemId[] = [];
 
 /** True while the hidden sidebar shows because the mouse is at the window's left edge. Not saved. */
 let isSidebarPeeking = false;
+
+/** The sidebar width while its edge is being dragged; null otherwise (the saved width applies). */
+let previewSidebarWidth: number | null = null;
 
 /** Functions to run after new page views were added (they land on top): floating layers raise themselves again. */
 const afterSyncHooks: (() => void)[] = [];
@@ -96,7 +100,18 @@ export function getRecentTabIds(): ItemId[] {
  * The card sits right of the sidebar (unless hidden) and below the toolbar.
  */
 export function getLayoutOptions(): CardLayoutOptions {
-  return { isSidebarVisible: currentState.settings.isSidebarVisible, isToolbarVisible: true, isSidebarPeeking: isSidebarPeeking };
+  const sidebarWidth = previewSidebarWidth ?? currentState.settings.sidebarWidth ?? SIDEBAR_WIDTH_PX;
+  return { isSidebarVisible: currentState.settings.isSidebarVisible, isToolbarVisible: true, isSidebarPeeking: isSidebarPeeking, sidebarWidth: sidebarWidth };
+}
+
+/**
+ * Moves the page card while the sidebar's edge is dragged, without saving (null ends the preview).
+ */
+export function previewSidebarWidthWhileDragging(width: number | null): void {
+  previewSidebarWidth = width === null ? null : Math.max(SIDEBAR_MIN_WIDTH_PX, Math.min(width, SIDEBAR_MAX_WIDTH_PX));
+  if (mainWindow !== null) {
+    layoutShownTabViews(mainWindow, currentState, getLayoutOptions());
+  }
 }
 
 /**

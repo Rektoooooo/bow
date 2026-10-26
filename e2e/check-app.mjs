@@ -213,6 +213,28 @@ const afterLeaveBounds = await tabViewBounds(app);
 check("moving away hides it again", afterLeaveBounds[0]?.x === 8, JSON.stringify(afterLeaveBounds));
 await dispatch(page, { type: "setSidebarVisible", isVisible: true });
 
+// Dragging the sidebar's right edge resizes it (saved); dragging far left hides it.
+const resizerBox = await page.locator("#sidebar-resizer").boundingBox();
+const resizerX = resizerBox.x + resizerBox.width / 2;
+await page.mouse.move(resizerX, 300);
+await page.mouse.down();
+await page.mouse.move(resizerX + 40, 300, { steps: 4 });
+await page.mouse.move(320, 300, { steps: 4 });
+await page.mouse.up();
+await page.waitForTimeout(500);
+state = await getState(page);
+const resizedBounds = await tabViewBounds(app);
+check("dragging the sidebar edge resizes it and moves the page", state.settings.sidebarWidth === 320 && resizedBounds[0]?.x === 328, `${state.settings.sidebarWidth} ${JSON.stringify(resizedBounds)}`);
+await page.mouse.move(318, 300);
+await page.mouse.down();
+await page.mouse.move(60, 300, { steps: 6 });
+await page.mouse.up();
+await page.waitForTimeout(500);
+state = await getState(page);
+check("letting go far to the left hides the sidebar", state.settings.isSidebarVisible === false);
+await dispatch(page, { type: "setSidebarVisible", isVisible: true });
+await page.waitForTimeout(300);
+
 await page.click(".space-button:nth-child(2)");
 await page.waitForFunction(() => document.querySelector(".space-title-name")?.textContent?.includes("Work"), null, { timeout: 5000 });
 const frameColor = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--frame-color-1").trim());

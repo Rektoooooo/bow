@@ -36,6 +36,9 @@ declare global {
 /** True while the address field has the keyboard, so page updates do not overwrite typing. */
 let isEditingAddress = false;
 
+/** A private window (⇧⌘N): shows a "Private" badge and cannot move its page into a Space. */
+const isPrivateWindow = new URLSearchParams(window.location.search).get("private") === "1";
+
 /**
  * Returns the host of an address, or the address itself when it has none.
  */
@@ -104,9 +107,17 @@ function renderBar(info: LittlePageInfo): void {
   });
 
   const copyButton = createBarButton("link", "Copy Link", "", () => window.littleApi.copyLink());
+  copyButton.disabled = info.url === "";
+  if (isPrivateWindow) {
+    const badge = document.createElement("span");
+    badge.className = "little-private";
+    badge.textContent = "Private";
+    badge.title = "Nothing from this window is saved: no history, cookies or archive.";
+    bar.replaceChildren(badge, backButton, address, copyButton);
+    return;
+  }
   const moveButton = createBarButton("expand", "Open in Space (⌘O)", "Open in Space", () => window.littleApi.moveToSpace());
   moveButton.classList.add("little-move");
-  copyButton.disabled = info.url === "";
   moveButton.disabled = info.url === "";
   bar.replaceChildren(backButton, address, copyButton, moveButton);
 }
@@ -115,6 +126,7 @@ function renderBar(info: LittlePageInfo): void {
  * Entry point: draws an empty bar, and focuses the address field when the window opened without a page (⌥⌘N).
  */
 function startLittleBar(): void {
+  document.body.classList.toggle("is-private", isPrivateWindow);
   window.littleApi.onInfo(renderBar);
   renderBar({ url: "", title: "", canGoBack: false });
   const openedEmpty = new URLSearchParams(window.location.search).get("empty") === "1";
@@ -122,7 +134,7 @@ function startLittleBar(): void {
     document.querySelector<HTMLInputElement>(".little-address")?.focus();
   }
   document.addEventListener("keydown", (event) => {
-    if (event.metaKey && event.key.toLowerCase() === "o") {
+    if (event.metaKey && event.key.toLowerCase() === "o" && !isPrivateWindow) {
       event.preventDefault();
       window.littleApi.moveToSpace();
     }

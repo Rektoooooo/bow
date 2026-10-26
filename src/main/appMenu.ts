@@ -45,6 +45,7 @@ export interface AppMenuCommands {
   importFromArc(): void;
   openUrlInNewTab(url: string): void;
   openPeekAsTab(): void;
+  openPrivateWindow(): void;
 }
 
 /** Where the Help menu points. */
@@ -78,6 +79,7 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
       submenu: [
         { label: "New Tab", accelerator: "CommandOrControl+T", click: () => commands.openCommandBar("newTab") },
         { label: "New Little Window", accelerator: "CommandOrControl+Alt+N", click: () => commands.openLittleWindow() },
+        { label: "New Private Window", accelerator: "CommandOrControl+Shift+N", click: () => commands.openPrivateWindow() },
         { label: "Open Location…", accelerator: "CommandOrControl+L", click: () => commands.openCommandBar("editUrl") },
         { label: "Open Peek as Tab", accelerator: "CommandOrControl+O", click: () => commands.openPeekAsTab() },
         { type: "separator" },

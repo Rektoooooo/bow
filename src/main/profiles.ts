@@ -58,6 +58,24 @@ export function getProfileSession(profileId: ProfileId): Session {
   return profileSession;
 }
 
+/** Counts private windows, so each gets its own throwaway session. */
+let privateSessionCounter = 0;
+
+/**
+ * Returns a new in-memory session for a private window: nothing it stores (cookies, cache, history) is written to
+ * disk, and it disappears when the window closes. It gets the same permission rules as every profile.
+ */
+export function createPrivateSession(): Session {
+  privateSessionCounter = privateSessionCounter + 1;
+  // A partition name without "persist:" is kept in memory only.
+  const privateSession = session.fromPartition(`private-${Date.now()}-${privateSessionCounter}`);
+  restrictWebPermissions(privateSession);
+  for (const listener of sessionCreatedListeners) {
+    listener(privateSession);
+  }
+  return privateSession;
+}
+
 /**
  * Runs a function for every profile session created from now on.
  */

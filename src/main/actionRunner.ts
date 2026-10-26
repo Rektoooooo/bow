@@ -10,8 +10,9 @@
  *   ipc.ts parseAction() → runAction(action) → applyChange(state function) / tabActions / menus / overlayController
  */
 import type { BrowserAction } from "../shared/actions";
+import { SIDEBAR_COLLAPSE_WIDTH_PX } from "../shared/settings";
 import type { SpaceTheme } from "../shared/types";
-import { applyChange, getState, getWindow, scheduleRuntimePush, sendSidebarCommand, setSidebarPeek } from "./browserCore";
+import { applyChange, getState, getWindow, previewSidebarWidthWhileDragging, scheduleRuntimePush, sendSidebarCommand, setSidebarPeek } from "./browserCore";
 import { dismissMedia, toggleMediaPlayback } from "./media";
 import { showMenuRequest } from "./menus";
 import type { MenuHost } from "./menus";
@@ -32,16 +33,19 @@ import {
   setArchiveAfter,
   setPinnedSectionOpen,
   setSidebarVisible,
+  setSidebarWidth,
   toggleFolder,
   unpinTab,
 } from "./state";
 import {
+  createProfile,
   createSpace,
   deleteSpace,
   moveItemToSpace,
   moveSpace,
   renameSpace,
   setSpaceIcon,
+  setSpaceProfile,
   setSpaceTheme,
   switchSpace,
   switchSpaceByOffset,
@@ -59,6 +63,23 @@ export const menuHost: MenuHost = {
   openInNewTab: (url, inBackground) => openLinkInNewTab(url, inBackground ? "background" : "foreground"),
   isTabLoaded: (tabId) => getTabContents(tabId) !== null,
 };
+
+/**
+ * Dragging the sidebar's edge: moves the page live, and saves the width when the drag ends. Letting go far to the
+ * left hides the sidebar, like Arc.
+ */
+function resizeSidebar(width: number, isFinal: boolean): void {
+  if (!isFinal) {
+    previewSidebarWidthWhileDragging(width);
+    return;
+  }
+  previewSidebarWidthWhileDragging(null);
+  if (width < SIDEBAR_COLLAPSE_WIDTH_PX) {
+    applyChange((state) => setSidebarVisible(state, false));
+    return;
+  }
+  applyChange((state) => setSidebarWidth(state, width));
+}
 
 /**
  * Creates a Space and puts its name into edit mode right away, so the user names it while it is fresh.
@@ -150,6 +171,15 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => setSidebarVisible(state, action.isVisible));
     case "setSidebarPeek":
       return setSidebarPeek(action.isPeeking);
+    case "setSidebarWidth":
+      return resizeSidebar(action.width, action.isFinal);
+    case "setSpaceProfile":
+      return applyChange((state) => setSpaceProfile(state, action.spaceId, action.profileId));
+    case "createProfileForSpace":
+      return applyChange((state) => {
+        const created = createProfile(state, "", now);
+        return setSpaceProfile(created.state, action.spaceId, created.profileId);
+      });
     case "toggleMediaPlayback":
       toggleMediaPlayback().then(scheduleRuntimePush);
       return;

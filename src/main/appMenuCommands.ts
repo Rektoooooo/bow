@@ -125,4 +125,5 @@ export const appMenuCommands: AppMenuCommands = {
   },
   openUrlInNewTab: (url) => openLinkInNewTab(url, "foreground"),
   openPeekAsTab: () => openPeekAsTab(),
+  openPrivateWindow: () => openLittleWindow(null, { isPrivate: true }),
 };

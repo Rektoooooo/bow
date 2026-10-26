@@ -25,13 +25,14 @@ import {
   restoreArchivedTab,
   restoreLastArchivedTab,
   selectTab,
+  setSidebarWidth,
   toggleFolder,
   unpinTab,
   updateTabPage,
 } from "../src/main/state";
 import { findLocation, findTab } from "../src/main/tree";
 import { getSiteKey, isSameSite, normalizeTypedInput } from "../src/main/urls";
-import { DEFAULT_PROFILE_ID, FAVORITES_LIMIT, HOUR_MS } from "../src/shared/settings";
+import { DEFAULT_PROFILE_ID, FAVORITES_LIMIT, HOUR_MS, SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX } from "../src/shared/settings";
 import type { BrowserState, ItemId, TabItem } from "../src/shared/types";
 import { getPinnedIds, getTab, getTodayIds, ONE_PM, openPinnedTabs, openTabs, PERSONAL_SPACE_ID, WORK_SPACE_ID } from "./builders";
 
@@ -400,5 +401,35 @@ describe("sites (for Peek)", () => {
     expect(isSameSite("https://mail.google.com/", "https://accounts.google.com/login")).toBe(true);
     expect(isSameSite("https://github.com/", "https://gist.github.com/")).toBe(true);
     expect(isSameSite("https://github.com/", "https://example.com/")).toBe(false);
+  });
+});
+
+describe("unread dot (Arc's isUnread)", () => {
+  it("marks a pinned tab whose title changes off screen, and clears it when the tab is opened", () => {
+    const { state: withPinned, tabIds } = openPinnedTabs(["https://mail.example/inbox"]);
+    const { state: withToday } = openTabs(["https://news.example"], withPinned);
+    const pinnedTabId = tabIds[0] as ItemId;
+
+    const unread = updateTabPage(withToday, pinnedTabId, "https://mail.example/inbox", "Inbox (3)", false);
+    const read = selectTab(unread, pinnedTabId, FIVE_PM);
+
+    expect(getTab(unread, pinnedTabId).isUnread).toBe(true);
+    expect(getTab(read, pinnedTabId).isUnread).toBe(false);
+  });
+
+  it("does not mark Today tabs or tabs on screen", () => {
+    const { state, tabIds } = openTabs(["https://news.example"]);
+
+    const offScreenToday = updateTabPage(state, tabIds[0] as ItemId, "https://news.example", "News (2)", false);
+
+    expect(getTab(offScreenToday, tabIds[0] as ItemId).isUnread).toBeFalsy();
+  });
+});
+
+describe("setSidebarWidth", () => {
+  it("keeps the width inside its limits", () => {
+    expect(setSidebarWidth(createInitialState(), 50).settings.sidebarWidth).toBe(SIDEBAR_MIN_WIDTH_PX);
+    expect(setSidebarWidth(createInitialState(), 900).settings.sidebarWidth).toBe(SIDEBAR_MAX_WIDTH_PX);
+    expect(setSidebarWidth(createInitialState(), 300.4).settings.sidebarWidth).toBe(300);
   });
 });

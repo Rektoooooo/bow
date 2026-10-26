@@ -42,6 +42,7 @@ import { refreshOpenPanel, registerOverlayIpc, relayoutOverlay, setCommandAction
 import { restrictWebPermissions, useChromeUserAgent } from "./profiles";
 import { moveTabsToArchive, updateTabFavicon, updateTabPage } from "./state";
 import { getStateFilePath } from "./store";
+import { loadWindowBounds, rememberWindowBounds } from "./windowState";
 import { openLinkInNewTab } from "./tabActions";
 import { getShownTabIds, getTabViews, layoutShownTabViews } from "./tabViews";
 import { findRootLocation, findTab } from "./tree";
@@ -68,7 +69,8 @@ let mainWindow: BrowserWindow | null = null;
 /** What tabViews.ts calls when a page does something. */
 const tabViewEvents: TabViewEvents = {
   onPageChanged: (tabId, url, title) => {
-    applyChange((state) => updateTabPage(state, tabId, url, title));
+    const isOnScreen = getShownTabIds().includes(tabId);
+    applyChange((state) => updateTabPage(state, tabId, url, title, isOnScreen));
     setVisitTitle(url, title);
   },
   onNavigated: (url, title) => addVisit(url, title, Date.now()),
@@ -114,9 +116,12 @@ function createMainWindow(): BrowserWindow {
   const preloadPath = path.join(__dirname, "..", "preload", "sidebarPreload.js");
   const sidebarPagePath = path.join(__dirname, "..", "..", "web", "renderer", "index.html");
 
+  const savedBounds = loadWindowBounds();
   const window = new BrowserWindow({
-    width: WINDOW_WIDTH_PX,
-    height: WINDOW_HEIGHT_PX,
+    width: savedBounds?.width ?? WINDOW_WIDTH_PX,
+    height: savedBounds?.height ?? WINDOW_HEIGHT_PX,
+    x: savedBounds?.x,
+    y: savedBounds?.y,
     minWidth: MIN_WINDOW_WIDTH_PX,
     minHeight: MIN_WINDOW_HEIGHT_PX,
     titleBarStyle: "hiddenInset",
@@ -143,7 +148,9 @@ function createMainWindow(): BrowserWindow {
     layoutShownTabViews(window, getState(), getLayoutOptions());
     relayoutOverlay();
     relayoutPeek();
+    rememberWindowBounds(window);
   });
+  window.on("move", () => rememberWindowBounds(window));
   return window;
 }
 

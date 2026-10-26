@@ -247,6 +247,12 @@ const server = http.createServer((request, response) => {
     response.end(toneWav);
     return;
   }
+  if (request.url === "/news") {
+    response.writeHead(200, { "Content-Type": "text/html" });
+    // Like a mail app: the title changes a moment later, when "new mail" arrives.
+    response.end('<!doctype html><title>Inbox</title><script>setTimeout(() => { document.title = "Inbox (3)"; }, 2500);</script><p>Inbox</p>');
+    return;
+  }
   response.writeHead(200, { "Content-Type": "text/html" });
   response.end('<!doctype html><title>Tone test</title><audio src="/tone.wav" autoplay loop></audio><p>Playing a tone</p>');
 });
@@ -272,7 +278,47 @@ const tonePaused = await app.evaluate(({ webContents }) => {
 });
 const runtimeAfterPause = await sidebar.evaluate(() => window.browserApi.getRuntimeState());
 check("its pause button pauses the page's audio and turns into Play", tonePaused === true && runtimeAfterPause.media?.isPlaying === false, JSON.stringify(runtimeAfterPause.media));
+
+// Unread dot: a pinned page that changes its title while you are elsewhere.
+await dispatch({ type: "openTab", typedText: `${toneUrl}news` });
+await sidebar.waitForTimeout(1200);
+state = await getState();
+const newsTabId = state.selectedTabIdBySpace[state.activeSpaceId];
+await dispatch({ type: "pinTab", tabId: newsTabId });
+await dispatch({ type: "selectTab", tabId: pinnedSourceId });
+await sidebar.waitForTimeout(3000);
+state = await getState();
+const unreadDots = await sidebar.locator(".pinned-list .unread-dot").count();
+check("a pinned tab whose title changes off screen gets an unread dot", state.items[newsTabId]?.isUnread === true && unreadDots === 1, `${state.items[newsTabId]?.title} dots=${unreadDots}`);
+await dispatch({ type: "selectTab", tabId: newsTabId });
+await sidebar.waitForTimeout(400);
+state = await getState();
+check("opening it clears the dot", state.items[newsTabId]?.isUnread === false);
 server.close();
+
+// Profiles: moving the Space to a new profile reloads its pages in that profile's own session.
+const contentsIdBefore = await app.evaluate(({ webContents }) => webContents.getAllWebContents().find((contents) => contents.getURL().includes("/news"))?.id);
+state = await getState();
+await dispatch({ type: "createProfileForSpace", spaceId: state.activeSpaceId });
+await sidebar.waitForTimeout(1500);
+state = await getState();
+const contentsIdAfter = await app.evaluate(({ webContents }) => webContents.getAllWebContents().find((contents) => contents.getURL().includes("/news"))?.id);
+check("a Space moved to a new profile uses it, and its page reloads in that profile", state.profiles.length === 2 && activeSpace(state).profileId === state.profiles[1].id && contentsIdAfter !== undefined && contentsIdAfter !== contentsIdBefore, `${contentsIdBefore} → ${contentsIdAfter}`);
+
+// Private window: says Private, has no Open in Space, and leaves nothing in the Archive.
+const archiveCountBefore = (await getState()).archive.length;
+await commandBar("newTab", "new private window");
+const privateBar = await findPage("private=1");
+await privateBar.waitForSelector(".little-private", { timeout: 5000 });
+check("a private window shows its badge and cannot move pages into a Space", (await privateBar.locator(".little-move").count()) === 0);
+await privateBar.fill(".little-address", "example.com/private");
+await privateBar.press(".little-address", "Enter");
+await privateBar.waitForTimeout(1500);
+await app.evaluate(({ BrowserWindow }) => {
+  BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().includes("private=1"))?.close();
+});
+await sidebar.waitForTimeout(500);
+check("closing a private window archives nothing", (await getState()).archive.length === archiveCountBefore);
 
 await app.close();
 const failed = results.filter((result) => !result.ok).length;

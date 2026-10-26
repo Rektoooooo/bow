@@ -33,13 +33,16 @@ and your browsing history. Running it twice adds nothing twice.
   puts its page away but keeps the tab.
 - Drag and drop: reorder, pin, make a Favorite, drop into a folder, move to another Space, or drop a link to open it.
 - Bottom bar: Library, the Space switcher (emoji for the active Space, dots for the others), and a **+** menu.
-- ⌘S hides the sidebar; touching the window's left edge shows it again for a moment.
+- ⌘S hides the sidebar; touching the window's left edge shows it again for a moment. Drag its edge to resize it.
+- A dot on a Pinned tab or Favorite whose page changed while you were elsewhere (a new mail count), like Arc.
 - A small player for a tab playing sound in the background.
 
 **Spaces and profiles**
 - Create, rename, change the emoji, pick a theme (one to three colors as a gradient, light / dark / automatic,
   film grain), reorder, delete. Two-finger swipe on the sidebar or ⌃1–⌃9 switches Spaces.
-- Each profile has its own cookies and logins (an Electron session partition).
+- Each profile has its own cookies, logins and Favorites (an Electron session partition). Space menu › Profile
+  moves a Space to another profile or a new one.
+- Private windows (⇧⌘N) keep nothing: an in-memory session, no history, no archive.
 
 **Command Bar** (⌘T, ⌘L)
 - Open tabs ("Switch to Tab"), history, what you typed, search suggestions and about 40 browser actions

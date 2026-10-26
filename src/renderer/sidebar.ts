@@ -15,6 +15,7 @@
  * The sidebar has at most a few hundred rows, so redrawing everything stays fast.
  */
 import type { SidebarCommand } from "../shared/actions.js";
+import { SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_WIDTH_PX } from "../shared/settings.js";
 import type { BrowserState, ItemId, ItemLocation, RuntimeState, Space, SpaceId, TabItem } from "../shared/types";
 import { createElement, createFavicon, createIconButton, createTextButton, dispatch } from "./dom.js";
 import { makeListDropZone, onDragStateChanged } from "./dragDrop.js";
@@ -47,6 +48,9 @@ let lastRenderedSpaceId: SpaceId | null = null;
 
 /** How long the pointer may be away from a peeking sidebar before it hides again. Our choice: avoids flicker. */
 const PEEK_HIDE_DELAY_MS = 250;
+
+/** The width being dragged right now, or null. While dragging, the page shows this instead of the saved width. */
+let draggedSidebarWidth: number | null = null;
 
 /** A pending "hide the peeking sidebar", cancelled when the pointer comes back in time. */
 let peekHideTimer: number | null = null;
@@ -408,6 +412,7 @@ function renderAll(): void {
   const context = createRowContext(state);
   document.body.classList.toggle("sidebar-hidden", !state.settings.isSidebarVisible);
   document.body.classList.toggle("sidebar-peeking", currentRuntime.isSidebarPeeking);
+  applySidebarWidth(draggedSidebarWidth ?? state.settings.sidebarWidth ?? SIDEBAR_WIDTH_PX);
   applySpaceTheme(space.theme);
   renderHeader();
   renderFavorites(state, space, context);
@@ -476,6 +481,60 @@ function setUpSidebarPeek(): void {
 }
 
 /**
+ * Sets the sidebar's width on the page. main.ts places the page card with the same number.
+ */
+function applySidebarWidth(width: number): void {
+  document.documentElement.style.setProperty("--sidebar-width", `${width}px`);
+}
+
+/**
+ * Dragging the sidebar's right edge resizes it. The page card follows live (a preview in main.ts); the width is
+ * saved when the button is released, and letting go far to the left hides the sidebar, like Arc.
+ */
+function setUpSidebarResizer(): void {
+  const resizer = document.getElementById("sidebar-resizer");
+  if (resizer === null) {
+    return;
+  }
+  let animationFrame: number | null = null;
+  resizer.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    resizer.setPointerCapture(event.pointerId);
+    document.body.classList.add("is-resizing");
+  });
+  resizer.addEventListener("pointermove", (event) => {
+    if (!resizer.hasPointerCapture(event.pointerId)) {
+      return;
+    }
+    draggedSidebarWidth = Math.max(0, Math.round(event.clientX));
+    const shownWidth = Math.max(SIDEBAR_MIN_WIDTH_PX, Math.min(draggedSidebarWidth, SIDEBAR_MAX_WIDTH_PX));
+    applySidebarWidth(shownWidth);
+    if (animationFrame !== null) {
+      return;
+    }
+    // One preview per frame is enough; pointer events can come much faster.
+    animationFrame = requestAnimationFrame(() => {
+      animationFrame = null;
+      if (draggedSidebarWidth !== null) {
+        dispatch({ type: "setSidebarWidth", width: draggedSidebarWidth, isFinal: false });
+      }
+    });
+  });
+  resizer.addEventListener("pointerup", (event) => {
+    if (!resizer.hasPointerCapture(event.pointerId)) {
+      return;
+    }
+    resizer.releasePointerCapture(event.pointerId);
+    document.body.classList.remove("is-resizing");
+    const finalWidth = draggedSidebarWidth;
+    draggedSidebarWidth = null;
+    if (finalWidth !== null) {
+      dispatch({ type: "setSidebarWidth", width: finalWidth, isFinal: true });
+    }
+  });
+}
+
+/**
  * Handles requests from the main process that only this page can carry out (inline editing).
  */
 function handleSidebarCommand(command: SidebarCommand): void {
@@ -518,6 +577,7 @@ async function startSidebar(): Promise<void> {
   });
   document.getElementById("sidebar")?.addEventListener("wheel", handleSidebarWheel, { passive: true });
   setUpSidebarPeek();
+  setUpSidebarResizer();
 
   currentRuntime = await window.browserApi.getRuntimeState();
   currentState = await window.browserApi.getState();

@@ -66,6 +66,9 @@ export type BrowserAction =
   | { type: "setArchiveAfter"; archiveAfterMs: number | null }
   | { type: "setSidebarVisible"; isVisible: boolean }
   | { type: "setSidebarPeek"; isPeeking: boolean }
+  | { type: "setSidebarWidth"; width: number; isFinal: boolean }
+  | { type: "setSpaceProfile"; spaceId: SpaceId; profileId: string }
+  | { type: "createProfileForSpace"; spaceId: SpaceId }
   | { type: "toggleMediaPlayback" }
   | { type: "dismissMedia" }
   | { type: "navigate"; command: NavigationCommand }
@@ -109,6 +112,9 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setArchiveAfter",
   "setSidebarVisible",
   "setSidebarPeek",
+  "setSidebarWidth",
+  "setSpaceProfile",
+  "createProfileForSpace",
   "toggleMediaPlayback",
   "dismissMedia",
   "navigate",

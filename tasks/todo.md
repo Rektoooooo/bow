@@ -60,6 +60,8 @@ and every Arc behavior we can observe is written down before Arc shuts down.
 - [x] Media: sidebar player for a tab playing in the background; automatic Picture-in-Picture when leaving a playing video
 - [x] Import Arc's archive (250 tabs) and browsing history (Chromium History via sqlite3)
 
+- [x] Profiles UI (Space menu › Profile), private windows (⇧⌘N), resizable sidebar, unread dot, window bounds remembered
+
 ### 2.7 Wrap-up
 - [ ] Unit tests for every pure module; e2e rewritten for the new UI; permission check still passing
 - [ ] README screenshot, CLAUDE.md (this Mac's facts), new handoff, commit + push

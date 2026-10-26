@@ -56,8 +56,8 @@ control". Their Arc screenshots are the visual reference (`reference/arc-ui/`, g
 
 ## Next steps (pick in this order)
 
-1. Profiles UI (assign a Space to a profile, create a profile), incognito window (⇧⌘N), resizable sidebar width,
-   unread dot for pinned tabs whose title changes in the background (Arc's `isUnread`), window size remembered.
+1. Done since this handoff was first written: profiles UI (Space menu › Profile), private windows (⇧⌘N), resizable
+   sidebar (drag the edge; far left hides it), unread dot (Arc's `isUnread`), window bounds remembered.
 2. Boosts (per-site CSS), Air Traffic Control (link routing rules to Spaces), Command Bar site search (Tab).
 3. Ghidra pass when RAM allows: `itemsToExclude`, cleanup timer interval, Command Bar weights.
 

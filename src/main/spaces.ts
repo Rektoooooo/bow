@@ -195,6 +195,33 @@ function deleteSubtree(items: BrowserState["items"], itemId: ItemId): void {
 }
 
 /**
+ * Adds a profile (its own cookies, logins and Favorites) and returns the new state and the profile's id.
+ * The name is trimmed; an empty name becomes "Profile N".
+ */
+export function createProfile(state: BrowserState, name: string, now: number): { state: BrowserState; profileId: string } {
+  const profileId = createId("profile", now);
+  const trimmedName = name.trim();
+  const profileName = trimmedName === "" ? `Profile ${state.profiles.length + 1}` : trimmedName;
+  const profiles = [...state.profiles, { id: profileId, name: profileName, favoriteIds: [] }];
+  return { state: { ...state, profiles: profiles }, profileId: profileId };
+}
+
+/**
+ * Makes a Space use another profile. Its tabs then load with that profile's cookies, and it shows that profile's
+ * Favorites. Returns the same state for an unknown profile or Space.
+ */
+export function setSpaceProfile(state: BrowserState, spaceId: SpaceId, profileId: string): BrowserState {
+  const space = findSpace(state, spaceId);
+  const profileExists = state.profiles.some((profile) => profile.id === profileId);
+  if (space === undefined || !profileExists || space.profileId === profileId) {
+    return state;
+  }
+  const changedState = updateSpace(state, spaceId, { profileId: profileId });
+  // The selected tab may have been a Favorite of the old profile.
+  return repairSelections(changedState);
+}
+
+/**
  * Moves a Space to a new position in the switcher (0 = first).
  */
 export function moveSpace(state: BrowserState, spaceId: SpaceId, newIndex: number): BrowserState {

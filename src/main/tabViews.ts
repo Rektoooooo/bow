@@ -57,6 +57,9 @@ export interface TabViewEvents {
 /** One web view per loaded tab, keyed by tab id. Lives only in memory. */
 const tabViews = new Map<ItemId, WebContentsView>();
 
+/** The profile whose session each loaded tab's page runs in. A tab moved to another profile must reload there. */
+const viewProfileIds = new Map<ItemId, string>();
+
 /** The tabs whose views are in the window right now, in pane order. */
 let shownTabIds: ItemId[] = [];
 
@@ -200,6 +203,7 @@ export function createTabView(state: BrowserState, tab: TabItem, events: TabView
   view.webContents.setAudioMuted(tab.isMuted);
   view.webContents.loadURL(tab.url).catch(ignoreLoadFailure);
   tabViews.set(tab.id, view);
+  viewProfileIds.set(tab.id, profileId);
   return view;
 }
 
@@ -233,6 +237,7 @@ export function destroyTabView(window: BrowserWindow, tabId: ItemId): void {
   window.contentView.removeChildView(view);
   view.webContents.close();
   tabViews.delete(tabId);
+  viewProfileIds.delete(tabId);
   shownTabIds = shownTabIds.filter((shownId) => shownId !== tabId);
   if (focusedTabId === tabId) {
     focusedTabId = null;
@@ -291,7 +296,10 @@ export function syncTabViews(window: BrowserWindow, state: BrowserState, layoutO
   // Copy the keys first, because destroyTabView deletes from the map we are looping over.
   const loadedTabIds = Array.from(tabViews.keys());
   for (const tabId of loadedTabIds) {
-    if (findTab(state, tabId) === undefined) {
+    const expectedProfileId = findProfileIdOfItem(state, tabId) ?? DEFAULT_PROFILE_ID;
+    const recordedProfileId = viewProfileIds.get(tabId);
+    const changedProfile = recordedProfileId !== undefined && recordedProfileId !== expectedProfileId;
+    if (findTab(state, tabId) === undefined || changedProfile) {
       destroyTabView(window, tabId);
     }
   }

@@ -244,6 +244,14 @@ function buildSpaceMenu(host: MenuHost, space: Space): MenuItemConstructorOption
     click: () => host.runAction({ type: "setSpaceTheme", spaceId: space.id, theme: { ...space.theme, grain: choice.grain } }),
   }));
 
+  const profileMenu: MenuItemConstructorOptions[] = state.profiles.map((profile) => ({
+    label: profile.name,
+    type: "radio",
+    checked: space.profileId === profile.id,
+    click: () => host.runAction({ type: "setSpaceProfile", spaceId: space.id, profileId: profile.id }),
+  }));
+  profileMenu.push({ type: "separator" }, { label: "New Profile", click: () => host.runAction({ type: "createProfileForSpace", spaceId: space.id }) });
+
   return [
     { label: "Rename Space…", click: () => host.sendSidebarCommand({ kind: "beginSpaceRename", spaceId: space.id }) },
     {
@@ -256,6 +264,7 @@ function buildSpaceMenu(host: MenuHost, space: Space): MenuItemConstructorOption
     { label: "Theme", submenu: themeMenu },
     { label: "Appearance", submenu: appearanceMenu },
     { label: "Grain", submenu: grainMenu },
+    { label: "Profile (cookies, logins, Favorites)", submenu: profileMenu },
     { type: "separator" },
     { label: "Move Left", enabled: spaceIndex > 0, click: () => host.runAction({ type: "moveSpace", spaceId: space.id, index: spaceIndex - 1 }) },
     {

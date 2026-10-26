@@ -4,17 +4,19 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  createProfile,
   createSpace,
   deleteSpace,
   moveItemToSpace,
   moveSpace,
   removeEmptySpaces,
   renameSpace,
+  setSpaceProfile,
   SPACES_LIMIT,
   switchSpaceByNumber,
   switchSpaceByOffset,
 } from "../src/main/spaces";
-import { createInitialState, getSelectedTabId } from "../src/main/state";
+import { addToFavorites, createInitialState, getSelectedTabId } from "../src/main/state";
 import { HOUR_MS } from "../src/shared/settings";
 import type { BrowserState, ItemId, SpaceTheme } from "../src/shared/types";
 import { getPinnedIds, getTodayIds, ONE_PM, openPinnedTabs, openTabs, PERSONAL_SPACE_ID, WORK_SPACE_ID } from "./builders";
@@ -122,5 +124,20 @@ describe("removeEmptySpaces", () => {
 
     expect(state.spaces.map((space) => space.id)).toEqual([PERSONAL_SPACE_ID]);
     expect(onlyOneLeft.spaces).toHaveLength(1);
+  });
+});
+
+describe("profiles", () => {
+  it("creates a profile and moves a Space to it; its Favorites change with it", () => {
+    const { state: withTab, tabIds } = openTabs(["https://mail.example"]);
+    const withFavorite = addToFavorites(withTab, tabIds[0] as ItemId);
+    const created = createProfile(withFavorite, "  ", ONE_PM);
+
+    const state = setSpaceProfile(created.state, PERSONAL_SPACE_ID, created.profileId);
+
+    expect(created.state.profiles.map((profile) => profile.name)).toEqual(["Default", "Profile 2"]);
+    expect(state.spaces[0]?.profileId).toBe(created.profileId);
+    // The Favorite belongs to the old profile, so the Space no longer shows it selected.
+    expect(getSelectedTabId(state)).toBeNull();
   });
 });

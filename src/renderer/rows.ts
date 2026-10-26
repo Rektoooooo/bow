@@ -144,6 +144,11 @@ export function renderTabRow(tab: TabItem, location: ItemLocation, index: number
 
   row.append(createTabIconSlot(tab, runtimeInfo?.isLoading === true));
   row.append(createTabTitle(tab, context));
+  if (tab.isUnread === true && !isSelected) {
+    const unreadDot = createElement("span", "unread-dot");
+    unreadDot.title = "Changed since you last looked";
+    row.append(unreadDot);
+  }
 
   const isAudible = runtimeInfo?.isAudible === true;
   if (isAudible || tab.isMuted) {
@@ -344,8 +349,9 @@ export function renderFavoriteTile(tab: TabItem, location: ItemLocation, index: 
   tile.append(createFavicon(tab.faviconUrl, tab.url, "favicon favicon-large"));
 
   const isAudible = context.runtime.tabs[tab.id]?.isAudible === true;
-  if (isAudible) {
-    tile.append(createElement("span", "tile-audio-dot"));
+  const isUnread = tab.isUnread === true && tab.id !== context.selectedTabId;
+  if (isAudible || isUnread) {
+    tile.append(createElement("span", isUnread ? "tile-audio-dot tile-unread-dot" : "tile-audio-dot"));
   }
 
   addTabRowEvents(tile, tab.id);

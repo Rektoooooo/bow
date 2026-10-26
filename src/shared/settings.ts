@@ -59,8 +59,15 @@ export const SPLIT_PANES_LIMIT = 4;
 /** The profile every new install starts with. Its pages use the session partition "persist:profile-default". */
 export const DEFAULT_PROFILE_ID = "profile-default";
 
-/** Sidebar width in pixels. Must match --sidebar-width in sidebar.css. */
+/** Default sidebar width in pixels (the sidebar page sets --sidebar-width from the saved width). */
 export const SIDEBAR_WIDTH_PX = 240;
+
+/** Narrowest and widest sidebar the edge can be dragged to. Our choice; Arc's limits are compiled constants. */
+export const SIDEBAR_MIN_WIDTH_PX = 180;
+export const SIDEBAR_MAX_WIDTH_PX = 420;
+
+/** Letting go of the edge below this width hides the sidebar, like dragging Arc's sidebar fully to the left. */
+export const SIDEBAR_COLLAPSE_WIDTH_PX = 130;
 
 /** Gap between the window edge and the web page card, in pixels. Must match --card-inset in sidebar.css. */
 export const CARD_INSET_PX = 8;

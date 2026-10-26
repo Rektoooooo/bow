@@ -26,6 +26,8 @@ export interface CardLayoutOptions {
   isToolbarVisible: boolean;
   /** The hidden sidebar is showing for a moment (mouse at the left edge): the card slides right without resizing. */
   isSidebarPeeking?: boolean;
+  /** The sidebar's width; SIDEBAR_WIDTH_PX when not given. */
+  sidebarWidth?: number;
 }
 
 /**
@@ -34,12 +36,13 @@ export interface CardLayoutOptions {
  * Example: content 1280×820, sidebar and toolbar visible → { x: 248, y: 40, width: 1024, height: 772 }
  */
 export function computeCardBounds(contentWidth: number, contentHeight: number, options: CardLayoutOptions): Bounds {
-  const left = options.isSidebarVisible ? SIDEBAR_WIDTH_PX + CARD_INSET_PX : CARD_INSET_PX;
+  const sidebarWidth = options.sidebarWidth ?? SIDEBAR_WIDTH_PX;
+  const left = options.isSidebarVisible ? sidebarWidth + CARD_INSET_PX : CARD_INSET_PX;
   const top = options.isToolbarVisible ? TOOLBAR_HEIGHT_PX : CARD_INSET_PX;
   const width = contentWidth - left - CARD_INSET_PX;
   const height = contentHeight - top - CARD_INSET_PX;
   // Sliding instead of shrinking keeps the page from re-laying out while the sidebar is only peeking.
-  const peekOffset = !options.isSidebarVisible && options.isSidebarPeeking === true ? SIDEBAR_WIDTH_PX : 0;
+  const peekOffset = !options.isSidebarVisible && options.isSidebarPeeking === true ? sidebarWidth : 0;
   return { x: left + peekOffset, y: top, width: Math.max(width, 0), height: Math.max(height, 0) };
 }
 

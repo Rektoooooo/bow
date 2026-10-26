@@ -20,7 +20,7 @@ import type { ArchiveReason } from "../shared/types";
 import { menuHost } from "./actionRunner";
 import { applyChange, getState, getWindow } from "./browserCore";
 import { showPageContextMenu } from "./menus";
-import { getProfileSession } from "./profiles";
+import { createPrivateSession, getProfileSession } from "./profiles";
 import { addPageToArchive, openTab } from "./state";
 import { openLinkInNewTab } from "./tabActions";
 import { getActiveSpace } from "./tree";
@@ -46,10 +46,21 @@ export const LITTLE_CHANNELS = {
   goBack: "little:go-back",
 } as const;
 
+/** Private window size: a full browsing window, not a quick look. Our choice. */
+const PRIVATE_WIDTH_PX = 1100;
+const PRIVATE_HEIGHT_PX = 760;
+
+/** How a Little Window opens. */
+export interface LittleWindowOptions {
+  /** A private window (⇧⌘N): in-memory session, never archived, cannot move into a Space. */
+  isPrivate?: boolean;
+}
+
 /** One open Little Window. */
 interface LittleWindow {
   window: BrowserWindow;
   pageView: WebContentsView;
+  isPrivate: boolean;
   lastActiveAt: number;
   /** Set once the page went somewhere (moved into a Space or archived), so closing does not archive it again. */
   isSettled: boolean;
@@ -87,7 +98,8 @@ function sendInfo(little: LittleWindow): void {
  * Puts a Little Window's page in the Archive (unless it already went somewhere) and marks it settled.
  */
 function archiveLittleWindow(little: LittleWindow, reason: ArchiveReason): void {
-  if (little.isSettled) {
+  // A private window leaves no trace, so it is never archived.
+  if (little.isSettled || little.isPrivate) {
     return;
   }
   little.isSettled = true;
@@ -111,9 +123,18 @@ function watchPage(little: LittleWindow): void {
   contents.on("page-favicon-updated", (_event, faviconUrls) => {
     little.faviconUrl = faviconUrls[0] ?? little.faviconUrl;
   });
-  contents.on("context-menu", (_event, params) => showPageContextMenu(menuHost, contents, params));
+  // Links that want a new tab: in a private window they stay in it (the main sidebar is saved to disk).
+  const openElsewhere = (url: string, inBackground: boolean): void => {
+    if (little.isPrivate) {
+      contents.loadURL(url).catch(() => undefined);
+      return;
+    }
+    openLinkInNewTab(url, inBackground ? "background" : "foreground");
+  };
+  const pageMenuHost = { ...menuHost, openInNewTab: openElsewhere };
+  contents.on("context-menu", (_event, params) => showPageContextMenu(pageMenuHost, contents, params));
   contents.setWindowOpenHandler((details) => {
-    openLinkInNewTab(details.url, details.disposition === "background-tab" ? "background" : "foreground");
+    openElsewhere(details.url, details.disposition === "background-tab");
     return { action: "deny" };
   });
 }
@@ -121,12 +142,13 @@ function watchPage(little: LittleWindow): void {
 /**
  * Opens a Little Window, on an address or empty (the bar's address field then has the keyboard).
  */
-export function openLittleWindow(url: string | null): void {
+export function openLittleWindow(url: string | null, options: LittleWindowOptions = {}): void {
+  const isPrivate = options.isPrivate === true;
   const preloadPath = path.join(__dirname, "..", "preload", "littlePreload.js");
   const barPagePath = path.join(__dirname, "..", "..", "web", "little", "little.html");
   const window = new BrowserWindow({
-    width: LITTLE_WIDTH_PX,
-    height: LITTLE_HEIGHT_PX,
+    width: isPrivate ? PRIVATE_WIDTH_PX : LITTLE_WIDTH_PX,
+    height: isPrivate ? PRIVATE_HEIGHT_PX : LITTLE_HEIGHT_PX,
     minWidth: LITTLE_MIN_WIDTH_PX,
     minHeight: LITTLE_MIN_HEIGHT_PX,
     titleBarStyle: "hiddenInset",
@@ -137,13 +159,14 @@ export function openLittleWindow(url: string | null): void {
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 
   const profileId = getActiveSpace(getState()).profileId;
+  const pageSession = isPrivate ? createPrivateSession() : getProfileSession(profileId);
   const pageView = new WebContentsView({
-    webPreferences: { session: getProfileSession(profileId), sandbox: true, contextIsolation: true, nodeIntegration: false },
+    webPreferences: { session: pageSession, sandbox: true, contextIsolation: true, nodeIntegration: false },
   });
   pageView.setBorderRadius(PAGE_RADIUS_PX);
   window.contentView.addChildView(pageView);
 
-  const little: LittleWindow = { window: window, pageView: pageView, lastActiveAt: Date.now(), isSettled: false, faviconUrl: null };
+  const little: LittleWindow = { window: window, pageView: pageView, isPrivate: isPrivate, lastActiveAt: Date.now(), isSettled: false, faviconUrl: null };
   littleWindows.add(little);
   layoutPage(little);
   watchPage(little);
@@ -161,7 +184,7 @@ export function openLittleWindow(url: string | null): void {
   });
 
   window.webContents.once("did-finish-load", () => sendInfo(little));
-  window.loadFile(barPagePath, { query: { empty: url === null ? "1" : "0" } });
+  window.loadFile(barPagePath, { query: { empty: url === null ? "1" : "0", private: isPrivate ? "1" : "0" } });
   if (url !== null) {
     pageView.webContents.loadURL(url).catch(() => undefined);
   }
@@ -180,7 +203,7 @@ export function handleExternalUrl(url: string): void {
 export function archiveIdleLittleWindows(now: number): void {
   for (const little of Array.from(littleWindows)) {
     const isIdle = now - little.lastActiveAt >= LITTLE_WINDOW_ARCHIVE_AFTER_MS;
-    if (!isIdle || little.window.isFocused()) {
+    if (!isIdle || little.window.isFocused() || little.isPrivate) {
       continue;
     }
     archiveLittleWindow(little, "auto");
@@ -212,7 +235,8 @@ export function registerLittleWindowIpc(): void {
   ipcMain.handle(LITTLE_CHANNELS.moveToSpace, (event) => {
     const little = findSender(event);
     const url = little === undefined ? "" : little.pageView.webContents.getURL();
-    if (little === undefined || url === "") {
+    // A private page must not end up in the saved sidebar.
+    if (little === undefined || url === "" || little.isPrivate) {
       return;
     }
     little.isSettled = true;
