@@ -20,4 +20,10 @@ export const IPC_CHANNELS = {
   dispatch: "browser:dispatch",
   sidebarCommand: "browser:sidebar-command",
   getSymbols: "browser:get-symbols",
+  readNote: "browser:read-note",
+  saveNote: "browser:save-note",
+  readEasel: "browser:read-easel",
+  saveEasel: "browser:save-easel",
+  listCaptures: "browser:list-captures",
+  readCapture: "browser:read-capture",
 } as const;

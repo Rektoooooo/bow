@@ -29,6 +29,12 @@ const CHANNELS: typeof IPC_CHANNELS = {
   dispatch: "browser:dispatch",
   sidebarCommand: "browser:sidebar-command",
   getSymbols: "browser:get-symbols",
+  readNote: "browser:read-note",
+  saveNote: "browser:save-note",
+  readEasel: "browser:read-easel",
+  saveEasel: "browser:save-easel",
+  listCaptures: "browser:list-captures",
+  readCapture: "browser:read-capture",
 };
 
 /**
@@ -55,6 +61,12 @@ function createBrowserApi(): BrowserApi {
         listener(command);
       });
     },
+    readNote: (noteId) => ipcRenderer.invoke(CHANNELS.readNote, noteId),
+    saveNote: (noteId, html, title) => ipcRenderer.invoke(CHANNELS.saveNote, noteId, html, title),
+    readEasel: (easelId) => ipcRenderer.invoke(CHANNELS.readEasel, easelId),
+    saveEasel: (easelId, json) => ipcRenderer.invoke(CHANNELS.saveEasel, easelId, json),
+    listCaptures: () => ipcRenderer.invoke(CHANNELS.listCaptures),
+    readCapture: (captureId) => ipcRenderer.invoke(CHANNELS.readCapture, captureId),
   };
 }
 

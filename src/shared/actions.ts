@@ -116,7 +116,9 @@ export type BrowserAction =
   | { type: "setAppIcon"; variantId: string }
   | { type: "showTabPreview"; tabId: ItemId; anchor: { x: number; y: number; width: number; height: number } }
   | { type: "hideTabPreview" }
-  | { type: "setTidyTitles"; isOn: boolean };
+  | { type: "setTidyTitles"; isOn: boolean }
+  | { type: "createNote" }
+  | { type: "createEasel" };
 
 /** Every action type, for checking an incoming `type` string. */
 export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
@@ -192,4 +194,6 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "showTabPreview",
   "hideTabPreview",
   "setTidyTitles",
+  "createNote",
+  "createEasel",
 ];

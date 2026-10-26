@@ -15,6 +15,8 @@
  */
 import type { BrowserState, ItemId, RuntimeState, TabItem, TabRuntimeInfo } from "../shared/types";
 import { isDeveloperModeOn } from "../shared/developerMode.js";
+import { isNoteUrl } from "../shared/notes.js";
+import { isEaselUrl } from "../shared/easels.js";
 import { createActionButton, createElement, getDisplayHost } from "./dom.js";
 import { createIcon } from "./icons.js";
 import { morphChildren } from "./morph.js";
@@ -202,7 +204,14 @@ export function renderToolbar(state: BrowserState, runtime: RuntimeState, select
 
   const centerGroup = createElement("div", "toolbar-group toolbar-center");
   centerGroup.dataset.key = "center";
-  if (!isDeveloper) {
+  const isNote = selectedTab !== null && isNoteUrl(selectedTab.url);
+  const isEasel = selectedTab !== null && isEaselUrl(selectedTab.url);
+  if (isNote || isEasel) {
+    const pagePill = createElement("span", "address-pill note-pill");
+    pagePill.dataset.key = isNote ? "note" : "easel";
+    pagePill.append(createIcon(isNote ? "note" : "easel", "icon address-icon"), createElement("span", "address-text", isNote ? "Note" : "Easel"));
+    centerGroup.append(pagePill);
+  } else if (!isDeveloper) {
     centerGroup.append(createAddressPill(selectedTab === null ? null : selectedTab.url));
   }
 

@@ -53,13 +53,16 @@ import { initializePeek, openPeek, relayoutPeek } from "./peek";
 import { createOverlayView, getOverlayContents } from "./overlay";
 import { refreshOpenPanel, registerOverlayIpc, relayoutOverlay, setCommandActionRegistry } from "./overlayController";
 import { onProfileSessionCreated, restrictWebPermissions, useChromeUserAgent } from "./profiles";
-import { moveTabsToArchive, updateTabFavicon, updateTabPage } from "./state";
+import { moveTabsToArchive, setNoteTitle, updateTabFavicon, updateTabPage } from "./state";
 import { getStateFilePath } from "./store";
 import { loadWindowBounds, rememberWindowBounds } from "./windowState";
 import { openLinkInNewTab } from "./tabActions";
 import { getShownTabIds, getTabViews, layoutShownTabViews, refreshShownSnapshots } from "./tabViews";
 import { SNAPSHOT_REFRESH_MS } from "./tabSnapshots";
-import { loadCaptures } from "./captures";
+import { listCaptures, loadCaptures, readCaptureAsDataUrl } from "./captures";
+import { initializeEaselsStore, readEasel, writeEasel } from "./easelsStore";
+import { initializeNotesStore, readNote, writeNote } from "./notesStore";
+import { createNoteUrl } from "../shared/notes";
 import { applyCosmeticFilters, initializeAdBlocking, installAdBlocker } from "./adBlock";
 import { applyAppIcon } from "./appIcon";
 import { findRootLocation, findTab } from "./tree";
@@ -80,6 +83,9 @@ const MIN_WINDOW_HEIGHT_PX = 400;
  * the user's Arc (1 px per pt): the close button's center is at 19, 22.5 pt.
  */
 const TRAFFIC_LIGHT_POSITION = { x: 12, y: 16 };
+
+/** How many of the Library's captures an easel offers to place. Our choice. */
+const EASEL_CAPTURE_CHOICES = 40;
 
 /** When this run of the app started. Auto-archive counts inactivity from here at the earliest. */
 const launchedAt = Date.now();
@@ -276,6 +282,8 @@ async function handleAppReady(): Promise<void> {
   loadHistory();
   loadToolbarColors(path.join(app.getPath("userData"), TOOLBAR_COLORS_FILE_NAME), scheduleRuntimePush);
   loadCaptures(app.getPath("userData"));
+  initializeNotesStore(app.getPath("userData"));
+  initializeEaselsStore(app.getPath("userData"));
   // Pictures of the pages on screen stay fresh for the recent-tab switcher and previews.
   setInterval(refreshShownSnapshots, SNAPSHOT_REFRESH_MS);
 
@@ -298,6 +306,18 @@ async function handleAppReady(): Promise<void> {
       runAction(action);
       refreshOpenPanel();
     },
+    readNote: (noteId) => readNote(noteId),
+    saveNote: (noteId, html, title) => {
+      if (writeNote(noteId, html)) {
+        applyChange((state) => setNoteTitle(state, createNoteUrl(noteId), title));
+      }
+    },
+    readEasel: (easelId) => readEasel(easelId),
+    saveEasel: (easelId, json) => {
+      writeEasel(easelId, json);
+    },
+    listCaptures: () => listCaptures(EASEL_CAPTURE_CHOICES).map((record) => ({ id: record.id, title: record.title, url: record.url, thumbnailUrl: record.thumbnailUrl })),
+    readCapture: (captureId) => readCaptureAsDataUrl(captureId),
   });
   registerOverlayIpc();
   registerLittleWindowIpc();

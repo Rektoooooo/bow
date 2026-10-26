@@ -65,6 +65,7 @@ export const SYMBOL_NAMES = {
   clock: "clock.arrow.circlepath",
   checkmark: "checkmark",
   hammer: "hammer",
+  easel: "scribble.variable",
   terminal: "apple.terminal",
   network: "network",
   scope: "scope",

@@ -27,6 +27,8 @@ import type { CardLayoutOptions } from "./layout";
 import { getProfileSession } from "./profiles";
 import { getToolbarColor, sampleToolbarColorSoon } from "./toolbarTint";
 import { captureSnapshotSoon, forgetSnapshot } from "./tabSnapshots";
+import { isNoteUrl } from "../shared/notes";
+import { isEaselUrl } from "../shared/easels";
 import { getSelectedTabId } from "./state";
 import { findProfileIdOfItem, findSplitOfTab, findTab } from "./tree";
 import { DEFAULT_PROFILE_ID } from "../shared/settings";
@@ -387,14 +389,13 @@ export function computeVisibleTabIds(state: BrowserState): ItemId[] {
     return [];
   }
   const splitId = findSplitOfTab(state, selectedTabId);
-  if (splitId === null) {
-    return [selectedTabId];
-  }
-  const split = state.items[splitId];
-  if (split === undefined || split.kind !== "split") {
-    return [selectedTabId];
-  }
-  return split.childIds;
+  const split = splitId === null ? undefined : state.items[splitId];
+  const shownIds = split !== undefined && split.kind === "split" ? split.childIds : [selectedTabId];
+  // Notes and easels have no web page: the sidebar page draws their editor in the card (shared/notes.ts, easels.ts).
+  return shownIds.filter((tabId) => {
+    const url = findTab(state, tabId)?.url ?? "";
+    return !isNoteUrl(url) && !isEaselUrl(url);
+  });
 }
 
 /**

@@ -31,6 +31,10 @@ import { applySpaceTheme, onSystemAppearanceChange } from "./theme.js";
 import { createNavigationButtons, renderToolbar } from "./toolbar.js";
 import { playSound } from "./sounds.js";
 import { installTabPreviewHover } from "./tabPreviewHover.js";
+import { showNoteEditor } from "./noteEditor.js";
+import { showEaselEditor } from "./easelEditor.js";
+import { getEaselId } from "../shared/easels.js";
+import { getNoteId } from "../shared/notes.js";
 import { isDeveloperModeOn } from "../shared/developerMode.js";
 
 /** Horizontal scroll distance (in wheel delta units) that counts as a swipe to the next Space. Our choice. */
@@ -480,10 +484,21 @@ function renderAll(): void {
   hasRenderedOnce = true;
   renderMediaPlayer(state);
   renderBottomBar(state);
-  renderToolbar(state, currentRuntime, context.selectedTabId);
-  applyToolbarTint(context.selectedTabId);
-  updateEmptyCard(context.selectedTabId);
-  updateDocumentTitle(state, context.selectedTabId);
+  // The page area follows the real selection even while "New Tab" carries the highlight (Arc's shot 3).
+  const selectedTabId = getSelectedTabId(state);
+  const selectedItem = selectedTabId === null ? undefined : state.items[selectedTabId];
+  const selectedUrl = selectedItem !== undefined && selectedItem.kind === "tab" ? selectedItem.url : "";
+  const noteId = getNoteId(selectedUrl);
+  const easelId = getEaselId(selectedUrl);
+  renderToolbar(state, currentRuntime, selectedTabId);
+  applyToolbarTint(selectedTabId);
+  updateEmptyCard(selectedTabId);
+  const cardSlot = document.getElementById("card-slot");
+  if (cardSlot !== null) {
+    showNoteEditor(cardSlot, noteId);
+    showEaselEditor(cardSlot, easelId);
+  }
+  updateDocumentTitle(state, selectedTabId);
 }
 
 /**

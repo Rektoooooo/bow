@@ -138,6 +138,21 @@ export function listCaptures(limit: number): (CaptureRecord & { thumbnailUrl: st
 }
 
 /**
+ * One picture as a PNG data: URL (an easel places it), or null when it is gone.
+ */
+export function readCaptureAsDataUrl(id: string): string | null {
+  const record = captures.find((candidate) => candidate.id === id);
+  if (record === undefined || capturesFolder === null) {
+    return null;
+  }
+  try {
+    return `data:image/png;base64,${fs.readFileSync(path.join(capturesFolder, record.fileName)).toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * A file name for a copy in Downloads: the page's name and the time, without characters Finder dislikes.
  */
 function buildExportName(record: CaptureRecord): string {

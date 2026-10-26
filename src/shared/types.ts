@@ -295,4 +295,13 @@ export interface BrowserApi {
   onRuntimeChanged(listener: (runtimeState: RuntimeState) => void): void;
   dispatch(action: BrowserAction): Promise<void>;
   onSidebarCommand(listener: (command: SidebarCommand) => void): void;
+  /** A note's text (HTML), and saving it with the name its tab takes (shared/notes.ts). */
+  readNote(noteId: string): Promise<string>;
+  saveNote(noteId: string, html: string, title: string): Promise<void>;
+  /** An easel's board (JSON) and saving it (shared/easels.ts). */
+  readEasel(easelId: string): Promise<string>;
+  saveEasel(easelId: string, json: string): Promise<void>;
+  /** The Library's captures, for putting one on an easel, and one capture as a PNG data: URL. */
+  listCaptures(): Promise<{ id: string; title: string; url: string; thumbnailUrl: string | null }[]>;
+  readCapture(captureId: string): Promise<string | null>;
 }

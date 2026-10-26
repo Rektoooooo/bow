@@ -117,6 +117,8 @@ export const appMenuCommands: AppMenuCommands = {
   openLibrary: () => openLibrary(),
   openLittleWindow: () => openLittleWindow(null),
   buildImportMenu: () => buildImportMenu(menuHost),
+  newNote: () => menuHost.runAction({ type: "createNote" }),
+  newEasel: () => menuHost.runAction({ type: "createEasel" }),
   importFromArc: () => {
     importFromArc().catch((error) => console.error("Import from Arc failed:", error));
   },

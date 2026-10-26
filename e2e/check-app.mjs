@@ -296,6 +296,61 @@ check(
   `${importedFolder?.title} › ${barFolder?.title} › ${barChildren.map((item) => item.title).join(",")}`,
 );
 
+// Notes, like Arc's: a note sits in Today like a tab, its editor fills the page card, its first line names it, and
+// its text is kept (in its own file) when you switch away and back. Pasted text arrives plain.
+await dispatch(page, { type: "createNote" });
+await page.waitForSelector(".note-body", { timeout: 5000 });
+await page.waitForTimeout(400);
+await page.click(".note-body");
+await page.keyboard.type("Shopping list");
+await page.keyboard.press("Enter");
+await page.keyboard.type("- milk");
+await page.waitForTimeout(1200);
+state = await getState(page);
+const noteTab = state.items[state.selectedTabIdBySpace[state.activeSpaceId]];
+const noteViews = await tabViewBounds(app);
+check("a new note opens in the card, without a web page, and its first line names the tab", noteTab?.url.startsWith("sidebar-note:") && noteTab?.title === "Shopping list" && noteViews.length === 0, `${noteTab?.title} views=${noteViews.length}`);
+const noteListMade = await page.evaluate(() => document.querySelector(".note-body ul li")?.textContent ?? "");
+check("typing '- ' at the start of a line makes a list", noteListMade === "milk", noteListMade);
+const noteFile = path.join(userDataDir, "Notes", `${noteTab.url.slice("sidebar-note:".length)}.html`);
+check("the note's text is saved in its own file", fs.existsSync(noteFile) && fs.readFileSync(noteFile, "utf8").includes("Shopping list"));
+const otherTab = Object.values(state.items).find((item) => item.kind === "tab" && item.id !== noteTab.id && !item.url.startsWith("sidebar-note:"));
+await dispatch(page, { type: "selectTab", tabId: otherTab.id });
+await page.waitForTimeout(500);
+await dispatch(page, { type: "selectTab", tabId: noteTab.id });
+await page.waitForSelector(".note-body li", { timeout: 5000 }).catch(() => undefined);
+const reopenedNote = await page.evaluate(() => document.querySelector(".note-body")?.innerText ?? "");
+check("switching away and back keeps the note", reopenedNote.includes("Shopping list") && reopenedNote.includes("milk"), reopenedNote.replace(/\n/g, " / "));
+
+// Easels, like Arc's: a board in the card; text and a pen stroke are kept in the easel's own file and come back
+// after switching away.
+await dispatch(page, { type: "createEasel" });
+await page.waitForSelector(".easel-viewport", { timeout: 5000 });
+await page.waitForTimeout(400);
+const boardBox = await page.locator(".easel-viewport").boundingBox();
+await page.click('[data-tool-button="text"]');
+await page.mouse.click(boardBox.x + 100, boardBox.y + 120);
+await page.keyboard.type("Board idea");
+await page.click('[data-tool-button="pen"]');
+await page.mouse.move(boardBox.x + 100, boardBox.y + 220);
+await page.mouse.down();
+for (let step = 0; step <= 12; step++) {
+  await page.mouse.move(boardBox.x + 100 + step * 15, boardBox.y + 220 + step * 4);
+}
+await page.mouse.up();
+await page.waitForTimeout(1300);
+state = await getState(page);
+const easelTab = state.items[state.selectedTabIdBySpace[state.activeSpaceId]];
+const easelFile = path.join(userDataDir, "Easels", `${easelTab.url.slice("sidebar-easel:".length)}.json`);
+const savedKinds = fs.existsSync(easelFile) ? JSON.parse(fs.readFileSync(easelFile, "utf8")).elements.map((element) => element.kind).join(",") : "none";
+check("an easel keeps its text and drawing in its own file", easelTab.url.startsWith("sidebar-easel:") && savedKinds === "text,stroke", savedKinds);
+await dispatch(page, { type: "selectTab", tabId: noteTab.id });
+await page.waitForTimeout(400);
+await dispatch(page, { type: "selectTab", tabId: easelTab.id });
+await page.waitForSelector(".easel-text", { timeout: 5000 }).catch(() => undefined);
+const reopenedBoard = await page.evaluate(() => ({ text: document.querySelector(".easel-text")?.textContent ?? "", strokes: document.querySelectorAll(".easel-strokes path").length }));
+check("switching away and back keeps the board", reopenedBoard.text === "Board idea" && reopenedBoard.strokes === 1, JSON.stringify(reopenedBoard));
+
 // Another app icon: our own drawing in other colors, drawn for the Dock (errors would show in the main log below).
 await dispatch(page, { type: "setAppIcon", variantId: "mint" });
 await page.waitForTimeout(1500);

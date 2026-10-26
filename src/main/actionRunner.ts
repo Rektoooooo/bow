@@ -50,6 +50,8 @@ import {
   setAdBlockForSite,
   setAppIcon,
   setTidyTitles,
+  createNote,
+  createEasel,
   setPinnedSectionOpen,
   setSidebarVisible,
   setSidebarWidth,
@@ -71,6 +73,7 @@ import {
 } from "./spaces";
 import { closeTabByUser, navigateFocusedPage, openLinkInNewTab, resetTabToHome, setMuted } from "./tabActions";
 import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
+import { createId } from "./tree";
 import { normalizeTypedInput } from "./urls";
 
 /** What menus.ts needs from the rest of the app. */
@@ -296,6 +299,10 @@ export function runAction(action: BrowserAction): void {
       applyChange((state) => setAdBlockForSite(state, action.site, action.isOn));
       reapplyCosmeticFiltersToAllPages();
       return;
+    case "createEasel":
+      return applyChange((state) => createEasel(state, createId("easel", now), now));
+    case "createNote":
+      return applyChange((state) => createNote(state, createId("note", now), now));
     case "setTidyTitles":
       return applyChange((state) => setTidyTitles(state, action.isOn));
     case "showTabPreview":

@@ -20,6 +20,8 @@ import { createIcon } from "./icons.js";
 import { encodeLocation, markDraggable, markDropTarget } from "./dragDrop.js";
 import { isDeveloperModeOn } from "../shared/developerMode.js";
 import { tidyTitle } from "../shared/tidyTitles.js";
+import { isNoteUrl } from "../shared/notes.js";
+import { isEaselUrl } from "../shared/easels.js";
 
 /** Everything a row needs to know to draw itself. */
 export interface RowContext {
@@ -104,6 +106,14 @@ function createRenameInput(itemId: ItemId, currentName: string, context: RowCont
  */
 function createTabIconSlot(tab: TabItem, isLoading: boolean): HTMLElement {
   const slot = createElement("span", "row-icon-slot");
+  if (isNoteUrl(tab.url)) {
+    slot.append(createIcon("note", "icon note-icon"));
+    return slot;
+  }
+  if (isEaselUrl(tab.url)) {
+    slot.append(createIcon("easel", "icon note-icon"));
+    return slot;
+  }
   const favicon = createFavicon(tab.faviconUrl, tab.url);
   favicon.classList.toggle("is-loading", isLoading);
   slot.append(favicon);
@@ -338,7 +348,7 @@ export function renderFavoriteTile(tab: TabItem, location: ItemLocation, index: 
   tile.tabIndex = 0;
   tile.classList.toggle("is-selected", tab.id === context.selectedTabId);
   tile.classList.toggle("is-loaded", context.runtime.tabs[tab.id] !== undefined);
-  tile.append(createFavicon(tab.faviconUrl, tab.url, "favicon favicon-large"));
+  tile.append(isNoteUrl(tab.url) ? createIcon("note", "icon note-icon") : createFavicon(tab.faviconUrl, tab.url, "favicon favicon-large"));
 
   const isAudible = context.runtime.tabs[tab.id]?.isAudible === true;
   const isUnread = tab.isUnread === true && tab.id !== context.selectedTabId;

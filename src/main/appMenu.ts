@@ -44,6 +44,8 @@ export interface AppMenuCommands {
   openLibrary(): void;
   openLittleWindow(): void;
   importFromArc(): void;
+  newNote(): void;
+  newEasel(): void;
   /** The import menu's items (Arc first); the File menu shows the browser part. */
   buildImportMenu(): MenuItemConstructorOptions[];
   openUrlInNewTab(url: string): void;
@@ -100,6 +102,8 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
       submenu: [
         { label: "New Tab", accelerator: "CommandOrControl+T", click: () => commands.openCommandBar("newTab") },
         { label: "New Little Window", accelerator: "CommandOrControl+Alt+N", click: () => commands.openLittleWindow() },
+        { label: "New Note", accelerator: "Control+Command+N", click: () => commands.newNote() },
+        { label: "New Easel", click: () => commands.newEasel() },
         { label: "New Private Window", accelerator: "CommandOrControl+Shift+N", click: () => commands.openPrivateWindow() },
         { label: "Open Location…", accelerator: "CommandOrControl+L", click: () => commands.openCommandBar("editUrl") },
         { label: "Open Peek as Tab", accelerator: "CommandOrControl+O", click: () => commands.openPeekAsTab() },

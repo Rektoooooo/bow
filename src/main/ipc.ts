@@ -12,6 +12,10 @@
  */
 import { APP_ICON_VARIANTS } from "../shared/appIconDrawing";
 import { BOOST_FONTS } from "../shared/boostFonts";
+import { isNoteId } from "../shared/notes";
+import { isEaselId } from "../shared/easels";
+import { MAX_EASEL_LENGTH } from "./easelsStore";
+import { MAX_NOTE_LENGTH } from "./notesStore";
 import { MAX_HUE_SHIFT } from "./boosts";
 import { ipcMain } from "electron";
 import type { WebContents } from "electron";
@@ -28,6 +32,12 @@ export interface IpcHandlers {
   getState(): BrowserState;
   getRuntimeState(): RuntimeState;
   runAction(action: BrowserAction): void;
+  readNote(noteId: string): string;
+  saveNote(noteId: string, html: string, title: string): void;
+  readEasel(easelId: string): string;
+  saveEasel(easelId: string, json: string): void;
+  listCaptures(): { id: string; title: string; url: string; thumbnailUrl: string | null }[];
+  readCapture(captureId: string): string | null;
 }
 
 /** Longest text we accept from the sidebar (typed addresses, names). Longer input is refused. */
@@ -278,6 +288,8 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   showTabPreview: { tabId: isText, anchor: isAnchor },
   hideTabPreview: {},
   setTidyTitles: { isOn: isBoolean },
+  createNote: {},
+  createEasel: {},
 };
 
 /**
@@ -312,6 +324,41 @@ export function registerIpcHandlers(handlers: IpcHandlers): void {
   });
   ipcMain.handle(IPC_CHANNELS.getRuntimeState, (event) => {
     return handlers.isTrustedSender(event.sender) ? handlers.getRuntimeState() : null;
+  });
+  ipcMain.handle(IPC_CHANNELS.readNote, (event, noteId: unknown) => {
+    if (!handlers.isTrustedSender(event.sender) || !isNoteId(noteId)) {
+      return "";
+    }
+    return handlers.readNote(noteId);
+  });
+  ipcMain.handle(IPC_CHANNELS.saveNote, (event, noteId: unknown, html: unknown, title: unknown) => {
+    const isNoteHtml = typeof html === "string" && html.length <= MAX_NOTE_LENGTH;
+    if (!handlers.isTrustedSender(event.sender) || !isNoteId(noteId) || !isNoteHtml || !isText(title)) {
+      return;
+    }
+    handlers.saveNote(noteId, html, title as string);
+  });
+  ipcMain.handle(IPC_CHANNELS.readEasel, (event, easelId: unknown) => {
+    if (!handlers.isTrustedSender(event.sender) || !isEaselId(easelId)) {
+      return "";
+    }
+    return handlers.readEasel(easelId);
+  });
+  ipcMain.handle(IPC_CHANNELS.saveEasel, (event, easelId: unknown, json: unknown) => {
+    const isBoardJson = typeof json === "string" && json.length <= MAX_EASEL_LENGTH;
+    if (!handlers.isTrustedSender(event.sender) || !isEaselId(easelId) || !isBoardJson) {
+      return;
+    }
+    handlers.saveEasel(easelId, json);
+  });
+  ipcMain.handle(IPC_CHANNELS.listCaptures, (event) => {
+    return handlers.isTrustedSender(event.sender) ? handlers.listCaptures() : [];
+  });
+  ipcMain.handle(IPC_CHANNELS.readCapture, (event, captureId: unknown) => {
+    if (!handlers.isTrustedSender(event.sender) || !isText(captureId)) {
+      return null;
+    }
+    return handlers.readCapture(captureId as string);
   });
   ipcMain.handle(IPC_CHANNELS.dispatch, (event, value: unknown) => {
     if (!handlers.isTrustedSender(event.sender)) {

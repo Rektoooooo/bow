@@ -314,6 +314,8 @@ function buildPlusMenu(host: MenuHost): MenuItemConstructorOptions[] {
   const newTheme = { colors: nextPreset?.colors ?? ["#d9d4e9"], appearance: nextPreset?.appearance ?? "auto", grain: 0 };
   return [
     { label: "New Tab", accelerator: "CommandOrControl+T", click: () => host.runAction({ type: "openCommandBar", mode: "newTab" }) },
+    { label: "New Note", click: () => host.runAction({ type: "createNote" }) },
+    { label: "New Easel", click: () => host.runAction({ type: "createEasel" }) },
     { label: "New Folder", click: () => host.runAction({ type: "createFolder", title: "New Folder" }) },
     {
       label: "New Space",

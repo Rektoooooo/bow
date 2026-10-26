@@ -16,6 +16,8 @@
  */
 import { ARCHIVE_LIMIT, DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_LIMIT, SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX } from "../shared/settings";
 import type { ArchiveReason, ArchivedTab, BrowserState, FolderItem, ItemId, ItemLocation, Space, SpaceId, TabItem } from "../shared/types";
+import { createNoteUrl, NEW_NOTE_TITLE } from "../shared/notes";
+import { createEaselUrl, NEW_EASEL_TITLE } from "../shared/easels";
 import {
   collectTabIds,
   collectTabIdsInList,
@@ -137,6 +139,39 @@ export function openTab(state: BrowserState, url: string, now: number, options: 
     return stateWithTab;
   }
   return selectTab(stateWithTab, newTab.id, now);
+}
+
+/**
+ * Opens a new, empty note at the top of Today and selects it (shared/notes.ts: a note is a tab with a note address).
+ */
+export function createNote(state: BrowserState, noteId: string, now: number): BrowserState {
+  const tabId = createId("tab", now);
+  const withTab = openTab(state, createNoteUrl(noteId), now, { id: tabId });
+  return updateTab(withTab, tabId, { title: NEW_NOTE_TITLE });
+}
+
+/**
+ * Opens a new, empty easel at the top of Today and selects it (shared/easels.ts: an easel is a tab with an easel
+ * address).
+ */
+export function createEasel(state: BrowserState, easelId: string, now: number): BrowserState {
+  const tabId = createId("tab", now);
+  const withTab = openTab(state, createEaselUrl(easelId), now, { id: tabId });
+  return updateTab(withTab, tabId, { title: NEW_EASEL_TITLE });
+}
+
+/**
+ * Names every tab of a note after its first line (a note can be open once; this also covers a restored copy).
+ */
+export function setNoteTitle(state: BrowserState, noteUrl: string, title: string): BrowserState {
+  const shownTitle = title.trim() === "" ? NEW_NOTE_TITLE : title.trim();
+  let changedState = state;
+  for (const item of Object.values(state.items)) {
+    if (item.kind === "tab" && item.url === noteUrl && item.title !== shownTitle) {
+      changedState = updateTab(changedState, item.id, { title: shownTitle });
+    }
+  }
+  return changedState;
 }
 
 /**
