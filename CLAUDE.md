@@ -58,7 +58,10 @@ The owner must be able to explain every line to a reviewer:
 
 - Once a plan or skeleton is approved, implement it in one go, then build, test, run the app, and report once.
   No per-function explain-back checkpoints (the user asked for this explicitly).
-- Still ask before outward-facing steps (pushing, publishing, installing new tools).
+- Commit and push after every verified step (build + `npm test` + `npm run e2e` green), so GitHub always has a
+  working version. The user asked for this explicitly (2026-10-26). Before each push, check that no personal data
+  (the user's Arc bookmarks, names, `reference/` screenshots) is staged.
+- Still ask before other outward-facing steps (publishing releases, installing new tools).
 
 ## Git and GitHub
 
