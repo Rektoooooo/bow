@@ -37,6 +37,8 @@ async function findPage(suffix, timeoutMs = 15000) {
 }
 
 const sidebar = await findPage("/renderer/index.html");
+// Reduced motion: rows appear and disappear at once, so checks never meet a row that is still animating.
+await sidebar.emulateMedia({ reducedMotion: "reduce" });
 await sidebar.waitForSelector(".space-title");
 const overlay = await findPage("/overlay/overlay.html");
 const getState = () => sidebar.evaluate(() => window.browserApi.getState());

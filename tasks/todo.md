@@ -77,6 +77,35 @@ and every Arc behavior we can observe is written down before Arc shuts down.
 - [x] Unit tests for every pure module (166); e2e for the app, overlay, extensions, permissions, packaged app
 - [x] README screenshots regenerated, CLAUDE.md, handoff, teardown page marks what is built (27 of 53, 4 partly)
 
+## Milestone 3 — Arc 1:1 look, smooth motion, remaining features (plan: user-approved 2026-10-26)
+User: "poorly polished, icons weird, not smooth — make it 1:1 with my Arc screenshots, finish every feature, no time
+limit, UI-test until perfect." Skip Arc Max (AI) and server features (sync, sharing, accounts).
+
+### 3.1 Motion foundation
+- [ ] Keyed, in-place sidebar rendering (rows created once per key, updated on push) + delegated events
+- [ ] CSS motion system: hover/selection transitions, row enter/leave + FLIP, folder open/close, Space slide,
+      theme cross-fade, reduced motion
+- [ ] Native view motion: animated bounds for ⌘S, sidebar peek, split, Peek grow/shrink
+- [ ] Overlay open/close animations (incl. Command Bar, Library), no stale-frame flash, no re-animating site controls
+
+### 3.2 Arc's look 1:1
+- [ ] SF Symbols rendered by macOS for every icon (CSS mask, tintable); native menu icons
+- [ ] Palette engine (frame #313131 for black/dark, white/black overlay alphas) + Arc theme import (windowTheme)
+- [ ] Card with the toolbar inside, hairline, per-site toolbar tint (50-site cache), "Show full URL" option
+- [ ] Sidebar to the measurements (tiles, rows, Space title, divider/Clear, New Tab, bottom bar)
+- [ ] Command Bar (shot 3), Control Center (shot 4), Library, Peek frame, Find, prompts, editors, Little Window
+
+### 3.3 Remaining Arc features
+- [ ] Tab hover previews · [ ] Recent-tab switcher (⌃Tab) · [ ] Inline URL autocomplete · [ ] Tidy titles
+- [ ] Capture + Library Media · [ ] Library Spaces/Boosts · [ ] Notes · [ ] Easels · [ ] Boost fonts/colors/JS
+- [ ] Sound effects · [ ] Alternate app icons · [ ] Ad & tracker blocking · [ ] Translate page · [ ] Handoff
+- [ ] Import from Chrome/Brave/Edge/Safari · [ ] First-run onboarding
+
+### 3.4 Verification
+- [ ] e2e/arc-compare.mjs (side-by-side with the reference, sampled colors/sizes within tolerance)
+- [ ] Motion checks (intermediate frames, long-task probe, 300-tab sidebar)
+- [ ] Hands-on runs of the packaged app; all suites green; docs + teardown page current
+
 ## Review (2026-10-26, end of the Arc-parity session)
 - **Works and verified:** everything in README "What works". Suites: `npm test` 166, `check-app` 36,
   `check-overlay` 40, `check-extensions` 19, `permission-check` 17, `check-package` 12 (after `npm run package`).

@@ -1,18 +1,23 @@
 /**
  * WHY this file exists:
  *   The sidebar shows four kinds of rows: tabs, folders (with their children), split views (one row, several panes)
- *   and Favorites tiles. Each is built here from the item it shows, with its clicks, hover buttons and drag handle.
+ *   and Favorites tiles. Each is described here from the item it shows: what it looks like and, as data attributes,
+ *   what clicking, dragging and dropping on it means.
  *
  * Data source:
  *   A RowContext: the BrowserState, the runtime facts (loading, sound) and which row is being renamed.
  *
  * Data flow:
- *   sidebar.ts renderAll() → renderItemRows() / renderFavoriteTile() → elements → clicks → dispatch(action)
+ *   sidebar.ts renderAll() → renderItemRows() / renderFavoriteTile() → morph.ts keeps the page's elements in step
+ *   → clicks and drags are handled by sidebarEvents.ts / dragDrop.ts from the data attributes
+ *
+ * Rule: no event listeners here (morph.ts keeps elements across redraws, so a listener would remember stale data).
+ * The one exception is the rename field, which morphing never replaces while it has the focus.
  */
 import type { BrowserState, FolderItem, ItemId, ItemLocation, RuntimeState, SidebarItem, SplitItem, TabItem } from "../shared/types";
-import { createElement, createFavicon, createIconButton, dispatch, getDisplayHost } from "./dom.js";
+import { createActionButton, createElement, createFavicon, dispatch, getDisplayHost } from "./dom.js";
 import { createIcon } from "./icons.js";
-import { makeDraggable, makeDropTarget } from "./dragDrop.js";
+import { encodeLocation, markDraggable, markDropTarget } from "./dragDrop.js";
 
 /** Everything a row needs to know to draw itself. */
 export interface RowContext {
@@ -27,6 +32,9 @@ export interface RowContext {
 
 /** Indent per folder level, in pixels. Our choice; Arc indents children by about one icon width. */
 const INDENT_PER_LEVEL_PX = 14;
+
+/** Left padding of a row at the top level. */
+const ROW_BASE_PADDING_PX = 8;
 
 /**
  * Returns the name a tab shows: the user's rename, or the page title.
@@ -75,10 +83,13 @@ function createRenameInput(itemId: ItemId, currentName: string, context: RowCont
   });
   input.addEventListener("blur", () => finish(true));
   input.addEventListener("click", (event) => event.stopPropagation());
-  // Focus after the element is in the page.
+  // Focus once the field is in the page. Only the field that made it into the page (morphing may keep an older one)
+  // takes the focus.
   requestAnimationFrame(() => {
-    input.focus();
-    input.select();
+    if (input.isConnected) {
+      input.focus();
+      input.select();
+    }
   });
   return input;
 }
@@ -89,16 +100,11 @@ function createRenameInput(itemId: ItemId, currentName: string, context: RowCont
 function createTabIconSlot(tab: TabItem, isLoading: boolean): HTMLElement {
   const slot = createElement("span", "row-icon-slot");
   const favicon = createFavicon(tab.faviconUrl, tab.url);
-  if (isLoading) {
-    favicon.classList.add("is-loading");
-  }
+  favicon.classList.toggle("is-loading", isLoading);
   slot.append(favicon);
 
   if (hasLeftHome(tab)) {
-    const resetButton = createIconButton("reset", "Back to pinned URL", "row-reset", () => {
-      dispatch({ type: "resetTab", tabId: tab.id });
-    });
-    slot.append(resetButton);
+    slot.append(createActionButton("reset", "Back to pinned URL", "row-reset", "reset-tab", { itemId: tab.id }));
   }
   return slot;
 }
@@ -120,6 +126,14 @@ function createTabTitle(tab: TabItem, context: RowContext): HTMLElement {
 }
 
 /**
+ * Sets a row's indent for its folder depth.
+ */
+function setIndent(row: HTMLElement, depth: number, basePadding: number = ROW_BASE_PADDING_PX): void {
+  row.style.setProperty("--depth", String(depth));
+  row.style.paddingLeft = `${basePadding + depth * INDENT_PER_LEVEL_PX}px`;
+}
+
+/**
  * Builds one tab row: icon, title, a speaker when it plays or is muted, and a close button on hover.
  * Pinned tabs only show the close button while their page is loaded, because closing puts the page away.
  */
@@ -130,10 +144,11 @@ export function renderTabRow(tab: TabItem, location: ItemLocation, index: number
   const isToday = location.kind === "today" || location.kind === "split";
 
   const row = createElement("div", "row tab-row");
-  row.dataset.itemId = tab.id;
+  row.dataset.key = `tab:${encodeLocation(location)}:${tab.id}`;
+  row.dataset.presence = "row";
+  row.dataset.row = "tab";
   row.title = tab.url;
-  row.style.setProperty("--depth", String(depth));
-  row.style.paddingLeft = `${8 + depth * INDENT_PER_LEVEL_PX}px`;
+  setIndent(row, depth);
   row.setAttribute("role", "button");
   row.tabIndex = 0;
   row.classList.toggle("is-selected", isSelected);
@@ -154,49 +169,17 @@ export function renderTabRow(tab: TabItem, location: ItemLocation, index: number
   if (isAudible || tab.isMuted) {
     const label = tab.isMuted ? "Unmute tab" : "Mute tab";
     const icon = tab.isMuted ? "speakerMuted" : "speaker";
-    const muteButton = createIconButton(icon, label, "row-action row-speaker is-visible", () => {
-      dispatch({ type: "setTabMuted", tabId: tab.id, isMuted: !tab.isMuted });
-    });
-    row.append(muteButton);
+    row.append(createActionButton(icon, label, "row-action row-speaker is-visible", "toggle-mute", { itemId: tab.id, isMuted: String(tab.isMuted) }));
   }
 
   if (isToday || isLoaded) {
     const closeLabel = isToday ? "Close tab (moves it to the Archive)" : "Close page (keeps the pinned tab)";
-    const closeButton = createIconButton("close", closeLabel, "row-action row-close", () => {
-      dispatch({ type: "closeTab", tabId: tab.id });
-    });
-    row.append(closeButton);
+    row.append(createActionButton("close", closeLabel, "row-action row-close", "close-tab", { itemId: tab.id }));
   }
 
-  addTabRowEvents(row, tab.id);
-  makeDraggable(row, tab.id);
-  makeDropTarget(row, { location: location, index: index, intoFolderId: null });
+  markDraggable(row, tab.id);
+  markDropTarget(row, location, index, null);
   return row;
-}
-
-/**
- * Click selects, middle-click closes, double-click renames, right-click opens the tab menu, Enter selects.
- */
-function addTabRowEvents(row: HTMLElement, tabId: ItemId): void {
-  row.addEventListener("click", () => dispatch({ type: "selectTab", tabId: tabId }));
-  row.addEventListener("auxclick", (event) => {
-    if (event.button === 1) {
-      dispatch({ type: "closeTab", tabId: tabId });
-    }
-  });
-  row.addEventListener("dblclick", (event) => {
-    event.preventDefault();
-    row.dispatchEvent(new CustomEvent("begin-rename", { bubbles: true, detail: tabId }));
-  });
-  row.addEventListener("contextmenu", (event) => {
-    event.preventDefault();
-    dispatch({ type: "showMenu", request: { menu: "item", itemId: tabId } });
-  });
-  row.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      dispatch({ type: "selectTab", tabId: tabId });
-    }
-  });
 }
 
 /**
@@ -227,10 +210,13 @@ function folderContainsTab(state: BrowserState, folder: FolderItem, tabId: ItemI
  */
 export function renderFolderRows(folder: FolderItem, location: ItemLocation, index: number, depth: number, context: RowContext): HTMLElement[] {
   const row = createElement("div", "row folder-row");
-  row.dataset.itemId = folder.id;
-  row.style.paddingLeft = `${8 + depth * INDENT_PER_LEVEL_PX}px`;
+  row.dataset.key = `folder:${encodeLocation(location)}:${folder.id}`;
+  row.dataset.presence = "row";
+  row.dataset.row = "folder";
+  setIndent(row, depth);
   row.setAttribute("role", "button");
   row.setAttribute("aria-expanded", String(folder.isOpen));
+  row.classList.toggle("is-open", folder.isOpen);
   row.tabIndex = 0;
 
   const iconSlot = createElement("span", "row-icon-slot folder-icon");
@@ -245,17 +231,8 @@ export function renderFolderRows(folder: FolderItem, location: ItemLocation, ind
   }
   row.append(title);
 
-  row.addEventListener("click", () => dispatch({ type: "toggleFolder", folderId: folder.id }));
-  row.addEventListener("dblclick", (event) => {
-    event.preventDefault();
-    row.dispatchEvent(new CustomEvent("begin-rename", { bubbles: true, detail: folder.id }));
-  });
-  row.addEventListener("contextmenu", (event) => {
-    event.preventDefault();
-    dispatch({ type: "showMenu", request: { menu: "item", itemId: folder.id } });
-  });
-  makeDraggable(row, folder.id);
-  makeDropTarget(row, { location: location, index: index, intoFolderId: folder.id });
+  markDraggable(row, folder.id);
+  markDropTarget(row, location, index, folder.id);
 
   const rows: HTMLElement[] = [row];
   const childLocation: ItemLocation = { kind: "folder", folderId: folder.id };
@@ -279,8 +256,10 @@ export function renderFolderRows(folder: FolderItem, location: ItemLocation, ind
  */
 export function renderSplitRow(split: SplitItem, location: ItemLocation, index: number, depth: number, context: RowContext): HTMLElement {
   const row = createElement("div", "row split-row");
-  row.dataset.itemId = split.id;
-  row.style.paddingLeft = `${4 + depth * INDENT_PER_LEVEL_PX}px`;
+  row.dataset.key = `split:${encodeLocation(location)}:${split.id}`;
+  row.dataset.presence = "row";
+  row.dataset.row = "split";
+  setIndent(row, depth, ROW_BASE_PADDING_PX / 2);
   const containsSelection = context.selectedTabId !== null && split.childIds.includes(context.selectedTabId);
   row.classList.toggle("is-selected", containsSelection);
 
@@ -290,24 +269,18 @@ export function renderSplitRow(split: SplitItem, location: ItemLocation, index: 
       continue;
     }
     const pane = createElement("span", "split-pane");
+    pane.dataset.key = `pane:${tabId}`;
+    pane.dataset.row = "split-pane";
+    pane.dataset.tabId = tabId;
     pane.classList.toggle("is-focused", tabId === context.selectedTabId);
     pane.title = getTabDisplayName(tab);
     pane.append(createFavicon(tab.faviconUrl, tab.url));
     pane.append(createElement("span", "split-pane-title", getTabDisplayName(tab)));
-    pane.addEventListener("click", (event) => {
-      event.stopPropagation();
-      dispatch({ type: "selectTab", tabId: tabId });
-    });
-    pane.addEventListener("contextmenu", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      dispatch({ type: "showMenu", request: { menu: "item", itemId: tabId } });
-    });
     row.append(pane);
   }
 
-  makeDraggable(row, split.id);
-  makeDropTarget(row, { location: location, index: index, intoFolderId: null });
+  markDraggable(row, split.id);
+  markDropTarget(row, location, index, null);
   return row;
 }
 
@@ -339,7 +312,9 @@ export function renderItemRows(itemIds: ItemId[], location: ItemLocation, depth:
  */
 export function renderFavoriteTile(tab: TabItem, location: ItemLocation, index: number, context: RowContext): HTMLElement {
   const tile = createElement("div", "favorite-tile");
-  tile.dataset.itemId = tab.id;
+  tile.dataset.key = `favorite:${tab.id}`;
+  tile.dataset.presence = "tile";
+  tile.dataset.row = "favorite";
   tile.title = `${getTabDisplayName(tab)}\n${getDisplayHost(tab.url)}`;
   tile.setAttribute("role", "button");
   tile.setAttribute("aria-label", getTabDisplayName(tab));
@@ -354,8 +329,7 @@ export function renderFavoriteTile(tab: TabItem, location: ItemLocation, index: 
     tile.append(createElement("span", isUnread ? "tile-audio-dot tile-unread-dot" : "tile-audio-dot"));
   }
 
-  addTabRowEvents(tile, tab.id);
-  makeDraggable(tile, tab.id);
-  makeDropTarget(tile, { location: location, index: index, intoFolderId: null, isHorizontal: true });
+  markDraggable(tile, tab.id);
+  markDropTarget(tile, location, index, null, true);
   return tile;
 }

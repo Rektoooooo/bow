@@ -36,6 +36,7 @@ async function findPage(urlEnding) {
   throw new Error(`${urlEnding} did not open`);
 }
 const page = await findPage("/renderer/index.html");
+await page.emulateMedia({ reducedMotion: "reduce" });
 await page.waitForSelector(".space-title");
 const overlay = await findPage("/overlay/overlay.html");
 const getState = () => page.evaluate(() => window.browserApi.getState());

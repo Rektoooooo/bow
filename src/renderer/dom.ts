@@ -55,6 +55,26 @@ export function createIconButton(icon: IconName, label: string, className: strin
 }
 
 /**
+ * Creates an icon button that only names what it does (`data-action` plus extra data attributes). The click is
+ * handled by a delegated listener (sidebarEvents.ts), which reads those attributes when it happens. Elements the
+ * sidebar keeps across redraws must work this way: a click handler would remember data from when it was built.
+ * Example: createActionButton("close", "Close tab", "row-action", "close-tab", { itemId: "tab-1" })
+ */
+export function createActionButton(icon: IconName, label: string, className: string, action: string, data: Record<string, string> = {}): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = className;
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  button.dataset.action = action;
+  for (const [name, value] of Object.entries(data)) {
+    button.dataset[name] = value;
+  }
+  button.append(createIcon(icon));
+  return button;
+}
+
+/**
  * Creates a button with text instead of an icon.
  */
 export function createTextButton(label: string, className: string, onClick: () => void): HTMLButtonElement {
@@ -119,6 +139,7 @@ export function createFavicon(faviconUrl: string | null, url: string, className:
   const host = getDisplayHost(url);
   const initial = host === "" ? FALLBACK_SITE_INITIAL : host.charAt(0).toUpperCase();
   const iconUrl = faviconUrl ?? guessFaviconUrl(url);
+  wrapper.dataset.initial = initial;
 
   if (iconUrl === null || failedIconUrls.has(iconUrl)) {
     wrapper.textContent = initial;
@@ -130,11 +151,19 @@ export function createFavicon(faviconUrl: string | null, url: string, className:
   image.src = iconUrl;
   image.alt = "";
   image.draggable = false;
+  // Read when the error happens: the sidebar keeps this image across redraws (morph.ts), so its address and the
+  // letter may have changed since it was built.
   image.addEventListener("error", () => {
-    failedIconUrls.add(iconUrl);
+    const failedUrl = image.getAttribute("src");
+    if (failedUrl !== null) {
+      failedIconUrls.add(failedUrl);
+    }
+    const holder = image.parentElement;
     image.remove();
-    wrapper.textContent = initial;
-    wrapper.classList.add("is-letter");
+    if (holder !== null) {
+      holder.textContent = holder.dataset.initial ?? FALLBACK_SITE_INITIAL;
+      holder.classList.add("is-letter");
+    }
   });
   wrapper.append(image);
   return wrapper;

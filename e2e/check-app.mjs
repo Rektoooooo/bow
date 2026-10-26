@@ -2,6 +2,8 @@
 // and open a version 1 state file to check the upgrade.
 // usage: npm run e2e        (builds first; output in e2e/output, or set E2E_OUTPUT_DIR)
 // Uses throwaway --user-data-dir folders, so your real browser state is never touched.
+// The sidebar page runs with reduced motion (emulated): rows appear and disappear at once, so checks never meet a
+// row that is still animating. e2e/check-motion.mjs checks the animations themselves.
 // Playwright emulates light mode by default, so screenshots here are light.
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
@@ -43,6 +45,7 @@ async function launch(dataDir) {
   app.process().stdout.on("data", (data) => mainLog.push(data.toString()));
   app.process().stderr.on("data", (data) => mainLog.push(data.toString()));
   const page = await findSidebarPage(app);
+  await page.emulateMedia({ reducedMotion: "reduce" });
   const consoleErrors = [];
   page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
   page.on("pageerror", (error) => consoleErrors.push("pageerror: " + error.message));

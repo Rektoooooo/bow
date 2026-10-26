@@ -46,6 +46,8 @@ async function findPage(app, urlEnding) {
 async function launch() {
   const app = await _electron.launch({ executablePath: electronBinary, args: [`--user-data-dir=${userDataDir}`, appDir], timeout: 30000 });
   const sidebar = await findPage(app, "/renderer/index.html");
+  // Reduced motion: rows appear and disappear at once, so checks never meet a row that is still animating.
+  await sidebar.emulateMedia({ reducedMotion: "reduce" });
   const pageErrors = [];
   sidebar.on("pageerror", (error) => pageErrors.push(error.message));
   await sidebar.waitForSelector(".sidebar");

@@ -8,12 +8,13 @@
  *   The selected tab (BrowserState) and its runtime facts (can go back/forward, loading).
  *
  * Data flow:
- *   sidebar.ts renderAll() → renderToolbar() → buttons → dispatch(navigate / openCommandBar / showExtensionsMenu /
- *   openSiteControls / showMenu)
+ *   sidebar.ts renderAll() → renderToolbar() → morph.ts keeps the buttons → clicks handled by sidebarEvents.ts
+ *   (navigate / openCommandBar / showExtensionsMenu / openSiteControls / showMenu / installWebStoreExtension)
  */
 import type { BrowserState, ItemId, RuntimeState } from "../shared/types";
-import { createElement, createIconButton, dispatch, getDisplayHost } from "./dom.js";
+import { createActionButton, createElement, getDisplayHost } from "./dom.js";
 import { createIcon } from "./icons.js";
+import { morphChildren } from "./morph.js";
 import { findWebStoreExtensionId } from "../shared/webStore.js";
 
 /**
@@ -23,6 +24,9 @@ function createAddressPill(url: string | null): HTMLElement {
   const pill = document.createElement("button");
   pill.type = "button";
   pill.className = "address-pill";
+  pill.dataset.key = "address";
+  pill.dataset.action = "open-command-bar";
+  pill.dataset.mode = url === null ? "newTab" : "editUrl";
   pill.title = url ?? "";
   pill.setAttribute("aria-label", url === null ? "Search or enter address" : `Edit address ${url}`);
 
@@ -31,11 +35,6 @@ function createAddressPill(url: string | null): HTMLElement {
   const host = url === null ? "" : getDisplayHost(url);
   const label = host === "" ? url ?? "Search or enter address" : host;
   pill.append(createElement("span", "address-text", label));
-
-  pill.addEventListener("click", () => {
-    const mode = url === null ? "newTab" : "editUrl";
-    dispatch({ type: "openCommandBar", mode: mode });
-  });
   return pill;
 }
 
@@ -61,26 +60,12 @@ function createAddExtensionPill(state: BrowserState, url: string | null): HTMLBu
   const pill = document.createElement("button");
   pill.type = "button";
   pill.className = "toolbar-pill";
+  pill.dataset.key = `add-extension:${extensionId}`;
+  pill.dataset.action = "add-extension";
+  pill.dataset.extensionId = extensionId;
   pill.title = "Download this extension from the Chrome Web Store and add it to this profile";
   pill.append(createIcon("puzzle"), createElement("span", "toolbar-pill-text", "Add Extension"));
-  pill.addEventListener("click", () => {
-    pill.disabled = true;
-    pill.querySelector(".toolbar-pill-text")?.replaceChildren("Adding…");
-    dispatch({ type: "installWebStoreExtension", extensionId: extensionId });
-  });
   return pill;
-}
-
-/**
- * Builds the extensions button. The menu and an extension's popup open below it, so it sends where it sits.
- */
-function createExtensionsButton(): HTMLButtonElement {
-  const button = createIconButton("puzzle", "Extensions", "toolbar-button", () => {
-    const box = button.getBoundingClientRect();
-    const anchor = { x: Math.round(box.left), y: Math.round(box.top), width: Math.round(box.width), height: Math.round(box.height) };
-    dispatch({ type: "showExtensionsMenu", anchor: anchor });
-  });
-  return button;
 }
 
 /**
@@ -98,40 +83,41 @@ export function renderToolbar(state: BrowserState, runtime: RuntimeState, select
   const runtimeInfo = selectedTabId === null ? undefined : runtime.tabs[selectedTabId];
 
   const leftGroup = createElement("div", "toolbar-group toolbar-left");
+  leftGroup.dataset.key = "left";
   if (!state.settings.isSidebarVisible) {
-    leftGroup.append(createIconButton("sidebar", "Show sidebar (⌘S)", "toolbar-button", () => {
-      dispatch({ type: "setSidebarVisible", isVisible: true });
-    }));
+    leftGroup.append(createActionButton("sidebar", "Show sidebar (⌘S)", "toolbar-button", "show-sidebar"));
   }
-  const backButton = createIconButton("back", "Back (⌘[)", "toolbar-button", () => dispatch({ type: "navigate", command: "back" }));
+  const backButton = createActionButton("back", "Back (⌘[)", "toolbar-button", "navigate", { command: "back" });
   backButton.disabled = runtimeInfo?.canGoBack !== true;
-  const forwardButton = createIconButton("forward", "Forward (⌘])", "toolbar-button", () => dispatch({ type: "navigate", command: "forward" }));
+  const forwardButton = createActionButton("forward", "Forward (⌘])", "toolbar-button", "navigate", { command: "forward" });
   forwardButton.disabled = runtimeInfo?.canGoForward !== true;
   const isLoading = runtimeInfo?.isLoading === true;
   const reloadButton = isLoading
-    ? createIconButton("stop", "Stop (⌘.)", "toolbar-button", () => dispatch({ type: "navigate", command: "stop" }))
-    : createIconButton("reload", "Reload (⌘R)", "toolbar-button", () => dispatch({ type: "navigate", command: "reload" }));
+    ? createActionButton("stop", "Stop (⌘.)", "toolbar-button", "navigate", { command: "stop" })
+    : createActionButton("reload", "Reload (⌘R)", "toolbar-button", "navigate", { command: "reload" });
   reloadButton.disabled = selectedTab === null;
   leftGroup.append(backButton, forwardButton, reloadButton);
 
   const centerGroup = createElement("div", "toolbar-group toolbar-center");
+  centerGroup.dataset.key = "center";
   centerGroup.append(createAddressPill(selectedTab === null ? null : selectedTab.url));
 
   const rightGroup = createElement("div", "toolbar-group toolbar-right");
-  const siteButton = createIconButton("sliders", "Site controls", "toolbar-button", () => dispatch({ type: "openSiteControls" }));
-  siteButton.disabled = selectedTab === null;
-  const splitButton = createIconButton("split", "Split view", "toolbar-button", () => dispatch({ type: "showMenu", request: { menu: "split" } }));
-  splitButton.disabled = selectedTab === null;
+  rightGroup.dataset.key = "right";
   const addExtensionPill = createAddExtensionPill(state, selectedTab === null ? null : selectedTab.url);
   if (addExtensionPill !== null) {
     rightGroup.append(addExtensionPill);
   }
   if (hasActiveExtensions(state)) {
-    rightGroup.append(createExtensionsButton());
+    rightGroup.append(createActionButton("puzzle", "Extensions", "toolbar-button", "extensions-menu"));
   }
+  const siteButton = createActionButton("sliders", "Site controls", "toolbar-button", "site-controls");
+  siteButton.disabled = selectedTab === null;
+  const splitButton = createActionButton("split", "Split view", "toolbar-button", "split-menu");
+  splitButton.disabled = selectedTab === null;
   rightGroup.append(siteButton, splitButton);
 
-  toolbar.replaceChildren(leftGroup, centerGroup, rightGroup);
+  morphChildren(toolbar, [leftGroup, centerGroup, rightGroup], { animate: false });
   // Arc's loading glow: a moving line along the top of the page while it loads.
   toolbar.classList.toggle("is-loading", isLoading);
 }

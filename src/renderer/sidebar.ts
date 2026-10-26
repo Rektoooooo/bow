@@ -11,16 +11,21 @@
  * Data flow:
  *   state arrives → renderAll() → favorites / space content / bottom bar / toolbar → clicks → dispatch(action)
  *
- * Pattern: "render from state". We never patch one row by hand; we redraw from the newest state.
- * The sidebar has at most a few hundred rows, so redrawing everything stays fast.
+ * Pattern: "render from state". We never patch one row by hand; we describe the whole sidebar from the newest state
+ * and morph.ts folds that description into the elements already on the page, so hover states and transitions
+ * survive, new rows grow in and removed rows shrink away. Clicks are handled by sidebarEvents.ts and dragDrop.ts
+ * from data attributes, never by handlers on the rows.
  */
 import type { SidebarCommand } from "../shared/actions.js";
 import { SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_WIDTH_PX } from "../shared/settings.js";
 import type { BrowserState, ItemId, ItemLocation, RuntimeState, Space, SpaceId, TabItem } from "../shared/types";
-import { createElement, createFavicon, createIconButton, createTextButton, dispatch } from "./dom.js";
-import { makeListDropZone, onDragStateChanged } from "./dragDrop.js";
+import { createActionButton, createElement, createFavicon, dispatch } from "./dom.js";
+import { installDragAndDrop, markListDropZone, onDragStateChanged } from "./dragDrop.js";
+import { morphChildren } from "./morph.js";
+import type { MorphOptions } from "./morph.js";
 import { renderFavoriteTile, renderItemRows } from "./rows.js";
 import type { RowContext } from "./rows.js";
+import { installSidebarEvents } from "./sidebarEvents.js";
 import { applySpaceTheme } from "./theme.js";
 import { renderToolbar } from "./toolbar.js";
 
@@ -45,6 +50,9 @@ let hasPendingRedraw = false;
 
 /** The Space shown in the last redraw, to slide the content when it changes. */
 let lastRenderedSpaceId: SpaceId | null = null;
+
+/** False until the first draw: the first state just appears, later changes animate. */
+let hasRenderedOnce = false;
 
 /** How long the pointer may be away from a peeking sidebar before it hides again. Our choice: avoids flicker. */
 const PEEK_HIDE_DELAY_MS = 250;
@@ -98,16 +106,14 @@ function renderHeader(): void {
   if (header === null) {
     return;
   }
-  const hideButton = createIconButton("sidebar", "Hide sidebar (⌘S)", "header-button", () => {
-    dispatch({ type: "setSidebarVisible", isVisible: false });
-  });
-  header.replaceChildren(hideButton);
+  const hideButton = createActionButton("sidebar", "Hide sidebar (⌘S)", "header-button", "hide-sidebar");
+  morphChildren(header, [hideButton], { animate: false });
 }
 
 /**
  * Draws the Favorites tiles of the active Space's profile, and a drop zone for adding more.
  */
-function renderFavorites(state: BrowserState, space: Space, context: RowContext): void {
+function renderFavorites(state: BrowserState, space: Space, context: RowContext, motion: MorphOptions): void {
   const container = document.getElementById("favorites");
   if (container === null) {
     return;
@@ -123,11 +129,12 @@ function renderFavorites(state: BrowserState, space: Space, context: RowContext)
       tiles.push(renderFavoriteTile(tab, location, index, context));
     }
   });
-  // A fresh end zone on every redraw, so drops always target the current Space's profile.
+  // The end zone's drop location follows the active Space's profile on every redraw.
   const endZone = createElement("div", "favorites-end-zone");
+  endZone.dataset.key = "favorites-end";
   endZone.title = "Drop a tab here to make it a Favorite";
-  makeListDropZone(endZone, location, "end");
-  container.replaceChildren(...tiles, endZone);
+  markListDropZone(endZone, location, "end");
+  morphChildren(container, [...tiles, endZone], motion);
   container.classList.toggle("is-empty", tiles.length === 0);
 }
 
@@ -166,9 +173,12 @@ function createSpaceEditInput(space: Space, field: "name" | "icon"): HTMLInputEl
     }
   });
   input.addEventListener("blur", () => finish(true));
+  // Only the field that made it into the page (morphing may keep an older one) takes the focus.
   requestAnimationFrame(() => {
-    input.focus();
-    input.select();
+    if (input.isConnected) {
+      input.focus();
+      input.select();
+    }
   });
   return input;
 }
@@ -179,6 +189,10 @@ function createSpaceEditInput(space: Space, field: "name" | "icon"): HTMLInputEl
  */
 function renderSpaceTitle(space: Space): HTMLElement {
   const row = createElement("div", "space-title");
+  row.dataset.key = "space-title";
+  row.dataset.row = "space-title";
+  row.dataset.spaceId = space.id;
+  row.dataset.pinnedOpen = String(space.isPinnedOpen);
   row.setAttribute("role", "button");
   row.setAttribute("aria-expanded", String(space.isPinnedOpen));
   row.tabIndex = 0;
@@ -191,22 +205,9 @@ function renderSpaceTitle(space: Space): HTMLElement {
   if (renamingSpaceId === space.id) {
     name.replaceChildren(createSpaceEditInput(space, "name"));
   }
-  const moreButton = createIconButton("more", "Space menu", "row-action space-more", () => {
-    dispatch({ type: "showMenu", request: { menu: "space", spaceId: space.id } });
-  });
+  const moreButton = createActionButton("more", "Space menu", "row-action space-more", "space-menu", { spaceId: space.id });
   row.append(icon, name, moreButton);
-
-  row.addEventListener("click", () => dispatch({ type: "setPinnedSectionOpen", spaceId: space.id, isOpen: !space.isPinnedOpen }));
-  row.addEventListener("dblclick", (event) => {
-    event.preventDefault();
-    renamingSpaceId = space.id;
-    renderAll();
-  });
-  row.addEventListener("contextmenu", (event) => {
-    event.preventDefault();
-    dispatch({ type: "showMenu", request: { menu: "space", spaceId: space.id } });
-  });
-  makeListDropZone(row, { kind: "pinned", spaceId: space.id }, "start");
+  markListDropZone(row, { kind: "pinned", spaceId: space.id }, "start");
   return row;
 }
 
@@ -215,14 +216,17 @@ function renderSpaceTitle(space: Space): HTMLElement {
  */
 function renderDivider(space: Space): HTMLElement {
   const divider = createElement("div", "today-divider");
+  divider.dataset.key = "divider";
   divider.append(createElement("span", "divider-line"));
   if (space.todayIds.length > 0) {
-    const clearButton = createTextButton("↓ Clear", "divider-clear", () => dispatch({ type: "clearTodayTabs" }));
+    const clearButton = createElement("button", "divider-clear", "↓ Clear") as HTMLButtonElement;
+    clearButton.type = "button";
+    clearButton.dataset.action = "clear-today";
     clearButton.title = "Move all Today tabs to the Archive (⇧⌘K)";
     divider.append(clearButton);
   }
   // Dropping on the divider puts an item at the end of Pinned.
-  makeListDropZone(divider, { kind: "pinned", spaceId: space.id }, "end");
+  markListDropZone(divider, { kind: "pinned", spaceId: space.id }, "end");
   return divider;
 }
 
@@ -231,19 +235,20 @@ function renderDivider(space: Space): HTMLElement {
  */
 function renderNewTabRow(space: Space): HTMLElement {
   const row = createElement("div", "row new-tab-row");
+  row.dataset.key = "new-tab";
+  row.dataset.row = "new-tab";
   row.setAttribute("role", "button");
   row.tabIndex = 0;
   const iconSlot = createElement("span", "row-icon-slot", "+");
   row.append(iconSlot, createElement("span", "row-title", "New Tab"));
-  row.addEventListener("click", () => dispatch({ type: "openCommandBar", mode: "newTab" }));
-  makeListDropZone(row, { kind: "today", spaceId: space.id }, "start");
+  markListDropZone(row, { kind: "today", spaceId: space.id }, "start");
   return row;
 }
 
 /**
  * Draws the active Space: title, Pinned (when open), divider, New Tab and Today.
  */
-function renderSpaceContent(state: BrowserState, space: Space, context: RowContext): void {
+function renderSpaceContent(state: BrowserState, space: Space, context: RowContext, motion: MorphOptions): void {
   const content = document.getElementById("space-content");
   if (content === null) {
     return;
@@ -255,6 +260,7 @@ function renderSpaceContent(state: BrowserState, space: Space, context: RowConte
 
   if (space.isPinnedOpen) {
     const pinnedSection = createElement("div", "item-list pinned-list");
+    pinnedSection.dataset.key = "pinned-list";
     pinnedSection.append(...renderItemRows(space.pinnedIds, pinnedLocation, 0, context));
     children.push(pinnedSection);
   }
@@ -262,14 +268,15 @@ function renderSpaceContent(state: BrowserState, space: Space, context: RowConte
   children.push(renderNewTabRow(space));
 
   const todaySection = createElement("div", "item-list today-list");
+  todaySection.dataset.key = "today-list";
   todaySection.append(...renderItemRows(space.todayIds, todayLocation, 0, context));
   const todayEnd = createElement("div", "list-end-zone");
-  makeListDropZone(todayEnd, todayLocation, "end");
+  todayEnd.dataset.key = "today-end";
+  markListDropZone(todayEnd, todayLocation, "end");
   todaySection.append(todayEnd);
   children.push(todaySection);
 
-  content.replaceChildren(...children);
-  slideIfSpaceChanged(state, content);
+  morphChildren(content, children, motion);
 }
 
 /**
@@ -298,29 +305,16 @@ function renderSpaceButton(space: Space, isActive: boolean): HTMLElement {
   const button = document.createElement("button");
   button.type = "button";
   button.className = isActive ? "space-button is-active" : "space-button";
+  button.dataset.key = `space:${space.id}`;
+  button.dataset.action = "switch-space";
+  button.dataset.spaceId = space.id;
+  // Dropping a sidebar item on a Space button moves it to that Space (dragDrop.ts).
+  button.dataset.drop = "space";
   button.title = space.name;
   button.setAttribute("aria-label", space.name);
   button.setAttribute("aria-pressed", String(isActive));
   button.append(createElement("span", "space-button-icon", space.icon));
   button.append(createElement("span", "space-button-dot"));
-  button.addEventListener("click", () => dispatch({ type: "switchSpace", spaceId: space.id }));
-  button.addEventListener("contextmenu", (event) => {
-    event.preventDefault();
-    dispatch({ type: "showMenu", request: { menu: "space", spaceId: space.id } });
-  });
-  button.addEventListener("dragover", (event) => {
-    event.preventDefault();
-    button.classList.add("drop-into");
-  });
-  button.addEventListener("dragleave", () => button.classList.remove("drop-into"));
-  button.addEventListener("drop", (event) => {
-    event.preventDefault();
-    button.classList.remove("drop-into");
-    const itemId = event.dataTransfer?.getData("application/x-sidebar-item") ?? "";
-    if (itemId !== "") {
-      dispatch({ type: "moveItemToSpace", itemId: itemId, spaceId: space.id });
-    }
-  });
   return button;
 }
 
@@ -332,15 +326,15 @@ function renderBottomBar(state: BrowserState): void {
   if (bar === null) {
     return;
   }
-  const libraryButton = createIconButton("archive", "Library and Archive (⇧⌘L)", "bottom-button", () => dispatch({ type: "openLibrary" }));
+  const libraryButton = createActionButton("archive", "Library and Archive (⇧⌘L)", "bottom-button", "open-library");
   libraryButton.classList.toggle("has-activity", currentRuntime.activeDownloadCount > 0);
   const switcher = createElement("nav", "space-switcher");
   switcher.setAttribute("aria-label", "Spaces");
   for (const space of state.spaces) {
     switcher.append(renderSpaceButton(space, space.id === state.activeSpaceId));
   }
-  const plusButton = createIconButton("plus", "New Space, folder or tab", "bottom-button", () => dispatch({ type: "showMenu", request: { menu: "plus" } }));
-  bar.replaceChildren(libraryButton, switcher, plusButton);
+  const plusButton = createActionButton("plus", "New Space, folder or tab", "bottom-button", "plus-menu");
+  morphChildren(bar, [libraryButton, switcher, plusButton], { animate: false });
 }
 
 /**
@@ -356,20 +350,20 @@ function renderMediaPlayer(state: BrowserState): void {
   const mediaItem = media === null ? undefined : state.items[media.tabId];
   if (media === null || mediaItem === undefined || mediaItem.kind !== "tab") {
     player.hidden = true;
-    player.replaceChildren();
+    morphChildren(player, [], { animate: false });
     return;
   }
-  const tabId = media.tabId;
   const titleButton = document.createElement("button");
   titleButton.type = "button";
   titleButton.className = "media-title";
   titleButton.title = "Go to the tab";
+  titleButton.dataset.action = "media-select";
+  titleButton.dataset.itemId = media.tabId;
   titleButton.append(createFavicon(mediaItem.faviconUrl, mediaItem.url), createElement("span", "media-title-text", mediaItem.customTitle ?? mediaItem.title));
-  titleButton.addEventListener("click", () => dispatch({ type: "selectTab", tabId: tabId }));
   const playLabel = media.isPlaying ? "Pause" : "Play";
-  const playButton = createIconButton(media.isPlaying ? "pause" : "play", playLabel, "media-button", () => dispatch({ type: "toggleMediaPlayback" }));
-  const closeButton = createIconButton("close", "Stop and hide", "media-button", () => dispatch({ type: "dismissMedia" }));
-  player.replaceChildren(titleButton, playButton, closeButton);
+  const playButton = createActionButton(media.isPlaying ? "pause" : "play", playLabel, "media-button", "media-toggle");
+  const closeButton = createActionButton("close", "Stop and hide", "media-button", "media-dismiss");
+  morphChildren(player, [titleButton, playButton, closeButton], { animate: false });
   player.hidden = false;
 }
 
@@ -414,9 +408,17 @@ function renderAll(): void {
   document.body.classList.toggle("sidebar-peeking", currentRuntime.isSidebarPeeking);
   applySidebarWidth(draggedSidebarWidth ?? state.settings.sidebarWidth ?? SIDEBAR_WIDTH_PX);
   applySpaceTheme(space.theme);
+  // A Space switch replaces the whole list: it slides in instead of every row growing in one by one.
+  const isSpaceSwitch = lastRenderedSpaceId !== null && lastRenderedSpaceId !== state.activeSpaceId;
+  const motion: MorphOptions = { animate: hasRenderedOnce && !isSpaceSwitch };
   renderHeader();
-  renderFavorites(state, space, context);
-  renderSpaceContent(state, space, context);
+  renderFavorites(state, space, context, motion);
+  renderSpaceContent(state, space, context, motion);
+  const content = document.getElementById("space-content");
+  if (content !== null) {
+    slideIfSpaceChanged(state, content);
+  }
+  hasRenderedOnce = true;
   renderMediaPlayer(state);
   renderBottomBar(state);
   renderToolbar(state, currentRuntime, context.selectedTabId);
@@ -571,11 +573,26 @@ async function startSidebar(): Promise<void> {
       renderAll();
     }
   });
-  document.addEventListener("begin-rename", (event) => {
-    renamingItemId = (event as CustomEvent<ItemId>).detail;
-    renderAll();
-  });
-  document.getElementById("sidebar")?.addEventListener("wheel", handleSidebarWheel, { passive: true });
+  const callbacks = {
+    beginRename: (itemId: ItemId) => {
+      renamingItemId = itemId;
+      renderAll();
+    },
+    beginSpaceRename: (spaceId: SpaceId) => {
+      renamingSpaceId = spaceId;
+      renderAll();
+    },
+  };
+  const sidebar = document.getElementById("sidebar");
+  const toolbar = document.getElementById("toolbar");
+  if (sidebar !== null) {
+    installSidebarEvents(sidebar, callbacks);
+    installDragAndDrop(sidebar);
+    sidebar.addEventListener("wheel", handleSidebarWheel, { passive: true });
+  }
+  if (toolbar !== null) {
+    installSidebarEvents(toolbar, callbacks);
+  }
   setUpSidebarPeek();
   setUpSidebarResizer();
 
