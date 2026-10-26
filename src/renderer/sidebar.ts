@@ -26,6 +26,7 @@ import type { MorphOptions } from "./morph.js";
 import { renderFavoriteTile, renderItemRows } from "./rows.js";
 import type { RowContext } from "./rows.js";
 import { installSidebarEvents } from "./sidebarEvents.js";
+import { installSymbols } from "./icons.js";
 import { applySpaceTheme } from "./theme.js";
 import { renderToolbar } from "./toolbar.js";
 
@@ -596,6 +597,7 @@ async function startSidebar(): Promise<void> {
   setUpSidebarPeek();
   setUpSidebarResizer();
 
+  window.browserApi.getSymbols().then(installSymbols).catch(() => undefined);
   currentRuntime = await window.browserApi.getRuntimeState();
   currentState = await window.browserApi.getState();
   renderAll();

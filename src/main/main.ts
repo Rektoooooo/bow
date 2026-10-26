@@ -39,6 +39,7 @@ import { createCommandActionRegistry } from "./commandBarActions";
 import { startTrackingDownloads } from "./downloads";
 import { getExtensionMenuItems, initializeExtensionHost, prepareExtensions } from "./extensionHost";
 import { initializePermissionPrompts } from "./permissionPrompts";
+import { registerSymbolIpc } from "./symbols";
 import { updateExtensionsFromWebStore } from "./extensionsController";
 import { isRecordableUrl } from "./history";
 import { addVisit, loadHistory, saveHistoryNow, setVisitTitle } from "./historyStore";
@@ -279,6 +280,7 @@ async function handleAppReady(): Promise<void> {
   });
   registerOverlayIpc();
   registerLittleWindowIpc();
+  registerSymbolIpc();
   setCommandActionRegistry(createCommandActionRegistry({ commands: appMenuCommands, runAction: runAction, getState: getState }));
   installAppMenu(appMenuCommands);
   // Extensions load before the first page, so their content scripts reach the pages restored at startup.

@@ -9,7 +9,8 @@
  * Data flow:
  *   "little:info" → renderBar() → click → littleApi.moveToSpace() / navigate() / copyLink() / goBack()
  */
-import { createIcon } from "../renderer/icons.js";
+import type { SymbolImage } from "../shared/symbols";
+import { createIcon, installSymbols } from "../renderer/icons.js";
 
 /** What the bar learns about its page. */
 interface LittlePageInfo {
@@ -25,6 +26,7 @@ interface LittleApi {
   moveToSpace(): Promise<void>;
   copyLink(): Promise<void>;
   goBack(): Promise<void>;
+  getSymbols(): Promise<Record<string, SymbolImage>>;
 }
 
 declare global {
@@ -127,6 +129,7 @@ function renderBar(info: LittlePageInfo): void {
  */
 function startLittleBar(): void {
   document.body.classList.toggle("is-private", isPrivateWindow);
+  window.littleApi.getSymbols().then(installSymbols).catch(() => undefined);
   window.littleApi.onInfo(renderBar);
   renderBar({ url: "", title: "", canGoBack: false });
   const openedEmpty = new URLSearchParams(window.location.search).get("empty") === "1";

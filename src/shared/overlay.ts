@@ -11,6 +11,7 @@
  *   main.ts openOverlay(panel) → "overlay:show" → overlay.ts draws the panel
  *   overlay.ts → overlayApi.query / choose / siteCommand / find → main.ts
  */
+import type { SymbolImage } from "./symbols";
 import type { ArchivedTab, ItemId, RoutingRule, SitePermissionKind, SpaceTheme, ThemeAppearance } from "./types";
 
 /** What a Command Bar line does when chosen. */
@@ -142,6 +143,8 @@ export interface OverlayApi {
   showDownload(downloadId: string): Promise<void>;
   openUrl(url: string): Promise<void>;
   peekCommand(command: PeekCommand): Promise<void>;
+  /** The SF Symbols our icons use, rendered by macOS. */
+  getSymbols(): Promise<Record<string, SymbolImage>>;
 }
 
 /** Channel names between the overlay page and main.ts. */

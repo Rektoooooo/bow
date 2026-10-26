@@ -12,6 +12,7 @@
  * Data flow:
  *   store.ts loads a BrowserState → state.ts / spaces.ts / autoArchive.ts return changed copies → sidebar.ts draws it
  */
+import type { SymbolImage } from "./symbols";
 
 import type { BrowserAction, SidebarCommand } from "./actions";
 
@@ -258,6 +259,8 @@ export type ItemLocation =
 export interface BrowserApi {
   getState(): Promise<BrowserState>;
   getRuntimeState(): Promise<RuntimeState>;
+  /** The SF Symbols our icons use, rendered by macOS (src/main/symbols.ts). */
+  getSymbols(): Promise<Record<string, SymbolImage>>;
   onStateChanged(listener: (state: BrowserState) => void): void;
   onRuntimeChanged(listener: (runtimeState: RuntimeState) => void): void;
   dispatch(action: BrowserAction): Promise<void>;

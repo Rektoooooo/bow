@@ -44,6 +44,19 @@ button:disabled {
   flex: none;
 }
 
+/* SF Symbols (icons.ts): a mask tinted with the text color, drawn at the symbol's natural size. */
+.icon-symbol {
+  width: var(--symbol-width, 16px);
+  height: var(--symbol-height, 16px);
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
 /* Leaves room for the traffic lights and drags the window. */
 .little-bar {
   display: flex;

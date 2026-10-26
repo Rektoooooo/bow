@@ -39,6 +39,7 @@ const CHANNELS: typeof OVERLAY_CHANNELS = {
 };
 
 const DISPATCH_CHANNEL: (typeof IPC_CHANNELS)["dispatch"] = "browser:dispatch";
+const SYMBOLS_CHANNEL: (typeof IPC_CHANNELS)["getSymbols"] = "browser:get-symbols";
 
 /**
  * Builds the overlay API. Each function forwards to one IPC channel.
@@ -67,6 +68,7 @@ function createOverlayApi(): OverlayApi {
     showDownload: (downloadId) => ipcRenderer.invoke(CHANNELS.showDownload, downloadId),
     openUrl: (url) => ipcRenderer.invoke(CHANNELS.openUrl, url),
     peekCommand: (command) => ipcRenderer.invoke(CHANNELS.peekCommand, command),
+    getSymbols: () => ipcRenderer.invoke(SYMBOLS_CHANNEL),
   };
 }
 

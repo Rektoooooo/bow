@@ -13,7 +13,7 @@
  */
 import type { CommandBarLine, CommandBarMode, OverlayApi, OverlayShowMessage } from "../shared/overlay";
 import { createElement, createFavicon } from "../renderer/dom.js";
-import { createIcon } from "../renderer/icons.js";
+import { createIcon, installSymbols } from "../renderer/icons.js";
 import type { IconName } from "../renderer/icons.js";
 import { renderFindBar } from "./findBar.js";
 import { renderLibrary } from "./library.js";
@@ -354,6 +354,7 @@ function showPanel(message: OverlayShowMessage): void {
  * Entry point: listens for panels and results, and closes on Escape or a click on the backdrop.
  */
 function startOverlay(): void {
+  window.overlayApi.getSymbols().then(installSymbols).catch(() => undefined);
   window.overlayApi.onShow(showPanel);
   window.overlayApi.onResults((query, lines) => {
     if (commandInput === null || commandInput.value !== query || siteSearch !== null) {

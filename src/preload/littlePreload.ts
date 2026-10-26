@@ -12,6 +12,7 @@
  */
 import { contextBridge, ipcRenderer } from "electron";
 import type { IpcRendererEvent } from "electron";
+import type { IPC_CHANNELS } from "../shared/ipcChannels";
 import type { LITTLE_CHANNELS } from "../main/littleWindow";
 
 /** Same names as LITTLE_CHANNELS in littleWindow.ts: preloads cannot import our files, so the type check guards them. */
@@ -22,6 +23,8 @@ const CHANNELS: typeof LITTLE_CHANNELS = {
   copyLink: "little:copy-link",
   goBack: "little:go-back",
 };
+
+const SYMBOLS_CHANNEL: (typeof IPC_CHANNELS)["getSymbols"] = "browser:get-symbols";
 
 /** What the bar learns about its page. */
 interface LittlePageInfo {
@@ -38,4 +41,5 @@ contextBridge.exposeInMainWorld("littleApi", {
   moveToSpace: () => ipcRenderer.invoke(CHANNELS.moveToSpace),
   copyLink: () => ipcRenderer.invoke(CHANNELS.copyLink),
   goBack: () => ipcRenderer.invoke(CHANNELS.goBack),
+  getSymbols: () => ipcRenderer.invoke(SYMBOLS_CHANNEL),
 });

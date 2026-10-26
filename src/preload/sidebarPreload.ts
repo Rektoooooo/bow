@@ -28,6 +28,7 @@ const CHANNELS: typeof IPC_CHANNELS = {
   runtimeChanged: "browser:runtime-changed",
   dispatch: "browser:dispatch",
   sidebarCommand: "browser:sidebar-command",
+  getSymbols: "browser:get-symbols",
 };
 
 /**
@@ -36,6 +37,7 @@ const CHANNELS: typeof IPC_CHANNELS = {
 function createBrowserApi(): BrowserApi {
   return {
     getState: () => ipcRenderer.invoke(CHANNELS.getState),
+    getSymbols: () => ipcRenderer.invoke(CHANNELS.getSymbols),
     getRuntimeState: () => ipcRenderer.invoke(CHANNELS.getRuntimeState),
     onStateChanged: (listener) => {
       ipcRenderer.on(CHANNELS.stateChanged, (_event: IpcRendererEvent, state: BrowserState) => {

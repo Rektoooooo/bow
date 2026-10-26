@@ -19,4 +19,5 @@ export const IPC_CHANNELS = {
   runtimeChanged: "browser:runtime-changed",
   dispatch: "browser:dispatch",
   sidebarCommand: "browser:sidebar-command",
+  getSymbols: "browser:get-symbols",
 } as const;
