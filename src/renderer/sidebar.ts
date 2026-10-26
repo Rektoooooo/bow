@@ -14,7 +14,7 @@
  * The sidebar has at most a few hundred rows, so redrawing everything stays fast.
  */
 import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS } from "../shared/settings.js";
-import type { ArchiveReason, ArchivedTab, BrowserApi, BrowserState, Tab, TabId } from "../shared/types";
+import type { ArchiveReason, ArchivedTab, BrowserApi, BrowserState, ItemId, TabItem } from "../shared/types";
 
 declare global {
   interface Window {
@@ -67,7 +67,7 @@ function createButton(label: string, className: string, onClick: () => void): HT
 /**
  * Returns the selected tab id of the active Space, or null when the Space is empty.
  */
-function getSelectedTabId(state: BrowserState): TabId | null {
+function getSelectedTabId(state: BrowserState): ItemId | null {
   // "?? null" turns a missing entry (undefined) into null, so both mean "nothing selected".
   return state.selectedTabIdBySpace[state.activeSpaceId] ?? null;
 }
@@ -119,18 +119,18 @@ function formatTimeAgo(archivedAt: number, now: number): string {
 /**
  * Pins an unpinned tab, or unpins a pinned one.
  */
-function togglePin(tab: Tab): void {
-  if (tab.isPinned) {
-    window.browserApi.unpinTab(tab.id);
+function togglePin(tab: TabItem, isPinned: boolean): void {
+  if (isPinned) {
+    window.browserApi.dispatch({ type: "unpinTab", tabId: tab.id });
     return;
   }
-  window.browserApi.pinTab(tab.id);
+  window.browserApi.dispatch({ type: "pinTab", tabId: tab.id });
 }
 
 /**
  * Builds one tab row: site letter, title, and hover buttons for pin/unpin and close.
  */
-function renderTabRow(tab: Tab, isSelected: boolean): HTMLElement {
+function renderTabRow(tab: TabItem, isSelected: boolean, isPinned: boolean): HTMLElement {
   const row = createElement("div", "tab-row");
   row.setAttribute("role", "button");
   row.tabIndex = 0;
@@ -141,21 +141,21 @@ function renderTabRow(tab: Tab, isSelected: boolean): HTMLElement {
   }
 
   let pinLabel = "Pin";
-  if (tab.isPinned) {
+  if (isPinned) {
     pinLabel = "Unpin";
   }
   const icon = createElement("span", "tab-icon", getSiteInitial(tab.url));
-  const title = createElement("span", "tab-title", tab.title);
-  const pinButton = createButton(pinLabel, "tab-action", () => togglePin(tab));
-  const closeButton = createButton("×", "tab-action tab-close", () => window.browserApi.closeTab(tab.id));
+  const title = createElement("span", "tab-title", tab.customTitle ?? tab.title);
+  const pinButton = createButton(pinLabel, "tab-action", () => togglePin(tab, isPinned));
+  const closeButton = createButton("×", "tab-action tab-close", () => window.browserApi.dispatch({ type: "closeTab", tabId: tab.id }));
   closeButton.setAttribute("aria-label", "Close tab");
   closeButton.title = "Close (moves the tab to the Archive)";
 
   row.append(icon, title, pinButton, closeButton);
-  row.addEventListener("click", () => window.browserApi.selectTab(tab.id));
+  row.addEventListener("click", () => window.browserApi.dispatch({ type: "selectTab", tabId: tab.id }));
   row.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
-      window.browserApi.selectTab(tab.id);
+      window.browserApi.dispatch({ type: "selectTab", tabId: tab.id });
     }
   });
   return row;
@@ -165,12 +165,12 @@ function renderTabRow(tab: Tab, isSelected: boolean): HTMLElement {
  * Builds one titled list of tabs. Used twice: "Pinned" and "Today".
  * The "Today" list also gets a "Clear" button that archives all its tabs.
  */
-function renderTabList(title: string, tabs: Tab[], selectedTabId: TabId | null, emptyMessage: string, showClearButton: boolean): HTMLElement {
+function renderTabList(title: string, tabs: TabItem[], selectedTabId: ItemId | null, emptyMessage: string, showClearButton: boolean): HTMLElement {
   const section = createElement("section", "tab-list");
   const header = createElement("div", "section-header");
   header.append(createElement("h2", "section-title", title));
   if (showClearButton && tabs.length > 0) {
-    const clearButton = createButton("Clear", "text-button", () => window.browserApi.clearTodayTabs());
+    const clearButton = createButton("Clear", "text-button", () => window.browserApi.dispatch({ type: "clearTodayTabs" }));
     clearButton.title = "Move all of today's tabs to the Archive";
     header.append(clearButton);
   }
@@ -182,7 +182,7 @@ function renderTabList(title: string, tabs: Tab[], selectedTabId: TabId | null, 
   }
   for (const tab of tabs) {
     const isSelected = tab.id === selectedTabId;
-    section.append(renderTabRow(tab, isSelected));
+    section.append(renderTabRow(tab, isSelected, !showClearButton));
   }
   return section;
 }
@@ -197,11 +197,11 @@ function renderArchiveRow(entry: ArchivedTab, now: number): HTMLElement {
   const reasonLabel = ARCHIVE_REASON_LABELS[entry.reason];
   const timeAgo = formatTimeAgo(entry.archivedAt, now);
   const text = createElement("div", "archive-text");
-  text.append(createElement("span", "archive-title", entry.tab.title));
+  text.append(createElement("span", "archive-title", entry.tab.customTitle ?? entry.tab.title));
   text.append(createElement("span", "archive-meta", `${reasonLabel} · ${timeAgo}`));
 
   const restoreButton = createButton("Restore", "text-button archive-restore", () => {
-    window.browserApi.restoreArchivedTab(entry.tab.id);
+    window.browserApi.dispatch({ type: "restoreArchivedTab", tabId: entry.tab.id });
   });
   row.append(text, restoreButton);
   return row;
@@ -245,7 +245,7 @@ function handleArchiveSettingChange(select: HTMLSelectElement): void {
   if (chosenOption === undefined) {
     return;
   }
-  window.browserApi.setArchiveAfter(chosenOption.valueMs);
+  window.browserApi.dispatch({ type: "setArchiveAfter", archiveAfterMs: chosenOption.valueMs });
 }
 
 /**
@@ -277,7 +277,7 @@ function renderSpaceSwitcher(state: BrowserState): HTMLElement {
   switcher.setAttribute("aria-label", "Spaces");
 
   for (const space of state.spaces) {
-    const button = createButton(space.icon, "space-button", () => window.browserApi.switchSpace(space.id));
+    const button = createButton(space.icon, "space-button", () => window.browserApi.dispatch({ type: "switchSpace", spaceId: space.id }));
     button.title = space.name;
     button.setAttribute("aria-label", space.name);
     if (space.id === state.activeSpaceId) {
@@ -300,19 +300,39 @@ function renderSpaceHeading(state: BrowserState): HTMLElement {
   }
 
   heading.textContent = `${activeSpace.icon}  ${activeSpace.name}`;
-  document.documentElement.style.setProperty("--frame-color", activeSpace.color);
+  const frameColor = activeSpace.theme.colors[0] ?? "#e9d8d4";
+  document.documentElement.style.setProperty("--frame-color", frameColor);
   return heading;
 }
 
 /**
  * Shows the "No tab open" message only while the active Space has no selected tab.
  */
-function updateEmptyCard(selectedTabId: TabId | null): void {
+function updateEmptyCard(selectedTabId: ItemId | null): void {
   const emptyCard = document.getElementById("empty-card");
   if (emptyCard === null) {
     return;
   }
   emptyCard.hidden = selectedTabId !== null;
+}
+
+/**
+ * Returns the tabs under a list of items in sidebar order, looking inside folders and split views.
+ */
+function collectTabs(state: BrowserState, itemIds: ItemId[]): TabItem[] {
+  const tabs: TabItem[] = [];
+  for (const itemId of itemIds) {
+    const item = state.items[itemId];
+    if (item === undefined) {
+      continue;
+    }
+    if (item.kind === "tab") {
+      tabs.push(item);
+      continue;
+    }
+    tabs.push(...collectTabs(state, item.childIds));
+  }
+  return tabs;
 }
 
 /**
@@ -325,18 +345,9 @@ function renderSidebar(state: BrowserState): void {
     return;
   }
 
-  const pinnedTabs: Tab[] = [];
-  const todayTabs: Tab[] = [];
-  for (const tab of state.tabs) {
-    if (tab.spaceId !== state.activeSpaceId) {
-      continue;
-    }
-    if (tab.isPinned) {
-      pinnedTabs.push(tab);
-    } else {
-      todayTabs.push(tab);
-    }
-  }
+  const activeSpace = state.spaces.find((space) => space.id === state.activeSpaceId);
+  const pinnedTabs = collectTabs(state, activeSpace === undefined ? [] : activeSpace.pinnedIds);
+  const todayTabs = collectTabs(state, activeSpace === undefined ? [] : activeSpace.todayIds);
 
   const selectedTabId = getSelectedTabId(state);
   content.replaceChildren(
@@ -355,7 +366,7 @@ function renderSidebar(state: BrowserState): void {
 function handleAddressSubmit(input: HTMLInputElement): void {
   const typedText = input.value;
   input.value = "";
-  window.browserApi.openTab(typedText);
+  window.browserApi.dispatch({ type: "openTab", typedText: typedText });
 }
 
 /**

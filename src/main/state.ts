@@ -1,7 +1,7 @@
 /**
  * WHY this file exists:
- *   Every user action in the sidebar (open, select, pin, close, switch Space) changes the browser's data.
- *   These functions make those changes without touching Electron, so they are easy to test.
+ *   Every tab action in the sidebar (open, select, pin, add to Favorites, rename, close, archive, restore) changes
+ *   the browser's data. These functions make those changes without touching Electron, so they are easy to test.
  *
  * Data source:
  *   The BrowserState passed in. Nothing is read from disk or the screen here.
@@ -12,181 +12,184 @@
  * Rules for every function in this file:
  *   - Never change the state that was passed in. Build and return a changed copy.
  *   - When nothing changes, return the same state object, so main.ts can skip saving.
+ *   - `now` is always a parameter; nothing here reads the clock.
  */
-import { DEFAULT_ARCHIVE_AFTER_MS } from "../shared/settings";
-import type { ArchiveReason, ArchivedTab, BrowserState, Space, SpaceId, Tab, TabId } from "../shared/types";
-
-/** Counts tabs created during this run, so two tabs opened in the same millisecond still get different ids. */
-let tabCounter = 0;
+import { DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_LIMIT } from "../shared/settings";
+import type { ArchiveReason, ArchivedTab, BrowserState, FolderItem, ItemId, ItemLocation, Space, SpaceId, TabItem } from "../shared/types";
+import {
+  collectTabIds,
+  collectTabIdsInList,
+  createId,
+  deleteItems,
+  findLocation,
+  findProfileIdOfItem,
+  findRootLocation,
+  findSpace,
+  findSpaceIdOfItem,
+  findTab,
+  getActiveSpace,
+  getIdsAt,
+  insertIntoLocation,
+  isSameOrDescendant,
+  removeFromLocation,
+  setIdsAt,
+} from "./tree";
 
 /**
- * Builds the state for a first launch: two Spaces ("Personal" and "Work"), no tabs, default settings.
+ * Builds the state for a first launch: one profile, two Spaces ("Personal" and "Work"), no tabs, default settings.
  * Example: createInitialState().spaces.length → 2
  */
 export function createInitialState(): BrowserState {
-  const personalSpace: Space = { id: "space-personal", name: "Personal", icon: "🏠", color: "#e9d8d4" };
-  const workSpace: Space = { id: "space-work", name: "Work", icon: "💼", color: "#d4dfe9" };
+  const personalSpace: Space = {
+    id: "space-personal",
+    name: "Personal",
+    icon: "🏠",
+    theme: { colors: ["#e9d8d4"], appearance: "auto", grain: 0 },
+    profileId: DEFAULT_PROFILE_ID,
+    pinnedIds: [],
+    todayIds: [],
+    isPinnedOpen: true,
+  };
+  const workSpace: Space = {
+    id: "space-work",
+    name: "Work",
+    icon: "💼",
+    theme: { colors: ["#d4dfe9"], appearance: "auto", grain: 0 },
+    profileId: DEFAULT_PROFILE_ID,
+    pinnedIds: [],
+    todayIds: [],
+    isPinnedOpen: true,
+  };
 
   return {
-    version: 1,
+    version: 2,
+    items: {},
+    profiles: [{ id: DEFAULT_PROFILE_ID, name: "Default", favoriteIds: [] }],
     spaces: [personalSpace, workSpace],
-    tabs: [],
     activeSpaceId: personalSpace.id,
     selectedTabIdBySpace: {
       [personalSpace.id]: null,
       [workSpace.id]: null,
     },
     archive: [],
-    settings: { archiveAfterMs: DEFAULT_ARCHIVE_AFTER_MS },
+    settings: { archiveAfterMs: DEFAULT_ARCHIVE_AFTER_MS, isSidebarVisible: true },
   };
 }
 
 /**
- * Makes a new unique tab id from the current time plus a counter.
- * Example: createTabId(1793020000000) → "tab-1793020000000-1"
+ * Returns the id of the selected tab in the active Space, or null when nothing is selected.
  */
-export function createTabId(now: number): TabId {
-  tabCounter = tabCounter + 1;
-  return `tab-${now}-${tabCounter}`;
+export function getSelectedTabId(state: BrowserState): ItemId | null {
+  // "?? null" turns a missing entry (undefined) into null, so both mean "nothing selected".
+  return state.selectedTabIdBySpace[state.activeSpaceId] ?? null;
 }
 
 /**
- * Returns a tab by id, or undefined when it does not exist.
+ * Returns a copy of the state where one tab has some fields changed. Returns the same state when the id is not a tab.
+ * Example: updateTab(state, "tab-1", { title: "Inbox" }) → tab-1 now titled "Inbox"
  */
-export function findTab(state: BrowserState, tabId: TabId): Tab | undefined {
-  return state.tabs.find((tab) => tab.id === tabId);
-}
-
-/**
- * Returns the id of the selected tab in the active Space, or null when that Space is empty.
- */
-export function getSelectedTabId(state: BrowserState): TabId | null {
-  const selectedTabId = state.selectedTabIdBySpace[state.activeSpaceId];
-  if (selectedTabId === undefined) {
-    return null;
-  }
-  return selectedTabId;
-}
-
-/**
- * Returns a copy of the tab list where one tab has some fields changed.
- * Selecting, switching Spaces and page updates all edit a single tab, so the copy rule lives here once.
- * Example: updateTab(tabs, "tab-1", { title: "Inbox" }) → same list, tab-1 now titled "Inbox"
- */
-function updateTab(tabs: Tab[], tabId: TabId, changes: Partial<Tab>): Tab[] {
-  const updatedTabs: Tab[] = [];
-  for (const tab of tabs) {
-    if (tab.id === tabId) {
-      updatedTabs.push({ ...tab, ...changes });
-    } else {
-      updatedTabs.push(tab);
-    }
-  }
-  return updatedTabs;
-}
-
-/**
- * Adds a new unpinned tab at the top of the active Space's today list and selects it.
- * Example: openTab(state, "https://example.com", now) → state with that tab first and selected
- */
-export function openTab(state: BrowserState, url: string, now: number): BrowserState {
-  const newTab: Tab = {
-    id: createTabId(now),
-    spaceId: state.activeSpaceId,
-    url: url,
-    title: url,
-    isPinned: false,
-    homeUrl: null,
-    lastActiveAt: now,
-  };
-
-  // The first item in state.tabs is drawn at the top of its section.
-  const stateWithNewTab: BrowserState = { ...state, tabs: [newTab, ...state.tabs] };
-  return selectTab(stateWithNewTab, newTab.id, now);
-}
-
-/**
- * Selects a tab and makes its Space active. Both the tab you leave and the tab you open
- * get lastActiveAt = now, because leaving a tab is the last moment it was in use.
- */
-export function selectTab(state: BrowserState, tabId: TabId, now: number): BrowserState {
+export function updateTab(state: BrowserState, tabId: ItemId, changes: Partial<TabItem>): BrowserState {
   const tab = findTab(state, tabId);
   if (tab === undefined) {
     return state;
   }
+  const updatedTab: TabItem = { ...tab, ...changes };
+  return { ...state, items: { ...state.items, [tabId]: updatedTab } };
+}
 
-  let tabs = state.tabs;
-  const previousTabId = getSelectedTabId(state);
-  if (previousTabId !== null) {
-    tabs = updateTab(tabs, previousTabId, { lastActiveAt: now });
-  }
-  tabs = updateTab(tabs, tabId, { lastActiveAt: now });
-
+/**
+ * Builds a new tab object. It is not in any list yet.
+ */
+function createTab(url: string, now: number): TabItem {
   return {
-    ...state,
-    tabs: tabs,
-    activeSpaceId: tab.spaceId,
-    selectedTabIdBySpace: { ...state.selectedTabIdBySpace, [tab.spaceId]: tabId },
+    kind: "tab",
+    id: createId("tab", now),
+    url: url,
+    title: url,
+    customTitle: null,
+    faviconUrl: null,
+    homeUrl: null,
+    lastActiveAt: now,
+    isMuted: false,
   };
 }
 
-/**
- * Pins a tab, remembers its current URL as its home URL and moves it to the bottom of the pinned list.
- * Example: pin a tab on "https://mail.example.com/inbox" → homeUrl is "https://mail.example.com/inbox"
- */
-export function pinTab(state: BrowserState, tabId: TabId): BrowserState {
-  const tab = findTab(state, tabId);
-  if (tab === undefined || tab.isPinned) {
-    return state;
-  }
-
-  const pinnedTab: Tab = { ...tab, isPinned: true, homeUrl: tab.url };
-  const otherTabs = state.tabs.filter((existingTab) => existingTab.id !== tabId);
-  return { ...state, tabs: [...otherTabs, pinnedTab] };
+/** Options for openTab. */
+export interface OpenTabOptions {
+  /** False opens the tab in the background (⌘-click on a link). Default true. */
+  select?: boolean;
 }
 
 /**
- * Unpins a tab, clears its home URL and moves it to the top of today's tabs.
- * Its lastActiveAt is set to now, so it does not archive the moment it is unpinned.
+ * Adds a new tab at the top of the active Space's Today list, like Arc, and selects it unless told not to.
+ * Example: openTab(state, "https://example.com", now) → state with that tab first in Today and selected
  */
-export function unpinTab(state: BrowserState, tabId: TabId, now: number): BrowserState {
-  const tab = findTab(state, tabId);
-  if (tab === undefined || !tab.isPinned) {
-    return state;
-  }
+export function openTab(state: BrowserState, url: string, now: number, options: OpenTabOptions = {}): BrowserState {
+  const newTab = createTab(url, now);
+  const stateWithItem: BrowserState = { ...state, items: { ...state.items, [newTab.id]: newTab } };
+  const todayLocation: ItemLocation = { kind: "today", spaceId: state.activeSpaceId };
+  const stateWithTab = insertIntoLocation(stateWithItem, todayLocation, newTab.id, 0);
 
-  const unpinnedTab: Tab = { ...tab, isPinned: false, homeUrl: null, lastActiveAt: now };
-  const otherTabs = state.tabs.filter((existingTab) => existingTab.id !== tabId);
-  return { ...state, tabs: [unpinnedTab, ...otherTabs] };
+  if (options.select === false) {
+    return stateWithTab;
+  }
+  return selectTab(stateWithTab, newTab.id, now);
 }
 
 /**
- * Switches to another Space. The tab you leave and the tab that becomes visible both get lastActiveAt = now.
+ * Finds which Space should show a tab. A tab in a Space's lists belongs to that Space. A Favorite belongs to a
+ * profile, so it shows in the active Space when that Space uses the same profile, otherwise in the first Space that does.
  */
-export function switchSpace(state: BrowserState, spaceId: SpaceId, now: number): BrowserState {
-  const spaceExists = state.spaces.some((space) => space.id === spaceId);
-  if (!spaceExists || spaceId === state.activeSpaceId) {
+function findSpaceToShowTab(state: BrowserState, tabId: ItemId): SpaceId | null {
+  const ownSpaceId = findSpaceIdOfItem(state, tabId);
+  if (ownSpaceId !== null) {
+    return ownSpaceId;
+  }
+
+  const profileId = findProfileIdOfItem(state, tabId);
+  if (profileId === null) {
+    return null;
+  }
+  const activeSpace = getActiveSpace(state);
+  if (activeSpace.profileId === profileId) {
+    return activeSpace.id;
+  }
+  const spaceWithProfile = state.spaces.find((space) => space.profileId === profileId);
+  return spaceWithProfile === undefined ? null : spaceWithProfile.id;
+}
+
+/**
+ * Selects a tab and makes its Space active. Both the tab you leave and the tab you open get lastActiveAt = now,
+ * because leaving a tab is the last moment it was in use.
+ */
+export function selectTab(state: BrowserState, tabId: ItemId, now: number): BrowserState {
+  const tab = findTab(state, tabId);
+  if (tab === undefined) {
+    return state;
+  }
+  const spaceId = findSpaceToShowTab(state, tabId);
+  if (spaceId === null) {
     return state;
   }
 
-  let tabs = state.tabs;
-  const leavingTabId = getSelectedTabId(state);
-  if (leavingTabId !== null) {
-    tabs = updateTab(tabs, leavingTabId, { lastActiveAt: now });
+  let changedState = state;
+  const previousTabId = getSelectedTabId(state);
+  if (previousTabId !== null) {
+    changedState = updateTab(changedState, previousTabId, { lastActiveAt: now });
   }
+  changedState = updateTab(changedState, tabId, { lastActiveAt: now });
 
-  const arrivingTabId = state.selectedTabIdBySpace[spaceId] ?? null;
-  if (arrivingTabId !== null) {
-    tabs = updateTab(tabs, arrivingTabId, { lastActiveAt: now });
-  }
-
-  return { ...state, tabs: tabs, activeSpaceId: spaceId };
+  return {
+    ...changedState,
+    activeSpaceId: spaceId,
+    selectedTabIdBySpace: { ...changedState.selectedTabIdBySpace, [spaceId]: tabId },
+  };
 }
 
 /**
  * Records a tab's new URL and title after the page navigates. An empty title falls back to the URL.
  */
-export function updateTabPage(state: BrowserState, tabId: TabId, url: string, title: string): BrowserState {
+export function updateTabPage(state: BrowserState, tabId: ItemId, url: string, title: string): BrowserState {
   const tab = findTab(state, tabId);
   if (tab === undefined) {
     return state;
@@ -199,118 +202,476 @@ export function updateTabPage(state: BrowserState, tabId: TabId, url: string, ti
   if (tab.url === url && tab.title === displayTitle) {
     return state;
   }
-
-  const tabs = updateTab(state.tabs, tabId, { url: url, title: displayTitle });
-  return { ...state, tabs: tabs };
+  return updateTab(state, tabId, { url: url, title: displayTitle });
 }
 
 /**
- * Returns the id of the most recently used tab in a Space, or null when the Space has no tabs.
- * Used to pick a new selection after the selected tab leaves the sidebar.
+ * Records the icon a page reported. Returns the same state when nothing changed.
  */
-function findMostRecentlyUsedTabId(tabs: Tab[], spaceId: SpaceId): TabId | null {
-  let mostRecentTab: Tab | null = null;
-  for (const tab of tabs) {
-    if (tab.spaceId !== spaceId) {
+export function updateTabFavicon(state: BrowserState, tabId: ItemId, faviconUrl: string): BrowserState {
+  const tab = findTab(state, tabId);
+  if (tab === undefined || tab.faviconUrl === faviconUrl) {
+    return state;
+  }
+  return updateTab(state, tabId, { faviconUrl: faviconUrl });
+}
+
+/**
+ * Pins a tab: it moves to the bottom of its Space's Pinned list and remembers its current URL as its home.
+ * A Favorite goes to the active Space's Pinned list. A pinned tab is left alone.
+ * Example: pin a tab on "https://mail.example.com/inbox" → homeUrl is "https://mail.example.com/inbox"
+ */
+export function pinTab(state: BrowserState, tabId: ItemId): BrowserState {
+  const tab = findTab(state, tabId);
+  const rootLocation = findRootLocation(state, tabId);
+  if (tab === undefined || rootLocation === null || rootLocation.kind === "pinned") {
+    return state;
+  }
+
+  const spaceId = rootLocation.kind === "today" ? rootLocation.spaceId : state.activeSpaceId;
+  const space = findSpace(state, spaceId);
+  if (space === undefined) {
+    return state;
+  }
+
+  const stateWithoutTab = removeFromLocation(state, tabId);
+  const pinnedLocation: ItemLocation = { kind: "pinned", spaceId: spaceId };
+  const pinnedIds = getIdsAt(stateWithoutTab, pinnedLocation);
+  const stateWithTab = insertIntoLocation(stateWithoutTab, pinnedLocation, tabId, pinnedIds.length);
+  const homeUrl = tab.homeUrl ?? tab.url;
+  return updateTab(stateWithTab, tabId, { homeUrl: homeUrl });
+}
+
+/**
+ * Unpins a tab (from Pinned, a folder or Favorites): it moves to the top of Today and forgets its home URL.
+ * Its lastActiveAt is set to now, so it does not archive the moment it is unpinned.
+ */
+export function unpinTab(state: BrowserState, tabId: ItemId, now: number): BrowserState {
+  const tab = findTab(state, tabId);
+  const rootLocation = findRootLocation(state, tabId);
+  if (tab === undefined || rootLocation === null || rootLocation.kind === "today") {
+    return state;
+  }
+
+  const spaceId = rootLocation.kind === "pinned" ? rootLocation.spaceId : state.activeSpaceId;
+  const stateWithoutTab = removeFromLocation(state, tabId);
+  const todayLocation: ItemLocation = { kind: "today", spaceId: spaceId };
+  const stateWithTab = insertIntoLocation(stateWithoutTab, todayLocation, tabId, 0);
+  return updateTab(stateWithTab, tabId, { homeUrl: null, lastActiveAt: now });
+}
+
+/**
+ * Makes a tab a Favorite of its profile (the tiles at the top). Returns the same state when that profile already
+ * has FAVORITES_LIMIT Favorites, or the tab is one already.
+ */
+export function addToFavorites(state: BrowserState, tabId: ItemId): BrowserState {
+  const tab = findTab(state, tabId);
+  const location = findLocation(state, tabId);
+  const profileId = findProfileIdOfItem(state, tabId);
+  if (tab === undefined || location === null || location.kind === "favorites" || profileId === null) {
+    return state;
+  }
+
+  const favoritesLocation: ItemLocation = { kind: "favorites", profileId: profileId };
+  const favoriteIds = getIdsAt(state, favoritesLocation);
+  if (favoriteIds.length >= FAVORITES_LIMIT) {
+    return state;
+  }
+
+  const stateWithoutTab = removeFromLocation(state, tabId);
+  const stateWithTab = insertIntoLocation(stateWithoutTab, favoritesLocation, tabId, favoriteIds.length);
+  const homeUrl = tab.homeUrl ?? tab.url;
+  return updateTab(stateWithTab, tabId, { homeUrl: homeUrl });
+}
+
+/**
+ * True when an item may be placed at a location. The rules:
+ *   - Favorites and split views hold only tabs.
+ *   - Today holds tabs and split views (folders live in Pinned).
+ *   - A folder cannot go inside itself.
+ */
+function canPlace(state: BrowserState, itemId: ItemId, target: ItemLocation): boolean {
+  const item = state.items[itemId];
+  if (item === undefined) {
+    return false;
+  }
+  if (target.kind === "favorites" || target.kind === "split") {
+    return item.kind === "tab";
+  }
+  if (target.kind === "today") {
+    return item.kind !== "folder";
+  }
+  if (target.kind === "folder") {
+    return !isSameOrDescendant(state, itemId, target.folderId);
+  }
+  return true;
+}
+
+/**
+ * Moves an item to a position in another (or the same) list: the drag-and-drop action.
+ * Tabs that enter Pinned or Favorites get a home URL; tabs that enter Today lose it and count as used now.
+ * Returns the same state when the move breaks a rule (see canPlace) or the target is full.
+ */
+export function moveItem(state: BrowserState, itemId: ItemId, target: ItemLocation, index: number, now: number): BrowserState {
+  if (!canPlace(state, itemId, target)) {
+    return state;
+  }
+  const favoritesAreFull = target.kind === "favorites" && getIdsAt(state, target).length >= FAVORITES_LIMIT;
+  const isAlreadyFavorite = findLocation(state, itemId)?.kind === "favorites";
+  if (favoritesAreFull && !isAlreadyFavorite) {
+    return state;
+  }
+
+  const stateWithoutItem = removeFromLocation(state, itemId);
+  let changedState = insertIntoLocation(stateWithoutItem, target, itemId, index);
+
+  const targetRoot = target.kind === "folder" || target.kind === "split" ? findRootLocation(changedState, itemId) : target;
+  const tabIds = collectTabIds(changedState, itemId);
+  for (const tabId of tabIds) {
+    changedState = updateHomeUrlForRoot(changedState, tabId, targetRoot, now);
+  }
+  // Dragging a tab out of a split view can leave it with one pane.
+  changedState = dissolveSmallSplits(changedState);
+  return repairSelections(changedState);
+}
+
+/**
+ * Gives a tab the home-URL rule of the list its branch sits in: Pinned and Favorites remember a home, Today does not.
+ */
+export function applyHomeUrlRule(state: BrowserState, tabId: ItemId, now: number): BrowserState {
+  const root = findRootLocation(state, tabId);
+  return updateHomeUrlForRoot(state, tabId, root, now);
+}
+
+/**
+ * Gives a tab the home-URL rule of a given root list. Today tabs also count as used now, since they just arrived.
+ */
+function updateHomeUrlForRoot(state: BrowserState, tabId: ItemId, root: ItemLocation | null, now: number): BrowserState {
+  const tab = findTab(state, tabId);
+  if (tab === undefined || root === null) {
+    return state;
+  }
+  if (root.kind === "today") {
+    return updateTab(state, tabId, { homeUrl: null, lastActiveAt: now });
+  }
+  if (tab.homeUrl === null) {
+    return updateTab(state, tabId, { homeUrl: tab.url });
+  }
+  return state;
+}
+
+/**
+ * Adds an empty, open folder at the bottom of the active Space's Pinned list.
+ */
+export function createFolder(state: BrowserState, title: string, now: number): BrowserState {
+  const folder: FolderItem = { kind: "folder", id: createId("folder", now), title: title, childIds: [], isOpen: true };
+  const stateWithItem: BrowserState = { ...state, items: { ...state.items, [folder.id]: folder } };
+  const pinnedLocation: ItemLocation = { kind: "pinned", spaceId: state.activeSpaceId };
+  const pinnedIds = getIdsAt(stateWithItem, pinnedLocation);
+  const stateWithFolder = insertIntoLocation(stateWithItem, pinnedLocation, folder.id, pinnedIds.length);
+  const space = getActiveSpace(stateWithFolder);
+  if (space.isPinnedOpen) {
+    return stateWithFolder;
+  }
+  return setPinnedSectionOpen(stateWithFolder, space.id, true);
+}
+
+/**
+ * Renames a tab or folder. An empty name on a tab removes the rename, so the page title shows again.
+ */
+export function renameItem(state: BrowserState, itemId: ItemId, newName: string): BrowserState {
+  const item = state.items[itemId];
+  if (item === undefined || item.kind === "split") {
+    return state;
+  }
+  const trimmedName = newName.trim();
+
+  if (item.kind === "tab") {
+    const customTitle = trimmedName === "" ? null : trimmedName;
+    if (item.customTitle === customTitle) {
+      return state;
+    }
+    return updateTab(state, itemId, { customTitle: customTitle });
+  }
+
+  if (trimmedName === "" || item.title === trimmedName) {
+    return state;
+  }
+  const renamedFolder: FolderItem = { ...item, title: trimmedName };
+  return { ...state, items: { ...state.items, [itemId]: renamedFolder } };
+}
+
+/**
+ * Opens a closed folder or closes an open one.
+ */
+export function toggleFolder(state: BrowserState, folderId: ItemId): BrowserState {
+  const folder = state.items[folderId];
+  if (folder === undefined || folder.kind !== "folder") {
+    return state;
+  }
+  const toggledFolder: FolderItem = { ...folder, isOpen: !folder.isOpen };
+  return { ...state, items: { ...state.items, [folderId]: toggledFolder } };
+}
+
+/**
+ * Expands or collapses a Space's Pinned section.
+ */
+export function setPinnedSectionOpen(state: BrowserState, spaceId: SpaceId, isOpen: boolean): BrowserState {
+  const space = findSpace(state, spaceId);
+  if (space === undefined || space.isPinnedOpen === isOpen) {
+    return state;
+  }
+  const spaces = state.spaces.map((candidate) => (candidate.id === spaceId ? { ...candidate, isPinnedOpen: isOpen } : candidate));
+  return { ...state, spaces: spaces };
+}
+
+/**
+ * Mutes or unmutes a tab.
+ */
+export function setTabMuted(state: BrowserState, tabId: ItemId, isMuted: boolean): BrowserState {
+  const tab = findTab(state, tabId);
+  if (tab === undefined || tab.isMuted === isMuted) {
+    return state;
+  }
+  return updateTab(state, tabId, { isMuted: isMuted });
+}
+
+/**
+ * Returns every tab id a Space can show: its Pinned and Today tabs plus its profile's Favorites.
+ */
+function collectSpaceTabIds(state: BrowserState, space: Space): ItemId[] {
+  const profile = state.profiles.find((candidate) => candidate.id === space.profileId);
+  const favoriteIds = profile === undefined ? [] : profile.favoriteIds;
+  const pinnedTabIds = collectTabIdsInList(state, space.pinnedIds);
+  const todayTabIds = collectTabIdsInList(state, space.todayIds);
+  return [...favoriteIds, ...pinnedTabIds, ...todayTabIds];
+}
+
+/**
+ * Returns the id of the most recently used tab a Space can show, or null when it has none.
+ * Used to pick a new selection after the selected tab leaves.
+ */
+function findMostRecentlyUsedTabId(state: BrowserState, space: Space, excludedTabIds: Set<ItemId>): ItemId | null {
+  let mostRecentTab: TabItem | null = null;
+  for (const tabId of collectSpaceTabIds(state, space)) {
+    const tab = findTab(state, tabId);
+    if (tab === undefined || excludedTabIds.has(tabId)) {
       continue;
     }
     if (mostRecentTab === null || tab.lastActiveAt > mostRecentTab.lastActiveAt) {
       mostRecentTab = tab;
     }
   }
+  return mostRecentTab === null ? null : mostRecentTab.id;
+}
 
-  if (mostRecentTab === null) {
-    return null;
+/**
+ * For every Space whose selected tab is gone, moved to another Space, or in the excluded set, selects the Space's
+ * most recently used remaining tab. A Space with nothing selected stays that way.
+ */
+export function repairSelections(state: BrowserState, excludedTabIds: Set<ItemId> = new Set()): BrowserState {
+  let selectionChanged = false;
+  const selectedTabIdBySpace: Record<SpaceId, ItemId | null> = {};
+  for (const space of state.spaces) {
+    const selectedTabId = state.selectedTabIdBySpace[space.id] ?? null;
+    const spaceTabIds = new Set(collectSpaceTabIds(state, space));
+    const isStillShown = selectedTabId !== null && spaceTabIds.has(selectedTabId) && !excludedTabIds.has(selectedTabId);
+    if (selectedTabId === null || isStillShown) {
+      selectedTabIdBySpace[space.id] = selectedTabId;
+      continue;
+    }
+    selectedTabIdBySpace[space.id] = findMostRecentlyUsedTabId(state, space, excludedTabIds);
+    selectionChanged = true;
   }
-  return mostRecentTab.id;
+  if (!selectionChanged) {
+    return state;
+  }
+  return { ...state, selectedTabIdBySpace: selectedTabIdBySpace };
+}
+
+/**
+ * Replaces split views that have fewer than two tabs left: one tab takes the split's place, an empty split is removed.
+ * Archiving a tab out of a split calls this, so a split never shows a single pane.
+ */
+export function dissolveSmallSplits(state: BrowserState): BrowserState {
+  let changedState = state;
+  for (const item of Object.values(state.items)) {
+    if (item.kind !== "split" || item.childIds.length >= 2) {
+      continue;
+    }
+    changedState = replaceSplitWithChildren(changedState, item.id);
+  }
+  return changedState;
+}
+
+/**
+ * Puts a split view's tabs where the split was, in pane order, and deletes the split.
+ */
+export function replaceSplitWithChildren(state: BrowserState, splitId: ItemId): BrowserState {
+  const split = state.items[splitId];
+  const location = findLocation(state, splitId);
+  if (split === undefined || split.kind !== "split") {
+    return state;
+  }
+  if (location === null) {
+    return deleteItems(state, [splitId]);
+  }
+
+  const siblingIds = getIdsAt(state, location);
+  const splitIndex = siblingIds.indexOf(splitId);
+  const newSiblingIds = [...siblingIds.slice(0, splitIndex), ...split.childIds, ...siblingIds.slice(splitIndex + 1)];
+  const stateWithoutSplit = deleteItems(state, [splitId]);
+  return setIdsAt(stateWithoutSplit, location, newSiblingIds);
 }
 
 /**
  * Removes tabs from the sidebar and adds them to the top of the archive with a reason.
- * In any Space whose selected tab was removed, the most recently used remaining tab becomes selected.
- * Used by closeTab, clearTodayTabs and the auto-archive sweeper, so the rules live in one place.
+ * Split views left with one tab dissolve, and every Space whose selected tab left selects its most recently used tab.
+ * Used by closing, clearing, deleting and the auto-archive sweeper, so the rules live in one place.
  */
-export function moveTabsToArchive(state: BrowserState, tabIds: TabId[], now: number, reason: ArchiveReason): BrowserState {
-  if (tabIds.length === 0) {
+export function moveTabsToArchive(state: BrowserState, tabIds: ItemId[], now: number, reason: ArchiveReason): BrowserState {
+  const existingTabIds = tabIds.filter((tabId) => findTab(state, tabId) !== undefined);
+  if (existingTabIds.length === 0) {
     return state;
   }
 
-  const idsToArchive = new Set(tabIds);
-  const remainingTabs: Tab[] = [];
   const newArchiveEntries: ArchivedTab[] = [];
-  for (const tab of state.tabs) {
-    if (idsToArchive.has(tab.id)) {
-      newArchiveEntries.push({ tab: tab, archivedAt: now, reason: reason });
-    } else {
-      remainingTabs.push(tab);
-    }
+  for (const tabId of existingTabIds) {
+    const tab = findTab(state, tabId) as TabItem;
+    const fromSpaceId = findSpaceIdOfItem(state, tabId);
+    newArchiveEntries.push({ tab: tab, fromSpaceId: fromSpaceId, archivedAt: now, reason: reason });
   }
 
-  const selectedTabIdBySpace: Record<SpaceId, TabId | null> = {};
-  for (const space of state.spaces) {
-    // "?? null" turns a missing entry (undefined) into null, so both mean "nothing selected".
-    const selectedTabId = state.selectedTabIdBySpace[space.id] ?? null;
-    const needsNewSelection = selectedTabId === null || idsToArchive.has(selectedTabId);
-    if (needsNewSelection) {
-      selectedTabIdBySpace[space.id] = findMostRecentlyUsedTabId(remainingTabs, space.id);
-    } else {
-      selectedTabIdBySpace[space.id] = selectedTabId;
-    }
+  let changedState = state;
+  for (const tabId of existingTabIds) {
+    changedState = removeFromLocation(changedState, tabId);
   }
-
-  return {
-    ...state,
-    tabs: remainingTabs,
-    selectedTabIdBySpace: selectedTabIdBySpace,
-    archive: [...newArchiveEntries, ...state.archive],
-  };
+  changedState = deleteItems(changedState, existingTabIds);
+  changedState = dissolveSmallSplits(changedState);
+  changedState = { ...changedState, archive: [...newArchiveEntries, ...changedState.archive] };
+  return repairSelections(changedState);
 }
 
 /**
- * Closing a tab archives it with reason "manual", so it can be found again like in Arc.
+ * Closing a Today tab archives it with reason "manual", so it can be found again like in Arc.
+ * Pinned tabs and Favorites are not removed by closing; see resetPinnedTab.
  */
-export function closeTab(state: BrowserState, tabId: TabId, now: number): BrowserState {
+export function closeTab(state: BrowserState, tabId: ItemId, now: number): BrowserState {
   return moveTabsToArchive(state, [tabId], now, "manual");
 }
 
 /**
- * Archives every unpinned tab in the active Space with reason "clear-button".
+ * What ⌘W does to a Pinned tab or Favorite in Arc: the page is put away and the tab goes back to its home URL,
+ * but it keeps its place. The selection moves to the most recently used other tab.
+ * main.ts also destroys the tab's web view.
+ */
+export function resetPinnedTab(state: BrowserState, tabId: ItemId): BrowserState {
+  const tab = findTab(state, tabId);
+  if (tab === undefined || tab.homeUrl === null) {
+    return state;
+  }
+  const resetState = updateTab(state, tabId, { url: tab.homeUrl });
+  return repairSelections(resetState, new Set([tabId]));
+}
+
+/**
+ * Removes an item for good: its tabs go to the archive ("manual") and any folders or split views inside are deleted.
+ */
+export function deleteItem(state: BrowserState, itemId: ItemId, now: number): BrowserState {
+  const item = state.items[itemId];
+  if (item === undefined) {
+    return state;
+  }
+  if (item.kind === "tab") {
+    return moveTabsToArchive(state, [itemId], now, "manual");
+  }
+
+  const tabIds = collectTabIds(state, itemId);
+  const containerIds = collectContainerIds(state, itemId);
+  const archivedState = moveTabsToArchive(state, tabIds, now, "manual");
+  const stateWithoutItem = removeFromLocation(archivedState, itemId);
+  return deleteItems(stateWithoutItem, containerIds);
+}
+
+/**
+ * Returns the ids of the folders and split views at or below an item.
+ */
+function collectContainerIds(state: BrowserState, itemId: ItemId): ItemId[] {
+  const item = state.items[itemId];
+  if (item === undefined || item.kind === "tab") {
+    return [];
+  }
+  const containerIds: ItemId[] = [itemId];
+  for (const childId of item.childIds) {
+    containerIds.push(...collectContainerIds(state, childId));
+  }
+  return containerIds;
+}
+
+/**
+ * Archives every Today tab in the active Space with reason "clear-button" (Arc's "Clear", ⇧⌘K).
  */
 export function clearTodayTabs(state: BrowserState, now: number): BrowserState {
-  const todayTabIds: TabId[] = [];
-  for (const tab of state.tabs) {
-    const isInActiveSpace = tab.spaceId === state.activeSpaceId;
-    if (isInActiveSpace && !tab.isPinned) {
-      todayTabIds.push(tab.id);
-    }
-  }
+  const activeSpace = getActiveSpace(state);
+  const todayTabIds = collectTabIdsInList(state, activeSpace.todayIds);
   return moveTabsToArchive(state, todayTabIds, now, "clear-button");
 }
 
 /**
- * Takes a tab out of the archive, puts it back unpinned at the top of its Space's today tabs and selects it.
- * Its lastActiveAt is set to now. If its Space no longer exists, it goes to the active Space.
+ * Takes a tab out of the archive and puts it back at the top of Today in the Space it left, then selects it.
+ * It comes back as a Today tab (no home URL) with lastActiveAt = now. If its Space is gone, it goes to the active Space.
  */
-export function restoreArchivedTab(state: BrowserState, tabId: TabId, now: number): BrowserState {
+export function restoreArchivedTab(state: BrowserState, tabId: ItemId, now: number): BrowserState {
   const archivedEntry = state.archive.find((entry) => entry.tab.id === tabId);
   if (archivedEntry === undefined) {
     return state;
   }
 
   let spaceId = state.activeSpaceId;
-  const originalSpaceExists = state.spaces.some((space) => space.id === archivedEntry.tab.spaceId);
-  if (originalSpaceExists) {
-    spaceId = archivedEntry.tab.spaceId;
+  if (archivedEntry.fromSpaceId !== null && findSpace(state, archivedEntry.fromSpaceId) !== undefined) {
+    spaceId = archivedEntry.fromSpaceId;
   }
 
-  const restoredTab: Tab = { ...archivedEntry.tab, spaceId: spaceId, isPinned: false, homeUrl: null, lastActiveAt: now };
-  const remainingArchive = state.archive.filter((entry) => entry.tab.id !== tabId);
-  const stateWithRestoredTab: BrowserState = {
-    ...state,
-    tabs: [restoredTab, ...state.tabs],
-    archive: remainingArchive,
-  };
-  return selectTab(stateWithRestoredTab, restoredTab.id, now);
+  // A tab with the same id may exist if it was restored before and archived again; give it a fresh id then.
+  const restoredId = state.items[tabId] === undefined ? tabId : createId("tab", now);
+  const restoredTab: TabItem = { ...archivedEntry.tab, id: restoredId, homeUrl: null, lastActiveAt: now };
+  const remainingArchive = state.archive.filter((entry) => entry !== archivedEntry);
+  const stateWithItem: BrowserState = { ...state, items: { ...state.items, [restoredId]: restoredTab }, archive: remainingArchive };
+  const stateWithTab = insertIntoLocation(stateWithItem, { kind: "today", spaceId: spaceId }, restoredId, 0);
+  return selectTab(stateWithTab, restoredId, now);
+}
+
+/**
+ * Restores the most recently archived tab (⇧⌘T, "Restore Last Closed Tab"). Returns the same state when the archive is empty.
+ */
+export function restoreLastArchivedTab(state: BrowserState, now: number): BrowserState {
+  const newestEntry = state.archive[0];
+  if (newestEntry === undefined) {
+    return state;
+  }
+  return restoreArchivedTab(state, newestEntry.tab.id, now);
+}
+
+/**
+ * Opens a copy of a tab right below it (Pinned and Favorites copies go to the top of Today) and selects it.
+ */
+export function duplicateTab(state: BrowserState, tabId: ItemId, now: number): BrowserState {
+  const tab = findTab(state, tabId);
+  if (tab === undefined) {
+    return state;
+  }
+
+  const copy: TabItem = { ...createTab(tab.url, now), title: tab.title, faviconUrl: tab.faviconUrl };
+  const stateWithItem: BrowserState = { ...state, items: { ...state.items, [copy.id]: copy } };
+  const location = findLocation(state, tabId);
+  let stateWithCopy: BrowserState;
+  if (location !== null && location.kind === "today") {
+    const index = getIdsAt(state, location).indexOf(tabId) + 1;
+    stateWithCopy = insertIntoLocation(stateWithItem, location, copy.id, index);
+  } else {
+    stateWithCopy = insertIntoLocation(stateWithItem, { kind: "today", spaceId: state.activeSpaceId }, copy.id, 0);
+  }
+  return selectTab(stateWithCopy, copy.id, now);
 }
 
 /**
@@ -321,4 +682,46 @@ export function setArchiveAfter(state: BrowserState, archiveAfterMs: number | nu
     return state;
   }
   return { ...state, settings: { ...state.settings, archiveAfterMs: archiveAfterMs } };
+}
+
+/**
+ * Shows or hides the sidebar (⌘S).
+ */
+export function setSidebarVisible(state: BrowserState, isVisible: boolean): BrowserState {
+  if (state.settings.isSidebarVisible === isVisible) {
+    return state;
+  }
+  return { ...state, settings: { ...state.settings, isSidebarVisible: isVisible } };
+}
+
+/**
+ * Returns the tabs in the order the sidebar shows them for the active Space: Favorites, then Pinned (open folders
+ * only), then Today. ⌘1–9 and ⌥⌘↑/↓ walk this list.
+ */
+export function listVisibleTabIds(state: BrowserState): ItemId[] {
+  const space = getActiveSpace(state);
+  const profile = state.profiles.find((candidate) => candidate.id === space.profileId);
+  const favoriteIds = profile === undefined ? [] : profile.favoriteIds;
+  const pinnedTabIds = space.isPinnedOpen ? collectOpenTabIds(state, space.pinnedIds) : [];
+  const todayTabIds = collectTabIdsInList(state, space.todayIds);
+  return [...favoriteIds, ...pinnedTabIds, ...todayTabIds];
+}
+
+/**
+ * Like collectTabIdsInList, but skips the inside of closed folders, because those tabs are hidden.
+ */
+function collectOpenTabIds(state: BrowserState, itemIds: ItemId[]): ItemId[] {
+  const tabIds: ItemId[] = [];
+  for (const itemId of itemIds) {
+    const item = state.items[itemId];
+    if (item === undefined) {
+      continue;
+    }
+    if (item.kind === "folder" && !item.isOpen) {
+      continue;
+    }
+    const childTabIds = item.kind === "folder" ? collectOpenTabIds(state, item.childIds) : collectTabIds(state, itemId);
+    tabIds.push(...childTabIds);
+  }
+  return tabIds;
 }

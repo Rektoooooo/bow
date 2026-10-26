@@ -47,11 +47,26 @@ export const ARCHIVE_PRUNE_INTERVAL_MS = 1 * HOUR_MS;
 /** How long archived tabs are kept before they are deleted. Our choice: Arc instead appears to keep the newest 250. */
 export const ARCHIVE_RETENTION_MS = 30 * DAY_MS;
 
+/** Most Favorites a profile can have. Same as Arc (help center: raised from 8 to 12 in 2023). */
+export const FAVORITES_LIMIT = 12;
+
+/** Most panes in one split view. Same as Arc (help center shortcuts page: up to 4). */
+export const SPLIT_PANES_LIMIT = 4;
+
+/** The profile every new install starts with. Its pages use the session partition "persist:profile-default". */
+export const DEFAULT_PROFILE_ID = "profile-default";
+
 /** Sidebar width in pixels. Must match --sidebar-width in sidebar.css. */
 export const SIDEBAR_WIDTH_PX = 240;
 
 /** Gap between the window edge and the web page card, in pixels. Must match --card-inset in sidebar.css. */
 export const CARD_INSET_PX = 8;
+
+/** Height of the toolbar above the card (back, forward, reload, address, site controls). Must match --toolbar-height in sidebar.css. */
+export const TOOLBAR_HEIGHT_PX = 40;
+
+/** Gap between the panes of a split view, in pixels. Our choice; Arc's panes sit a few pixels apart. */
+export const SPLIT_GAP_PX = 6;
 
 /** Corner radius of the web page card, in pixels. */
 export const CARD_RADIUS_PX = 10;

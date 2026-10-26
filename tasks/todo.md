@@ -28,9 +28,9 @@ and every Arc behavior we can observe is written down before Arc shuts down.
 - [ ] Teardown page (`docs/arc-teardown.html`): auto-archive answers + new feature notes
 
 ### 2.2 Data model v2 (foundation)
-- [ ] Items tree like Arc's: tab / folder / split items, ordered child id lists, Spaces with pinned + today lists
-- [ ] Profiles (own cookie jar via session partitions) with Favorites per profile (max 12, like Arc)
-- [ ] Migration v1 → v2, tested; runtime-only state (loading, audible, can go back) kept out of the saved file
+- [x] Items tree like Arc's: tab / folder / split items, ordered child id lists, Spaces with pinned + today lists
+- [x] Profiles (own cookie jar via session partitions) with Favorites per profile (max 12, like Arc)
+- [x] Migration v1 → v2, tested; runtime-only state (loading, audible, can go back) kept out of the saved file
 
 ### 2.3 Arc-style window
 - [ ] Sidebar: traffic lights + sidebar toggle, Favorites grid, Space title, Pinned tree with folders,

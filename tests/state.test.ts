@@ -4,161 +4,340 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  addToFavorites,
+  clearTodayTabs,
   closeTab,
+  createFolder,
   createInitialState,
-  findTab,
+  deleteItem,
+  duplicateTab,
   getSelectedTabId,
+  listVisibleTabIds,
+  moveItem,
   moveTabsToArchive,
   openTab,
   pinTab,
+  renameItem,
+  resetPinnedTab,
   restoreArchivedTab,
+  restoreLastArchivedTab,
   selectTab,
+  toggleFolder,
   unpinTab,
+  updateTabPage,
 } from "../src/main/state";
+import { findLocation, findTab } from "../src/main/tree";
 import { normalizeTypedInput } from "../src/main/urls";
-import { HOUR_MS } from "../src/shared/settings";
-import type { BrowserState, Tab } from "../src/shared/types";
+import { DEFAULT_PROFILE_ID, FAVORITES_LIMIT, HOUR_MS } from "../src/shared/settings";
+import type { BrowserState, ItemId, TabItem } from "../src/shared/types";
+import { getPinnedIds, getTab, getTodayIds, ONE_PM, openPinnedTabs, openTabs, PERSONAL_SPACE_ID, WORK_SPACE_ID } from "./builders";
 
-const ONE_PM = Date.UTC(2026, 9, 26, 13, 0, 0);
 const TWO_PM = ONE_PM + 1 * HOUR_MS;
 const THREE_PM = ONE_PM + 2 * HOUR_MS;
 const FOUR_PM = ONE_PM + 3 * HOUR_MS;
+const FIVE_PM = ONE_PM + 4 * HOUR_MS;
 
-/** Returns the tab with this id, failing the test if it is missing, so the checks below can read its fields. */
-function getTab(state: BrowserState, tabId: string): Tab {
-  const tab = findTab(state, tabId);
-  if (tab === undefined) {
-    throw new Error(`Test setup problem: tab ${tabId} is missing`);
-  }
-  return tab;
-}
-
-/** Returns the id of the tab at the top of the list. New and restored tabs always go there. */
-function getTopTabId(state: BrowserState): string {
-  const topTab = state.tabs[0];
-  if (topTab === undefined) {
-    throw new Error("Test setup problem: no tabs");
-  }
-  return topTab.id;
+/** Returns the newest folder's id in the active Space's Pinned list. */
+function getLastPinnedId(state: BrowserState): ItemId {
+  const pinnedIds = getPinnedIds(state, state.activeSpaceId);
+  return pinnedIds[pinnedIds.length - 1] as ItemId;
 }
 
 describe("openTab", () => {
-  it("adds an unpinned tab at the top of the active Space and selects it", () => {
-    const state = openTab(createInitialState(), "https://example.com", ONE_PM);
+  it("adds a tab at the top of the active Space's Today list and selects it", () => {
+    const { state, tabIds } = openTabs(["https://a.example", "https://b.example"]);
 
-    const newTab = getTab(state, getTopTabId(state));
-    expect(newTab.url).toBe("https://example.com");
-    expect(newTab.isPinned).toBe(false);
-    expect(newTab.spaceId).toBe(state.activeSpaceId);
-    expect(getSelectedTabId(state)).toBe(newTab.id);
+    expect(getTodayIds(state)).toEqual([tabIds[1], tabIds[0]]);
+    expect(getSelectedTabId(state)).toBe(tabIds[1]);
+    expect(getTab(state, tabIds[0] as ItemId).homeUrl).toBeNull();
+  });
+
+  it("can open a tab in the background without taking the selection", () => {
+    const { state: withTab, tabIds } = openTabs(["https://a.example"]);
+
+    const state = openTab(withTab, "https://b.example", TWO_PM, { select: false });
+
+    expect(getTodayIds(state)).toHaveLength(2);
+    expect(getSelectedTabId(state)).toBe(tabIds[0]);
   });
 });
 
 describe("selectTab", () => {
   it("sets lastActiveAt on both the tab you leave and the tab you open", () => {
-    const withFirstTab = openTab(createInitialState(), "https://a.example", ONE_PM);
-    const firstTabId = getTopTabId(withFirstTab);
-    const withSecondTab = openTab(withFirstTab, "https://b.example", TWO_PM);
-    const secondTabId = getTopTabId(withSecondTab);
+    const { state: withTabs, tabIds } = openTabs(["https://a.example", "https://b.example"]);
 
-    const state = selectTab(withSecondTab, firstTabId, THREE_PM);
+    const state = selectTab(withTabs, tabIds[0] as ItemId, THREE_PM);
 
-    expect(getTab(state, firstTabId).lastActiveAt).toBe(THREE_PM);
-    expect(getTab(state, secondTabId).lastActiveAt).toBe(THREE_PM);
-    expect(getSelectedTabId(state)).toBe(firstTabId);
+    expect(getTab(state, tabIds[0] as ItemId).lastActiveAt).toBe(THREE_PM);
+    expect(getTab(state, tabIds[1] as ItemId).lastActiveAt).toBe(THREE_PM);
+    expect(getSelectedTabId(state)).toBe(tabIds[0]);
+  });
+
+  it("switches to the tab's Space when it lives in another Space", () => {
+    const { state: withTab, tabIds } = openTabs(["https://a.example"]);
+    const inWork: BrowserState = { ...withTab, activeSpaceId: WORK_SPACE_ID };
+
+    const state = selectTab(inWork, tabIds[0] as ItemId, TWO_PM);
+
+    expect(state.activeSpaceId).toBe(PERSONAL_SPACE_ID);
+  });
+
+  it("shows a Favorite in the active Space, because Favorites belong to the profile", () => {
+    const { state: withTab, tabIds } = openTabs(["https://mail.example"]);
+    const favoriteState = addToFavorites(withTab, tabIds[0] as ItemId);
+    const inWork: BrowserState = { ...favoriteState, activeSpaceId: WORK_SPACE_ID };
+
+    const state = selectTab(inWork, tabIds[0] as ItemId, TWO_PM);
+
+    expect(state.activeSpaceId).toBe(WORK_SPACE_ID);
+    expect(state.selectedTabIdBySpace[WORK_SPACE_ID]).toBe(tabIds[0]);
+  });
+});
+
+describe("updateTabPage", () => {
+  it("falls back to the URL when the page has no title, and returns the same state when nothing changed", () => {
+    const { state: withTab, tabIds } = openTabs(["https://a.example"]);
+    const tabId = tabIds[0] as ItemId;
+
+    const state = updateTabPage(withTab, tabId, "https://a.example/page", "  ");
+
+    expect(getTab(state, tabId).title).toBe("https://a.example/page");
+    expect(updateTabPage(state, tabId, "https://a.example/page", "")).toBe(state);
   });
 });
 
 describe("pinTab / unpinTab", () => {
-  it("pinning stores the current URL as the home URL", () => {
-    const withTab = openTab(createInitialState(), "https://mail.example.com/inbox", ONE_PM);
-    const tabId = getTopTabId(withTab);
+  it("pinning moves the tab to the bottom of Pinned and stores its URL as the home URL", () => {
+    const { state: withTabs, tabIds } = openTabs(["https://mail.example.com/inbox", "https://b.example"]);
+    const pinnedFirst = pinTab(withTabs, tabIds[1] as ItemId);
 
-    const state = pinTab(withTab, tabId);
+    const state = pinTab(pinnedFirst, tabIds[0] as ItemId);
 
-    expect(getTab(state, tabId).isPinned).toBe(true);
-    expect(getTab(state, tabId).homeUrl).toBe("https://mail.example.com/inbox");
+    expect(getPinnedIds(state)).toEqual([tabIds[1], tabIds[0]]);
+    expect(getTodayIds(state)).toEqual([]);
+    expect(getTab(state, tabIds[0] as ItemId).homeUrl).toBe("https://mail.example.com/inbox");
   });
 
-  it("unpinning moves the tab to the top of today's tabs with a fresh lastActiveAt", () => {
-    const withFirstTab = openTab(createInitialState(), "https://a.example", ONE_PM);
-    const firstTabId = getTopTabId(withFirstTab);
-    const pinned = pinTab(withFirstTab, firstTabId);
-    const withSecondTab = openTab(pinned, "https://b.example", TWO_PM);
+  it("unpinning moves the tab to the top of Today with a fresh lastActiveAt and no home URL", () => {
+    const { state: withPinned, tabIds } = openPinnedTabs(["https://a.example"]);
+    const { state: withBoth } = openTabs(["https://b.example"], withPinned);
 
-    const state = unpinTab(withSecondTab, firstTabId, THREE_PM);
+    const state = unpinTab(withBoth, tabIds[0] as ItemId, FIVE_PM);
 
-    const unpinnedTab = getTab(state, firstTabId);
-    expect(getTopTabId(state)).toBe(firstTabId);
-    expect(unpinnedTab.isPinned).toBe(false);
+    const unpinnedTab = getTab(state, tabIds[0] as ItemId);
+    expect(getTodayIds(state)[0]).toBe(tabIds[0]);
     expect(unpinnedTab.homeUrl).toBeNull();
-    expect(unpinnedTab.lastActiveAt).toBe(THREE_PM);
+    expect(unpinnedTab.lastActiveAt).toBe(FIVE_PM);
   });
 });
 
-describe("moveTabsToArchive", () => {
-  it("removes the tabs from the sidebar and adds archive entries with the given reason", () => {
-    const withFirstTab = openTab(createInitialState(), "https://a.example", ONE_PM);
-    const firstTabId = getTopTabId(withFirstTab);
-    const withSecondTab = openTab(withFirstTab, "https://b.example", TWO_PM);
+describe("addToFavorites", () => {
+  it("moves the tab into its profile's Favorites with a home URL", () => {
+    const { state: withTab, tabIds } = openTabs(["https://music.example"]);
 
-    const state = moveTabsToArchive(withSecondTab, [firstTabId], THREE_PM, "auto");
+    const state = addToFavorites(withTab, tabIds[0] as ItemId);
 
-    expect(findTab(state, firstTabId)).toBeUndefined();
-    expect(state.tabs).toHaveLength(1);
-    expect(state.archive[0]?.tab.id).toBe(firstTabId);
+    expect(state.profiles[0]?.favoriteIds).toEqual([tabIds[0]]);
+    expect(getTodayIds(state)).toEqual([]);
+    expect(getTab(state, tabIds[0] as ItemId).homeUrl).toBe("https://music.example");
+  });
+
+  it(`refuses a ${FAVORITES_LIMIT + 1}th Favorite, like Arc`, () => {
+    const urls = Array.from({ length: FAVORITES_LIMIT + 1 }, (_value, index) => `https://site${index}.example`);
+    const { state: withTabs, tabIds } = openTabs(urls);
+    let state = withTabs;
+    for (const tabId of tabIds) {
+      state = addToFavorites(state, tabId);
+    }
+
+    expect(state.profiles[0]?.favoriteIds).toHaveLength(FAVORITES_LIMIT);
+    expect(findLocation(state, tabIds[FAVORITES_LIMIT] as ItemId)?.kind).toBe("today");
+  });
+});
+
+describe("folders and moveItem", () => {
+  it("creates an open folder at the bottom of Pinned and renames it", () => {
+    const created = createFolder(createInitialState(), "Reading", ONE_PM);
+    const folderId = getLastPinnedId(created);
+
+    const state = renameItem(created, folderId, "  Articles ");
+
+    const folder = state.items[folderId];
+    expect(folder?.kind === "folder" && folder.title).toBe("Articles");
+    expect(folder?.kind === "folder" && folder.isOpen).toBe(true);
+  });
+
+  it("moving a Today tab into a folder gives it a home URL; moving it back to Today removes it", () => {
+    const { state: withTab, tabIds } = openTabs(["https://docs.example"]);
+    const withFolder = createFolder(withTab, "Work", TWO_PM);
+    const folderId = getLastPinnedId(withFolder);
+    const tabId = tabIds[0] as ItemId;
+
+    const inFolder = moveItem(withFolder, tabId, { kind: "folder", folderId: folderId }, 0, THREE_PM);
+    const backInToday = moveItem(inFolder, tabId, { kind: "today", spaceId: PERSONAL_SPACE_ID }, 0, FOUR_PM);
+
+    expect(getTab(inFolder, tabId).homeUrl).toBe("https://docs.example");
+    expect(getTab(backInToday, tabId).homeUrl).toBeNull();
+    expect(getTab(backInToday, tabId).lastActiveAt).toBe(FOUR_PM);
+  });
+
+  it("refuses to put a folder inside itself or into Today", () => {
+    const outerState = createFolder(createInitialState(), "Outer", ONE_PM);
+    const outerId = getLastPinnedId(outerState);
+    const bothState = createFolder(outerState, "Inner", TWO_PM);
+    const innerId = getLastPinnedId(bothState);
+    const nested = moveItem(bothState, innerId, { kind: "folder", folderId: outerId }, 0, THREE_PM);
+
+    expect(moveItem(nested, outerId, { kind: "folder", folderId: innerId }, 0, FOUR_PM)).toBe(nested);
+    expect(moveItem(nested, outerId, { kind: "today", spaceId: PERSONAL_SPACE_ID }, 0, FOUR_PM)).toBe(nested);
+  });
+
+  it("listVisibleTabIds skips tabs inside closed folders", () => {
+    const { state: withTabs, tabIds } = openPinnedTabs(["https://a.example", "https://b.example"]);
+    const withFolder = createFolder(withTabs, "Folder", THREE_PM);
+    const folderId = getLastPinnedId(withFolder);
+    const filled = moveItem(withFolder, tabIds[1] as ItemId, { kind: "folder", folderId: folderId }, 0, FOUR_PM);
+
+    const closed = toggleFolder(filled, folderId);
+
+    expect(listVisibleTabIds(filled)).toEqual([tabIds[0], tabIds[1]]);
+    expect(listVisibleTabIds(closed)).toEqual([tabIds[0]]);
+  });
+});
+
+describe("moveTabsToArchive / closeTab", () => {
+  it("removes the tabs and adds archive entries with the reason and the Space they left", () => {
+    const { state: withTabs, tabIds } = openTabs(["https://a.example", "https://b.example"]);
+
+    const state = moveTabsToArchive(withTabs, [tabIds[0] as ItemId], THREE_PM, "auto");
+
+    expect(findTab(state, tabIds[0] as ItemId)).toBeUndefined();
+    expect(state.archive[0]?.tab.id).toBe(tabIds[0]);
     expect(state.archive[0]?.reason).toBe("auto");
+    expect(state.archive[0]?.fromSpaceId).toBe(PERSONAL_SPACE_ID);
     expect(state.archive[0]?.archivedAt).toBe(THREE_PM);
   });
 
-  it("selects the most recently used tab in the Space when the selected tab is archived", () => {
-    // Opening a tab marks the one you leave as used at that moment:
-    // A is left at 2 PM, B is left at 3 PM, C is selected.
-    const withA = openTab(createInitialState(), "https://a.example", ONE_PM);
-    const withB = openTab(withA, "https://b.example", TWO_PM);
-    const tabBId = getTopTabId(withB);
-    const withC = openTab(withB, "https://c.example", THREE_PM);
-    const tabCId = getTopTabId(withC);
+  it("selects the most recently used tab in the Space when the selected tab is closed", () => {
+    // Opening a tab marks the one you leave as used at that moment: A is left at 2 PM, B at 3 PM, C is selected.
+    const { state: withTabs, tabIds } = openTabs(["https://a.example", "https://b.example", "https://c.example"]);
 
-    const state = closeTab(withC, tabCId, FOUR_PM);
+    const state = closeTab(withTabs, tabIds[2] as ItemId, FOUR_PM);
 
-    expect(getSelectedTabId(state)).toBe(tabBId);
+    expect(getSelectedTabId(state)).toBe(tabIds[1]);
+  });
+
+  it("resetPinnedTab keeps the tab, sends it home and moves the selection away", () => {
+    const { state: withPinned, tabIds } = openPinnedTabs(["https://mail.example/inbox"]);
+    const pinnedTabId = tabIds[0] as ItemId;
+    const navigated = updateTabPage(withPinned, pinnedTabId, "https://mail.example/message/42", "Message");
+    const { state: withToday, tabIds: todayIds } = openTabs(["https://news.example"], navigated);
+    const selectedPinned = selectTab(withToday, pinnedTabId, FOUR_PM);
+
+    const state = resetPinnedTab(selectedPinned, pinnedTabId);
+
+    expect(getTab(state, pinnedTabId).url).toBe("https://mail.example/inbox");
+    expect(getPinnedIds(state)).toEqual([pinnedTabId]);
+    expect(getSelectedTabId(state)).toBe(todayIds[0]);
+  });
+
+  it("deleting a folder archives every tab inside it", () => {
+    const { state: withTabs, tabIds } = openPinnedTabs(["https://a.example", "https://b.example"]);
+    const withFolder = createFolder(withTabs, "Folder", THREE_PM);
+    const folderId = getLastPinnedId(withFolder);
+    let filled = withFolder;
+    for (const tabId of tabIds) {
+      filled = moveItem(filled, tabId, { kind: "folder", folderId: folderId }, 0, FOUR_PM);
+    }
+
+    const state = deleteItem(filled, folderId, FIVE_PM);
+
+    expect(state.items[folderId]).toBeUndefined();
+    expect(getPinnedIds(state)).toEqual([]);
+    expect(state.archive.map((entry) => entry.tab.id).sort()).toEqual([...tabIds].sort());
+  });
+
+  it("Clear archives the active Space's Today tabs and keeps Pinned ones", () => {
+    const { state: withPinned } = openPinnedTabs(["https://pinned.example"]);
+    const { state: withToday } = openTabs(["https://a.example", "https://b.example"], withPinned);
+
+    const state = clearTodayTabs(withToday, FIVE_PM);
+
+    expect(getTodayIds(state)).toEqual([]);
+    expect(getPinnedIds(state)).toHaveLength(1);
+    expect(state.archive.every((entry) => entry.reason === "clear-button")).toBe(true);
   });
 });
 
 describe("restoreArchivedTab", () => {
-  it("puts the tab back at the top of its Space and selects it", () => {
-    const withTab = openTab(createInitialState(), "https://a.example", ONE_PM);
-    const tabId = getTopTabId(withTab);
+  it("puts the tab back at the top of the Space it left and selects it", () => {
+    const { state: withTab, tabIds } = openTabs(["https://a.example"]);
+    const tabId = tabIds[0] as ItemId;
     const archived = closeTab(withTab, tabId, TWO_PM);
+    const inWork: BrowserState = { ...archived, activeSpaceId: WORK_SPACE_ID };
 
-    const state = restoreArchivedTab(archived, tabId, THREE_PM);
+    const state = restoreArchivedTab(inWork, tabId, THREE_PM);
 
-    expect(getTopTabId(state)).toBe(tabId);
-    expect(getSelectedTabId(state)).toBe(tabId);
+    expect(getTodayIds(state, PERSONAL_SPACE_ID)[0]).toBe(tabId);
+    expect(state.activeSpaceId).toBe(PERSONAL_SPACE_ID);
     expect(getTab(state, tabId).lastActiveAt).toBe(THREE_PM);
     expect(state.archive).toHaveLength(0);
   });
 
   it("falls back to the active Space when the tab's Space was deleted", () => {
-    const orphanTab: Tab = {
+    const orphanTab: TabItem = {
+      kind: "tab",
       id: "tab-orphan",
-      spaceId: "space-deleted",
       url: "https://a.example",
       title: "A",
-      isPinned: false,
+      customTitle: null,
+      faviconUrl: null,
       homeUrl: null,
       lastActiveAt: ONE_PM,
+      isMuted: false,
     };
     const initialState = createInitialState();
     const archived: BrowserState = {
       ...initialState,
-      archive: [{ tab: orphanTab, archivedAt: TWO_PM, reason: "manual" }],
+      archive: [{ tab: orphanTab, fromSpaceId: "space-deleted", archivedAt: TWO_PM, reason: "manual" }],
     };
 
     const state = restoreArchivedTab(archived, "tab-orphan", THREE_PM);
 
-    expect(getTab(state, "tab-orphan").spaceId).toBe(initialState.activeSpaceId);
+    expect(getTodayIds(state, initialState.activeSpaceId)).toEqual(["tab-orphan"]);
+  });
+
+  it("restoreLastArchivedTab brings back the newest entry (⇧⌘T)", () => {
+    const { state: withTabs, tabIds } = openTabs(["https://a.example", "https://b.example"]);
+    const closedFirst = closeTab(withTabs, tabIds[0] as ItemId, THREE_PM);
+    const closedBoth = closeTab(closedFirst, tabIds[1] as ItemId, FOUR_PM);
+
+    const state = restoreLastArchivedTab(closedBoth, FIVE_PM);
+
+    expect(getTodayIds(state)).toEqual([tabIds[1]]);
+  });
+});
+
+describe("duplicateTab", () => {
+  it("puts a copy right below a Today tab and selects it", () => {
+    const { state: withTabs, tabIds } = openTabs(["https://a.example", "https://b.example"]);
+
+    const state = duplicateTab(withTabs, tabIds[1] as ItemId, THREE_PM);
+
+    const todayIds = getTodayIds(state);
+    expect(todayIds).toHaveLength(3);
+    expect(todayIds[0]).toBe(tabIds[1]);
+    expect(getTab(state, todayIds[1] as ItemId).url).toBe("https://b.example");
+    expect(getSelectedTabId(state)).toBe(todayIds[1]);
+  });
+});
+
+describe("createInitialState", () => {
+  it("starts with one profile shared by both Spaces", () => {
+    const state = createInitialState();
+
+    expect(state.profiles.map((profile) => profile.id)).toEqual([DEFAULT_PROFILE_ID]);
+    expect(state.spaces.every((space) => space.profileId === DEFAULT_PROFILE_ID)).toBe(true);
   });
 });
 

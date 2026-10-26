@@ -12,7 +12,8 @@
  *   main.ts prune timer → pruneArchive() → archive without entries older than the retention period
  */
 import { ARCHIVE_RETENTION_MS } from "../shared/settings";
-import type { BrowserState, Tab, TabId } from "../shared/types";
+import type { BrowserState, ItemId, TabItem } from "../shared/types";
+import { collectTabIdsInList, findTab } from "./tree";
 
 /**
  * How long a tab has been unused, in milliseconds.
@@ -20,7 +21,7 @@ import type { BrowserState, Tab, TabId } from "../shared/types";
  * archive the moment you open the app after a week away.
  * Example: lastActiveAt = 9:00, launchedAt = 10:00, now = 11:00 → 1 hour (not 2)
  */
-export function getInactiveDurationMs(tab: Tab, now: number, launchedAt: number): number {
+export function getInactiveDurationMs(tab: TabItem, now: number, launchedAt: number): number {
   // Time while the app was closed does not count, so start from launch if that is later.
   const countFrom = Math.max(tab.lastActiveAt, launchedAt);
   const inactiveDurationMs = now - countFrom;
@@ -30,22 +31,22 @@ export function getInactiveDurationMs(tab: Tab, now: number, launchedAt: number)
 /**
  * Returns the ids of tabs that should be auto-archived now.
  * A tab qualifies only when ALL of these are true:
- *   - it is unpinned
+ *   - it is a Today tab (directly, or inside a Today split view); Pinned tabs and Favorites never archive
  *   - it is not in use right now (inUseTabIds)
  *   - it has been unused for at least settings.archiveAfterMs
  * Returns an empty list when the setting is "Never" (null).
  * Example: threshold 12 h, unpinned tab unused for 13 h, not in use → ["tab-…"]
  */
-export function findTabsToArchive(state: BrowserState, now: number, launchedAt: number, inUseTabIds: TabId[]): TabId[] {
+export function findTabsToArchive(state: BrowserState, now: number, launchedAt: number, inUseTabIds: ItemId[]): ItemId[] {
   const archiveAfterMs = state.settings.archiveAfterMs;
   if (archiveAfterMs === null) {
     return [];
   }
 
   const tabsInUse = new Set(inUseTabIds);
-  const tabIdsToArchive: TabId[] = [];
-  for (const tab of state.tabs) {
-    if (tab.isPinned || tabsInUse.has(tab.id)) {
+  const tabIdsToArchive: ItemId[] = [];
+  for (const tab of listTodayTabs(state)) {
+    if (tabsInUse.has(tab.id)) {
       continue;
     }
     const inactiveDurationMs = getInactiveDurationMs(tab, now, launchedAt);
@@ -54,6 +55,22 @@ export function findTabsToArchive(state: BrowserState, now: number, launchedAt: 
     }
   }
   return tabIdsToArchive;
+}
+
+/**
+ * Returns every Today tab in every Space, including tabs inside Today split views.
+ */
+function listTodayTabs(state: BrowserState): TabItem[] {
+  const todayTabs: TabItem[] = [];
+  for (const space of state.spaces) {
+    for (const tabId of collectTabIdsInList(state, space.todayIds)) {
+      const tab = findTab(state, tabId);
+      if (tab !== undefined) {
+        todayTabs.push(tab);
+      }
+    }
+  }
+  return todayTabs;
 }
 
 /**

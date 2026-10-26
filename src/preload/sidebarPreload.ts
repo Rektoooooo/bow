@@ -7,13 +7,13 @@
  *   Electron's contextBridge and ipcRenderer.
  *
  * Data flow:
- *   sidebar.ts calls window.browserApi.selectTab(id) → ipcRenderer.invoke("tabs:select", id) → ipc.ts
+ *   sidebar.ts calls window.browserApi.dispatch({ type: "selectTab", tabId }) → ipcRenderer.invoke("browser:dispatch") → ipc.ts
  *   main.ts sends "browser:state-changed" → onStateChanged listener → sidebar.ts redraws
  */
 import { contextBridge, ipcRenderer } from "electron";
 import type { IpcRendererEvent } from "electron";
 import type { IPC_CHANNELS } from "../shared/ipcChannels";
-import type { BrowserApi, BrowserState } from "../shared/types";
+import type { BrowserApi, BrowserState, RuntimeState } from "../shared/types";
 
 /**
  * Sandboxed preload scripts may load only Electron's own modules, not our files, so the channel
@@ -22,38 +22,30 @@ import type { BrowserApi, BrowserState } from "../shared/types";
  */
 const CHANNELS: typeof IPC_CHANNELS = {
   getState: "browser:get-state",
+  getRuntimeState: "browser:get-runtime-state",
   stateChanged: "browser:state-changed",
-  openTab: "tabs:open",
-  selectTab: "tabs:select",
-  closeTab: "tabs:close",
-  pinTab: "tabs:pin",
-  unpinTab: "tabs:unpin",
-  clearTodayTabs: "tabs:clear-today",
-  switchSpace: "spaces:switch",
-  restoreArchivedTab: "archive:restore",
-  setArchiveAfter: "settings:set-archive-after",
+  runtimeChanged: "browser:runtime-changed",
+  dispatch: "browser:dispatch",
 };
 
 /**
- * Builds the BrowserApi object. Each function forwards its arguments to one IPC channel.
+ * Builds the BrowserApi object. Each function forwards to one IPC channel.
  */
 function createBrowserApi(): BrowserApi {
   return {
     getState: () => ipcRenderer.invoke(CHANNELS.getState),
+    getRuntimeState: () => ipcRenderer.invoke(CHANNELS.getRuntimeState),
     onStateChanged: (listener) => {
       ipcRenderer.on(CHANNELS.stateChanged, (_event: IpcRendererEvent, state: BrowserState) => {
         listener(state);
       });
     },
-    openTab: (typedText) => ipcRenderer.invoke(CHANNELS.openTab, typedText),
-    selectTab: (tabId) => ipcRenderer.invoke(CHANNELS.selectTab, tabId),
-    closeTab: (tabId) => ipcRenderer.invoke(CHANNELS.closeTab, tabId),
-    pinTab: (tabId) => ipcRenderer.invoke(CHANNELS.pinTab, tabId),
-    unpinTab: (tabId) => ipcRenderer.invoke(CHANNELS.unpinTab, tabId),
-    clearTodayTabs: () => ipcRenderer.invoke(CHANNELS.clearTodayTabs),
-    switchSpace: (spaceId) => ipcRenderer.invoke(CHANNELS.switchSpace, spaceId),
-    restoreArchivedTab: (tabId) => ipcRenderer.invoke(CHANNELS.restoreArchivedTab, tabId),
-    setArchiveAfter: (archiveAfterMs) => ipcRenderer.invoke(CHANNELS.setArchiveAfter, archiveAfterMs),
+    onRuntimeChanged: (listener) => {
+      ipcRenderer.on(CHANNELS.runtimeChanged, (_event: IpcRendererEvent, runtimeState: RuntimeState) => {
+        listener(runtimeState);
+      });
+    },
+    dispatch: (action) => ipcRenderer.invoke(CHANNELS.dispatch, action),
   };
 }
 

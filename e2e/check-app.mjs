@@ -63,6 +63,11 @@ async function windowShot(app, name) {
 }
 
 const getState = (page) => page.evaluate(() => window.browserApi.getState());
+// Version 2 state: tabs live in state.items; each Space lists its Pinned and Today ids.
+const personalSpace = (state) => state.spaces[0];
+const todayTabs = (state) => personalSpace(state).todayIds.map((id) => state.items[id]);
+const pinnedTabs = (state) => personalSpace(state).pinnedIds.map((id) => state.items[id]);
+const itemCount = (state) => Object.keys(state.items).length;
 
 // ---------- first run ----------
 let { app, page, mainLog, consoleErrors } = await launch();
@@ -80,8 +85,8 @@ try {
   await page.waitForFunction(() => document.querySelector(".tab-row .tab-title")?.textContent?.includes("Example"), null, { timeout: 15000 });
 } catch { titleOk = false; }
 let state = await getState(page);
-check("typing example.com opens a tab with https://", state.tabs[0]?.url.startsWith("https://example.com"), state.tabs[0]?.url);
-check("page title flows back into the sidebar", titleOk, state.tabs[0]?.title);
+check("typing example.com opens a tab with https://", todayTabs(state)[0]?.url.startsWith("https://example.com"), todayTabs(state)[0]?.url);
+check("page title flows back into the sidebar", titleOk, todayTabs(state)[0]?.title);
 const contents = await app.evaluate(({ webContents }) => webContents.getAllWebContents().map((contents) => contents.getURL()));
 check("a web view exists for the tab", contents.some((url) => url.startsWith("https://example.com")), contents.join(", "));
 check("empty card hidden while a tab is open", !(await page.isVisible("#empty-card")));
@@ -96,19 +101,19 @@ await windowShot(app, "02-tab-open");
 await page.evaluate(() => [...document.querySelectorAll(".tab-row .tab-action")].find((button) => button.textContent === "Pin").click());
 await page.waitForFunction(() => document.querySelectorAll(".tab-list")[0].querySelector(".tab-row") !== null, null, { timeout: 5000 });
 state = await getState(page);
-check("Pin moves the tab into Pinned with a home URL", state.tabs[0]?.isPinned === true && state.tabs[0]?.homeUrl?.startsWith("https://example.com"));
+check("Pin moves the tab into Pinned with a home URL", pinnedTabs(state).length === 1 && pinnedTabs(state)[0]?.homeUrl?.startsWith("https://example.com"));
 
 await page.fill("#address-input", "best pizza");
 await page.press("#address-input", "Enter");
 await page.waitForFunction(() => document.querySelectorAll(".tab-row").length === 2, null, { timeout: 10000 });
 state = await getState(page);
-const searchTab = state.tabs.find((tab) => !tab.isPinned);
+const searchTab = todayTabs(state)[0];
 check("plain words open a search tab", searchTab?.url.startsWith("https://duckduckgo.com/?q=best%20pizza"), searchTab?.url);
 await page.evaluate(() => document.querySelectorAll(".tab-list")[1].querySelector(".tab-close").click());
 await page.waitForFunction(() => document.querySelectorAll(".tab-row").length === 1, null, { timeout: 5000 });
 state = await getState(page);
 check("Close moves the tab to the Archive as 'manual'", state.archive.length === 1 && state.archive[0].reason === "manual");
-check("selection falls back to the remaining tab", state.selectedTabIdBySpace[state.activeSpaceId] === state.tabs[0]?.id);
+check("selection falls back to the remaining tab", state.selectedTabIdBySpace[state.activeSpaceId] === pinnedTabs(state)[0]?.id);
 const viewsAfterClose = await app.evaluate(({ webContents }) => webContents.getAllWebContents().map((contents) => contents.getURL()));
 check("closed tab's web view is destroyed", !viewsAfterClose.some((url) => url.includes("duckduckgo")), viewsAfterClose.join(", "));
 
@@ -116,7 +121,7 @@ await page.evaluate(() => { document.querySelector(".archive").open = true; });
 await page.evaluate(() => document.querySelector(".archive-restore").click());
 await page.waitForFunction(() => document.querySelectorAll(".tab-row").length === 2, null, { timeout: 5000 });
 state = await getState(page);
-check("Restore brings the tab back and empties the Archive", state.archive.length === 0 && state.tabs.length === 2);
+check("Restore brings the tab back and empties the Archive", state.archive.length === 0 && itemCount(state) === 2);
 
 await page.selectOption("#archive-after", { label: "1 hour" });
 await page.waitForTimeout(300);
@@ -126,7 +131,7 @@ check("'Archive tabs after' setting saves 1 hour", state.settings.archiveAfterMs
 await page.evaluate(() => [...document.querySelectorAll(".text-button")].find((button) => button.textContent === "Clear").click());
 await page.waitForTimeout(300);
 state = await getState(page);
-check("Clear archives today's tabs, keeps pinned", state.tabs.length === 1 && state.tabs[0].isPinned && state.archive[0]?.reason === "clear-button");
+check("Clear archives today's tabs, keeps pinned", itemCount(state) === 1 && pinnedTabs(state).length === 1 && state.archive[0]?.reason === "clear-button");
 
 await page.evaluate(() => document.querySelectorAll(".space-button")[1].click());
 await page.waitForFunction(() => document.querySelector(".space-heading")?.textContent?.includes("Work"), null, { timeout: 5000 });
@@ -152,7 +157,7 @@ check("state saved under the test data folder", fs.existsSync(stateFile), stateF
 await page.waitForSelector(".space-heading", { timeout: 30000 });
 await page.waitForSelector(".tab-row", { timeout: 30000 });
 state = await getState(page);
-check("pinned tab and setting survive a restart", state.tabs.length === 1 && state.tabs[0].isPinned && state.settings.archiveAfterMs === 3600000);
+check("pinned tab and setting survive a restart", itemCount(state) === 1 && pinnedTabs(state).length === 1 && state.settings.archiveAfterMs === 3600000);
 check("archive survives a restart", state.archive.length === 1);
 await page.waitForTimeout(1500);
 await windowShot(app, "05-after-restart");
