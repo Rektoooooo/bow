@@ -114,14 +114,22 @@ Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 �
 - [x] Command Bar (shot 3): 750 wide a third down, 62 input row with tips, 44 rows titled only, inverted arrow
 - [x] Control Center (shot 4): Share sheet, Boost, Screenshot, Capture (drag a region), extension grid with +,
       Settings rows (sound, zoom, Boost, permission answers), Secure pill, "…" native menu
-- [ ] Library, Peek frame, Find, prompts, editors, Little Window, status bubble, crash page in the same language
+- [x] Library (grouped settings with switches), Find, theme editor (with intensity), Boost editor, Little Window
+      reviewed in the same language · [ ] Peek frame, permission prompt, status bubble, crash page review
 - [ ] Verify the traffic lights and native rendering once screen recording works (Claude restart)
 
 ### 3.3 Remaining Arc features
-- [ ] Tab hover previews · [ ] Recent-tab switcher (⌃Tab) · [ ] Inline URL autocomplete · [ ] Tidy titles
-- [x] Capture (Control Center) · [ ] Library Media · [ ] Library Spaces/Boosts · [ ] Notes · [ ] Easels · [ ] Boost fonts/colors/JS
-- [ ] Sound effects · [ ] Alternate app icons · [ ] Ad & tracker blocking · [ ] Translate page · [ ] Handoff
-- [ ] Import from Chrome/Brave/Edge/Safari · [ ] First-run onboarding
+- [x] Tab hover previews · [x] Recent-tab switcher (⌃Tab, with page pictures) · [x] Inline URL autocomplete (also
+      well-known sites) · [x] Tidy titles (our own rules)
+- [x] Capture (Control Center) · [x] Library Media · [x] Library Spaces/Boosts · [x] Notes · [x] Easels (text, pen,
+      pictures, captures; no live-refreshing captures, no sharing) · [x] Boost colors/fonts/JS
+- [x] Sound effects (our own synthesized) · [x] Alternate app icons (Dock while running; Finder icon needs a Dock
+      tile plug-in Electron cannot ship) · [x] Ad & tracker blocking (own engine, EasyList/EasyPrivacy downloaded)
+- [x] Translate page (Google Translate, labelled) · [x] Handoff (unverified: needs signing and a second device)
+- [x] Import from Chrome/Brave/Edge/Vivaldi/Safari (bookmarks + history; no passwords) · [x] First-run welcome
+- [x] Developer Mode (shot 5)
+- Not doing (documented): Arc Max (user's choice), sync/sharing/accounts (user's choice), AppleScript and
+  password-manager bridges (need native code), auto-updates (needs published releases: ask first)
 
 ### 3.4 Verification
 - [x] e2e/arc-compare.mjs (side-by-side with the reference; positions match within about a point)

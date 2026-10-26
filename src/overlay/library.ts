@@ -489,14 +489,47 @@ function renderExtensionsSection(body: HTMLElement, data: LibraryData): void {
 }
 
 /**
- * Builds the Settings section: when unused tabs are archived.
+ * One setting: its name and a short explanation on the left, its control on the right.
  */
-function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
-  const settings = createElement("div", "library-settings");
-  const row = createElement("label", "library-setting-row");
-  row.append(createElement("span", "library-setting-label", "Archive Today tabs after"));
+function createSettingRow(label: string, note: string, control: HTMLElement): HTMLElement {
+  const row = createElement("div", "setting-row");
+  const text = createElement("div", "setting-text");
+  text.append(createElement("span", "setting-label", label));
+  if (note !== "") {
+    text.append(createElement("span", "setting-note", note));
+  }
+  row.append(text, control);
+  return row;
+}
+
+/**
+ * An on/off switch (role "switch", so assistive technology reads it as one).
+ */
+function createSwitch(isOn: boolean, label: string, onToggle: (isOn: boolean) => void): HTMLElement {
+  const toggle = createElement("button", "setting-switch");
+  toggle.setAttribute("role", "switch");
+  toggle.setAttribute("aria-checked", String(isOn));
+  toggle.setAttribute("aria-label", label);
+  toggle.addEventListener("click", () => onToggle(!isOn));
+  return toggle;
+}
+
+/**
+ * A titled group of settings.
+ */
+function createSettingGroup(title: string, rows: HTMLElement[]): HTMLElement {
+  const group = createElement("section", "setting-group");
+  group.append(createElement("h2", "library-setting-heading", title), ...rows);
+  return group;
+}
+
+/**
+ * The choice of how long Today tabs stay before they move to the Archive.
+ */
+function createArchiveSelect(data: LibraryData): HTMLElement {
   const select = document.createElement("select");
   select.className = "library-select";
+  select.setAttribute("aria-label", "Archive Today tabs after");
   for (const option of ARCHIVE_THRESHOLD_OPTIONS) {
     const optionElement = document.createElement("option");
     optionElement.textContent = option.label;
@@ -510,40 +543,13 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
       dispatch({ type: "setArchiveAfter", archiveAfterMs: chosen.valueMs });
     }
   });
-  row.append(select);
-  const explanation = createElement(
-    "p",
-    "library-setting-note",
-    "Today tabs you have not used for this long move to the Archive, checked every 5 minutes, like Arc (default 12 hours). " +
-      "Pinned tabs and Favorites never do. Time while the browser is closed does not count. Little Windows archive after 6 hours. " +
-      "The Archive keeps your newest 250 tabs, like Arc.",
-  );
-  const soundRow = createElement("div", "library-setting-row");
-  const areSoundsOn = data.areSoundEffectsOn;
-  soundRow.append(
-    createElement("span", "library-setting-label", "Sound effects"),
-    createTextButton(areSoundsOn ? "On" : "Off", areSoundsOn ? "library-chip is-active" : "library-chip", () => dispatch({ type: "setSoundEffects", isOn: !areSoundsOn })),
-  );
-  const adBlockRow = createElement("div", "library-setting-row");
-  const adBlock = data.adBlock;
-  adBlockRow.append(
-    createElement("span", "library-setting-label", "Block ads and trackers"),
-    createTextButton(adBlock.isOn ? "On" : "Off", adBlock.isOn ? "library-chip is-active" : "library-chip", () => dispatch({ type: "setAdBlock", isOn: !adBlock.isOn })),
-  );
-  const adBlockStatus: Record<typeof adBlock.status, string> = {
-    off: "Uses the public EasyList and EasyPrivacy lists, downloaded from easylist.to when you turn this on and refreshed every 4 days.",
-    loading: "Downloading the EasyList and EasyPrivacy lists…",
-    ready: `EasyList and EasyPrivacy: ${adBlock.filterCount.toLocaleString()} filters. Turn it off for one site in the Control Center.`,
-    failed: "The lists could not be downloaded. Check the connection and turn it off and on again.",
-  };
-  const adBlockNote = createElement("p", "library-setting-note", adBlockStatus[adBlock.status]);
-  const tidyRow = createElement("div", "library-setting-row");
-  const areTitlesTidy = data.areTitlesTidy;
-  tidyRow.append(
-    createElement("span", "library-setting-label", "Tidy titles for pinned tabs"),
-    createTextButton(areTitlesTidy ? "On" : "Off", areTitlesTidy ? "library-chip is-active" : "library-chip", () => dispatch({ type: "setTidyTitles", isOn: !areTitlesTidy })),
-  );
-  const iconRow = createElement("div", "library-setting-row");
+  return select;
+}
+
+/**
+ * The app icon choices, each a swatch of its colors.
+ */
+function createAppIconChoices(data: LibraryData): HTMLElement {
   const iconChoices = createElement("div", "app-icon-choices");
   for (const variant of APP_ICON_VARIANTS) {
     const choice = createTextButton("", "app-icon-choice", () => dispatch({ type: "setAppIcon", variantId: variant.id }));
@@ -554,13 +560,54 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
     choice.style.background = `linear-gradient(135deg, ${firstColor}, ${middleColor} 50%, ${lastColor})`;
     iconChoices.append(choice);
   }
-  iconRow.append(createElement("span", "library-setting-label", "App icon in the Dock"), iconChoices);
-  const importRow = createElement("div", "library-setting-row");
-  importRow.append(
-    createElement("span", "library-setting-label", "Bookmarks and history from another browser"),
-    createTextButton("Import…", "library-chip", () => dispatch({ type: "showMenu", request: { menu: "import" } })),
-  );
-  settings.append(row, explanation, soundRow, tidyRow, adBlockRow, adBlockNote, iconRow, importRow, renderRoutingSettings(data));
+  return iconChoices;
+}
+
+/** What the ad blocker's row says, by its state. */
+function describeAdBlockStatus(adBlock: LibraryData["adBlock"]): string {
+  const notes: Record<typeof adBlock.status, string> = {
+    off: "Uses the public EasyList and EasyPrivacy lists, downloaded from easylist.to when you turn this on and refreshed every 4 days.",
+    loading: "Downloading the EasyList and EasyPrivacy lists…",
+    ready: `EasyList and EasyPrivacy: ${adBlock.filterCount.toLocaleString()} filters. Allow a site in its Control Center.`,
+    failed: "The lists could not be downloaded. Check the connection, then turn this off and on again.",
+  };
+  return notes[adBlock.status];
+}
+
+/**
+ * Builds the Settings section: tabs, browsing, appearance, import, and links from other apps.
+ */
+function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
+  const settings = createElement("div", "library-settings");
+  const tabs = createSettingGroup("Tabs", [
+    createSettingRow(
+      "Archive Today tabs after",
+      "Unused Today tabs move to the Archive, like Arc (default 12 hours). Pinned tabs and Favorites never do; time with the browser closed does not count. The Archive keeps your newest 250 tabs.",
+      createArchiveSelect(data),
+    ),
+    createSettingRow(
+      "Tidy titles for pinned tabs",
+      "Short names: “Inbox” instead of “(3) Inbox - Mail”. Your own names stay as they are.",
+      createSwitch(data.areTitlesTidy, "Tidy titles for pinned tabs", (isOn) => dispatch({ type: "setTidyTitles", isOn: isOn })),
+    ),
+  ]);
+  const browsing = createSettingGroup("Browsing", [
+    createSettingRow("Block ads and trackers", describeAdBlockStatus(data.adBlock), createSwitch(data.adBlock.isOn, "Block ads and trackers", (isOn) => dispatch({ type: "setAdBlock", isOn: isOn }))),
+    createSettingRow(
+      "Sound effects",
+      "Short, quiet sounds when you close a tab, clear Today, switch Spaces, split or capture.",
+      createSwitch(data.areSoundEffectsOn, "Sound effects", (isOn) => dispatch({ type: "setSoundEffects", isOn: isOn })),
+    ),
+  ]);
+  const appearance = createSettingGroup("Appearance", [createSettingRow("App icon", "Shown in the Dock while the browser runs.", createAppIconChoices(data))]);
+  const importing = createSettingGroup("Import", [
+    createSettingRow(
+      "Bookmarks and history from another browser",
+      "Arc, Chrome, Brave, Edge, Vivaldi or Safari. Bookmarks arrive as a folder in this Space.",
+      createTextButton("Import…", "library-chip", () => dispatch({ type: "showMenu", request: { menu: "import" } })),
+    ),
+  ]);
+  settings.append(tabs, browsing, appearance, importing, renderRoutingSettings(data));
   body.replaceChildren(settings);
 }
 

@@ -48,6 +48,11 @@ in Arc). Running it twice adds nothing twice.
 - ⌘S hides the sidebar; touching the window's left edge shows it again for a moment. Drag its edge to resize it.
 - A dot on a Pinned tab or Favorite whose page changed while you were elsewhere (a new mail count), like Arc.
 - A small player for a tab playing sound in the background.
+- Rest the pointer on a tab to see a preview of its page; ⌃Tab shows the recently used tabs as cards with pictures.
+- Pinned tabs show tidy titles ("Inbox" rather than "(3) Inbox - Mail"), our own rules (Library › Settings).
+- The look is measured from Arc pixel by pixel (`node e2e/arc-compare.mjs` puts them side by side): Apple's SF
+  Symbols, Arc's frame colors from a Space's theme and intensity, the toolbar inside the page card tinted with the
+  page's own color, and motion that glides (the page moves with the sidebar).
 
 **Spaces and profiles**
 - Create, rename, change the emoji, edit the theme (one to three colors as a gradient, light / dark / automatic,
@@ -57,6 +62,7 @@ in Arc). Running it twice adds nothing twice.
 - Private windows (⇧⌘N) keep nothing: an in-memory session, no history, no archive.
 
 **Command Bar** (⌘T, ⌘L)
+- Finishes addresses as you type ("git" → github.com, also well-known sites you never visited).
 - Open tabs ("Switch to Tab"), history, what you typed, search suggestions and about 40 browser actions
   ("New Space", "Toggle Sidebar", "Copy URL", "Theme: Mint", …), ranked by how well title and address match plus
   boosts for open tabs, Favorites and recent use, the way Arc ranks.
@@ -73,15 +79,23 @@ in Arc). Running it twice adds nothing twice.
 - **Split View**: two to four tabs side by side or stacked, one row in the sidebar.
 - **Little Window**: links from other apps (and ⌥⌘N) open in a small window; "Open in Space" moves the page into the
   sidebar. A Little Window left alone for 6 hours goes to the Archive.
-- **Boosts**: your own CSS for a site, and Zap (click elements to hide them for good), from the site controls or the
-  Command Bar. Turn a Boost off or reset it any time.
+- **Boosts**: change a site's colors (shift them, or invert for a dark look) and font, Zap elements away, and add
+  your own CSS and JavaScript (only once switched on). Turn a Boost off or reset it any time; Library › Boosts.
+- **Developer Mode** per site (on by itself for localhost): a striped toolbar with the full address, Console,
+  Network and Inspect buttons, a reload menu with Hard Reload, and the tab outlined in yellow.
+- **Notes** and **Easels**: rich-text notes and boards (text, drawing, pictures, captures) that sit in the sidebar
+  like tabs (File › New Note / New Easel).
+- **Ad and tracker blocking** with EasyList and EasyPrivacy (off until you turn it on in Library › Settings), allowed
+  per site in the Control Center.
 - **Air Traffic Control**: rules such as "address contains github.com → Work" send links from other apps to a Space
   (Library › Settings).
 - **Permission prompts**: a site that wants your camera, microphone, location, notifications or clipboard asks
   first ("meet.google.com wants to use your camera and microphone", Block / Allow). The answer is remembered per
   profile and site; the site controls list it with a Reset. Private windows ask every time and remember nothing.
   Links to apps (mailto:, zoommtg:, steam:, …) ask every time and name the app macOS would open.
-- Site controls (copy link, screenshot, mute, inspect, zoom, permissions, clear site data), Find in page,
+- The **Control Center** (Arc's site controls): Share, Boost, Screenshot, Capture (drag over part of the page), the
+  profile's extensions, per-site settings, and more behind "…" (Translate Page, zoom, clear site data, developer
+  tools). Find in page,
   downloads, Print (⌘P), spelling suggestions, a right-click menu in pages, and automatic Picture-in-Picture when
   you leave a tab playing a video.
 
@@ -96,8 +110,12 @@ in Arc). Running it twice adds nothing twice.
 - Some extensions need Chrome features Electron does not have (side panels, tab capture); those load but only
   partly work.
 
-**Library** (⇧⌘L): the Archive (search, filter by reason, click to restore), History, Downloads, Extensions and
-Settings.
+**Library** (⇧⌘L): the Archive (search, filter by reason, click to restore), History, Media (screenshots and
+captures), Downloads, Spaces, Boosts, Extensions and Settings (sounds, ad blocking, app icon, import from Arc,
+Chrome, Brave, Edge, Vivaldi or Safari).
+
+**Also**: a short welcome tour on the first start, Handoff of the page you are reading to your other Apple devices,
+and alternate app icons for the Dock.
 
 ## Auto-archive, like Arc
 
@@ -111,7 +129,7 @@ The evidence is in [docs/research/arc-findings.md](docs/research/arc-findings.md
 
 Same keys as Arc. ⌘T new tab, ⌘L edit address, ⌘W close, ⇧⌘T reopen, ⌘D pin/unpin, ⇧⌘C copy URL
 (⌥⇧⌘C as Markdown), ⌘S sidebar, ⌘[ / ⌘] back/forward, ⌘R reload, ⌥⌘↑ / ⌥⌘↓ previous/next tab, ⌘1–⌘9 tab N,
-⌃Tab recent tab, ⌥⌘← / ⌥⌘→ previous/next Space, ⌃1–⌃9 Space N, ⇧⌘K clear Today, ⌃⇧= split view, ⌃⇧- close pane,
+⌃Tab / ⌃⇧Tab recent tabs, ⌃⌘N new note, ⌥⌘← / ⌥⌘→ previous/next Space, ⌃1–⌃9 Space N, ⇧⌘K clear Today, ⌃⇧= split view, ⌃⇧- close pane,
 ⌘O open Peek as tab, ⌥⌘N Little Window, ⌘F find, ⇧⌘L Library, ⌘+ / ⌘- / ⌘0 zoom, ⌥⌘I developer tools.
 
 ## How the code is organized

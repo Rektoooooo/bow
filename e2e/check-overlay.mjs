@@ -480,7 +480,7 @@ await overlay.waitForSelector(".theme-editor", { timeout: 5000 });
 await overlay.click(".theme-segment:has-text('Light')");
 await overlay.click(".theme-colors .theme-round-button[aria-label^='Add a color']");
 await overlay.evaluate(() => {
-  const slider = document.querySelector(".theme-grain input");
+  const slider = document.querySelector(".theme-grain:not(.theme-intensity) input");
   slider.value = "0.5";
   slider.dispatchEvent(new Event("input", { bubbles: true }));
 });
@@ -587,7 +587,7 @@ const boostTitles = await overlay.$$eval(".library-line .library-line-title", (t
 check("Library › Boosts lists the sites with a Boost", boostTitles.includes("example.com"), boostTitles.join(","));
 await overlay.click(".library-tab[data-section='settings']");
 await overlay.waitForTimeout(200);
-await overlay.click(".library-setting-row:has-text('Sound effects') .library-chip");
+await overlay.click(".setting-switch[aria-label='Sound effects']");
 await sidebar.waitForTimeout(300);
 check("Library › Settings turns sound effects off", (await getState()).settings.areSoundEffectsOn === false);
 await overlay.press("body", "Escape");

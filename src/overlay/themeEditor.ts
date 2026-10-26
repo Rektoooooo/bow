@@ -132,6 +132,26 @@ function renderGrainRow(): HTMLElement {
 }
 
 /**
+ * Builds the intensity slider (0 to 1), Arc's "how much of the color": less makes the frame quieter (themePalette.ts).
+ */
+function renderIntensityRow(): HTMLElement {
+  const row = createElement("label", "theme-grain theme-intensity");
+  row.append(createElement("span", "theme-label", "Intensity"));
+  const slider = document.createElement("input");
+  slider.type = "range";
+  slider.min = "0";
+  slider.max = "1";
+  slider.step = "0.05";
+  slider.value = String((editedTheme as SpaceTheme).intensity ?? 1);
+  slider.addEventListener("input", () => {
+    editedTheme = { ...(editedTheme as SpaceTheme), intensity: Number(slider.value) };
+    sendSoon();
+  });
+  row.append(slider);
+  return row;
+}
+
+/**
  * Builds the preset chips; each shows its colors and applies them on click (grain stays as it is).
  */
 function renderPresets(panel: ThemePanel, host: HTMLElement): HTMLElement {
@@ -176,6 +196,7 @@ export function renderThemeEditor(host: HTMLElement, panel: ThemePanel): void {
     renderColorRow(panel, host),
     createElement("span", "theme-label", "Appearance"),
     renderAppearanceRow(panel, host),
+    renderIntensityRow(),
     renderGrainRow(),
     createElement("span", "theme-label", "Presets"),
     renderPresets(panel, host),
