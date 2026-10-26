@@ -51,7 +51,7 @@ and every Arc behavior we can observe is written down before Arc shuts down.
 
 ### 2.6 Arc features
 - [ ] Spaces: create / rename / icon / theme / delete, swipe and ⌃1–9 to switch
-- [ ] Peek for links from Favorites and Pinned tabs (⌘O expand, Esc close)
+- [x] Peek for links from Favorites and Pinned tabs to other sites, and Shift-click (⌘O tab, Split, Esc / ⌘W close)
 - [ ] Split View (up to 4 panes)
 - [ ] Hide sidebar (⌘S)
 - [x] Little Arc-style small window (⌥⌘N, links from other apps), archives after 6 h

@@ -597,6 +597,69 @@ button:disabled {
   user-select: text;
 }
 
+/* ---------- Peek (the page itself is a separate view inside .peek-shadow's rectangle) ---------- */
+
+.peek-shadow {
+  position: fixed;
+  border-radius: 12px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.12);
+  background: var(--panel);
+}
+
+.peek-header {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 6px 0 12px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--panel-shadow);
+}
+
+.peek-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.peek-host {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.peek-page-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.peek-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.peek-button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+}
+
+.peek-button:hover {
+  background: var(--highlight);
+  color: var(--ink);
+}
+
 /* ---------- Find bar (the overlay is only as big as the bar) ---------- */
 
 .find-bar {

@@ -30,7 +30,7 @@ import {
   updateTabPage,
 } from "../src/main/state";
 import { findLocation, findTab } from "../src/main/tree";
-import { normalizeTypedInput } from "../src/main/urls";
+import { getSiteKey, isSameSite, normalizeTypedInput } from "../src/main/urls";
 import { DEFAULT_PROFILE_ID, FAVORITES_LIMIT, HOUR_MS } from "../src/shared/settings";
 import type { BrowserState, ItemId, TabItem } from "../src/shared/types";
 import { getPinnedIds, getTab, getTodayIds, ONE_PM, openPinnedTabs, openTabs, PERSONAL_SPACE_ID, WORK_SPACE_ID } from "./builders";
@@ -389,5 +389,16 @@ describe("addPageToArchive", () => {
     expect(state.archive[0]).toMatchObject({ fromSpaceId: null, reason: "auto", archivedAt: ONE_PM });
     expect(state.archive[0]?.tab.title).toBe("News");
     expect(addPageToArchive(state, { url: "about:blank", title: "", faviconUrl: null }, ONE_PM, "manual")).toBe(state);
+  });
+});
+
+describe("sites (for Peek)", () => {
+  it("treats subdomains of one registrable domain as the same site", () => {
+    expect(getSiteKey("https://mail.google.com/mail")).toBe("google.com");
+    expect(getSiteKey("https://news.bbc.co.uk/x")).toBe("bbc.co.uk");
+    expect(getSiteKey("about:blank")).toBeNull();
+    expect(isSameSite("https://mail.google.com/", "https://accounts.google.com/login")).toBe(true);
+    expect(isSameSite("https://github.com/", "https://gist.github.com/")).toBe(true);
+    expect(isSameSite("https://github.com/", "https://example.com/")).toBe(false);
   });
 });

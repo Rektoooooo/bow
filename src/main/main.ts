@@ -36,6 +36,7 @@ import { addVisit, loadHistory, saveHistoryNow, setVisitTitle } from "./historyS
 import { registerIpcHandlers } from "./ipc";
 import { archiveIdleLittleWindows, handleExternalUrl, registerLittleWindowIpc } from "./littleWindow";
 import { showPageContextMenu } from "./menus";
+import { initializePeek, openPeek, relayoutPeek } from "./peek";
 import { createOverlayView, getOverlayContents } from "./overlay";
 import { refreshOpenPanel, registerOverlayIpc, relayoutOverlay, setCommandActionRegistry } from "./overlayController";
 import { restrictWebPermissions, useChromeUserAgent } from "./profiles";
@@ -43,6 +44,8 @@ import { moveTabsToArchive, updateTabFavicon, updateTabPage } from "./state";
 import { getStateFilePath } from "./store";
 import { openLinkInNewTab } from "./tabActions";
 import { getShownTabIds, getTabViews, layoutShownTabViews } from "./tabViews";
+import { findRootLocation, findTab } from "./tree";
+import { isSameSite } from "./urls";
 import type { TabViewEvents } from "./tabViews";
 
 /** Starting window size in pixels. Our choice: fits a 13-inch laptop screen. */
@@ -71,9 +74,36 @@ const tabViewEvents: TabViewEvents = {
   onNavigated: (url, title) => addVisit(url, title, Date.now()),
   onFaviconChanged: (tabId, faviconUrl) => applyChange((state) => updateTabFavicon(state, tabId, faviconUrl)),
   onRuntimeChanged: () => scheduleRuntimePush(),
-  onOpenInNewTab: (_tabId, url, disposition) => openLinkInNewTab(url, disposition),
+  onOpenInNewTab: (tabId, url, disposition) => {
+    if (shouldOpenInPeek(tabId, url)) {
+      openPeek(url, tabId);
+      return;
+    }
+    openLinkInNewTab(url, disposition);
+  },
+  onOpenInPeek: (tabId, url) => openPeek(url, tabId),
+  onWillNavigate: (tabId, url, isUserInitiated) => {
+    if (!isUserInitiated || !shouldOpenInPeek(tabId, url)) {
+      return false;
+    }
+    openPeek(url, tabId);
+    return true;
+  },
   onContextMenu: (_tabId, contents, params) => showPageContextMenu(menuHost, contents, params),
 };
+
+/**
+ * Arc's rule: a link from a Pinned tab or Favorite to another site opens in a Peek, so the pinned page stays put.
+ */
+function shouldOpenInPeek(tabId: ItemId, url: string): boolean {
+  const state = getState();
+  const tab = findTab(state, tabId);
+  const root = findRootLocation(state, tabId);
+  if (tab === undefined || root === null || root.kind === "today") {
+    return false;
+  }
+  return !isSameSite(tab.url, url);
+}
 
 /**
  * Creates the window: sidebar page on the left, hidden title bar with the traffic-light buttons inset,
@@ -112,6 +142,7 @@ function createMainWindow(): BrowserWindow {
   window.on("resize", () => {
     layoutShownTabViews(window, getState(), getLayoutOptions());
     relayoutOverlay();
+    relayoutPeek();
   });
   return window;
 }
@@ -214,6 +245,7 @@ function handleAppReady(): void {
   // Little Windows cannot live without the main window; closing it ends the app.
   mainWindow.on("closed", () => app.quit());
   attachWindow(mainWindow, tabViewEvents);
+  initializePeek(tabViewEvents);
   createOverlayView();
   syncViews();
 

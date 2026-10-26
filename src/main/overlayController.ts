@@ -29,6 +29,7 @@ import { clearHistory, getHistory } from "./historyStore";
 import { computeCardBounds } from "./layout";
 import type { Bounds } from "./layout";
 import { getOverlayContents, hideOverlay, sendToOverlay, setOverlayBounds, showOverlay } from "./overlay";
+import { closePeek, isPeekOpen, openPeekAsTab, openPeekInSplit } from "./peek";
 import { toggleDevTools, zoomPage } from "./pageCommands";
 import { splitTabs } from "./split";
 import { getSelectedTabId, openTab, selectTab } from "./state";
@@ -220,6 +221,11 @@ export function findNextMatch(forward: boolean): void {
 export function closeOverlay(): void {
   const window = getWindow();
   if (window === null) {
+    return;
+  }
+  // The overlay under a Peek belongs to the Peek: closing it (a click outside, Escape) dismisses the Peek.
+  if (isPeekOpen()) {
+    closePeek();
     return;
   }
   if (shownPanel?.kind === "find") {
@@ -547,6 +553,20 @@ export function registerOverlayIpc(): void {
   ipcMain.handle(OVERLAY_CHANNELS.showDownload, (event, downloadId: unknown) => {
     if (isFromOverlay(event) && isShortText(downloadId)) {
       showDownloadInFolder(downloadId);
+    }
+  });
+  ipcMain.handle(OVERLAY_CHANNELS.peekCommand, (event, command: unknown) => {
+    if (!isFromOverlay(event)) {
+      return;
+    }
+    if (command === "openAsTab") {
+      openPeekAsTab();
+    }
+    if (command === "split") {
+      openPeekInSplit();
+    }
+    if (command === "close") {
+      closePeek();
     }
   });
   ipcMain.handle(OVERLAY_CHANNELS.openUrl, (event, url: unknown) => {

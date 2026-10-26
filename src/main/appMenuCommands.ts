@@ -15,6 +15,7 @@ import { applyChange, getRecentTabIds, getState } from "./browserCore";
 import { openLittleWindow } from "./littleWindow";
 import { findNextMatch, openCommandBar, openFind, openLibrary } from "./overlayController";
 import { copyTabUrl, toggleDevTools, zoomPage } from "./pageCommands";
+import { closePeek, isPeekOpen, openPeekAsTab } from "./peek";
 import { showMenuRequest } from "./menus";
 import { menuHost } from "./actionRunner";
 import {
@@ -43,7 +44,14 @@ function getSelectedId(): string | null {
 
 export const appMenuCommands: AppMenuCommands = {
   openCommandBar: (mode) => openCommandBar(mode),
-  closeSelectedTab: () => closeSelectedTab(),
+  closeSelectedTab: () => {
+    // With a Peek open, ⌘W dismisses the Peek, like Arc.
+    if (isPeekOpen()) {
+      closePeek();
+      return;
+    }
+    closeSelectedTab();
+  },
   reopenClosedTab: () => applyChange((state) => restoreLastArchivedTab(state, Date.now())),
   togglePinSelected: () => {
     const selectedTabId = getSelectedId();
@@ -116,4 +124,5 @@ export const appMenuCommands: AppMenuCommands = {
     importFromArc().catch((error) => console.error("Import from Arc failed:", error));
   },
   openUrlInNewTab: (url) => openLinkInNewTab(url, "foreground"),
+  openPeekAsTab: () => openPeekAsTab(),
 };

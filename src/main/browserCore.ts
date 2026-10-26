@@ -49,6 +49,16 @@ let runtimePushTimer: NodeJS.Timeout | null = null;
 /** Recently selected tabs, newest first, for ⌃Tab and the Command Bar. Lives only in memory. */
 let recentTabIds: ItemId[] = [];
 
+/** Functions to run after new page views were added (they land on top): floating layers raise themselves again. */
+const afterSyncHooks: (() => void)[] = [];
+
+/**
+ * Registers a function to run whenever the set of shown page views changed.
+ */
+export function addAfterSyncHook(hook: () => void): void {
+  afterSyncHooks.push(hook);
+}
+
 /**
  * Loads the saved state (or a fresh one). Runs once, before anything else reads the state.
  */
@@ -105,8 +115,12 @@ export function syncViews(): void {
     return;
   }
   const viewsChanged = syncTabViews(mainWindow, currentState, getLayoutOptions(), tabViewEvents);
-  if (viewsChanged) {
-    raiseOverlayIfShown(mainWindow);
+  if (!viewsChanged) {
+    return;
+  }
+  raiseOverlayIfShown(mainWindow);
+  for (const hook of afterSyncHooks) {
+    hook();
   }
 }
 

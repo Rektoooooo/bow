@@ -25,7 +25,11 @@ export type OverlayPanel =
   | { kind: "commandBar"; mode: CommandBarMode; initialText: string }
   | { kind: "library"; section: LibrarySection }
   | { kind: "siteControls" }
-  | { kind: "find" };
+  | { kind: "find" }
+  | { kind: "peek"; frame: { x: number; y: number; width: number; height: number }; url: string; title: string };
+
+/** The Peek header's buttons. */
+export type PeekCommand = "openAsTab" | "split" | "close";
 
 /** One line in the Command Bar, as the overlay draws it. */
 export interface CommandBarLine {
@@ -110,6 +114,7 @@ export interface OverlayApi {
   clearHistory(): Promise<void>;
   showDownload(downloadId: string): Promise<void>;
   openUrl(url: string): Promise<void>;
+  peekCommand(command: PeekCommand): Promise<void>;
 }
 
 /** Channel names between the overlay page and main.ts. */
@@ -127,4 +132,5 @@ export const OVERLAY_CHANNELS = {
   clearHistory: "overlay:clear-history",
   showDownload: "overlay:show-download",
   openUrl: "overlay:open-url",
+  peekCommand: "overlay:peek-command",
 } as const;

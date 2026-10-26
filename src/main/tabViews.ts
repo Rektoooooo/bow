@@ -43,6 +43,13 @@ export interface TabViewEvents {
   onRuntimeChanged(): void;
   /** The page wants a link opened in a new tab (target=_blank, middle-click, ⌘-click). */
   onOpenInNewTab(tabId: ItemId, url: string, disposition: OpenDisposition): void;
+  /** A link was Shift-clicked: Arc opens those in a Peek. */
+  onOpenInPeek(tabId: ItemId, url: string): void;
+  /**
+   * The page is about to leave for another address. `isUserInitiated` is true when the user clicked or typed in the
+   * page just before (a link), false for redirects and scripts. Return true to stop it (main.ts opens a Peek instead).
+   */
+  onWillNavigate(tabId: ItemId, url: string, isUserInitiated: boolean): boolean;
   /** The user right-clicked in the page. */
   onContextMenu(tabId: ItemId, contents: WebContents, params: ContextMenuParams): void;
 }
@@ -55,6 +62,12 @@ let shownTabIds: ItemId[] = [];
 
 /** The tab whose pane has focus (the selected tab), or null. */
 let focusedTabId: ItemId | null = null;
+
+/** When the user last clicked or pressed a key in each tab's page, to tell link clicks from redirects. */
+const lastUserInputAt = new Map<ItemId, number>();
+
+/** A navigation this soon after a click or key press counts as the user's. Our choice. */
+const USER_NAVIGATION_WINDOW_MS = 1000;
 
 /**
  * Gives other modules (activity.ts, main.ts) read access to the views.
@@ -104,11 +117,16 @@ function toDisposition(details: HandlerDetails): OpenDisposition {
 
 /**
  * Decides what happens when a page opens a window. Real popups (sign-in windows that talk back to the page through
- * window.opener) open as small windows in the same session; everything else becomes a new tab.
+ * window.opener, opened with a size) open as small windows in the same session. A Shift-click asks for a new window
+ * without a size; Arc opens those in a Peek. Everything else becomes a new tab.
  */
 function handleWindowOpen(tabId: ItemId, contents: WebContents, details: HandlerDetails, events: TabViewEvents) {
-  const isPopup = details.disposition === "new-window";
-  if (isPopup) {
+  const isNewWindow = details.disposition === "new-window";
+  if (isNewWindow && details.features === "") {
+    events.onOpenInPeek(tabId, details.url);
+    return { action: "deny" as const };
+  }
+  if (isNewWindow) {
     return {
       action: "allow" as const,
       overrideBrowserWindowOptions: {
@@ -121,6 +139,54 @@ function handleWindowOpen(tabId: ItemId, contents: WebContents, details: Handler
 }
 
 /**
+ * Listens to a tab's page: navigation, titles, icons, loading, sound, links and right-clicks.
+ */
+function watchTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvents): void {
+  const contents = view.webContents;
+  contents.on("page-title-updated", (_event, title) => {
+    events.onPageChanged(tabId, contents.getURL(), title);
+  });
+  contents.on("input-event", (_event, input) => {
+    if (input.type === "mouseDown" || input.type === "keyDown") {
+      lastUserInputAt.set(tabId, Date.now());
+    }
+  });
+  contents.on("will-navigate", (details) => {
+    if (!details.isMainFrame || details.isSameDocument) {
+      return;
+    }
+    const lastInputAt = lastUserInputAt.get(tabId) ?? 0;
+    const isUserInitiated = Date.now() - lastInputAt <= USER_NAVIGATION_WINDOW_MS;
+    if (events.onWillNavigate(tabId, details.url, isUserInitiated)) {
+      details.preventDefault();
+    }
+  });
+  contents.on("did-navigate", (_event, url) => {
+    events.onPageChanged(tabId, url, contents.getTitle());
+    events.onNavigated(url, contents.getTitle());
+    events.onRuntimeChanged();
+  });
+  contents.on("did-navigate-in-page", (_event, url) => {
+    events.onPageChanged(tabId, url, contents.getTitle());
+    events.onRuntimeChanged();
+  });
+  contents.on("page-favicon-updated", (_event, faviconUrls) => {
+    const firstFaviconUrl = faviconUrls[0];
+    if (firstFaviconUrl !== undefined) {
+      events.onFaviconChanged(tabId, firstFaviconUrl);
+    }
+  });
+  contents.on("did-start-loading", () => events.onRuntimeChanged());
+  contents.on("did-stop-loading", () => events.onRuntimeChanged());
+  contents.on("audio-state-changed", () => events.onRuntimeChanged());
+  contents.on("context-menu", (_event, params) => {
+    events.onContextMenu(tabId, contents, params);
+  });
+  contents.setWindowOpenHandler((details) => handleWindowOpen(tabId, contents, details, events));
+  view.setBorderRadius(CARD_RADIUS_PX);
+}
+
+/**
  * Creates a web view for one tab in its profile's session, loads its URL and listens to the page.
  */
 export function createTabView(state: BrowserState, tab: TabItem, events: TabViewEvents): WebContentsView {
@@ -130,39 +196,21 @@ export function createTabView(state: BrowserState, tab: TabItem, events: TabView
   const view = new WebContentsView({
     webPreferences: { session: profileSession, sandbox: true, contextIsolation: true, nodeIntegration: false },
   });
-  const contents = view.webContents;
-
-  contents.on("page-title-updated", (_event, title) => {
-    events.onPageChanged(tab.id, contents.getURL(), title);
-  });
-  contents.on("did-navigate", (_event, url) => {
-    events.onPageChanged(tab.id, url, contents.getTitle());
-    events.onNavigated(url, contents.getTitle());
-    events.onRuntimeChanged();
-  });
-  contents.on("did-navigate-in-page", (_event, url) => {
-    events.onPageChanged(tab.id, url, contents.getTitle());
-    events.onRuntimeChanged();
-  });
-  contents.on("page-favicon-updated", (_event, faviconUrls) => {
-    const firstFaviconUrl = faviconUrls[0];
-    if (firstFaviconUrl !== undefined) {
-      events.onFaviconChanged(tab.id, firstFaviconUrl);
-    }
-  });
-  contents.on("did-start-loading", () => events.onRuntimeChanged());
-  contents.on("did-stop-loading", () => events.onRuntimeChanged());
-  contents.on("audio-state-changed", () => events.onRuntimeChanged());
-  contents.on("context-menu", (_event, params) => {
-    events.onContextMenu(tab.id, contents, params);
-  });
-  contents.setWindowOpenHandler((details) => handleWindowOpen(tab.id, contents, details, events));
-
-  contents.setAudioMuted(tab.isMuted);
-  view.setBorderRadius(CARD_RADIUS_PX);
-  contents.loadURL(tab.url).catch(ignoreLoadFailure);
+  watchTabView(tab.id, view, events);
+  view.webContents.setAudioMuted(tab.isMuted);
+  view.webContents.loadURL(tab.url).catch(ignoreLoadFailure);
   tabViews.set(tab.id, view);
   return view;
+}
+
+/**
+ * Takes over a page that already exists (a Peek becoming a tab) for a tab id made in advance, so the page keeps its
+ * state instead of loading again. Call before the state change that adds the tab.
+ */
+export function adoptTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvents): void {
+  watchTabView(tabId, view, events);
+  tabViews.set(tabId, view);
+  events.onPageChanged(tabId, view.webContents.getURL(), view.webContents.getTitle());
 }
 
 /**

@@ -35,6 +35,7 @@ const CHANNELS: typeof OVERLAY_CHANNELS = {
   clearHistory: "overlay:clear-history",
   showDownload: "overlay:show-download",
   openUrl: "overlay:open-url",
+  peekCommand: "overlay:peek-command",
 };
 
 const DISPATCH_CHANNEL: (typeof IPC_CHANNELS)["dispatch"] = "browser:dispatch";
@@ -65,6 +66,7 @@ function createOverlayApi(): OverlayApi {
     clearHistory: () => ipcRenderer.invoke(CHANNELS.clearHistory),
     showDownload: (downloadId) => ipcRenderer.invoke(CHANNELS.showDownload, downloadId),
     openUrl: (url) => ipcRenderer.invoke(CHANNELS.openUrl, url),
+    peekCommand: (command) => ipcRenderer.invoke(CHANNELS.peekCommand, command),
   };
 }
 

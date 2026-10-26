@@ -165,6 +165,58 @@ await sidebar.waitForTimeout(500);
 state = await getState();
 check("closing a Little Window puts its page in the Archive", state.archive[0]?.tab.url.startsWith("https://example.com/little") && state.archive[0]?.fromSpaceId === null, state.archive[0]?.tab.url);
 
+// Peek: a link from a pinned tab to another site opens in a Peek; the pinned page stays.
+await commandBar("newTab", "example.com/peek-source");
+await sidebar.waitForTimeout(2500);
+state = await getState();
+const pinnedSourceId = state.selectedTabIdBySpace[state.activeSpaceId];
+await dispatch({ type: "pinTab", tabId: pinnedSourceId });
+await sidebar.waitForTimeout(300);
+const peekViews = () =>
+  app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+    return win.contentView.children.map((child) => ({ url: child.webContents?.getURL() ?? "", id: child.webContents?.id }));
+  });
+// Real mouse events at the link's position (they count as user input, which Peek requires). Playwright's own click
+// would wait for the navigation, which the Peek rule cancels on purpose.
+async function clickLinkInPage(urlPart) {
+  const page = await findPage(urlPart);
+  const point = await page.evaluate(() => {
+    const rectangle = document.querySelector("a").getBoundingClientRect();
+    return { x: rectangle.x + rectangle.width / 2, y: rectangle.y + rectangle.height / 2 };
+  });
+  await page.mouse.click(point.x, point.y);
+}
+await clickLinkInPage("example.com/peek-source");
+await sidebar.waitForTimeout(2500);
+let views = await peekViews();
+const peekEntry = views.find((view) => view.url.includes("iana.org"));
+state = await getState();
+check("a link from a pinned tab to another site opens in a Peek", peekEntry !== undefined, JSON.stringify(views.map((view) => view.url)));
+check("…and the pinned tab stays on its page", state.items[pinnedSourceId]?.url.startsWith("https://example.com/peek-source"), state.items[pinnedSourceId]?.url);
+await overlay.click(".peek-button[aria-label^='Open as Tab']");
+await sidebar.waitForTimeout(800);
+state = await getState();
+views = await peekViews();
+const adoptedTab = selectedTab(state);
+const adoptedView = views.find((view) => view.url.includes("iana.org"));
+check("Open as Tab turns the Peek into a Today tab", adoptedTab?.url.includes("iana.org") && activeSpace(state).todayIds[0] === adoptedTab?.id, adoptedTab?.url);
+check("…keeping the same page (no reload)", adoptedView?.id === peekEntry?.id, `${adoptedView?.id} vs ${peekEntry?.id}`);
+
+await dispatch({ type: "selectTab", tabId: pinnedSourceId });
+await sidebar.waitForTimeout(800);
+await clickLinkInPage("example.com/peek-source");
+await sidebar.waitForTimeout(2000);
+// Press Escape in the Peek's page: the newest iana.org page (the adopted tab is an older one).
+await app.evaluate(({ webContents }) => {
+  const ianaPages = webContents.getAllWebContents().filter((contents) => contents.getURL().includes("iana.org"));
+  const peekContents = ianaPages.sort((first, second) => second.id - first.id)[0];
+  peekContents.sendInputEvent({ type: "keyDown", keyCode: "Escape" });
+});
+await sidebar.waitForTimeout(600);
+views = await peekViews();
+check("Escape dismisses the Peek", !views.some((view) => view.url.includes("iana.org")) && !(await overlayIsShown()), JSON.stringify(views.map((view) => view.url)));
+
 await app.close();
 const failed = results.filter((result) => !result.ok).length;
 console.log(`\n${results.length - failed}/${results.length} overlay checks passed.`);

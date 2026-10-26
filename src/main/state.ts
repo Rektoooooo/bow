@@ -118,6 +118,8 @@ function createTab(url: string, now: number): TabItem {
 export interface OpenTabOptions {
   /** False opens the tab in the background (⌘-click on a link). Default true. */
   select?: boolean;
+  /** Use this id instead of a new one: a Peek that becomes a tab hands over its page under an id made in advance. */
+  id?: ItemId;
 }
 
 /**
@@ -125,7 +127,8 @@ export interface OpenTabOptions {
  * Example: openTab(state, "https://example.com", now) → state with that tab first in Today and selected
  */
 export function openTab(state: BrowserState, url: string, now: number, options: OpenTabOptions = {}): BrowserState {
-  const newTab = createTab(url, now);
+  const freshTab = createTab(url, now);
+  const newTab: TabItem = options.id === undefined ? freshTab : { ...freshTab, id: options.id };
   const stateWithItem: BrowserState = { ...state, items: { ...state.items, [newTab.id]: newTab } };
   const todayLocation: ItemLocation = { kind: "today", spaceId: state.activeSpaceId };
   const stateWithTab = insertIntoLocation(stateWithItem, todayLocation, newTab.id, 0);
