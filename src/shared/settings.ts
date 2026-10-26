@@ -61,9 +61,10 @@ export const DEFAULT_PROFILE_ID = "profile-default";
 
 /**
  * Default sidebar width in pixels, from the window edge to the right edge of the sidebar's content (the sidebar page
- * sets --sidebar-width from the saved width). Measured on the user's Arc: 8 pt padding + 239 pt of content.
+ * sets --sidebar-width from the saved width). Measured on the user's Arc (1 px per pt): rows span 7…241.5 pt and the page card starts at 248.5 pt, so 7 pt
+ * padding + 235 pt of content.
  */
-export const SIDEBAR_WIDTH_PX = 247;
+export const SIDEBAR_WIDTH_PX = 242;
 
 /** Narrowest and widest sidebar the edge can be dragged to. Our choice; Arc's limits are compiled constants. */
 export const SIDEBAR_MIN_WIDTH_PX = 180;
@@ -83,9 +84,10 @@ export const CARD_GAP_PX = 7;
 
 /**
  * Height of the toolbar at the top of the page card (back, forward, reload, address, site controls), including the
- * 1 px hairline under it. Measured on the user's Arc: 32 pt + hairline. Must match --toolbar-height in sidebar.css.
+ * 1 px hairline under it. Measured on the user's Arc: card top at about 9.5 pt, hairline at 41, page from 42, so
+ * 31 pt + hairline. Must match --toolbar-height in sidebar.css.
  */
-export const TOOLBAR_HEIGHT_PX = 33;
+export const TOOLBAR_HEIGHT_PX = 32;
 
 /** Gap between the panes of a split view, in pixels. Our choice; Arc's panes sit a few pixels apart. */
 export const SPLIT_GAP_PX = 6;

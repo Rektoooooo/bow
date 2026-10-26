@@ -122,9 +122,10 @@ check("opening example.com adds a Today tab with https://", todayTabs(state)[0]?
 check("page title flows back into the sidebar", titleOk, todayTabs(state)[0]?.title);
 check("toolbar shows the page's host", (await page.textContent(".address-text")) === "example.com");
 const bounds = await tabViewBounds(app);
-// Arc's measured layout: sidebar 247 + gap 7 → x 254; card inset 10 + toolbar 33 → y 43 (shared/settings.ts).
-const PAGE_LEFT = 254;
-const PAGE_TOP = 43;
+// Arc's measured layout: sidebar 242 + gap 7 → x 249; card inset 10 + toolbar 32 → y 42 (shared/settings.ts).
+const SIDEBAR_WIDTH = 242;
+const PAGE_LEFT = 249;
+const PAGE_TOP = 42;
 const HIDDEN_PAGE_LEFT = 10;
 check("tab view sits right of the sidebar and below the card's toolbar", bounds[0]?.x === PAGE_LEFT && bounds[0]?.y === PAGE_TOP, JSON.stringify(bounds));
 check("empty card hidden while a tab is open", !(await page.isVisible("#empty-card")));
@@ -215,7 +216,7 @@ await page.mouse.move(3, 400);
 await page.waitForTimeout(500);
 const peekBounds = await tabViewBounds(app);
 const sidebarShows = await page.evaluate(() => getComputedStyle(document.getElementById("sidebar")).visibility === "visible");
-check("touching the left edge shows the hidden sidebar and slides the page", sidebarShows && peekBounds[0]?.x === HIDDEN_PAGE_LEFT + 247 && peekBounds[0]?.width === hiddenBounds[0]?.width, JSON.stringify(peekBounds));
+check("touching the left edge shows the hidden sidebar and slides the page", sidebarShows && peekBounds[0]?.x === HIDDEN_PAGE_LEFT + SIDEBAR_WIDTH && peekBounds[0]?.width === hiddenBounds[0]?.width, JSON.stringify(peekBounds));
 await page.mouse.move(900, 400);
 await page.waitForTimeout(700);
 const afterLeaveBounds = await tabViewBounds(app);

@@ -49,6 +49,15 @@ const LINE_ICONS: Record<CommandBarLine["kind"], IconName> = {
   action: "sliders",
 };
 
+/** What the info button lists: things the Command Bar does that a first look does not show. Our own wording. */
+const COMMAND_BAR_TIPS: { keys: string; text: string }[] = [
+  { keys: "Site name, Tab", text: "Search that site (YouTube, Wikipedia, GitHub…)" },
+  { keys: "↑ ↓  Return", text: "Pick a result; open tabs switch instead of opening again" },
+  { keys: "⌘L", text: "Edit the current page's address" },
+  { keys: "⌘⇧C", text: "Copy the current page's address" },
+  { keys: "Esc", text: "Close" },
+];
+
 /** Placeholder text per Command Bar mode. */
 const PLACEHOLDERS: Record<CommandBarMode, string> = {
   newTab: "Search or Enter URL…",
@@ -61,6 +70,9 @@ let commandLines: CommandBarLine[] = [];
 let highlightedIndex = 0;
 let commandMode: CommandBarMode = "newTab";
 let commandInput: HTMLInputElement | null = null;
+
+/** Whether the info button's tips are showing in place of the results. */
+let isShowingTips = false;
 
 /** Counts queries, so a slow answer to an old query does not replace a newer one. */
 let queryCounter = 0;
@@ -80,12 +92,14 @@ export function closeOverlay(): void {
 }
 
 /**
- * Builds one Command Bar line.
+ * Builds one Command Bar line: icon, title (and the address, dimmer, on the same line), and on the right what Return
+ * does. Tab lines always show "Switch to Tab" (Arc does); the others only while highlighted.
  */
 function createCommandLine(line: CommandBarLine, index: number): HTMLElement {
   const row = createElement("div", "command-line");
   row.setAttribute("role", "option");
   row.dataset.index = String(index);
+  row.dataset.kind = line.kind;
   row.classList.toggle("is-highlighted", index === highlightedIndex);
 
   const iconSlot = createElement("span", "command-line-icon");
@@ -93,6 +107,7 @@ function createCommandLine(line: CommandBarLine, index: number): HTMLElement {
   if (line.faviconUrl !== null || hasPage) {
     iconSlot.append(createFavicon(line.faviconUrl, line.url ?? ""));
   } else {
+    iconSlot.classList.add("is-tile");
     iconSlot.append(createIcon(LINE_ICONS[line.kind]));
   }
 
@@ -102,19 +117,36 @@ function createCommandLine(line: CommandBarLine, index: number): HTMLElement {
     text.append(createElement("span", "command-line-subtitle", line.subtitle));
   }
   const hint = createElement("span", "command-line-hint", LINE_HINTS[line.kind]);
-  if (line.kind === "tab") {
-    hint.append(createIcon("forward", "icon hint-arrow"));
-  }
+  const arrowBox = createElement("span", "hint-arrow-box");
+  arrowBox.append(createIcon("forward"));
+  hint.append(arrowBox);
 
   row.append(iconSlot, text, hint);
-  row.addEventListener("mousemove", () => {
-    if (highlightedIndex !== index) {
-      highlightedIndex = index;
-      drawCommandLines();
-    }
-  });
+  row.addEventListener("mousemove", () => highlightLine(index, false));
   row.addEventListener("click", () => chooseLine(index));
   return row;
+}
+
+/**
+ * Moves the highlight without rebuilding the lines (so favicons do not reload). From the keyboard it also scrolls the
+ * line into view.
+ */
+function highlightLine(index: number, isFromKeyboard: boolean): void {
+  if (index === highlightedIndex) {
+    return;
+  }
+  highlightedIndex = index;
+  const list = document.getElementById("command-lines");
+  if (list === null) {
+    return;
+  }
+  for (const row of list.children) {
+    const isHighlighted = (row as HTMLElement).dataset.index === String(index);
+    row.classList.toggle("is-highlighted", isHighlighted);
+    if (isHighlighted && isFromKeyboard) {
+      row.scrollIntoView({ block: "nearest" });
+    }
+  }
 }
 
 /**
@@ -127,7 +159,36 @@ function drawCommandLines(): void {
   }
   const rows = commandLines.map((line, index) => createCommandLine(line, index));
   list.replaceChildren(...rows);
-  list.hidden = rows.length === 0;
+  list.hidden = rows.length === 0 || isShowingTips;
+}
+
+/**
+ * The info button: shows the tips instead of the results, or the results again.
+ */
+function toggleTips(button: HTMLElement): void {
+  isShowingTips = !isShowingTips;
+  button.setAttribute("aria-pressed", String(isShowingTips));
+  const tips = document.getElementById("command-tips");
+  if (tips !== null) {
+    tips.hidden = !isShowingTips;
+  }
+  drawCommandLines();
+  commandInput?.focus();
+}
+
+/**
+ * The tips list the info button shows.
+ */
+function createTips(): HTMLElement {
+  const tips = createElement("div", "command-tips");
+  tips.id = "command-tips";
+  tips.hidden = true;
+  for (const tip of COMMAND_BAR_TIPS) {
+    const row = createElement("div", "command-tip");
+    row.append(createElement("kbd", "", tip.keys), createElement("span", "", tip.text));
+    tips.append(row);
+  }
+  return tips;
 }
 
 /**
@@ -252,8 +313,8 @@ function handleCommandKeys(event: KeyboardEvent): void {
     event.preventDefault();
     const step = event.key === "ArrowDown" ? 1 : -1;
     const count = commandLines.length;
-    highlightedIndex = count === 0 ? 0 : (highlightedIndex + step + count) % count;
-    drawCommandLines();
+    const nextIndex = count === 0 ? 0 : (highlightedIndex + step + count) % count;
+    highlightLine(nextIndex, true);
     return;
   }
   if (event.key === "Enter") {
@@ -270,6 +331,7 @@ function renderCommandBar(host: HTMLElement, mode: CommandBarMode, initialText: 
   commandLines = [];
   highlightedIndex = 0;
   siteSearch = null;
+  isShowingTips = false;
 
   const panel = createElement("div", "panel command-bar");
   panel.setAttribute("role", "dialog");
@@ -290,7 +352,14 @@ function renderCommandBar(host: HTMLElement, mode: CommandBarMode, initialText: 
   chip.hidden = true;
   const hint = createElement("span", "command-site-hint");
   hint.hidden = true;
-  inputRow.append(chip, input, hint);
+  const infoButton = createElement("button", "command-info-button");
+  infoButton.setAttribute("aria-label", "Command Bar tips");
+  infoButton.setAttribute("aria-pressed", "false");
+  infoButton.append(createIcon("info"));
+  // Keep the focus (and the typed text's selection) in the input.
+  infoButton.addEventListener("mousedown", (event) => event.preventDefault());
+  infoButton.addEventListener("click", () => toggleTips(infoButton));
+  inputRow.append(chip, input, hint, infoButton);
   commandInput = input;
   siteChip = chip;
   siteHint = hint;
@@ -299,7 +368,7 @@ function renderCommandBar(host: HTMLElement, mode: CommandBarMode, initialText: 
   list.id = "command-lines";
   list.setAttribute("role", "listbox");
   list.hidden = true;
-  panel.append(inputRow, list);
+  panel.append(inputRow, list, createTips());
   host.replaceChildren(panel);
 
   input.focus();

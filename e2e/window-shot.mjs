@@ -7,6 +7,7 @@ import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { captureWindow } from "./composite.mjs";
 
 const appDir = path.resolve(import.meta.dirname, "..");
 const outDir = process.env.E2E_OUTPUT_DIR || path.join(appDir, "e2e", "output");
@@ -64,45 +65,8 @@ await sidebar.waitForSelector(".space-title");
 await sidebar.waitForTimeout(6000);
 
 async function compositeShot(fileName) {
-  const pngBase64 = await app.evaluate(async ({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
-    const views = win.contentView.children.filter((child) => child.webContents && child.webContents !== win.webContents);
-    const base = await win.capturePage();
-    const layers = [];
-    for (const view of views) {
-      const bounds = view.getBounds();
-      const isOverlay = view.webContents.getURL().endsWith("/overlay/overlay.html");
-      if (bounds.width > 0) layers.push({ bounds, isOverlay, url: (await view.webContents.capturePage()).toDataURL() });
-    }
-    const contentWidth = win.getContentSize()[0];
-    const helper = new BrowserWindow({ show: false, width: 400, height: 300 });
-    await helper.loadURL("about:blank");
-    const script = `(async () => {
-      const load = (src) => new Promise((resolve) => { const image = new Image(); image.onload = () => resolve(image); image.src = src; });
-      const baseImage = await load(${JSON.stringify(base.toDataURL())});
-      const scale = baseImage.width / ${contentWidth};
-      const canvas = document.createElement("canvas");
-      canvas.width = baseImage.width; canvas.height = baseImage.height;
-      const context = canvas.getContext("2d");
-      context.drawImage(baseImage, 0, 0);
-      for (const layer of ${JSON.stringify(layers)}) {
-        const image = await load(layer.url);
-        const b = layer.bounds;
-        context.save();
-        context.beginPath();
-        context.roundRect(b.x * scale, b.y * scale, b.width * scale, b.height * scale, layer.isOverlay ? 0 : 10 * scale);
-        context.clip();
-        context.drawImage(image, b.x * scale, b.y * scale, b.width * scale, b.height * scale);
-        context.restore();
-      }
-      return canvas.toDataURL("image/png").split(",")[1];
-    })()`;
-    const result = await helper.webContents.executeJavaScript(script);
-    helper.destroy();
-    return result;
-  });
   const filePath = path.join(appDir, "docs", fileName);
-  fs.writeFileSync(filePath, Buffer.from(pngBase64, "base64"));
+  fs.writeFileSync(filePath, await captureWindow(app));
   console.log("saved", filePath);
 }
 

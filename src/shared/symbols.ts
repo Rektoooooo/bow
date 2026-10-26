@@ -7,7 +7,7 @@
  *
  * Data source:
  *   SF Symbols names (Apple's SF Symbols app lists them). Picked to match what Arc shows in the same places
- *   (measured from the user's Arc screenshots: toolbar `slider.horizontal.2.square` and `rectangle.split.2x1`,
+ *   (measured from the user's Arc screenshots: toolbar `slider.horizontal.2.square` and `square.split.2x1`,
  *   Library `archivebox.fill`, …).
  *
  * Data flow:
@@ -24,11 +24,10 @@ export const SYMBOL_NAMES = {
   link: "link",
   lock: "lock.fill",
   sliders: "slider.horizontal.2.square",
-  split: "rectangle.split.2x1",
+  split: "square.split.2x1",
   plus: "plus",
   archive: "archivebox.fill",
   folder: "folder",
-  folderFill: "folder.fill",
   chevronRight: "chevron.right",
   chevronDown: "chevron.down",
   close: "xmark",

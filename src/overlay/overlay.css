@@ -9,11 +9,13 @@
 
 :root {
   /* Opaque: the overlay is its own layer, so CSS blur cannot reach the page underneath. */
-  --panel: #fafafa;
-  --panel-border: rgba(0, 0, 0, 0.1);
+  --panel: #fbfbfb;
+  --panel-border: rgba(0, 0, 0, 0.12);
   --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.1);
   --ink: rgba(0, 0, 0, 0.88);
-  --muted: rgba(0, 0, 0, 0.5);
+  --ink-soft: rgba(0, 0, 0, 0.7);
+  --muted: rgba(0, 0, 0, 0.45);
+  --tile: rgba(0, 0, 0, 0.06);
   --line: rgba(0, 0, 0, 0.08);
   --highlight: rgba(0, 0, 0, 0.06);
   --field: rgba(0, 0, 0, 0.05);
@@ -22,17 +24,24 @@
   --backdrop: rgba(0, 0, 0, 0.12);
   --letter-icon: rgba(0, 0, 0, 0.08);
   --danger: #c4302b;
+  /* Same motion tokens as the sidebar (sidebar.css). */
+  --motion-fast: 120ms;
+  --motion-medium: 200ms;
+  --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   color-scheme: light;
 }
 
 body.dark {
-  --panel: #28282a;
-  --panel-border: rgba(255, 255, 255, 0.1);
+  /* Measured: Arc's dark panel #161819 (over a dark page), highlight #2c2c2c, hairline #2e3032, edge #545454. */
+  --panel: #18191a;
+  --panel-border: rgba(255, 255, 255, 0.2);
   --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
   --ink: rgba(255, 255, 255, 0.92);
-  --muted: rgba(255, 255, 255, 0.5);
+  --ink-soft: rgba(255, 255, 255, 0.75);
+  --muted: rgba(255, 255, 255, 0.42);
+  --tile: rgba(255, 255, 255, 0.07);
   --line: rgba(255, 255, 255, 0.08);
-  --highlight: rgba(255, 255, 255, 0.08);
+  --highlight: rgba(255, 255, 255, 0.09);
   --field: rgba(255, 255, 255, 0.07);
   --chip-active: rgba(255, 255, 255, 0.9);
   --chip-active-ink: #111;
@@ -57,7 +66,7 @@ body {
 body {
   color: var(--ink);
   font: 13px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
+  -webkit-font-smoothing: auto;
   user-select: none;
 }
 
@@ -104,9 +113,9 @@ button:disabled {
   position: fixed;
   background: var(--panel);
   border: 1px solid var(--panel-border);
-  border-radius: 14px;
+  border-radius: 12px;
   box-shadow: var(--panel-shadow);
-  animation: panel-in 140ms ease-out;
+  animation: panel-in 160ms var(--motion-ease);
 }
 
 @keyframes fade-in {
@@ -118,7 +127,7 @@ button:disabled {
 @keyframes panel-in {
   from {
     opacity: 0;
-    transform: translateY(-6px) scale(0.985);
+    transform: translateY(-4px) scale(0.98);
   }
 }
 
@@ -152,37 +161,44 @@ button:disabled {
   background: var(--letter-icon);
 }
 
-/* ---------- Command Bar ---------- */
+/* ---------- Command Bar ----------
+   Measured from the user's Arc screenshot (shot 3, 1 px per point, e2e/arc-compare.mjs): a 750 pt panel centered on
+   the window, its top a third of the way down; a 62 pt input row (magnifier, 18 pt placeholder, info button) over a
+   hairline inset 10 pt; 44 pt result rows 5 pt apart, inset 9 pt from the edge, radius 8; icons centered under the
+   magnifier and titles (13 pt semibold) aligned with the typed text; "Switch to Tab" (12.5 pt) with an arrow in a
+   24 pt rounded square, inverted on the highlighted row. */
 
 .command-bar {
-  top: 18vh;
+  top: 34vh;
   left: 50%;
-  width: min(640px, calc(100vw - 48px));
-  transform: translateX(-50%);
+  width: min(750px, calc(100vw - 48px));
+  translate: -50% 0;
   overflow: hidden;
-  animation: none;
 }
 
 .command-input-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 54px;
-  padding: 0 16px;
+  gap: 11px;
+  height: 62px;
+  padding: 0 20px 0 21px;
 }
 
 .command-search-icon {
-  color: var(--muted);
+  width: 18px;
+  color: var(--ink-soft);
 }
 
 .command-input {
   flex: 1;
   min-width: 0;
+  padding: 0;
   border: 0;
   background: none;
   color: var(--ink);
   font: inherit;
-  font-size: 17px;
+  font-size: 18px;
+  font-weight: 500;
   outline: none;
   user-select: text;
 }
@@ -191,13 +207,38 @@ button:disabled {
   color: var(--muted);
 }
 
+.command-info-button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--muted);
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+
+/* Arc's info button sits on a dark disc. */
+body.dark .command-info-button {
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--ink-soft);
+}
+
+.command-info-button:hover,
+.command-info-button[aria-pressed="true"] {
+  background: var(--highlight);
+  color: var(--ink);
+}
+
 .command-site-chip {
   flex: none;
   padding: 3px 9px;
   border-radius: 7px;
   background: var(--chip-active);
   color: var(--chip-active-ink);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -212,24 +253,35 @@ button:disabled {
   white-space: nowrap;
 }
 
-.command-lines {
-  max-height: 60vh;
+/* The hairline under the input is inset 10 pt; the highlighted row only 8 (Arc's). The hairline is the list's own
+   background, so it stays put while the list scrolls. */
+.command-lines,
+.command-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: calc(66vh - 62px - 24px);
+  overflow-x: hidden;
   overflow-y: auto;
-  padding: 6px;
-  border-top: 1px solid var(--line);
+  scrollbar-width: none;
+  padding: 7px 8px 10px;
+  background: linear-gradient(var(--line), var(--line)) 10px 0 / calc(100% - 20px) 1px no-repeat;
 }
 
-.command-lines[hidden] {
+.command-lines[hidden],
+.command-tips[hidden] {
   display: none;
 }
 
 .command-line {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 44px;
-  padding: 6px 10px;
-  border-radius: 9px;
+  gap: 8px;
+  flex: none;
+  height: 44px;
+  padding: 0 12px 0 10px;
+  border-radius: 8px;
+  transition: background-color var(--motion-fast) var(--motion-ease);
 }
 
 .command-line.is-highlighted {
@@ -239,51 +291,103 @@ button:disabled {
 .command-line-icon {
   display: grid;
   place-items: center;
-  width: 20px;
-  color: var(--muted);
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 6px;
+  color: var(--ink-soft);
+}
+
+.command-line-icon.is-tile {
+  background: var(--tile);
 }
 
 .command-line-text {
   flex: 1;
   min-width: 0;
   display: flex;
-  flex-direction: column;
+  align-items: baseline;
+  gap: 8px;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .command-line-title {
+  flex: none;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Arc shows open tabs, actions and searches by their title alone. */
+.command-line[data-kind="tab"] .command-line-subtitle,
+.command-line[data-kind="action"] .command-line-subtitle,
+.command-line[data-kind="search"] .command-line-subtitle {
+  display: none;
 }
 
 .command-line-subtitle {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .command-line-hint {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  flex: none;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
   opacity: 0;
+  transition: opacity var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 
-.command-line.is-highlighted .command-line-hint {
+.command-line.is-highlighted .command-line-hint,
+.command-line[data-kind="tab"] .command-line-hint {
   opacity: 1;
 }
 
-.hint-arrow {
-  width: 18px;
-  height: 18px;
-  padding: 2px;
-  border-radius: 5px;
-  background: var(--highlight);
+.command-line.is-highlighted .command-line-hint {
+  color: var(--ink);
+}
+
+.hint-arrow-box {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--tile);
+  color: var(--ink-soft);
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+
+.command-line.is-highlighted .hint-arrow-box {
+  background: var(--chip-active);
+  color: var(--chip-active-ink);
+}
+
+.command-tip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 34px;
+  padding: 0 12px 0 10px;
+  color: var(--ink-soft);
+}
+
+.command-tip kbd {
+  flex: none;
+  min-width: 96px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 /* ---------- Library ---------- */
@@ -293,10 +397,9 @@ button:disabled {
   left: 50%;
   width: min(760px, calc(100vw - 48px));
   height: min(620px, 84vh);
-  transform: translateX(-50%);
+  translate: -50% 0;
   display: flex;
   flex-direction: column;
-  animation: none;
 }
 
 .library-header {
@@ -687,12 +790,11 @@ button:disabled {
   top: 10vh;
   left: 50%;
   width: min(620px, calc(100vw - 48px));
-  transform: translateX(-50%);
+  translate: -50% 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 16px;
-  animation: none;
 }
 
 .boost-header {

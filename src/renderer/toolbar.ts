@@ -18,7 +18,26 @@ import { morphChildren } from "./morph.js";
 import { findWebStoreExtensionId } from "../shared/webStore.js";
 
 /**
- * Builds the address pill: a lock for https pages (a globe otherwise) and the host name. Clicking edits the address.
+ * The address as Arc's toolbar shows it: host without "www." and the path, no scheme, query or fragment
+ * ("github.com/user/project"; a site's front page is just "example.com").
+ */
+function getDisplayAddress(url: string): string {
+  const host = getDisplayHost(url);
+  if (host === "") {
+    return "";
+  }
+  let path = "";
+  try {
+    path = decodeURI(new URL(url).pathname);
+  } catch {
+    path = new URL(url).pathname;
+  }
+  const trimmedPath = path.endsWith("/") ? path.slice(0, -1) : path;
+  return `${host}${trimmedPath}`;
+}
+
+/**
+ * Builds the address pill: a link icon for https pages (Arc's), a globe otherwise, and the address. Clicking edits it.
  */
 function createAddressPill(url: string | null): HTMLElement {
   const pill = document.createElement("button");
@@ -31,9 +50,9 @@ function createAddressPill(url: string | null): HTMLElement {
   pill.setAttribute("aria-label", url === null ? "Search or enter address" : `Edit address ${url}`);
 
   const isSecure = url !== null && url.startsWith("https://");
-  pill.append(createIcon(isSecure ? "lock" : "globe", "icon address-icon"));
-  const host = url === null ? "" : getDisplayHost(url);
-  const label = host === "" ? url ?? "Search or enter address" : host;
+  pill.append(createIcon(isSecure ? "link" : "globe", "icon address-icon"));
+  const address = url === null ? "" : getDisplayAddress(url);
+  const label = address === "" ? url ?? "Search or enter address" : address;
   pill.append(createElement("span", "address-text", label));
   return pill;
 }

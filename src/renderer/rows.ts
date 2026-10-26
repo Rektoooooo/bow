@@ -183,15 +183,6 @@ export function renderTabRow(tab: TabItem, location: ItemLocation, index: number
 }
 
 /**
- * Arc's closed folder: the outline in the text color over a dark inside (the SF Symbols folder over folder.fill).
- */
-function createClosedFolderGlyph(): HTMLElement {
-  const glyph = createElement("span", "folder-glyph");
-  glyph.append(createIcon("folderFill", "icon folder-glyph-fill"), createIcon("folder"));
-  return glyph;
-}
-
-/**
  * True when the selected tab sits somewhere inside a folder (at any depth).
  */
 function folderContainsTab(state: BrowserState, folder: FolderItem, tabId: ItemId | null): boolean {
@@ -229,7 +220,7 @@ export function renderFolderRows(folder: FolderItem, location: ItemLocation, ind
   row.tabIndex = 0;
 
   const iconSlot = createElement("span", "row-icon-slot folder-icon");
-  iconSlot.append(folder.isOpen ? createIcon("folderOpen") : createClosedFolderGlyph());
+  iconSlot.append(createIcon(folder.isOpen ? "folderOpen" : "folderClosed"));
   row.append(iconSlot);
 
   const title = createElement("span", "row-title");

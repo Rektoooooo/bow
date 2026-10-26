@@ -1,8 +1,8 @@
 /*
   WHY this file exists:
     Look of the window's own page: the sidebar, and the page card with its toolbar, like Arc's. Sizes and colors are
-    measured from the user's Arc screenshots (reference/arc-ui, 0.985 px per pt; see docs/research/arc-findings.md
-    and tasks/todo.md 3.2). Sizes must match shared/settings.ts, because main.ts places the web page with them.
+    measured from the user's Arc screenshots (reference/arc-ui, 1 px per pt; e2e/arc-compare.mjs shows them side by
+    side with ours; see docs/research/arc-findings.md and tasks/todo.md 3.2). Sizes must match shared/settings.ts, because main.ts places the web page with them.
 
   Data source:
     CSS variables set by theme.ts from the active Space's theme (--frame-1…3 computed like Arc's frame,
@@ -39,13 +39,13 @@
 }
 
 :root {
-  --sidebar-width: 247px; /* = SIDEBAR_WIDTH_PX; sidebar.ts sets the saved width */
+  --sidebar-width: 242px; /* = SIDEBAR_WIDTH_PX; sidebar.ts sets the saved width */
   --card-inset: 10px; /* = CARD_INSET_PX */
   --card-gap: 7px; /* = CARD_GAP_PX */
   --card-radius: 10px; /* = CARD_RADIUS_PX */
-  --toolbar-height: 33px; /* = TOOLBAR_HEIGHT_PX (32 + hairline) */
-  --header-height: 46px;
-  --row-height: 36px;
+  --toolbar-height: 32px; /* = TOOLBAR_HEIGHT_PX (31 + hairline) */
+  --header-height: 43px; /* Favorites start 43 pt from the top in Arc */
+  --row-height: 35px;
   --row-gap: 5px;
   --row-radius: 10px;
 
@@ -64,21 +64,26 @@
     --card-bg var(--motion-slow) var(--motion-ease);
 }
 
-/* Dark: white overlays (measured on the user's Arc: selected row 22 %, Favorites tile 12 %, divider 16 %). */
+/*
+  Dark: white overlays, calibrated against the user's Arc pixel by pixel (e2e/arc-compare.mjs) on #313131: selected
+  row #5f5f5f, Favorites tile #494949, divider #525252, text #dedede, "New Tab" #999, sidebar toggle #b1b1b1.
+  Chromium blends in the display's color space, so these strengths are what reproduces Arc's pixels, not the
+  plain sRGB arithmetic.
+*/
 :root[data-appearance="dark"] {
   color-scheme: dark;
-  --ink: rgba(255, 255, 255, 0.88);
-  --muted: rgba(255, 255, 255, 0.45);
-  --icon: rgba(255, 255, 255, 0.58);
+  --ink: rgba(255, 255, 255, 0.83);
+  --muted: rgba(255, 255, 255, 0.46);
+  --icon: rgba(255, 255, 255, 0.64);
   --faint: rgba(255, 255, 255, 0.22);
-  --dot: rgba(255, 255, 255, 0.2);
-  --line: rgba(255, 255, 255, 0.16);
-  --row-hover: rgba(255, 255, 255, 0.09);
-  --row-selected: rgba(255, 255, 255, 0.22);
+  --dot: rgba(255, 255, 255, 0.18);
+  --line: rgba(255, 255, 255, 0.14);
+  --row-hover: rgba(255, 255, 255, 0.08);
+  --row-selected: rgba(255, 255, 255, 0.195);
   --row-shadow: none;
-  --tile: rgba(255, 255, 255, 0.12);
-  --tile-hover: rgba(255, 255, 255, 0.17);
-  --tile-selected: rgba(255, 255, 255, 0.26);
+  --tile: rgba(255, 255, 255, 0.1);
+  --tile-hover: rgba(255, 255, 255, 0.145);
+  --tile-selected: rgba(255, 255, 255, 0.225);
   --field: rgba(255, 255, 255, 0.09);
   --letter-icon: rgba(255, 255, 255, 0.14);
   --drop-line: rgba(255, 255, 255, 0.7);
@@ -148,7 +153,7 @@ body {
   background: linear-gradient(165deg, var(--frame-1), var(--frame-2) 55%, var(--frame-3));
   color: var(--ink);
   font: 13.5px/1.25 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
+  -webkit-font-smoothing: auto;
   user-select: none;
   overflow: hidden;
   transition: grid-template-columns var(--motion-slow) var(--motion-ease);
@@ -234,8 +239,8 @@ button:disabled {
 
 /* SF Symbols (icons.ts): a mask tinted with the text color, drawn at the symbol's natural size. */
 .icon-symbol {
-  width: var(--symbol-width, 16px);
-  height: var(--symbol-height, 16px);
+  width: calc(var(--symbol-width, 16px) * var(--symbol-scale, 1));
+  height: calc(var(--symbol-height, 16px) * var(--symbol-scale, 1));
   background-color: currentColor;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
@@ -253,32 +258,35 @@ button:disabled {
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  padding: 0 0 0 8px;
+  padding: 0 0 0 7px;
 }
 
 /* The top strip holds the traffic lights; it also drags the window. */
 .sidebar-header {
   flex: none;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   height: var(--header-height);
   -webkit-app-region: drag;
 }
 
-/* Up to the sidebar toggle, which sits right of the traffic lights (centered about 93 pt from the left in Arc). */
+/* Up to the sidebar toggle, which sits right of the traffic lights (its glyph centered at 90.5, 22.5 pt in Arc). */
 .traffic-light-space {
-  width: 71px;
+  width: 67px;
   flex: none;
 }
 
 .header-buttons {
   display: flex;
   gap: 2px;
+  margin-top: 9px;
   -webkit-app-region: no-drag;
 }
 
 .header-button,
 .bottom-button {
+  /* Arc draws these a little larger than a 13 pt symbol (measured: the sidebar toggle 18 pt wide, + 14 pt). */
+  --symbol-scale: 1.1;
   display: grid;
   place-items: center;
   width: 28px;
@@ -320,15 +328,15 @@ button:disabled {
   flex: none;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
-  gap: 8px;
-  padding-bottom: 12px;
+  gap: 7px;
+  padding-bottom: 8px;
 }
 
 .favorite-tile {
   position: relative;
   display: grid;
   place-items: center;
-  height: 45px;
+  height: 46px;
   border-radius: 10px;
   background: var(--tile);
   transition:
@@ -439,13 +447,13 @@ button:disabled {
   }
 }
 
-/* The Space's name above Pinned: small, muted, its icon where row icons sit. */
+/* The Space's name above Pinned: small, muted, its icon where row icons sit; as tall as a row, like Arc's. */
 .space-title {
   position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 30px;
+  height: var(--row-height);
   margin-bottom: var(--row-gap);
   padding: 0 6px 0 8px;
   border-radius: var(--row-radius);
@@ -461,6 +469,7 @@ button:disabled {
 
 .space-title-icon {
   width: 20px;
+  color: var(--ink);
   text-align: center;
   font-size: 13px;
 }
@@ -529,23 +538,22 @@ button:disabled {
   color: var(--ink);
 }
 
-/* Arc's folder: an outline with a dark inside (the SF Symbol folder over folder.fill). */
-.folder-glyph {
-  position: relative;
-  display: grid;
-  place-items: center;
+/* Our folder drawings (icons.ts): the back washed in the text color, the inside dark like Arc's. */
+.icon-part-none {
+  fill: none;
 }
 
-.folder-glyph > .icon-symbol {
-  grid-area: 1 / 1;
+.icon-part-soft {
+  fill: currentColor;
+  fill-opacity: 0.35;
 }
 
-.folder-glyph-fill {
-  color: rgba(0, 0, 0, 0.85);
+.icon-part-dark {
+  fill: rgba(0, 0, 0, 0.85);
 }
 
-:root[data-appearance="light"] .folder-glyph-fill {
-  color: rgba(255, 255, 255, 0.85);
+:root[data-appearance="light"] .icon-part-dark {
+  fill: rgba(255, 255, 255, 0.9);
 }
 
 .favicon {
@@ -700,13 +708,15 @@ button:disabled {
   white-space: nowrap;
 }
 
-/* Divider between Pinned and Today, with "Clear" on hover. */
+/* Divider between Pinned and Today, with "Clear" on hover. In Arc the line sits 10.5 pt under the last pinned row
+   and 12.5 pt over New Tab. */
 .today-divider {
   position: relative;
   display: flex;
-  align-items: center;
-  height: 21px;
+  align-items: flex-start;
+  height: 23px;
   margin: 0 10px;
+  padding-top: 10px;
 }
 
 .divider-line {
@@ -717,6 +727,7 @@ button:disabled {
 
 .divider-clear {
   position: absolute;
+  top: 2px;
   right: 0;
   border: 0;
   border-radius: 6px;
@@ -904,6 +915,7 @@ button:disabled {
   justify-content: space-between;
   gap: 4px;
   height: 50px;
+  padding-right: 3px;
 }
 
 .space-switcher {
@@ -995,7 +1007,7 @@ body.sidebar-hidden .main-column {
   align-items: center;
   gap: 8px;
   height: var(--toolbar-height);
-  padding: 0 6px 0 8px;
+  padding: 0 6px 0 7px;
   border-bottom: 1px solid var(--hairline);
   color: var(--toolbar-ink);
   -webkit-app-region: drag;
@@ -1043,7 +1055,12 @@ body.sidebar-hidden .toolbar {
 
 .toolbar-right {
   justify-content: flex-end;
-  gap: 7px;
+  gap: 9px;
+}
+
+/* Arc's site-controls glyph is larger than a 13 pt symbol (measured 16 × 16.5 pt). */
+.toolbar-button[data-action="site-controls"] {
+  --symbol-scale: 1.2;
 }
 
 .toolbar-button {

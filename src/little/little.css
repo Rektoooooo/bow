@@ -24,7 +24,7 @@ body {
   background: var(--frame);
   color: var(--ink);
   font: 13px/1.3 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
+  -webkit-font-smoothing: auto;
   user-select: none;
   overflow: hidden;
 }

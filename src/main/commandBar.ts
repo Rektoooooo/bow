@@ -62,8 +62,8 @@ export interface CommandBarInput {
 /** Most lines shown. Arc shows about this many before scrolling. */
 export const RESULTS_LIMIT = 8;
 
-/** Open tabs listed when nothing is typed yet. */
-const EMPTY_QUERY_TAB_COUNT = 6;
+/** Open tabs listed when nothing is typed yet. The user's Arc lists five lines (shot 3). */
+const EMPTY_QUERY_TAB_COUNT = 5;
 
 const OPEN_TAB_BOOST = 15;
 const FAVORITE_BOOST = 10;

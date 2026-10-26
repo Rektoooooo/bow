@@ -2,8 +2,9 @@
  * WHY this file exists:
  *   Every page of ours shows icons: back, reload, folder, archive, … They are Apple's SF Symbols, the same system
  *   icons Arc uses, rendered by macOS (src/main/symbols.ts) and shown as masks tinted with the text color, so hover
- *   and theme colors apply to them like to text. One icon has no SF Symbol (the open folder Arc draws itself); it
- *   stays a small path of our own drawn in the same weight.
+ *   and theme colors apply to them like to text. Folders are drawn by us: Arc's folders are its own drawings (taller
+ *   than SF Symbols' folder, with a dark inside), so ours are our own paths in the same proportions, measured from
+ *   the user's screenshots (closed 19 × 19 pt, open 22 × 17 pt).
  *
  * Data source:
  *   SYMBOL_NAMES (src/shared/symbols.ts) and the images each page receives from getSymbols().
@@ -15,20 +16,47 @@
 import { SYMBOL_NAMES } from "../shared/symbols.js";
 import type { SymbolIconName, SymbolImage } from "../shared/symbols";
 
-/** Icons we draw ourselves because no SF Symbol fits: path data on a 16×16 grid, stroked like SF Symbols Regular. */
-const OWN_ICON_PATHS = {
-  folderOpen: "M2.25 12.75V4.25c0-.55.45-1 1-1h3.1l1.4 1.4h4.75c.55 0 1 .45 1 1v1.1M2.25 12.75l1.7-5.1c.14-.4.52-.65.95-.65h9.3c.68 0 1.16.67.95 1.32l-1.5 4.43H2.25z",
-} as const;
+/**
+ * One part of an icon we draw: an outline in the text color, filled with nothing, a soft wash of the text color
+ * (the back of an open folder) or near-black (the inside of a folder; near-white in light mode, see sidebar.css).
+ */
+interface OwnIconPart {
+  path: string;
+  fill: "none" | "soft" | "dark";
+}
 
-export type IconName = SymbolIconName | keyof typeof OWN_ICON_PATHS;
+interface OwnIcon {
+  width: number;
+  height: number;
+  parts: OwnIconPart[];
+}
+
+/** Icons we draw ourselves, in CSS pixels. */
+const OWN_ICONS = {
+  folderClosed: {
+    width: 19,
+    height: 19,
+    parts: [
+      { path: "M1.25 5.25V3.25C1.25 2.15 2.15 1.25 3.25 1.25H6.9C7.45 1.25 7.95 1.5 8.3 1.9L9.4 3.25H15.75C16.85 3.25 17.75 4.15 17.75 5.25Z", fill: "soft" },
+      { path: "M1.25 5.25H17.75V15.5C17.75 16.75 16.75 17.75 15.5 17.75H3.5C2.25 17.75 1.25 16.75 1.25 15.5Z", fill: "dark" },
+    ],
+  },
+  folderOpen: {
+    width: 22,
+    height: 17,
+    parts: [
+      { path: "M1.5 12.5V2.6C1.5 1.7 2.2 1 3.1 1H6.2C6.7 1 7.1 1.2 7.4 1.6L8.3 2.9H18.4C19.3 2.9 20 3.6 20 4.5V5.1H7.6L4.7 15.4C2.9 15.4 1.5 14.2 1.5 12.5Z", fill: "soft" },
+      { path: "M7.6 5.1H20.4C21 5.1 21.4 5.7 21.2 6.2L18.6 14.6C18.4 15.1 18 15.4 17.5 15.4H5.4C4.9 15.4 4.5 14.9 4.7 14.4Z", fill: "dark" },
+    ],
+  },
+} satisfies Record<string, OwnIcon>;
+
+export type IconName = SymbolIconName | keyof typeof OWN_ICONS;
 
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
-/** Edge length of our own drawn icons, in CSS pixels. */
-const OWN_ICON_SIZE_PX = 16;
-
-/** Stroke width of our own drawn icons: close to SF Symbols' Regular weight at this size. */
-const OWN_ICON_STROKE_WIDTH = 1.3;
+/** Stroke width of our own drawn icons: Arc's folder outlines measure about 1.5 pt. */
+const OWN_ICON_STROKE_WIDTH = 1.5;
 
 /**
  * True for icons drawn from an SF Symbol.
@@ -68,19 +96,22 @@ export function createIcon(name: IconName, className: string = "icon"): Element 
     symbol.setAttribute("aria-hidden", "true");
     return symbol;
   }
+  const icon: OwnIcon = OWN_ICONS[name];
   const svg = document.createElementNS(SVG_NAMESPACE, "svg");
-  svg.setAttribute("viewBox", `0 0 ${OWN_ICON_SIZE_PX} ${OWN_ICON_SIZE_PX}`);
-  svg.setAttribute("width", String(OWN_ICON_SIZE_PX));
-  svg.setAttribute("height", String(OWN_ICON_SIZE_PX));
+  svg.setAttribute("viewBox", `0 0 ${icon.width} ${icon.height}`);
+  svg.setAttribute("width", String(icon.width));
+  svg.setAttribute("height", String(icon.height));
   svg.setAttribute("aria-hidden", "true");
   svg.setAttribute("class", className);
-  const path = document.createElementNS(SVG_NAMESPACE, "path");
-  path.setAttribute("d", OWN_ICON_PATHS[name]);
-  path.setAttribute("fill", "none");
-  path.setAttribute("stroke", "currentColor");
-  path.setAttribute("stroke-width", String(OWN_ICON_STROKE_WIDTH));
-  path.setAttribute("stroke-linecap", "round");
-  path.setAttribute("stroke-linejoin", "round");
-  svg.append(path);
+  for (const part of icon.parts) {
+    const path = document.createElementNS(SVG_NAMESPACE, "path");
+    path.setAttribute("d", part.path);
+    path.setAttribute("class", `icon-part-${part.fill}`);
+    path.setAttribute("stroke", "currentColor");
+    path.setAttribute("stroke-width", String(OWN_ICON_STROKE_WIDTH));
+    path.setAttribute("stroke-linecap", "round");
+    path.setAttribute("stroke-linejoin", "round");
+    svg.append(path);
+  }
   return svg;
 }

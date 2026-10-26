@@ -71,10 +71,11 @@ const MIN_WINDOW_WIDTH_PX = 640;
 const MIN_WINDOW_HEIGHT_PX = 400;
 
 /**
- * Where macOS draws the close/minimize/zoom buttons, so they sit in the sidebar's top strip. Measured on the user's
- * Arc: the first button's center is about 20 pt from the left and 25 pt from the top.
+ * Where macOS draws the close/minimize/zoom buttons, so they sit in the sidebar's top strip: the top-left corner of
+ * the close button's 14 × 14 pt frame (Electron centers the buttons in a strip 2 × y taller than them). Measured on
+ * the user's Arc (1 px per pt): the close button's center is at 19, 22.5 pt.
  */
-const TRAFFIC_LIGHT_POSITION = { x: 13, y: 18 };
+const TRAFFIC_LIGHT_POSITION = { x: 12, y: 16 };
 
 /** When this run of the app started. Auto-archive counts inactivity from here at the earliest. */
 const launchedAt = Date.now();
