@@ -18,11 +18,12 @@ import type { SidebarCommand } from "../shared/actions";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
 import type { BrowserState, ItemId, RuntimeState } from "../shared/types";
 import { getActiveDownloadCount } from "./downloads";
+import { findMediaInfo, handleShownTabsChanged } from "./media";
 import type { CardLayoutOptions } from "./layout";
 import { raiseOverlayIfShown } from "./overlay";
 import { getSelectedTabId } from "./state";
 import { loadState, saveState } from "./store";
-import { collectTabRuntime, syncTabViews } from "./tabViews";
+import { collectTabRuntime, getShownTabIds, layoutShownTabViews, syncTabViews } from "./tabViews";
 import type { TabViewEvents } from "./tabViews";
 
 /** Page events come in bursts (a load fires several); wait this long and send one runtime update. */
@@ -48,6 +49,9 @@ let runtimePushTimer: NodeJS.Timeout | null = null;
 
 /** Recently selected tabs, newest first, for ⌃Tab and the Command Bar. Lives only in memory. */
 let recentTabIds: ItemId[] = [];
+
+/** True while the hidden sidebar shows because the mouse is at the window's left edge. Not saved. */
+let isSidebarPeeking = false;
 
 /** Functions to run after new page views were added (they land on top): floating layers raise themselves again. */
 const afterSyncHooks: (() => void)[] = [];
@@ -92,7 +96,21 @@ export function getRecentTabIds(): ItemId[] {
  * The card sits right of the sidebar (unless hidden) and below the toolbar.
  */
 export function getLayoutOptions(): CardLayoutOptions {
-  return { isSidebarVisible: currentState.settings.isSidebarVisible, isToolbarVisible: true };
+  return { isSidebarVisible: currentState.settings.isSidebarVisible, isToolbarVisible: true, isSidebarPeeking: isSidebarPeeking };
+}
+
+/**
+ * Shows or hides the sidebar for a moment while it is hidden (Arc's hover at the left edge). The page slides aside.
+ */
+export function setSidebarPeek(isPeeking: boolean): void {
+  const canPeek = !currentState.settings.isSidebarVisible;
+  const newValue = isPeeking && canPeek;
+  if (newValue === isSidebarPeeking || mainWindow === null) {
+    return;
+  }
+  isSidebarPeeking = newValue;
+  layoutShownTabViews(mainWindow, currentState, getLayoutOptions());
+  scheduleRuntimePush();
 }
 
 /**
@@ -114,10 +132,12 @@ export function syncViews(): void {
   if (mainWindow === null || tabViewEvents === null) {
     return;
   }
+  const previouslyShownTabIds = [...getShownTabIds()];
   const viewsChanged = syncTabViews(mainWindow, currentState, getLayoutOptions(), tabViewEvents);
   if (!viewsChanged) {
     return;
   }
+  handleShownTabsChanged(previouslyShownTabIds, getShownTabIds());
   raiseOverlayIfShown(mainWindow);
   for (const hook of afterSyncHooks) {
     hook();
@@ -137,6 +157,9 @@ export function applyChange(change: (state: BrowserState) => BrowserState): void
   }
 
   currentState = newState;
+  if (currentState.settings.isSidebarVisible) {
+    isSidebarPeeking = false;
+  }
   rememberSelectedTab();
   saveState(stateFilePath, currentState);
   syncViews();
@@ -158,7 +181,13 @@ export function pushStateToSidebar(): void {
  * Builds the runtime facts: every loaded tab's loading / sound / history, and the downloads in progress.
  */
 export function collectRuntimeState(): RuntimeState {
-  return { tabs: collectTabRuntime(), activeDownloadCount: getActiveDownloadCount() };
+  const tabs = collectTabRuntime();
+  return {
+    tabs: tabs,
+    activeDownloadCount: getActiveDownloadCount(),
+    isSidebarPeeking: isSidebarPeeking,
+    media: findMediaInfo(tabs, getShownTabIds()),
+  };
 }
 
 /**

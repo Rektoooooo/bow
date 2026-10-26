@@ -20,6 +20,14 @@ describe("computeCardBounds", () => {
     });
   });
 
+  it("slides the card right without resizing it while the hidden sidebar peeks", () => {
+    const hidden = computeCardBounds(1280, 820, { isSidebarVisible: false, isToolbarVisible: true });
+    const peeking = computeCardBounds(1280, 820, { isSidebarVisible: false, isToolbarVisible: true, isSidebarPeeking: true });
+
+    expect(peeking.x).toBe(hidden.x + SIDEBAR_WIDTH_PX);
+    expect(peeking.width).toBe(hidden.width);
+  });
+
   it("fills the window when the sidebar is hidden, and never goes negative", () => {
     const card = computeCardBounds(1280, 820, { isSidebarVisible: false, isToolbarVisible: false });
     const tiny = computeCardBounds(10, 10, { isSidebarVisible: true, isToolbarVisible: true });

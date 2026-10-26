@@ -10,7 +10,9 @@
  *   ipc.ts parseAction() → runAction(action) → applyChange(state function) / tabActions / menus / overlayController
  */
 import type { BrowserAction } from "../shared/actions";
-import { applyChange, getState, getWindow, sendSidebarCommand } from "./browserCore";
+import type { SpaceTheme } from "../shared/types";
+import { applyChange, getState, getWindow, scheduleRuntimePush, sendSidebarCommand, setSidebarPeek } from "./browserCore";
+import { dismissMedia, toggleMediaPlayback } from "./media";
 import { showMenuRequest } from "./menus";
 import type { MenuHost } from "./menus";
 import { openCommandBar, openLibrary, openSiteControls } from "./overlayController";
@@ -57,6 +59,18 @@ export const menuHost: MenuHost = {
   openInNewTab: (url, inBackground) => openLinkInNewTab(url, inBackground ? "background" : "foreground"),
   isTabLoaded: (tabId) => getTabContents(tabId) !== null,
 };
+
+/**
+ * Creates a Space and puts its name into edit mode right away, so the user names it while it is fresh.
+ */
+function createSpaceAndRename(name: string, icon: string, theme: SpaceTheme): void {
+  const activeSpaceBefore = getState().activeSpaceId;
+  applyChange((state) => createSpace(state, { name: name, icon: icon, theme: theme }, Date.now()));
+  const activeSpaceAfter = getState().activeSpaceId;
+  if (activeSpaceAfter !== activeSpaceBefore) {
+    sendSidebarCommand({ kind: "beginSpaceRename", spaceId: activeSpaceAfter });
+  }
+}
 
 /**
  * Runs one action. Each state action is one applyChange() call with the matching pure function.
@@ -117,7 +131,7 @@ export function runAction(action: BrowserAction): void {
     case "switchSpaceByOffset":
       return applyChange((state) => switchSpaceByOffset(state, action.offset, now));
     case "createSpace":
-      return applyChange((state) => createSpace(state, { name: action.name, icon: action.icon, theme: action.theme }, now));
+      return createSpaceAndRename(action.name, action.icon, action.theme);
     case "renameSpace":
       return applyChange((state) => renameSpace(state, action.spaceId, action.name));
     case "setSpaceIcon":
@@ -134,6 +148,14 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => setArchiveAfter(state, action.archiveAfterMs));
     case "setSidebarVisible":
       return applyChange((state) => setSidebarVisible(state, action.isVisible));
+    case "setSidebarPeek":
+      return setSidebarPeek(action.isPeeking);
+    case "toggleMediaPlayback":
+      toggleMediaPlayback().then(scheduleRuntimePush);
+      return;
+    case "dismissMedia":
+      dismissMedia().then(scheduleRuntimePush);
+      return;
     case "navigate":
       return navigateFocusedPage(action.command);
     case "openCommandBar":

@@ -161,6 +161,16 @@ export interface RuntimeState {
   tabs: Record<ItemId, TabRuntimeInfo>;
   /** Downloads still in progress; the Library button shows a dot while it is above zero. */
   activeDownloadCount: number;
+  /** True while the hidden sidebar is shown because the mouse touched the window's left edge. */
+  isSidebarPeeking: boolean;
+  /** A tab playing (or paused) media in the background, shown as a small player above the bottom bar. */
+  media: MediaInfo | null;
+}
+
+/** What the sidebar's small media player shows. */
+export interface MediaInfo {
+  tabId: ItemId;
+  isPlaying: boolean;
 }
 
 /** Where an item lives. Exactly one list in the state contains each item's id. */

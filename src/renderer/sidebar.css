@@ -97,6 +97,46 @@ body.sidebar-hidden .sidebar {
   visibility: hidden;
 }
 
+/* Hidden sidebar, pointer at the left edge: the sidebar shows over the toolbar while main.ts slides the page aside. */
+body.sidebar-hidden.sidebar-peeking .sidebar {
+  visibility: visible;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--sidebar-width);
+  z-index: 2;
+  background: linear-gradient(165deg, var(--frame-1), var(--frame-2) 55%, var(--frame-3));
+  box-shadow: 1px 0 0 var(--line), 8px 0 24px rgba(0, 0, 0, 0.12);
+  animation: sidebar-slide-in 140ms ease-out;
+}
+
+@keyframes sidebar-slide-in {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+}
+
+/* The strip that reveals a hidden sidebar: the card's left inset, where the page does not cover the window. */
+.reveal-edge {
+  display: none;
+}
+
+body.sidebar-hidden .reveal-edge {
+  display: block;
+  position: absolute;
+  top: var(--toolbar-height);
+  bottom: 0;
+  left: 0;
+  width: var(--card-inset);
+  z-index: 3;
+}
+
+body.sidebar-hidden.sidebar-peeking .reveal-edge {
+  display: none;
+}
+
 :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
@@ -627,6 +667,58 @@ button:disabled {
 .drop-into {
   background: var(--row-selected) !important;
   box-shadow: inset 0 0 0 1px var(--drop-line);
+}
+
+/* ---------- Media player (a tab playing in the background) ---------- */
+
+.media-player {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 4px 0 2px;
+  padding: 4px 4px 4px 6px;
+  border-radius: 10px;
+  background: var(--tile);
+}
+
+.media-player[hidden] {
+  display: none;
+}
+
+.media-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-weight: 500;
+  text-align: left;
+}
+
+.media-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--ink);
+}
+
+.media-button:hover {
+  background: var(--row-hover);
 }
 
 /* ---------- Bottom bar ---------- */

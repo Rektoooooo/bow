@@ -50,12 +50,15 @@ and every Arc behavior we can observe is written down before Arc shuts down.
 - [x] History store (bounded) for the Command Bar
 
 ### 2.6 Arc features
-- [ ] Spaces: create / rename / icon / theme / delete, swipe and ⌃1–9 to switch
+- [x] Spaces: create (then name it inline) / rename / icon / theme / delete, swipe and ⌃1–9 to switch
 - [x] Peek for links from Favorites and Pinned tabs to other sites, and Shift-click (⌘O tab, Split, Esc / ⌘W close)
-- [ ] Split View (up to 4 panes)
-- [ ] Hide sidebar (⌘S)
+- [x] Split View (up to 4 panes)
+- [x] Hide sidebar (⌘S), hover the left edge to reveal it (the page slides aside, no reflow)
 - [x] Little Arc-style small window (⌥⌘N, links from other apps), archives after 6 h
 - [x] Import from Arc: Spaces, Favorites, Pinned folders/tabs, Today tabs, themes, cached favicons (File › Import from Arc…)
+
+- [x] Media: sidebar player for a tab playing in the background; automatic Picture-in-Picture when leaving a playing video
+- [x] Import Arc's archive (250 tabs) and browsing history (Chromium History via sqlite3)
 
 ### 2.7 Wrap-up
 - [ ] Unit tests for every pure module; e2e rewritten for the new UI; permission check still passing

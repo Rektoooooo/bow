@@ -16,7 +16,7 @@
  */
 import type { SidebarCommand } from "../shared/actions.js";
 import type { BrowserState, ItemId, ItemLocation, RuntimeState, Space, SpaceId, TabItem } from "../shared/types";
-import { createElement, createIconButton, createTextButton, dispatch } from "./dom.js";
+import { createElement, createFavicon, createIconButton, createTextButton, dispatch } from "./dom.js";
 import { makeListDropZone, onDragStateChanged } from "./dragDrop.js";
 import { renderFavoriteTile, renderItemRows } from "./rows.js";
 import type { RowContext } from "./rows.js";
@@ -31,7 +31,7 @@ const SWIPE_COOLDOWN_MS = 450;
 
 /** The newest state and runtime facts received. */
 let currentState: BrowserState | null = null;
-let currentRuntime: RuntimeState = { tabs: {}, activeDownloadCount: 0 };
+let currentRuntime: RuntimeState = { tabs: {}, activeDownloadCount: 0, isSidebarPeeking: false, media: null };
 
 /** The sidebar item, Space name or Space icon being edited inline, or null. */
 let renamingItemId: ItemId | null = null;
@@ -44,6 +44,12 @@ let hasPendingRedraw = false;
 
 /** The Space shown in the last redraw, to slide the content when it changes. */
 let lastRenderedSpaceId: SpaceId | null = null;
+
+/** How long the pointer may be away from a peeking sidebar before it hides again. Our choice: avoids flicker. */
+const PEEK_HIDE_DELAY_MS = 250;
+
+/** A pending "hide the peeking sidebar", cancelled when the pointer comes back in time. */
+let peekHideTimer: number | null = null;
 
 /** Accumulated horizontal wheel distance of the current swipe, and when the last swipe fired. */
 let swipeDistance = 0;
@@ -334,6 +340,36 @@ function renderBottomBar(state: BrowserState): void {
 }
 
 /**
+ * Draws the small media player for a tab playing in the background: its icon and title (click to go there),
+ * play / pause, and × (pause and hide).
+ */
+function renderMediaPlayer(state: BrowserState): void {
+  const player = document.getElementById("media-player");
+  if (player === null) {
+    return;
+  }
+  const media = currentRuntime.media;
+  const mediaItem = media === null ? undefined : state.items[media.tabId];
+  if (media === null || mediaItem === undefined || mediaItem.kind !== "tab") {
+    player.hidden = true;
+    player.replaceChildren();
+    return;
+  }
+  const tabId = media.tabId;
+  const titleButton = document.createElement("button");
+  titleButton.type = "button";
+  titleButton.className = "media-title";
+  titleButton.title = "Go to the tab";
+  titleButton.append(createFavicon(mediaItem.faviconUrl, mediaItem.url), createElement("span", "media-title-text", mediaItem.customTitle ?? mediaItem.title));
+  titleButton.addEventListener("click", () => dispatch({ type: "selectTab", tabId: tabId }));
+  const playLabel = media.isPlaying ? "Pause" : "Play";
+  const playButton = createIconButton(media.isPlaying ? "pause" : "play", playLabel, "media-button", () => dispatch({ type: "toggleMediaPlayback" }));
+  const closeButton = createIconButton("close", "Stop and hide", "media-button", () => dispatch({ type: "dismissMedia" }));
+  player.replaceChildren(titleButton, playButton, closeButton);
+  player.hidden = false;
+}
+
+/**
  * Shows the "No tab open" message only while the active Space has no selected tab.
  */
 function updateEmptyCard(selectedTabId: ItemId | null): void {
@@ -371,10 +407,12 @@ function renderAll(): void {
 
   const context = createRowContext(state);
   document.body.classList.toggle("sidebar-hidden", !state.settings.isSidebarVisible);
+  document.body.classList.toggle("sidebar-peeking", currentRuntime.isSidebarPeeking);
   applySpaceTheme(space.theme);
   renderHeader();
   renderFavorites(state, space, context);
   renderSpaceContent(state, space, context);
+  renderMediaPlayer(state);
   renderBottomBar(state);
   renderToolbar(state, currentRuntime, context.selectedTabId);
   updateEmptyCard(context.selectedTabId);
@@ -402,6 +440,39 @@ function handleSidebarWheel(event: WheelEvent): void {
   swipeDistance = 0;
   lastSwipeAt = now;
   dispatch({ type: "switchSpaceByOffset", offset: offset });
+}
+
+/**
+ * With the sidebar hidden: touching the left edge shows it (the page slides aside); leaving it hides it again
+ * after a short delay, so a brief slip of the pointer does not make it flicker.
+ */
+function setUpSidebarPeek(): void {
+  const edge = document.getElementById("reveal-edge");
+  const sidebar = document.getElementById("sidebar");
+  if (edge === null || sidebar === null) {
+    return;
+  }
+  const cancelHide = (): void => {
+    if (peekHideTimer !== null) {
+      window.clearTimeout(peekHideTimer);
+      peekHideTimer = null;
+    }
+  };
+  edge.addEventListener("mouseenter", () => {
+    cancelHide();
+    dispatch({ type: "setSidebarPeek", isPeeking: true });
+  });
+  sidebar.addEventListener("mouseenter", cancelHide);
+  sidebar.addEventListener("mouseleave", () => {
+    if (!currentRuntime.isSidebarPeeking) {
+      return;
+    }
+    cancelHide();
+    peekHideTimer = window.setTimeout(() => {
+      peekHideTimer = null;
+      dispatch({ type: "setSidebarPeek", isPeeking: false });
+    }, PEEK_HIDE_DELAY_MS);
+  });
 }
 
 /**
@@ -446,6 +517,7 @@ async function startSidebar(): Promise<void> {
     renderAll();
   });
   document.getElementById("sidebar")?.addEventListener("wheel", handleSidebarWheel, { passive: true });
+  setUpSidebarPeek();
 
   currentRuntime = await window.browserApi.getRuntimeState();
   currentState = await window.browserApi.getState();

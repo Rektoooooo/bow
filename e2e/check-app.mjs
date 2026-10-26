@@ -200,6 +200,17 @@ await dispatch(page, { type: "setSidebarVisible", isVisible: false });
 await page.waitForTimeout(400);
 const hiddenBounds = await tabViewBounds(app);
 check("hiding the sidebar widens the page card", hiddenBounds.length === 1 && hiddenBounds[0].x === 8, JSON.stringify(hiddenBounds));
+// Touching the window's left edge shows the hidden sidebar; the page slides aside without resizing.
+await page.mouse.move(400, 400);
+await page.mouse.move(3, 400);
+await page.waitForTimeout(500);
+const peekBounds = await tabViewBounds(app);
+const sidebarShows = await page.evaluate(() => getComputedStyle(document.getElementById("sidebar")).visibility === "visible");
+check("touching the left edge shows the hidden sidebar and slides the page", sidebarShows && peekBounds[0]?.x === 248 && peekBounds[0]?.width === hiddenBounds[0]?.width, JSON.stringify(peekBounds));
+await page.mouse.move(900, 400);
+await page.waitForTimeout(700);
+const afterLeaveBounds = await tabViewBounds(app);
+check("moving away hides it again", afterLeaveBounds[0]?.x === 8, JSON.stringify(afterLeaveBounds));
 await dispatch(page, { type: "setSidebarVisible", isVisible: true });
 
 await page.click(".space-button:nth-child(2)");

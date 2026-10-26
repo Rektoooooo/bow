@@ -65,6 +65,9 @@ export type BrowserAction =
   | { type: "moveItemToSpace"; itemId: ItemId; spaceId: SpaceId }
   | { type: "setArchiveAfter"; archiveAfterMs: number | null }
   | { type: "setSidebarVisible"; isVisible: boolean }
+  | { type: "setSidebarPeek"; isPeeking: boolean }
+  | { type: "toggleMediaPlayback" }
+  | { type: "dismissMedia" }
   | { type: "navigate"; command: NavigationCommand }
   | { type: "openCommandBar"; mode: "newTab" | "editUrl" }
   | { type: "openLibrary" }
@@ -105,6 +108,9 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "moveItemToSpace",
   "setArchiveAfter",
   "setSidebarVisible",
+  "setSidebarPeek",
+  "toggleMediaPlayback",
+  "dismissMedia",
   "navigate",
   "openCommandBar",
   "openLibrary",

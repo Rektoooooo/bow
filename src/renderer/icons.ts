@@ -42,6 +42,8 @@ const ICON_PATHS = {
   zoomOut: "M7 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM10 10l3.5 3.5M5.5 7h3",
   trash: "M3.5 4.5h9M6.5 4.5V3h3v1.5M4.5 4.5l.7 8h5.6l.7-8",
   expand: "M9.5 3.5h3v3M6.5 12.5h-3v-3M12.5 3.5 9 7M3.5 12.5 7 9",
+  play: "M5.5 3.8v8.4L12 8z",
+  pause: "M5.5 4v8M10.5 4v8",
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;

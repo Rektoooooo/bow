@@ -6,6 +6,7 @@ import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as http from "node:http";
 
 const appDir = path.resolve(import.meta.dirname, "..");
 const outDir = process.env.E2E_OUTPUT_DIR || path.join(appDir, "e2e", "output");
@@ -216,6 +217,62 @@ await app.evaluate(({ webContents }) => {
 await sidebar.waitForTimeout(600);
 views = await peekViews();
 check("Escape dismisses the Peek", !views.some((view) => view.url.includes("iana.org")) && !(await overlayIsShown()), JSON.stringify(views.map((view) => view.url)));
+
+// Media: a page plays a tone in a looping <audio>; in the background, the sidebar shows a player that can pause it.
+function createToneWav() {
+  const sampleRate = 8000;
+  const sampleCount = sampleRate;
+  const buffer = Buffer.alloc(44 + sampleCount * 2);
+  buffer.write("RIFF", 0);
+  buffer.writeUInt32LE(36 + sampleCount * 2, 4);
+  buffer.write("WAVEfmt ", 8);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(1, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * 2, 28);
+  buffer.writeUInt16LE(2, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write("data", 36);
+  buffer.writeUInt32LE(sampleCount * 2, 40);
+  for (let index = 0; index < sampleCount; index++) {
+    buffer.writeInt16LE(Math.round(Math.sin((2 * Math.PI * 440 * index) / sampleRate) * 6000), 44 + index * 2);
+  }
+  return buffer;
+}
+const toneWav = createToneWav();
+const server = http.createServer((request, response) => {
+  if (request.url === "/tone.wav") {
+    response.writeHead(200, { "Content-Type": "audio/wav" });
+    response.end(toneWav);
+    return;
+  }
+  response.writeHead(200, { "Content-Type": "text/html" });
+  response.end('<!doctype html><title>Tone test</title><audio src="/tone.wav" autoplay loop></audio><p>Playing a tone</p>');
+});
+await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+const toneUrl = `http://127.0.0.1:${server.address().port}/`;
+await dispatch({ type: "openTab", typedText: toneUrl });
+await sidebar.waitForFunction(async () => {
+  const runtime = await window.browserApi.getRuntimeState();
+  return Object.values(runtime.tabs).some((info) => info.isAudible);
+}, null, { timeout: 15000 }).catch(() => undefined);
+state = await getState();
+const toneTabId = state.selectedTabIdBySpace[state.activeSpaceId];
+await dispatch({ type: "selectTab", tabId: pinnedSourceId });
+await sidebar.waitForSelector("#media-player:not([hidden])", { timeout: 5000 }).catch(() => undefined);
+const playerText = await sidebar.textContent("#media-player");
+check("a tab playing in the background shows the sidebar media player", playerText?.includes("Tone test"), playerText);
+await sidebar.click("#media-player .media-button[aria-label='Pause']");
+// Chromium keeps a background tab "audible" for a while after a pause, so ask the page itself.
+await sidebar.waitForSelector("#media-player .media-button[aria-label='Play']", { timeout: 5000 }).catch(() => undefined);
+const tonePaused = await app.evaluate(({ webContents }) => {
+  const tonePage = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith("http://127.0.0.1"));
+  return tonePage.executeJavaScript("document.querySelector('audio').paused");
+});
+const runtimeAfterPause = await sidebar.evaluate(() => window.browserApi.getRuntimeState());
+check("its pause button pauses the page's audio and turns into Play", tonePaused === true && runtimeAfterPause.media?.isPlaying === false, JSON.stringify(runtimeAfterPause.media));
+server.close();
 
 await app.close();
 const failed = results.filter((result) => !result.ok).length;
