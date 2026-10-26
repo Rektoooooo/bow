@@ -1,0 +1,13 @@
+{
+  // Main process + preload: they run in Node inside Electron, so they compile to CommonJS.
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "rootDir": "src",
+    "outDir": "dist/node",
+    "sourceMap": true
+  },
+  "include": ["src/main", "src/preload", "src/shared"]
+}

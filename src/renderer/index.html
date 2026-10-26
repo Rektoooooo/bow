@@ -1,0 +1,36 @@
+<!doctype html>
+<!--
+  WHY this file exists:
+    The browser window's own page. It draws the sidebar and the colored frame.
+    The web page "card" is not part of this page: it is a separate WebContentsView
+    that main.ts lays over the #card-slot area. #card-slot only shows when no tab is open.
+
+    The address box is written here once, not redrawn by sidebar.ts, so text you are
+    typing is never wiped when a page title changes and the sidebar redraws.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <!-- Only our own script and styles may run in this page. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'">
+    <title>Sidebar Browser</title>
+    <link rel="stylesheet" href="./sidebar.css">
+  </head>
+  <body>
+    <aside id="sidebar" class="sidebar" aria-label="Tabs and Spaces">
+      <div class="drag-strip"></div>
+      <form id="address-form" class="address-form" autocomplete="off">
+        <input id="address-input" class="address-input" type="text" placeholder="Search or enter address" spellcheck="false" aria-label="Search or enter address">
+      </form>
+      <div id="sidebar-content" class="sidebar-content"></div>
+      <footer id="sidebar-footer" class="sidebar-footer"></footer>
+    </aside>
+    <main id="card-slot" class="card-slot">
+      <div id="empty-card" class="empty-card">
+        <p class="empty-title">No tab open</p>
+        <p class="empty-hint">Type an address or a search in the box on the left.</p>
+      </div>
+    </main>
+    <script type="module" src="./sidebar.js"></script>
+  </body>
+</html>

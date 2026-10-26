@@ -1,0 +1,397 @@
+/*
+  WHY this file exists:
+    Look of the sidebar and the window frame. Sizes must match shared/settings.ts,
+    because main.ts places the web page card using those same numbers.
+
+  Layout: two columns, sidebar | card slot, both sitting on a frame painted in the active Space's color.
+*/
+
+:root {
+  --sidebar-width: 240px; /* = SIDEBAR_WIDTH_PX */
+  --card-inset: 8px;      /* = CARD_INSET_PX */
+  --card-radius: 10px;    /* = CARD_RADIUS_PX */
+  --frame-color: #e9d8d4; /* replaced per Space by renderSpaceHeading() */
+
+  --frame: var(--frame-color);
+  --ink: #241a1c;
+  --muted: rgba(36, 26, 28, 0.56);
+  --line: rgba(36, 26, 28, 0.1);
+  --row-hover: rgba(255, 255, 255, 0.42);
+  --row-selected: rgba(255, 255, 255, 0.9);
+  --row-shadow: 0 1px 2px rgba(40, 20, 25, 0.12);
+  --field: rgba(255, 255, 255, 0.55);
+  --field-focus: rgba(255, 255, 255, 0.95);
+  --icon-background: rgba(36, 26, 28, 0.09);
+  --card-empty: rgba(255, 255, 255, 0.35);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    /* A dark frame that still carries a hint of the Space's color. */
+    --frame: color-mix(in oklab, var(--frame-color) 16%, #161113);
+    --ink: #f2eaeb;
+    --muted: rgba(242, 234, 235, 0.55);
+    --line: rgba(255, 255, 255, 0.09);
+    --row-hover: rgba(255, 255, 255, 0.06);
+    --row-selected: rgba(255, 255, 255, 0.13);
+    --row-shadow: none;
+    --field: rgba(255, 255, 255, 0.07);
+    --field-focus: rgba(255, 255, 255, 0.14);
+    --icon-background: rgba(255, 255, 255, 0.1);
+    --card-empty: rgba(255, 255, 255, 0.04);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  background: var(--frame);
+  color: var(--ink);
+  font: 13px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overflow: hidden;
+  transition: background-color 200ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--ink) 45%, transparent);
+  outline-offset: 1px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: default;
+}
+
+/* Sidebar column */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 8px 10px 10px;
+}
+
+/* Leaves room for the traffic-light buttons and lets you drag the window by its top edge. */
+.drag-strip {
+  flex: none;
+  height: 44px;
+  -webkit-app-region: drag;
+}
+
+.address-form {
+  flex: none;
+}
+
+.address-input {
+  width: 100%;
+  border: 0;
+  border-radius: 9px;
+  padding: 8px 10px;
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  outline: none;
+}
+
+.address-input::placeholder {
+  color: var(--muted);
+}
+
+.address-input:focus {
+  background: var(--field-focus);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ink) 16%, transparent);
+}
+
+.sidebar-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-block: 14px;
+}
+
+.space-heading {
+  margin: 0;
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: pre;
+}
+
+.tab-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px 4px;
+}
+
+.section-title {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.text-button {
+  border: 0;
+  border-radius: 5px;
+  padding: 2px 5px;
+  background: none;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.text-button:hover {
+  background: var(--row-hover);
+  color: var(--ink);
+}
+
+.list-empty {
+  margin: 0;
+  padding: 4px 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Tab rows */
+
+.tab-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 4px 0 8px;
+  border-radius: 8px;
+}
+
+.tab-row:hover {
+  background: var(--row-hover);
+}
+
+.tab-row.is-selected {
+  background: var(--row-selected);
+  box-shadow: var(--row-shadow);
+}
+
+.tab-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--icon-background);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.tab-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-action {
+  flex: none;
+  border: 0;
+  border-radius: 5px;
+  padding: 2px 5px;
+  background: none;
+  color: var(--muted);
+  font-size: 11px;
+  opacity: 0;
+}
+
+.tab-row:hover .tab-action,
+.tab-row:focus-within .tab-action {
+  opacity: 1;
+}
+
+.tab-action:hover {
+  background: var(--row-hover);
+  color: var(--ink);
+}
+
+.tab-close {
+  font-size: 15px;
+  line-height: 1;
+}
+
+/* Archive */
+
+.archive {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.archive-summary {
+  padding: 0 6px 6px;
+  list-style: none;
+}
+
+.archive-summary::-webkit-details-marker {
+  display: none;
+}
+
+.archive-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 4px 5px 8px;
+  border-radius: 8px;
+}
+
+.archive-row:hover {
+  background: var(--row-hover);
+}
+
+.archive-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.archive-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archive-meta {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.archive-restore {
+  opacity: 0;
+}
+
+.archive-row:hover .archive-restore,
+.archive-row:focus-within .archive-restore {
+  opacity: 1;
+}
+
+/* Footer: setting + Space switcher */
+
+.sidebar-footer {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.archive-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.archive-setting select {
+  border: 0;
+  border-radius: 6px;
+  padding: 3px 6px;
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+}
+
+.space-switcher {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.space-button {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-size: 15px;
+  opacity: 0.55;
+}
+
+.space-button:hover {
+  background: var(--row-hover);
+  opacity: 0.9;
+}
+
+.space-button.is-active {
+  background: var(--row-selected);
+  box-shadow: var(--row-shadow);
+  opacity: 1;
+}
+
+/* Card slot: covered by the tab's web view whenever a tab is open */
+
+.card-slot {
+  display: grid;
+  place-items: center;
+  margin: var(--card-inset);
+  border-radius: var(--card-radius);
+  background: var(--card-empty);
+  -webkit-app-region: drag;
+}
+
+.empty-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+}
+
+.empty-card[hidden] {
+  display: none;
+}
+
+.empty-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.empty-hint {
+  margin: 0;
+  color: var(--muted);
+}

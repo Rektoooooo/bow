@@ -1,0 +1,15 @@
+{
+  // Sidebar page: it runs in a browser page, so it compiles to ES modules.
+  // Separate output folder (dist/web) so it never overwrites the CommonJS copy of src/shared.
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023", "DOM"],
+    "strict": true,
+    "rootDir": "src",
+    "outDir": "dist/web",
+    "sourceMap": true
+  },
+  "include": ["src/renderer", "src/shared"]
+}

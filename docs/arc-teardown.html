@@ -1,0 +1,581 @@
+<title>Arc Teardown</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Funnel+Display:wght@500;700;800&family=Funnel+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: an Arc window. A sticky sidebar of section "tabs" sits beside one inset content card on a Space-tinted frame. */
+:root{
+  --frame:#E8D6D3;
+  --frame-glow:#F3E6E3;
+  --card:#FFFCFB;
+  --ink:#24191B;
+  --muted:#6B5B5E;
+  --line:#ECE1DF;
+  --accent:#C22F3D;
+  --accent-soft:#F7E1E3;
+  --tab-active:#FFFCFB;
+  --tab-hover:rgba(255,255,255,.5);
+  --code-bg:#F6EEEC;
+  --obs-fg:#20704B; --obs-bg:#DEF0E5;
+  --sta-fg:#845400; --sta-bg:#F5E7CA;
+  --bin-fg:#3D48AC; --bin-bg:#E2E5FA;
+  --shadow:0 1px 2px rgba(60,20,25,.06), 0 10px 32px rgba(60,20,25,.09);
+  --shadow-sm:0 1px 2px rgba(60,20,25,.08), 0 2px 8px rgba(60,20,25,.06);
+  --f-display:"Funnel Display","Avenir Next","Helvetica Neue",system-ui,sans-serif;
+  --f-body:"Funnel Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --f-mono:"DM Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --frame:#2A1D21; --frame-glow:#3B262C; --card:#1B1416; --ink:#F3EAEB; --muted:#B4A3A6;
+    --line:#34272B; --accent:#F2636F; --accent-soft:#3D2227; --tab-active:#3A2A2E; --tab-hover:rgba(255,255,255,.06);
+    --code-bg:#251C1F;
+    --obs-fg:#86D6AA; --obs-bg:#1C3328; --sta-fg:#EBC173; --sta-bg:#3A2D14; --bin-fg:#AEB6FF; --bin-bg:#252A4D;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 32px rgba(0,0,0,.35);
+    --shadow-sm:0 1px 2px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --frame:#2A1D21; --frame-glow:#3B262C; --card:#1B1416; --ink:#F3EAEB; --muted:#B4A3A6;
+  --line:#34272B; --accent:#F2636F; --accent-soft:#3D2227; --tab-active:#3A2A2E; --tab-hover:rgba(255,255,255,.06);
+  --code-bg:#251C1F;
+  --obs-fg:#86D6AA; --obs-bg:#1C3328; --sta-fg:#EBC173; --sta-bg:#3A2D14; --bin-fg:#AEB6FF; --bin-bg:#252A4D;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 32px rgba(0,0,0,.35);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.25);
+}
+
+*{box-sizing:border-box}
+html{scroll-padding-top:24px}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+body{
+  background:radial-gradient(1100px 620px at 8% -8%, var(--frame-glow), transparent 62%), var(--frame);
+  background-attachment:fixed;
+  color:var(--ink);
+  font-family:var(--f-body);
+  font-size:15px;
+  line-height:1.55;
+  padding-block:20px 40px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top, 0px);z-index:10;background:var(--frame)}
+a{color:inherit}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3,h4,p{margin:0}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance}
+code,kbd,pre{font-family:var(--f-mono)}
+
+.window{display:grid;grid-template-columns:212px minmax(0,1fr);gap:14px;max-width:1240px;margin:0 auto;align-items:start}
+
+/* Sidebar, styled like Arc's own */
+.side{position:sticky;top:calc(env(safe-area-inset-top, 0px) + 20px);display:flex;flex-direction:column;gap:14px;max-height:calc(100vh - 40px);overflow:auto;padding-block:2px}
+.urlbar{background:var(--tab-hover);border-radius:9px;padding:7px 10px;font-family:var(--f-mono);font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side nav{display:flex;flex-direction:column;gap:2px}
+.tab{display:flex;gap:9px;align-items:center;padding:7px 10px;border-radius:9px;text-decoration:none;font-size:14px;color:var(--ink)}
+.tab:hover{background:var(--tab-hover)}
+.tab.active{background:var(--tab-active);box-shadow:var(--shadow-sm)}
+.ico{flex:none;width:16px;height:16px;border-radius:5px;background:var(--accent-soft);color:var(--accent);font-family:var(--f-mono);font-size:9.5px;font-weight:500;display:grid;place-items:center}
+.sub{display:flex;flex-direction:column;gap:1px;padding-left:16px}
+.sub .tab{font-size:13px;color:var(--muted);padding-block:5px}
+.sub .tab.active{color:var(--ink)}
+.side-label{font-family:var(--f-mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:6px 10px 2px}
+
+/* The inset card */
+main{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:clamp(20px,4vw,48px);min-width:0;display:flex;flex-direction:column;gap:64px}
+
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+header{display:flex;flex-direction:column;gap:14px}
+h1{font-weight:800;font-size:clamp(40px,6.4vw,60px);line-height:.98;letter-spacing:-.025em}
+.lede{font-size:18px;line-height:1.5;color:var(--muted);max-width:62ch}
+
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:18px 24px;margin:8px 0 0;padding-top:18px;border-top:1px solid var(--line)}
+.facts div{display:flex;flex-direction:column;gap:4px}
+.facts dt{font-family:var(--f-mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.facts dd{margin:0;font-size:15px}
+.facts b{font-family:var(--f-display);font-weight:700;font-size:20px;font-variant-numeric:tabular-nums}
+
+.note{background:var(--accent-soft);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;gap:6px;max-width:78ch}
+.note h3{font-size:16px;font-weight:700}
+.note p{font-size:14.5px}
+.note code{font-size:12.5px}
+
+section{display:flex;flex-direction:column;gap:18px}
+h2{font-weight:700;font-size:30px;line-height:1.1;letter-spacing:-.012em}
+.intro{color:var(--muted);max-width:66ch}
+
+/* Architecture */
+.arch{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:14px;align-items:start}
+.layers{display:flex;flex-direction:column;gap:6px}
+.layer{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;grid-template-columns:150px minmax(0,1fr);gap:14px}
+.layer.engine{background:var(--accent-soft);border-color:transparent}
+.ln{font-family:var(--f-display);font-weight:700;font-size:16px;line-height:1.2}
+.ln small{display:block;font-family:var(--f-mono);font-weight:400;font-size:11px;color:var(--muted);margin-top:3px;letter-spacing:.02em}
+.lx{display:flex;flex-direction:column;gap:6px;font-size:14px}
+.mods{display:flex;flex-wrap:wrap;gap:4px}
+.mods code{font-size:11.5px;background:var(--code-bg);border-radius:5px;padding:2px 6px;color:var(--muted)}
+.layer.engine .mods code{background:var(--card)}
+.down{font-family:var(--f-mono);font-size:11px;color:var(--muted);padding-left:14px}
+.services{border:1px dashed var(--muted);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;font-size:14px}
+.services h3{font-size:16px;font-weight:700}
+.services ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.services li b{font-weight:600}
+.services li span{display:block;color:var(--muted);font-size:13px}
+
+/* Depth legend + chips */
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 20px}
+.legend div{display:flex;flex-direction:column;gap:6px;align-items:flex-start;font-size:14px;color:var(--muted)}
+.chip{font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;white-space:nowrap}
+.chip.observe{color:var(--obs-fg);background:var(--obs-bg)}
+.chip.static{color:var(--sta-fg);background:var(--sta-bg)}
+.chip.binary{color:var(--bin-fg);background:var(--bin-bg)}
+
+/* Feature map controls */
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;position:sticky;top:env(safe-area-inset-top, 0px);background:var(--card);padding-block:10px;z-index:2;border-bottom:1px solid var(--line)}
+.controls input{flex:1 1 220px;min-width:0;font:inherit;font-size:14.5px;color:var(--ink);background:var(--code-bg);border:1px solid var(--line);border-radius:9px;padding:8px 12px}
+.controls input::placeholder{color:var(--muted)}
+.filters{display:flex;flex-wrap:wrap;gap:6px}
+.filters button{font:inherit;font-size:13.5px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;display:flex;gap:6px;align-items:center}
+.filters button:hover{background:var(--code-bg)}
+.filters button[aria-pressed="true"]{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.filters .n{font-family:var(--f-mono);font-size:11.5px;opacity:.7;font-variant-numeric:tabular-nums}
+
+.groups{display:flex;flex-direction:column;gap:40px}
+.group{display:flex;flex-direction:column;gap:0}
+.group h3{font-size:21px;font-weight:700;display:flex;gap:10px;align-items:baseline;padding-bottom:8px}
+.group h3 .n{font-family:var(--f-mono);font-weight:400;font-size:12px;color:var(--muted)}
+.feat{display:grid;grid-template-columns:minmax(140px,1fr) minmax(0,2.5fr) minmax(150px,1.15fr);gap:20px;padding-block:14px;border-top:1px solid var(--line)}
+.f-name{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.f-name h4{font-size:15.5px;font-weight:600;line-height:1.3}
+kbd{font-size:11.5px;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 6px;background:var(--code-bg);color:var(--ink);white-space:nowrap}
+.f-body{display:flex;flex-direction:column;gap:6px;max-width:66ch}
+.f-body .rb{color:var(--muted);font-size:14px}
+.f-body .rb b{font-family:var(--f-mono);font-weight:500;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink);margin-right:6px}
+.f-ev{display:flex;flex-direction:column;gap:7px;align-items:flex-start}
+.f-ev code{font-size:12px;color:var(--muted);overflow-wrap:anywhere;line-height:1.45}
+.f-ev .doc{font-size:12.5px;color:var(--muted);font-style:italic}
+#empty{color:var(--muted);padding-block:20px}
+
+/* Plan */
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:22px;counter-reset:s}
+.steps li{display:grid;grid-template-columns:40px minmax(0,1fr);gap:12px;counter-increment:s}
+.steps li::before{content:counter(s);font-family:var(--f-display);font-weight:800;font-size:26px;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
+.steps .sb{display:flex;flex-direction:column;gap:8px;max-width:70ch}
+.steps h3{font-size:18px;font-weight:700}
+.steps p,.steps ul{color:var(--muted);font-size:14.5px}
+.steps ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.steps ul b{color:var(--ink);font-weight:600}
+pre{margin:0;background:var(--code-bg);border-radius:8px;padding:10px 12px;font-size:13px;overflow-x:auto;color:var(--ink)}
+p code,li code,td code{font-size:.88em;background:var(--code-bg);border-radius:4px;padding:1px 5px}
+.state{display:inline-block;font-family:var(--f-mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:999px;margin-left:6px;vertical-align:2px}
+.state.done{color:var(--obs-fg);background:var(--obs-bg)}
+.state.todo{color:var(--sta-fg);background:var(--sta-bg)}
+.state.open{color:var(--bin-fg);background:var(--bin-bg)}
+td .state{margin-left:0}
+.design{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:8px;max-width:70ch;color:var(--muted)}
+.design b{color:var(--ink);font-weight:600}
+.sub-h{font-family:var(--f-display);font-size:19px;font-weight:700}
+
+/* Build paths */
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:14px}
+th{font-family:var(--f-mono);font-weight:500;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);text-align:left;padding:10px 14px;border-bottom:1px solid var(--line)}
+td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td:first-child{font-weight:600;min-width:150px}
+td .pick{display:inline-block;margin-top:5px;font-family:var(--f-mono);font-weight:400;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:2px 7px}
+td.muted{color:var(--muted)}
+
+.rules{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:8px;max-width:70ch}
+footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:18px;max-width:80ch}
+
+@media (max-width:900px){
+  .window{grid-template-columns:minmax(0,1fr)}
+  .side{position:static;max-height:none;overflow:visible}
+  .side nav{flex-direction:row;overflow-x:auto;gap:4px;padding-bottom:4px}
+  .side .tab{white-space:nowrap}
+  .sub,.side-label,.urlbar{display:none}
+  .arch{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:760px){
+  .feat{grid-template-columns:minmax(0,1fr);gap:8px}
+  .f-ev{flex-direction:row;flex-wrap:wrap;align-items:center}
+  .layer{grid-template-columns:minmax(0,1fr);gap:8px}
+  main{gap:52px}
+}
+</style>
+
+<div class="window">
+  <aside class="side" aria-label="Sections">
+    <div class="urlbar">Arc.app · 1.170.0 · build 89123</div>
+    <nav id="nav">
+      <a class="tab" href="#top" data-for="top"><span class="ico">A</span>Overview</a>
+      <a class="tab" href="#arch" data-for="arch"><span class="ico">≡</span>Architecture</a>
+      <a class="tab" href="#map" data-for="map"><span class="ico">#</span>Feature map</a>
+      <div class="sub" id="subnav"></div>
+      <a class="tab" href="#archive" data-for="archive"><span class="ico">⌫</span>Auto-archive</a>
+      <a class="tab" href="#plan" data-for="plan"><span class="ico">→</span>Rebuild plan</a>
+      <a class="tab" href="#paths" data-for="paths"><span class="ico">⌥</span>Build paths</a>
+      <a class="tab" href="#rules" data-for="rules"><span class="ico">!</span>Ground rules</a>
+    </nav>
+  </aside>
+
+  <main>
+    <header id="top" data-spy="top">
+      <p class="eyebrow">Teardown · macOS · Arc 1.170.0 (89123)</p>
+      <h1>Arc Teardown</h1>
+      <p class="lede">Every feature of Arc, mapped from the copy installed on this Mac, with how hard each one is to understand and how you would rebuild it. The deep dives use REA, a reverse-engineering toolkit your agent drives over MCP.</p>
+      <dl class="facts">
+        <div><dt>Interface shell</dt><dd><b>166 MB</b><br>Swift binary, arm64 + x86_64</dd></div>
+        <div><dt>Web engine</dt><dd><b>591 MB</b><br>ArcCore.framework, a Chromium build</dd></div>
+        <div><dt>Feature modules</dt><dd><b>48</b><br><code>ARC_*</code> bundles, one per feature</dd></div>
+        <div><dt>Minimum macOS</dt><dd><b>13.0</b><br>Ventura</dd></div>
+      </dl>
+    </header>
+
+    <div class="note" role="note">
+      <h3>Your Arc data is not on this macOS account</h3>
+      <p>Arc's folder here holds only <code>User Data/NativeMessagingHosts</code>, and the app was installed from another account. Your Spaces, pinned tabs and folders live in <code>~/Library/Application&nbsp;Support/Arc/StorableSidebar.json</code> on the account where you use Arc. Back that file up before Arc stops working; it is also the best reference for the sidebar data model.</p>
+    </div>
+
+    <section id="arch" data-spy="arch">
+      <h2>How Arc is built</h2>
+      <p class="intro">Arc is a native Swift app that drives Chromium. The browser you see is Swift and AppKit; the engine underneath is the same Chromium that Chrome uses. Each layer below calls into the one under it. Layer names come straight from the bundle and the binary's source paths.</p>
+      <div class="arch">
+        <div class="layers">
+          <div class="layer">
+            <div class="ln">Feature modules<small>Resources/ARC_*.bundle</small></div>
+            <div class="lx">One Swift package per feature, 48 in total.
+              <div class="mods"><code>CommandBar</code><code>LittleBrowser</code><code>EaselUI</code><code>BoostsEditor</code><code>SpaceStyleEditor</code><code>PictureInPicture</code><code>SiteControlCenter</code><code>StorableSidebar</code><code>SidebarSyncCloudKit</code><code>AskArc</code><code>+38</code></div>
+            </div>
+          </div>
+          <div class="down">calls ↓</div>
+          <div class="layer">
+            <div class="ln">Design system<small>ARCUI · ARCFoundation · ARCClients</small></div>
+            <div class="lx">Shared views, icons, fonts and service clients used by every feature.
+              <div class="mods"><code>ARCUI</code><code>ARCClients_Icons</code><code>ARCClients_FontsManager</code><code>ARCClients_BlockListClient</code></div>
+            </div>
+          </div>
+          <div class="down">calls ↓</div>
+          <div class="layer">
+            <div class="ln">App shell<small>Browser/… source paths</small></div>
+            <div class="lx">Windows, the sidebar, the web content card and app state. Store and DataFlow names point to a central state store.
+              <div class="mods"><code>Application/Store</code><code>Windows/BrowserWindow</code><code>Windows/LittleWindowViewController</code><code>WindowContent/WebContentViewController</code><code>Sidebar/SidebarCells</code><code>DataStore/RestoreSidebarDataFlow</code></div>
+            </div>
+          </div>
+          <div class="down">calls ↓</div>
+          <div class="layer">
+            <div class="ln">ADK bridge<small>ADK · ADKClientLive</small></div>
+            <div class="lx">Arc's Swift API over Chromium (likely "Arc Development Kit"). It ships its own ad-block list and cosmetic selectors.
+              <div class="mods"><code>ADK_ADK.bundle</code><code>adblock_list.json</code><code>selectors.css</code></div>
+            </div>
+          </div>
+          <div class="down">calls ↓</div>
+          <div class="layer engine">
+            <div class="ln">Chromium<small>Frameworks/ArcCore.framework</small></div>
+            <div class="lx">Rendering, networking, extensions and DevTools. This is why Chrome extensions work in Arc.
+              <div class="mods"><code>chrome_100_percent.pak</code><code>DevTools</code><code>app_mode-Info.plist</code></div>
+            </div>
+          </div>
+        </div>
+        <aside class="services" aria-label="Third-party services">
+          <h3>Services it links</h3>
+          <ul>
+            <li><b>Firebase Auth + Firestore</b><span>Accounts, sharing, sync</span></li>
+            <li><b>CloudKit</b><span>Sidebar sync between devices</span></li>
+            <li><b>LaunchDarkly</b><span>Remote feature flags</span></li>
+            <li><b>Sentry, Datadog</b><span>Crash reports and telemetry</span></li>
+            <li><b>Sparkle</b><span>Auto-updates</span></li>
+            <li><b>Lottie</b><span>Animated icons (Library, banners)</span></li>
+            <li><b>Metal shaders</b><span>Space gradients, loading glow</span></li>
+          </ul>
+        </aside>
+      </div>
+    </section>
+
+    <section id="map" data-spy="map">
+      <h2>Feature map</h2>
+      <p class="intro">Each feature lists what it does, how you would rebuild it, the evidence found in the installed app, and the depth of analysis needed to understand it well enough to rebuild.</p>
+      <div class="legend">
+        <div><span class="chip observe">Observe</span>Use Arc and copy the behavior. No tools needed.</div>
+        <div><span class="chip static">Static</span>Read files in the app bundle or your own Arc data. REA's bundle and file inspection covers this without a decompiler.</div>
+        <div><span class="chip binary">Binary</span>The rules live in compiled code. Trace them with REA plus Ghidra or Hopper.</div>
+      </div>
+      <div class="controls">
+        <input id="q" type="search" placeholder="Search features, modules, files…" aria-label="Search features" autocomplete="off">
+        <div class="filters" role="group" aria-label="Filter by analysis depth" id="filters"></div>
+      </div>
+      <div class="groups" id="groups"></div>
+      <p id="empty" hidden>No features match. Clear the search or choose another filter.</p>
+    </section>
+
+    <section id="archive" data-spy="archive">
+      <h2>Auto-archive teardown</h2>
+      <p class="intro">Traced in the arm64 slice of Arc 1.170.0 (SHA-256 <code>77be289e…</code>) from its strings and Swift type metadata, which keep source file names, field names and enum cases. Ghidra decompilation stopped because the Mac ran out of memory, so the timer intervals and exclusion rules are still open.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Question</th><th>Finding</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Where it lives</td><td><code>Archive/ArchiveState+AutoArchive.swift</code>, <code>ArchiveState.swift</code>, <code>StorableArchive.swift</code> and <code>WindowData+Archive.swift</code>, named in the binary.</td><td><span class="state done">Observed</span></td></tr>
+            <tr><td>Framework</td><td>Each feature is a reducer with State, Action and injected clients for the clock, main queue, user defaults, the archive store and analytics. The layout matches Point-Free's Composable Architecture.</td><td><span class="state todo">Inferred</span></td></tr>
+            <tr><td>Lifecycle</td><td>Actions <code>didLaunch</code>, <code>runAutoArchive</code>, <code>autoArchiveItems</code>, <code>removeExpiredItems</code> and <code>willTerminate</code>, plus a debug <code>simulateAutoArchive</code>. Two cancellable timers: <code>autoArchiveTimer</code> and <code>cleanupTimer</code>.</td><td><span class="state done">Observed</span></td></tr>
+            <tr><td>Thresholds</td><td>1 hour, 6 hours, 12 hours, 24 hours, 7 days, 30 days and never, plus a 20-second debug value. "Never" and the debug value sit behind <code>allowNeverArchivePreference</code> and <code>allowDebugArchivePreference</code>.</td><td><span class="state done">Observed</span></td></tr>
+            <tr><td>Scopes</td><td>Today tabs and Little Arc windows have separate thresholds. Tab thresholds can differ per profile and sync between devices.</td><td><span class="state done">Observed</span></td></tr>
+            <tr><td>What counts as use</td><td>Each window keeps <code>itemLastActiveDates</code> and <code>lastActiveTabsPerSpace</code>, refreshed by <code>itemLastActiveDateUpdateTimer</code>. Which tabs that timer refreshes is not in the metadata.</td><td><span class="state done">Observed</span></td></tr>
+            <tr><td>Exclusions</td><td>The auto-archive state carries <code>itemsToExclude</code>. What goes into it needs decompilation.</td><td><span class="state open">Unknown</span></td></tr>
+            <tr><td>After launch</td><td><code>autoArchiveStartTime</code> sits beside <code>didLaunch</code>. Most likely the countdown restarts at launch, so a Mac that was off for a week does not empty the sidebar.</td><td><span class="state todo">Inferred</span></td></tr>
+            <tr><td>Archive record</td><td>Stores <code>sidebarItem</code>, <code>reason</code>, <code>archivedAt</code>, <code>source</code>, <code>version</code> and child <code>items</code>. Reasons: auto, manual, clear button, clear tab group.</td><td><span class="state done">Observed</span></td></tr>
+            <tr><td>Storage</td><td><code>StorableArchive.json</code> and <code>StorableArchiveItems.json</code>, plus cached page snapshots and favicons for the Archive view.</td><td><span class="state done">Observed</span></td></tr>
+            <tr><td>Pruning</td><td><code>removeExpiredItems</code> runs on <code>cleanupTimer</code>. How long archived tabs are kept is in code.</td><td><span class="state open">Unknown</span></td></tr>
+            <tr><td>Keepalive list</td><td>The 21 <code>keepaliveAllowList</code> patterns (Slack, Gmail, Calendar, Notion, Spotify, WhatsApp, Figma, Google Docs) live in web-content config, and no archive field refers to them. They most likely keep those pages running in the background rather than exempt them from archiving.</td><td><span class="state todo">Inferred</span></td></tr>
+            <tr><td>Timer intervals</td><td>How often each of the three timers fires.</td><td><span class="state open">Unknown</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 class="sub-h">Rebuild it</h3>
+      <p class="intro">A design for your browser that follows Arc's structure. The interval values are suggestions, not Arc's numbers.</p>
+      <ul class="design">
+        <li><b>Track use.</b> Store <code>lastActiveAt</code> per unpinned tab. Set it when a tab is selected or left, and refresh visible tabs on a one-minute tick.</li>
+        <li><b>Sweep.</b> Every few minutes, archive unpinned tabs older than the Space's threshold. Skip visible, audible and picture-in-picture tabs.</li>
+        <li><b>Start fair.</b> On launch, measure from the later of <code>lastActiveAt</code> and the launch time.</li>
+        <li><b>Record why.</b> Write an archive record with the reason and time, and keep it searchable.</li>
+        <li><b>Prune.</b> On a slower timer, delete archive records past your retention period.</li>
+      </ul>
+    </section>
+
+    <section id="plan" data-spy="plan">
+      <h2>Rebuild plan with REA</h2>
+      <p class="intro">The order matters: cheap evidence first, decompiler time only for the handful of features whose rules you cannot see from outside.</p>
+      <ol class="steps">
+        <li><div class="sb">
+          <h3>Map the bundle<span class="state done">Done</span></h3>
+          <p>Bundle inventory, frameworks, Info.plist, the AppleScript dictionary and the bundled JSON configs. That is everything on this page.</p>
+        </div></li>
+        <li><div class="sb">
+          <h3>Fix Node and install REA<span class="state done">Done</span></h3>
+          <p>REA needs Node 22.23.4+, 24.22.1+ or 26.12.1+; this Mac had 23.10.0. Homebrew here belongs to another macOS account, so Node 24.22.1 went into the home folder instead, checksum-verified from nodejs.org. REA 6.8.0 is registered with Claude Code and a test scan of Arc.app passed.</p>
+          <pre>npx -y rea-agents@latest setup --client claude_code --yes</pre>
+        </div></li>
+        <li><div class="sb">
+          <h3>Set up a decompiler<span class="state done">Done</span></h3>
+          <p>Ghidra 12.1.4 with Temurin JDK 21, both in the home folder and both checksum-verified. The Apple Silicon decompiler was built from Ghidra's bundled source, and a test decompile of Arc's Dock plugin returned Swift pseudocode. Ghidra through REA cannot open universal binaries, so analyze an arm64-only copy of each Arc binary:</p>
+          <pre>lipo -thin arm64 /Applications/Arc.app/Contents/MacOS/Arc -output Arc-arm64</pre>
+        </div></li>
+        <li><div class="sb">
+          <h3>Read your own data model</h3>
+          <p>On the account where you use Arc, inspect <code>StorableSidebar.json</code> and the Chromium profile databases. This gives the exact shape of Spaces, folders, pinned tabs and split views.</p>
+        </div></li>
+        <li><div class="sb">
+          <h3>Trace the Binary features</h3>
+          <p>Ranked by how much each shapes the feel of Arc:</p>
+          <ul>
+            <li><b>Auto-archive</b>: design mapped (see above); timer intervals, exclusions and retention still need Ghidra</li>
+            <li><b>Command Bar ranking</b>: source weights and duplicate rules</li>
+            <li><b>Peek triggers</b>: which tabs and links open a Peek</li>
+            <li><b>Sidebar sync</b>: how concurrent edits merge</li>
+            <li><b>Easel live captures</b>: how regions refresh</li>
+            <li><b>Block list client</b>: what it is for</li>
+          </ul>
+        </div></li>
+        <li><div class="sb">
+          <h3>Build feature by feature</h3>
+          <p>Start with the sidebar, Spaces and the inset card, since everything else hangs off them. Then the Command Bar, Peek and Little Arc. Leave sync, sharing and AI for last.</p>
+        </div></li>
+      </ol>
+    </section>
+
+    <section id="paths" data-spy="paths">
+      <h2>Build paths</h2>
+      <p class="intro">The engine you pick decides which Arc features are within reach. Arc itself is the native Swift + Chromium row, which is also the hardest to set up.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Path</th><th>Engine</th><th>Gets you</th><th>Misses</th><th>Effort</th></tr></thead>
+          <tbody>
+            <tr><td>Electron shell<br><span class="pick">Suggested start</span></td><td>Chromium</td><td>Full control of window chrome: sidebar, inset card, split view, Peek, Little Arc, per-Space profiles. TypeScript throughout.</td><td>Native feel needs work; Chrome extension support is partial.</td><td class="muted">Months</td></tr>
+            <tr><td>Native Swift + WKWebView</td><td>WebKit</td><td>The most Mac-native result: AppKit, SwiftUI, Metal themes, real trackpad gestures.</td><td>No Chrome extensions. Engine is Safari's, not Chromium.</td><td class="muted">Months</td></tr>
+            <tr><td>Native Swift + Chromium (CEF)</td><td>Chromium</td><td>Arc's actual architecture, with extensions.</td><td>Heavy build pipeline and large binary. Hard to maintain alone.</td><td class="muted">Many months</td></tr>
+            <tr><td>Chrome extension</td><td>Chromium</td><td>Side-panel sidebar, Spaces as tab groups, Command Bar, Boosts, tidy titles, auto-archive.</td><td>Cannot hide Chrome's tab strip or draw the inset card. No Little Arc.</td><td class="muted">Weeks</td></tr>
+            <tr><td>Customize Zen Browser</td><td>Firefox</td><td>Open source (MPL 2.0) and already has vertical tabs, workspaces, split view and a Peek-like preview.</td><td>Firefox engine and extensions, not Chrome's.</td><td class="muted">Days</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="rules" data-spy="rules">
+      <h2>Ground rules</h2>
+      <ul class="rules">
+        <li>Use REA to understand how a feature behaves, then write the implementation yourself.</li>
+        <li>Do not ship anything taken from the Arc bundle: code, icons, Lottie animations, sounds, onboarding videos, shaders, or rule lists such as tidy titles and the ad-block list. Make your own.</li>
+        <li>Give your browser its own name and look. Do not use Arc's name or logo.</li>
+        <li>REA's own disclaimer rules out copying proprietary code or assets. Analysis runs locally on your Mac.</li>
+      </ul>
+    </section>
+
+    <footer>Mapped on 26 October 2026 from /Applications/Arc.app on this Mac. Evidence entries name files or modules found in Arc 1.170.0. Entries marked "documented behavior" have no trace in the bundle and come from how Arc is known to work.</footer>
+  </main>
+</div>
+
+<script>
+const GROUPS = [
+  ["layout","Window & layout"],
+  ["org","Spaces, tabs & memory"],
+  ["nav","Command Bar & navigation"],
+  ["float","Little Arc, Peek & media"],
+  ["make","Easels, notes & Library"],
+  ["custom","Boosts & themes"],
+  ["site","Site controls & privacy"],
+  ["ai","Arc Max (AI)"],
+  ["mac","macOS integration"],
+  ["acct","Account, sync & ops"]
+];
+
+// [group, name, shortcut, what it does, how to rebuild, evidence ("" = documented behavior), depth]
+const FEATURES = [
+  ["layout","Vertical sidebar","⌘S","Tabs live in a sidebar on the left or right instead of a top strip. Hide it and it slides back in when the pointer touches the window edge.","A list view in your own window chrome, plus a thin hover zone at the edge that reveals it as an overlay.","Browser/Sidebar/SidebarCells","observe"],
+  ["layout","Inset web card","","The page sits in a rounded, padded card. The frame around it carries the Space's color, so the browser recedes and the page reads as an object.","Host the web view in a container with padding and a corner radius; paint the frame from the active Space theme.","Browser/WindowContent/WebContentViewController","observe"],
+  ["layout","Split View","","Two to four tabs side by side, vertical or horizontal. A split is saved as one sidebar item and reopens together.","Several web views in a resizable split container, saved as a group node in the sidebar tree.","ARC_WelcomeToArcFeature split_view.mp4","observe"],
+  ["layout","Space themes & grain","","Each Space gets a GPU-rendered gradient with film grain, in light, dark or automatic mode.","A gradient plus noise shader: CSS for Electron, Metal for native. Read the editor's parameter set in the bundle first.","ARC_WindowThemeUI (.metallib), ARC_SpaceStyleEditor","static"],
+  ["layout","Glow loading indicator","","Loading shows as a soft animated glow instead of a thin progress bar.","Animate a blurred gradient along the card edge while the page loads.","ARC_GlowProgressLoadingIndicator (.metallib)","observe"],
+  ["layout","Tab hover previews","","Hovering a sidebar tab shows a preview card of the page.","Snapshot each tab when it loses focus and show the cached image in a popover on hover.","Browser/Sidebar/Previews","observe"],
+  ["layout","Link status text","","Hovering a link shows its URL in a small label at the bottom of the card.","Listen for the engine's hovered-link event and show a fading label.","Browser/WindowContent/StatusTextView","observe"],
+  ["layout","Crashed-tab page","","A friendly page with a reload button when a tab's renderer crashes.","Handle the engine's render-process-gone event and show your own view.","ARC_SadTab","observe"],
+
+  ["org","Spaces","⌃1–9","Named workspaces with an icon and theme. Swipe between them with two fingers on the trackpad.","A Space holds a name, icon, theme, profile and pinned-tab tree. Switch with horizontal paging that follows the trackpad.","ARC_SpaceCreation, space_swiping.mp4","observe"],
+  ["org","Profiles per Space","","A Space can use its own profile, with separate logins, cookies and history.","One storage partition per profile: Electron session partitions, WKWebsiteDataStore, or Chromium profiles.","ARC_ProfilesUI","observe"],
+  ["org","Favorites","","Icon grid at the top of the sidebar, shared by every Space, with unread badges such as a mail count.","A global item list. Read badge counts from a \"(3)\" title prefix or the favicon, then check against the badging provider.","Browser/Sidebar/AppTrayBadgingProvider, ARC_AppTray","observe"],
+  ["org","Pinned tabs & folders","⌘D","A per-Space tree of pinned tabs and nested folders. A pinned tab remembers its home URL and can reset to it.","A tree of nodes that store both the home URL and the current URL. Model it on the schema in StorableSidebar.json.","ARC_StorableSidebar","static"],
+  ["org","Today tabs & auto-archive","⌘⇧K","Unpinned tabs move to the Archive after 1 hour, 6 hours, 12 hours, 24 hours, 7 days or 30 days without use, or never. Little Arc windows have their own setting, and each profile can have its own.","A last-active date per tab, refreshed on a timer, and a sweeper on a second timer. See the auto-archive teardown below.","ARC/Sources/Archive/ArchiveState+AutoArchive.swift","binary"],
+  ["org","Archive","⌘⇧T","Auto-closed tabs go to a searchable archive instead of disappearing.","Store closed tabs with title, URL, Space and time, and search them from the Command Bar.","ARC_HomeButton archive.json","observe"],
+  ["org","Tidy titles","","Pinned tabs show cleaner names for common sites such as Gmail, Figma and Notion.","Per-domain regex rules applied to document.title. Write your own rules.","web_content_behavior.json tidyTitles (24 domains)","static"],
+  ["org","Sidebar restore","","The whole sidebar comes back exactly after a restart or crash.","Save the sidebar tree to disk on every change and replay it at launch.","Browser/DataStore/RestoreSidebarDataFlow","static"],
+
+  ["nav","Command Bar","⌘T  ⌘L","One box for search, open tabs, pinned tabs, history and app commands. ⌘L opens it on the current URL.","A fuzzy matcher over several sources with ranking and duplicate removal. The ranking weights need tracing.","ARC_CommandBar, command_bar_behavior.json dedupByTitleAndHostList","binary"],
+  ["nav","URL autocomplete","","Typing a few letters completes to popular domains and handles short top-level domains.","Rank a local top-domains list above history and validate TLDs against a short list.","ARC_TopDomains (TopDomains.json, TLD-short-list.json), ARC_URLInputter, popularDomains.json","static"],
+  ["nav","Recent-tab switcher","⌃Tab","Cycles tabs in most-recently-used order.","Keep an MRU stack per window and show it while ⌃ is held.","","observe"],
+  ["nav","Copy URL","⇧⌘C","Copies the current URL and confirms with a small toast.","One command plus a toast component.","","observe"],
+  ["nav","Context menus","","Custom right-click menus for tabs, folders and pages.","Build menus per item type in your sidebar and page views.","ARC_ContextMenus","observe"],
+
+  ["float","Little Arc","⌥⌘N","A small floating window for quick lookups and for links opened from other apps. One click moves it into a Space.","A second, minimal window type that can hand its web view over to a main window.","ARC_LittleBrowser, Browser/Windows/LittleWindowViewController","observe"],
+  ["float","Peek","","Links from a pinned tab to another site open in a floating preview over the page. Expand it into a full tab or dismiss it.","An overlay web view above the card. Trace the trigger rules: which tabs, which links, which modifier keys.","","binary"],
+  ["float","Auto picture-in-picture","","A playing video pops out into a floating player when you switch tabs. Some sites get custom handling, others are excluded.","Detect playing video when a tab loses focus and request PiP. Keep per-site allow and deny lists.","ARC_PictureInPicture, web_content_behavior.json pipSiteConfigs (5), pipDisallowList (3)","static"],
+  ["float","Media controls","","Play and pause audio from any tab without switching to it.","Read media session metadata from the engine and show controls in the sidebar.","ARC_MediaControlsFeature","observe"],
+
+  ["make","Easels","","An infinite canvas for live web captures that refresh, plus text, drawings and images. Shareable by link.","A canvas document. Live captures re-render a page region on a schedule; trace how they refresh.","ARC_EaselUI (DisableInlineLinks.js)","binary"],
+  ["make","Notes","","Rich-text notes that sit in the sidebar like tabs.","A rich-text editor such as ProseMirror or TipTap, with notes stored as sidebar nodes.","ARC_ArcRichTextEditor, ARC_TextEditor","observe"],
+  ["make","Capture","","Screenshot a region or a whole page. Captures land in the Library.","A region-selection overlay plus the engine's capture-page API.","ARC_Capture","observe"],
+  ["make","Library","","One panel for downloads, media and screenshots, Easels, Spaces, the archive and Boosts.","A tabbed panel over your own stores.","ARC_HomeButton (6 animated icons)","observe"],
+  ["make","Sharing","","Share a Space, folder, Easel or note by link. Shared folders stay in sync between people.","A backend with per-object access rules and real-time listeners. Arc uses Firestore for this.","ARC_SharableObjectsFeature, Firebase Firestore","binary"],
+
+  ["custom","Boosts","","Per-site CSS and JavaScript, font swaps and color changes, made in a built-in editor.","A content script keyed by host. Check one of your saved Boosts on disk to see how Arc packages them.","ARC_BoostsEditor, ARC_BoostsDialog","static"],
+  ["custom","Zap","","Click page elements to hide them on that site for good.","Build a unique selector from tag, id, classes and child index, then store it as a Boost rule.","ARC_BoostsEditor SelectorPicker.js","static"],
+  ["custom","Space style editor","","Pick colors, gradients, grain, and light, dark or automatic mode for each Space.","A color-picker panel that writes theme values for the frame shader.","ARC_SpaceStyleEditor (sun, moon, automatic)","observe"],
+  ["custom","App icons & fonts","","Alternate app icons, a custom Dock tile and font management.","Set the app icon at runtime or ship a Dock tile plugin.","ARCClients_Icons, ARCClients_FontsManager, DockTilePlugIn.plugin","observe"],
+  ["custom","Sound effects","","Short UI sounds on some actions.","Play short sounds on events. Record or license your own.","ARC_SoundEffects","observe"],
+
+  ["site","Site Control Center","","Click the domain to see permissions, cookies, ad blocking, Boosts and extensions for that site.","A popover bound to the active tab's origin.","ARC_SiteControlCenter","observe"],
+  ["site","Ad and tracker blocking","","Built-in blocking with network rules and cosmetic CSS selectors.","Use an open filter engine such as @ghostery/adblocker with EasyList.","ARC_AdBlocking, ADK adblock_list.json, selectors.css","static"],
+  ["site","Translation","","Translate pages in place.","Chromium's translate feature, or a translation API applied per text node.","ARC_Translation","observe"],
+  ["site","Chrome extensions","","Installs extensions from the Chrome Web Store.","Comes with a Chromium engine. Partial in Electron, absent with WebKit.","ArcCore.framework (Chromium)","static"],
+  ["site","Block list client","","Purpose not visible from the bundle.","Trace its callers in the binary before deciding whether you need it.","ARCClients_BlockListClient","binary"],
+
+  ["ai","Ask on page","⌘F","Ask a question about the open page from the find bar.","Send the page's readable text and the question to an LLM API.","ARC_AskArc","observe"],
+  ["ai","5-second previews","⇧ + hover","Hold Shift and hover a link to get a short AI summary before opening it.","Fetch the link, extract its text, summarize it and show it in a popover.","ARC_AskArc","observe"],
+  ["ai","Tidy tab titles & downloads","","AI renames pinned tabs and downloaded files to short, readable names.","One LLM call per item with a short naming prompt.","ARC_AskArc","observe"],
+
+  ["mac","AppleScript","","Scripts can list and create windows, Spaces and tabs, focus or reload them, and run JavaScript in a tab. Launchers such as Raycast use this.","Ship an .sdef dictionary and implement its handlers.","Arc.sdef, Resources/README.md","static"],
+  ["mac","Default browser & URL scheme","","Handles http, https and mailto links, plus its own arcBrowser:// scheme.","Declare URL types in Info.plist.","Info.plist CFBundleURLTypes","static"],
+  ["mac","Handoff","","Continue the current page on another Apple device.","Publish a browsing-web user activity for the active tab.","Info.plist NSUserActivityTypes","static"],
+  ["mac","Password-manager bridges","","Native messaging hosts let apps such as 1Password talk to the browser.","Chromium native messaging, with host manifests registered in the profile.","User Data/NativeMessagingHosts","static"],
+  ["mac","Import from other browsers","","Brings over bookmarks, history and logins from Chrome, Safari and others.","Read the other browsers' profile files: bookmarks JSON and the History SQLite database.","ARC_ImportFeature, ARC_ImportMenuFeature","observe"],
+
+  ["acct","Sidebar sync","","Spaces and pinned tabs sync between Macs and to Arc on iPhone.","A sync backend with conflict handling for tree edits. Trace how Arc merges.","ARC_SidebarSyncCloudKit, Firebase Firestore","binary"],
+  ["acct","Account & sign-in","","An Arc account backs sync and sharing.","Optional. Any auth provider works.","ARC_AuthFeature, Firebase Auth","observe"],
+  ["acct","Onboarding","","A first-run tour with short videos on pinning, Space swiping, new tabs and split view.","A few onboarding screens with your own clips.","ARC_WelcomeToArcFeature (4 videos)","observe"],
+  ["acct","Membership & referrals","","A member card and invite codes.","Skip unless you need growth features.","ARC_MembershipCard, ARC_ReferralCodeFeature","observe"],
+  ["acct","Updates, flags & crash reports","","Auto-updates, remote feature flags and crash reporting.","Sparkle for updates. The rest is optional.","Sparkle, LaunchDarkly, Sentry, Datadog","static"]
+];
+
+const DEPTHS = [["all","All"],["observe","Observe"],["static","Static"],["binary","Binary"]];
+const LABEL = {observe:"Observe",static:"Static",binary:"Binary"};
+
+function el(tag, cls, text){
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+function render(){
+  const groupsEl = document.getElementById("groups");
+  const subnav = document.getElementById("subnav");
+  for (const [gid, gname] of GROUPS){
+    const items = FEATURES.filter(f => f[0] === gid);
+    const sec = el("div","group"); sec.id = "g-" + gid; sec.dataset.group = gid;
+    const h = el("h3", null, gname); const n = el("span","n", items.length); h.append(n); sec.append(h);
+    for (const [, name, keys, what, rebuild, ev, depth] of items){
+      const row = el("article","feat"); row.dataset.depth = depth;
+      row.dataset.text = [name, keys, what, rebuild, ev, LABEL[depth]].join(" ").toLowerCase();
+      const c1 = el("div","f-name"); c1.append(el("h4", null, name));
+      if (keys) c1.append(el("kbd", null, keys));
+      const c2 = el("div","f-body"); c2.append(el("p", null, what));
+      const rb = el("p","rb"); rb.append(el("b", null, "Rebuild"), document.createTextNode(rebuild)); c2.append(rb);
+      const c3 = el("div","f-ev"); c3.append(el("span","chip " + depth, LABEL[depth]));
+      c3.append(ev ? el("code", null, ev) : el("span","doc","Documented behavior"));
+      row.append(c1, c2, c3); sec.append(row);
+    }
+    groupsEl.append(sec);
+    const a = el("a","tab", gname); a.href = "#g-" + gid; a.dataset.for = "g-" + gid; subnav.append(a);
+  }
+  const filters = document.getElementById("filters");
+  for (const [id, label] of DEPTHS){
+    const count = id === "all" ? FEATURES.length : FEATURES.filter(f => f[6] === id).length;
+    const b = el("button", null, label); b.type = "button"; b.id = "f-" + id; b.dataset.depth = id;
+    b.setAttribute("aria-pressed", id === "all" ? "true" : "false");
+    b.append(el("span","n", count));
+    b.addEventListener("click", () => { state.depth = id; applyFilter(); });
+    filters.append(b);
+  }
+}
+
+const state = {depth:"all", q:""};
+
+function applyFilter(){
+  const q = state.q.trim().toLowerCase();
+  let shown = 0;
+  document.querySelectorAll(".group").forEach(g => {
+    let any = 0;
+    g.querySelectorAll(".feat").forEach(r => {
+      const ok = (state.depth === "all" || r.dataset.depth === state.depth) && (!q || r.dataset.text.includes(q));
+      r.hidden = !ok; if (ok) any++;
+    });
+    g.hidden = any === 0; shown += any;
+    g.querySelector("h3 .n").textContent = any;
+  });
+  document.getElementById("empty").hidden = shown > 0;
+  document.querySelectorAll("#filters button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.depth === state.depth)));
+}
+
+function spy(){
+  const links = new Map();
+  document.querySelectorAll("#nav a[data-for]").forEach(a => links.set(a.dataset.for, a));
+  const targets = [...document.querySelectorAll("[data-spy], .group")];
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries){
+      if (!e.isIntersecting) continue;
+      const id = e.target.id;
+      links.forEach(a => a.classList.remove("active"));
+      const link = links.get(id); if (link) link.classList.add("active");
+      if (id.startsWith("g-")) links.get("map")?.classList.add("active");
+    }
+  }, {rootMargin:"-25% 0px -65% 0px"});
+  targets.forEach(t => io.observe(t));
+}
+
+render();
+document.getElementById("q").addEventListener("input", e => { state.q = e.target.value; applyFilter(); });
+applyFilter();
+spy();
+document.querySelector('#nav a[data-for="top"]').classList.add("active");
+</script>

@@ -1,0 +1,18 @@
+{
+  "name": "sidebar-browser",
+  "version": "0.1.0",
+  "description": "A desktop browser with a vertical sidebar, Spaces and auto-archive of unused tabs.",
+  "private": true,
+  "main": "dist/node/main/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.renderer.json && cp src/renderer/index.html src/renderer/sidebar.css dist/web/renderer/",
+    "start": "npm run build && electron .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "electron": "44.9.3",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  }
+}
