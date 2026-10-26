@@ -354,6 +354,25 @@ function activateExtension(host: ProfileExtensionHost, extensionId: string, anch
 }
 
 /**
+ * The Control Center's extension tiles: the profile's turned-on extensions with their icons.
+ */
+export function listExtensionTiles(state: BrowserState, profileId: ProfileId): { id: string; name: string; iconUrl: string | null }[] {
+  const enabled = getProfileExtensions(state, profileId).filter((extension) => extension.isEnabled);
+  return enabled.map((extension) => ({ id: extension.id, name: extension.name, iconUrl: getExtensionIconUrl(extension) }));
+}
+
+/**
+ * A Control Center tile was clicked: opens that extension of the active profile under the tile.
+ */
+export function activateExtensionOfActiveProfile(extensionId: string, anchor: ExtensionMenuAnchor): void {
+  const profileId = getActiveSpace(getState()).profileId;
+  const host = hostsByProfile.get(profileId);
+  if (host !== undefined && host.loadedPaths.has(extensionId)) {
+    activateExtension(host, extensionId, anchor);
+  }
+}
+
+/**
  * The toolbar's extensions menu: the active profile's extensions (click opens the popup), then Manage Extensions.
  */
 export function showExtensionsMenu(anchor: ExtensionMenuAnchor): void {

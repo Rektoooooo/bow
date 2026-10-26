@@ -38,7 +38,7 @@ const SWIPE_COOLDOWN_MS = 450;
 
 /** The newest state and runtime facts received. */
 let currentState: BrowserState | null = null;
-let currentRuntime: RuntimeState = { tabs: {}, activeDownloadCount: 0, isSidebarPeeking: false, media: null };
+let currentRuntime: RuntimeState = { tabs: {}, activeDownloadCount: 0, isSidebarPeeking: false, media: null, isNewTabPending: false };
 
 /** The sidebar item, Space name or Space icon being edited inline, or null. */
 let renamingItemId: ItemId | null = null;
@@ -90,7 +90,8 @@ function createRowContext(state: BrowserState): RowContext {
   return {
     state: state,
     runtime: currentRuntime,
-    selectedTabId: getSelectedTabId(state),
+    // While the Command Bar makes a new tab, "New Tab" carries the highlight instead (Arc's shot 3).
+    selectedTabId: currentRuntime.isNewTabPending ? null : getSelectedTabId(state),
     renamingItemId: renamingItemId,
     onRenameFinished: () => {
       renamingItemId = null;
@@ -213,19 +214,19 @@ function renderSpaceTitle(space: Space): HTMLElement {
 }
 
 /**
- * Builds the divider between Pinned and Today, with Arc's "Clear" button that archives every Today tab.
+ * Builds the divider between Pinned and Today, with Arc's "Clear" button that archives every Today tab. Like Arc's,
+ * it is only there while Today has tabs (shot 4: with Today empty, New Tab follows Pinned directly).
  */
 function renderDivider(space: Space): HTMLElement {
   const divider = createElement("div", "today-divider");
   divider.dataset.key = "divider";
+  divider.dataset.presence = "row";
   divider.append(createElement("span", "divider-line"));
-  if (space.todayIds.length > 0) {
-    const clearButton = createElement("button", "divider-clear", "↓ Clear") as HTMLButtonElement;
-    clearButton.type = "button";
-    clearButton.dataset.action = "clear-today";
-    clearButton.title = "Move all Today tabs to the Archive (⇧⌘K)";
-    divider.append(clearButton);
-  }
+  const clearButton = createElement("button", "divider-clear", "↓ Clear") as HTMLButtonElement;
+  clearButton.type = "button";
+  clearButton.dataset.action = "clear-today";
+  clearButton.title = "Move all Today tabs to the Archive (⇧⌘K)";
+  divider.append(clearButton);
   // Dropping on the divider puts an item at the end of Pinned.
   markListDropZone(divider, { kind: "pinned", spaceId: space.id }, "end");
   return divider;
@@ -236,6 +237,7 @@ function renderDivider(space: Space): HTMLElement {
  */
 function renderNewTabRow(space: Space): HTMLElement {
   const row = createElement("div", "row new-tab-row");
+  row.classList.toggle("is-selected", currentRuntime.isNewTabPending);
   row.dataset.key = "new-tab";
   row.dataset.row = "new-tab";
   row.setAttribute("role", "button");
@@ -266,7 +268,9 @@ function renderSpaceContent(state: BrowserState, space: Space, context: RowConte
     pinnedSection.append(...renderItemRows(space.pinnedIds, pinnedLocation, 0, context));
     children.push(pinnedSection);
   }
-  children.push(renderDivider(space));
+  if (space.todayIds.length > 0) {
+    children.push(renderDivider(space));
+  }
   children.push(renderNewTabRow(space));
 
   const todaySection = createElement("div", "item-list today-list");

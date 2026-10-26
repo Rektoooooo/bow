@@ -349,9 +349,9 @@ await sidebar.waitForTimeout(2500);
 const backgroundAfterReload = await pageStyle("getComputedStyle(document.body).backgroundColor");
 check("a Boost's CSS changes the site, also after a reload", boostedBackground === "rgb(1, 2, 3)" && backgroundAfterReload === "rgb(1, 2, 3)", `${boostedBackground} / ${backgroundAfterReload}`);
 
-await dispatch({ type: "openSiteControls" });
-await overlay.waitForSelector(".site-controls", { timeout: 5000 });
-await overlay.click(".site-button:has-text('Zap Elements')");
+await dispatch({ type: "openBoostEditor" });
+await overlay.waitForSelector(".boost-zap", { timeout: 5000 });
+await overlay.click(".boost-zap");
 await sidebar.waitForTimeout(600);
 await clickLinkInPage("example.com/boost");
 await sidebar.waitForTimeout(800);
@@ -464,6 +464,47 @@ await overlay.press(".command-input", "Enter");
 await waitForSelectedUrl("youtube.com/results");
 state = await getState();
 check("Enter opens the site's search results in a new tab", selectedTab(state)?.url === "https://www.youtube.com/results?search_query=lofi%20beats", selectedTab(state)?.url);
+
+// The Control Center, Arc's popover under the sliders button: its actions, a setting that changes in place, and
+// Capture, which copies the part of the page you drag over and saves it. Saves go to a throwaway folder; the
+// clipboard's text is put back afterwards.
+const captureDir = path.join(outDir, "capture-downloads");
+fs.rmSync(captureDir, { recursive: true, force: true });
+fs.mkdirSync(captureDir, { recursive: true });
+const clipboardTextBefore = await app.evaluate(({ app: electronApp, clipboard }, directory) => {
+  electronApp.setPath("downloads", directory);
+  return clipboard.readText();
+}, captureDir);
+await dispatch({ type: "openSiteControls" });
+await overlay.waitForSelector(".control-center", { timeout: 5000 });
+const actionLabels = await overlay.$$eval(".control-action", (buttons) => buttons.map((button) => button.getAttribute("aria-label")));
+check("the Control Center shows Share, Boost, Screenshot and Capture", actionLabels.join("|") === "Share|Boost this site|Take Screenshot|Capture Part of the Page", actionLabels.join("|"));
+const soundBefore = await overlay.textContent(".control-setting .control-setting-state");
+await overlay.click(".control-setting");
+await overlay.waitForFunction(() => document.querySelector(".control-setting .control-setting-state")?.textContent === "Muted", null, { timeout: 3000 }).catch(() => undefined);
+const soundAfter = await overlay.textContent(".control-setting .control-setting-state");
+const panelsAfterToggle = await overlay.$$eval(".control-center", (panels) => panels.length);
+check("the Sound setting mutes the tab, shown in the same panel", soundBefore === "On" && soundAfter === "Muted" && selectedTab(await getState())?.isMuted === true && panelsAfterToggle === 1, `${soundBefore} → ${soundAfter}`);
+await overlay.click(".control-setting");
+await overlay.click('.control-action[aria-label="Capture Part of the Page"]');
+await overlay.waitForSelector(".capture-layer", { timeout: 5000 });
+const pageFrame = await overlay.evaluate(() => {
+  const box = document.querySelector(".capture-page").getBoundingClientRect();
+  return { x: box.x, y: box.y };
+});
+await overlay.mouse.move(pageFrame.x + 40, pageFrame.y + 40);
+await overlay.mouse.down();
+await overlay.mouse.move(pageFrame.x + 140, pageFrame.y + 90, { steps: 5 });
+await overlay.mouse.up();
+let capturedFiles = [];
+for (let attempt = 0; attempt < 25 && capturedFiles.length === 0; attempt += 1) {
+  await sidebar.waitForTimeout(200);
+  capturedFiles = fs.readdirSync(captureDir).filter((name) => name.endsWith(".png"));
+}
+const capturedSize = await app.evaluate(({ nativeImage }, filePath) => (filePath === null ? null : nativeImage.createFromPath(filePath).getSize()), capturedFiles.length === 1 ? path.join(captureDir, capturedFiles[0]) : null);
+check("Capture saves exactly the dragged part of the page", capturedSize?.width === 100 && capturedSize?.height === 50, `${capturedFiles.join(",")} ${JSON.stringify(capturedSize)}`);
+check("and closes the capture layer", !(await overlayIsShown()));
+await app.evaluate(({ clipboard }, text) => clipboard.writeText(text), clipboardTextBefore);
 
 await app.close();
 const failed = results.filter((result) => !result.ok).length;

@@ -7,7 +7,8 @@
  *   The "boost" panel message: the site and its current CSS.
  *
  * Data flow:
- *   site controls › Edit CSS → "overlay:show" (boost) → renderBoostEditor() → Save → dispatch setBoostCss → pages
+ *   Control Center › Boost → "overlay:show" (boost) → renderBoostEditor() → Save → dispatch setBoostCss → pages
+ *   Zap Elements → overlayApi.siteCommand("zap") → click elements on the page to hide them
  */
 import type { OverlayPanel } from "../shared/overlay";
 import { createElement, createTextButton, dispatch } from "../renderer/dom.js";
@@ -52,7 +53,10 @@ export function renderBoostEditor(host: HTMLElement, panel: BoostPanel): void {
     window.overlayApi.close();
   };
   const buttons = createElement("div", "boost-buttons");
+  const zapButton = createTextButton("Zap Elements", "site-button boost-zap", () => window.overlayApi.siteCommand("zap"));
+  zapButton.title = "Click elements on the page to hide them for good; Escape when done";
   buttons.append(
+    zapButton,
     createTextButton("Delete Boost", "site-button boost-delete", () => {
       dispatch({ type: "deleteBoost", site: panel.site });
       window.overlayApi.close();

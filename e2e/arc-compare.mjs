@@ -2,7 +2,7 @@
 //   The look is meant to match Arc 1:1. This script renders our window at the size of the user's Arc screenshots
 //   (reference/arc-ui, git-ignored) with a made-up sidebar of the same shape, and writes side-by-side crops
 //   (Arc left, ours right) of the parts that matter, so differences are visible at a glance.
-// Data source: reference/arc-ui/1.webp (sidebar + toolbar) and 3.webp (Command Bar): a 1888 × 1032 pt window,
+// Data source: reference/arc-ui/1.webp (sidebar + toolbar), 3.webp (Command Bar) and 4.webp (Control Center): a 1888 × 1032 pt window,
 //   captured at 1 px per point with macOS's window shadow around it (window at 56, 38 in the image).
 // Data flow: sample state → app at 1888 × 1032 → captureWindow() → crops → e2e/output/arc-compare/*.png
 // usage: npm run build && node e2e/arc-compare.mjs   (needs the reference screenshots; they are never committed)
@@ -29,6 +29,9 @@ const REGIONS = [
   { name: "1-toolbar-right", shot: 1, x: 1660, y: 0, width: 228, height: 90, zoom: 2 },
   { name: "1-card-bottom", shot: 1, x: 220, y: 952, width: 300, height: 80, zoom: 2 },
   { name: "3-command-bar", shot: 3, x: 540, y: 330, width: 810, height: 360, zoom: 1 },
+  { name: "4-control-center", shot: 4, x: 1630, y: 36, width: 258, height: 480, zoom: 2 },
+  { name: "4-sidebar-top", shot: 4, x: 0, y: 90, width: 300, height: 330, zoom: 2 },
+  { name: "4-sidebar-bottom", shot: 4, x: 0, y: 690, width: 300, height: 330, zoom: 2 },
 ];
 
 if (!fs.existsSync(path.join(referenceDir, "1.webp"))) {
@@ -43,15 +46,36 @@ const now = Date.now();
 function tab(id, url, title, homeUrl = null) {
   return { kind: "tab", id, url, title, customTitle: null, faviconUrl: null, homeUrl, lastActiveAt: now, isMuted: false };
 }
-// Same shape as the reference (four Favorites, two closed folders, one Today tab), public sites only.
+// Same shape as the reference (four Favorites, two folders, one Today tab), public sites only. The first folder
+// holds as many rows as the user's, for shot 4 (opened there, its second child selected).
+const READING_SITES = [
+  ["mdn", "https://developer.mozilla.org/", "MDN Web Docs"],
+  ["hn", "https://news.ycombinator.com/", "Hacker News"],
+  ["ars", "https://arstechnica.com/", "Ars Technica"],
+  ["wiki-browser", "https://en.wikipedia.org/wiki/Web_browser", "Web browser - Wikipedia"],
+  ["node", "https://nodejs.org/", "Node.js"],
+  ["typescript", "https://www.typescriptlang.org/", "TypeScript"],
+  ["rust", "https://www.rust-lang.org/", "Rust Programming Language"],
+  ["python", "https://www.python.org/", "Welcome to Python.org"],
+  ["w3c", "https://www.w3.org/", "W3C"],
+  ["webkit", "https://webkit.org/", "WebKit"],
+  ["chromium", "https://www.chromium.org/", "The Chromium Projects"],
+  ["mozilla", "https://www.mozilla.org/", "Mozilla"],
+  ["kernel", "https://www.kernel.org/", "The Linux Kernel Archives"],
+  ["gnu", "https://www.gnu.org/", "GNU Project"],
+  ["debian", "https://www.debian.org/", "Debian"],
+  ["sqlite", "https://www.sqlite.org/", "SQLite Home Page"],
+  ["vim", "https://www.vim.org/", "welcome home : vim online"],
+];
+const readingChildren = Object.fromEntries(READING_SITES.map(([key, url, title]) => [`pin-${key}`, tab(`pin-${key}`, url, title, url)]));
 const items = {
+  ...readingChildren,
   "fav-wikipedia": tab("fav-wikipedia", "https://www.wikipedia.org/", "Wikipedia", "https://www.wikipedia.org/"),
   "fav-github": tab("fav-github", "https://github.com/", "GitHub", "https://github.com/"),
   "fav-youtube": tab("fav-youtube", "https://www.youtube.com/", "YouTube", "https://www.youtube.com/"),
   "fav-duckduckgo": tab("fav-duckduckgo", "https://duckduckgo.com/", "DuckDuckGo", "https://duckduckgo.com/"),
-  "folder-reading": { kind: "folder", id: "folder-reading", title: "Reading List", childIds: ["pin-mdn"], isOpen: false },
+  "folder-reading": { kind: "folder", id: "folder-reading", title: "Reading List", childIds: Object.keys(readingChildren), isOpen: false },
   "folder-projects": { kind: "folder", id: "folder-projects", title: "Projects", childIds: ["pin-electron"], isOpen: false },
-  "pin-mdn": tab("pin-mdn", "https://developer.mozilla.org/", "MDN Web Docs", "https://developer.mozilla.org/"),
   "pin-electron": tab("pin-electron", "https://www.electronjs.org/", "Electron", "https://www.electronjs.org/"),
   "today-search": tab("today-search", "https://duckduckgo.com/", "DuckDuckGo"),
   "today-mdn": tab("today-mdn", "https://developer.mozilla.org/", "MDN Web Docs"),
@@ -113,6 +137,18 @@ await overlay.mouse.move(0, 0);
 await overlay.waitForTimeout(1500);
 ours[3] = await captureWindow(app);
 await overlay.keyboard.press("Escape");
+await sidebar.waitForTimeout(500);
+await sidebar.evaluate(async () => {
+  await window.browserApi.dispatch({ type: "toggleFolder", folderId: "folder-reading" });
+  await window.browserApi.dispatch({ type: "selectTab", tabId: "pin-hn" });
+});
+await sidebar.waitForTimeout(2500);
+await sidebar.evaluate(() => window.browserApi.dispatch({ type: "openSiteControls" }));
+await overlay.waitForSelector(".control-center", { timeout: 5000 }).catch(() => undefined);
+await overlay.mouse.move(0, 0);
+await overlay.waitForTimeout(800);
+ours[4] = await captureWindow(app);
+await overlay.keyboard.press("Escape");
 
 // Crop and pair with the helper window's canvas (the app's own renderer decodes WebP and PNG).
 const pairs = await app.evaluate(async ({ BrowserWindow }, job) => {
@@ -151,12 +187,18 @@ const pairs = await app.evaluate(async ({ BrowserWindow }, job) => {
   references: {
     1: `data:image/webp;base64,${fs.readFileSync(path.join(referenceDir, "1.webp")).toString("base64")}`,
     3: `data:image/webp;base64,${fs.readFileSync(path.join(referenceDir, "3.webp")).toString("base64")}`,
+    4: `data:image/webp;base64,${fs.readFileSync(path.join(referenceDir, "4.webp")).toString("base64")}`,
   },
-  ours: { 1: `data:image/png;base64,${ours[1].toString("base64")}`, 3: `data:image/png;base64,${ours[3].toString("base64")}` },
+  ours: {
+    1: `data:image/png;base64,${ours[1].toString("base64")}`,
+    3: `data:image/png;base64,${ours[3].toString("base64")}`,
+    4: `data:image/png;base64,${ours[4].toString("base64")}`,
+  },
 });
 
 fs.writeFileSync(path.join(outDir, "ours-1.png"), ours[1]);
 fs.writeFileSync(path.join(outDir, "ours-3.png"), ours[3]);
+fs.writeFileSync(path.join(outDir, "ours-4.png"), ours[4]);
 for (const pair of pairs) {
   fs.writeFileSync(path.join(outDir, `${pair.name}.png`), Buffer.from(pair.png, "base64"));
 }

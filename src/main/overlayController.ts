@@ -12,19 +12,19 @@
  *   ⌘T → openCommandBar() → showOverlay → overlay types → "overlay:query" → rankCommandBarResults → lines
  *   (suggestions arrive later as "overlay:results") → "overlay:choose" → close overlay → run the result
  */
-import { app, clipboard, ClipboardItem, ipcMain, nativeTheme, net } from "electron";
-import type { IpcMainInvokeEvent, WebContents } from "electron";
+import { app, clipboard, ClipboardItem, ipcMain, Menu, nativeTheme, net, ShareMenu } from "electron";
+import type { IpcMainInvokeEvent, MenuItemConstructorOptions, Rectangle, WebContents } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { OVERLAY_CHANNELS } from "../shared/overlay";
-import type { CommandBarLine, CommandBarMode, LibraryData, LibrarySection, OverlayPanel, SiteCommand, SiteInfo } from "../shared/overlay";
+import type { CommandBarLine, CommandBarMode, LibraryData, LibrarySection, OverlayPanel, OverlayRect, SiteCommand, SiteInfo } from "../shared/overlay";
 import type { BrowserState, ItemId, SitePermissionKind } from "../shared/types";
-import { applyChange, getLayoutOptions, getRecentTabIds, getState, getWindow } from "./browserCore";
+import { applyChange, getLayoutOptions, getRecentTabIds, getState, getWindow, setNewTabPending } from "./browserCore";
 import { rankCommandBarResults } from "./commandBar";
 import type { CommandBarResult } from "./commandBar";
 import type { CommandActionRegistry } from "./commandBarActions";
 import { getDownloads, showDownloadInFolder } from "./downloads";
-import { getExtensionIconUrl, getExtensionLoadError } from "./extensionHost";
+import { activateExtensionOfActiveProfile, getExtensionIconUrl, getExtensionLoadError, listExtensionTiles } from "./extensionHost";
 import { searchHistory } from "./history";
 import { clearHistory, getHistory } from "./historyStore";
 import { computeCardBounds } from "./layout";
@@ -40,7 +40,7 @@ import { toggleDevTools, zoomPage } from "./pageCommands";
 import { splitTabs } from "./split";
 import { getSelectedTabId, openTab, selectTab } from "./state";
 import { loadUrlInTab, openLinkInNewTab, setMuted } from "./tabActions";
-import { getFocusedContents, getTabContents } from "./tabViews";
+import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
 import { findProfileIdOfItem, findTab, getActiveSpace } from "./tree";
 import { getPermissionOrigin, getSitePermissions } from "./sitePermissions";
 import { looksLikeWebAddress, normalizeTypedInput } from "./urls";
@@ -223,6 +223,7 @@ function buildSiteInfo(state: BrowserState): SiteInfo | null {
     profileId: profileId,
     origin: origin,
     permissions: permissions,
+    extensions: listExtensionTiles(state, profileId),
   };
 }
 
@@ -262,6 +263,7 @@ function openPanel(panel: OverlayPanel): void {
   const state = getState();
   const replacedPanel = shownPanel;
   shownPanel = panel;
+  setNewTabPending(panel.kind === "commandBar" && panel.mode === "newTab");
   if (replacedPanel !== null) {
     notifyPanelEnded(replacedPanel, "replaced");
   }
@@ -359,6 +361,7 @@ export function closeOverlay(): void {
   }
   const closedPanel = shownPanel;
   shownPanel = null;
+  setNewTabPending(false);
   hideOverlay(window);
   if (closedPanel !== null) {
     notifyPanelEnded(closedPanel, "closed");
@@ -391,6 +394,10 @@ export function relayoutOverlay(): void {
 export function refreshOpenPanel(): void {
   if (shownPanel?.kind === "library") {
     sendToOverlay(OVERLAY_CHANNELS.libraryUpdate, buildLibraryData(getState()));
+  }
+  // The Control Center shows settings that actions change (a Boost turned off, a permission forgotten).
+  if (shownPanel?.kind === "siteControls" && buildSiteInfo(getState()) !== null) {
+    openPanel({ kind: "siteControls" });
   }
 }
 
@@ -531,10 +538,11 @@ function handleChoose(resultId: string | null, typedText: string, mode: CommandB
 }
 
 /**
- * Saves a picture of the visible page into Downloads and copies it, like Arc's capture.
+ * Saves a picture of the visible page (or a part of it) into Downloads and copies it, like Arc's screenshot and
+ * capture.
  */
-async function capturePage(contents: WebContents, host: string): Promise<void> {
-  const image = await contents.capturePage();
+async function capturePage(contents: WebContents, host: string, region?: Rectangle): Promise<void> {
+  const image = await contents.capturePage(region);
   const pngBytes = image.toPNG();
   // Electron 44's clipboard follows the web's async Clipboard API: an item per MIME type.
   // Blob wants a plain Uint8Array view, not Node's Buffer type.
@@ -558,6 +566,24 @@ function handleSiteCommand(command: SiteCommand): void {
   if (command === "copyLink") {
     clipboard.writeText(site.url);
     closeOverlay();
+    return;
+  }
+  if (command === "share") {
+    closeOverlay();
+    // macOS's own share menu (Messages, Mail, AirDrop, Notes, …) at the pointer, like Arc's Share button.
+    new ShareMenu({ urls: [site.url] }).popup();
+    return;
+  }
+  if (command === "addExtension") {
+    closeOverlay();
+    openLinkInNewTab(CHROME_WEB_STORE_URL, "foreground");
+    return;
+  }
+  if (command === "capture") {
+    const pageBounds = getTabViews().get(site.tabId)?.getBounds();
+    if (pageBounds !== undefined && contents !== null) {
+      openPanel({ kind: "capture", frame: pageBounds });
+    }
     return;
   }
   if (command === "zap" && site.site !== null && contents !== null) {
@@ -638,7 +664,96 @@ function isMode(value: unknown): value is CommandBarMode {
   return value === "newTab" || value === "editUrl" || value === "splitWith";
 }
 
-const SITE_COMMANDS: SiteCommand[] = ["copyLink", "screenshot", "toggleMute", "devTools", "zoomIn", "zoomOut", "zoomReset", "clearSiteData", "reload", "zap"];
+const SITE_COMMANDS: SiteCommand[] = [
+  "copyLink",
+  "share",
+  "screenshot",
+  "capture",
+  "toggleMute",
+  "devTools",
+  "zoomIn",
+  "zoomOut",
+  "zoomReset",
+  "clearSiteData",
+  "reload",
+  "zap",
+  "addExtension",
+];
+
+/** Where the Control Center's "+" tile goes to find extensions. */
+const CHROME_WEB_STORE_URL = "https://chromewebstore.google.com/";
+
+/** A capture smaller than this (either side, in points) counts as a click, not a selection. */
+const MIN_CAPTURE_SIZE_PX = 4;
+
+/**
+ * True for a rectangle of finite numbers with a positive size.
+ */
+function isOverlayRect(value: unknown): value is OverlayRect {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const rect = value as Record<string, unknown>;
+  const numbers = [rect.x, rect.y, rect.width, rect.height];
+  return numbers.every((number) => typeof number === "number" && Number.isFinite(number)) && (rect.width as number) >= 0 && (rect.height as number) >= 0;
+}
+
+/**
+ * Rounds a rectangle to whole points (menus and captures want integers).
+ */
+function roundRect(rect: OverlayRect): Rectangle {
+  return { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) };
+}
+
+/**
+ * Capture: the user dragged out a part of the page. Copies it and saves it like a screenshot.
+ */
+function handleCaptureRegion(region: OverlayRect | null): void {
+  const panel = shownPanel;
+  closeOverlay();
+  const site = buildSiteInfo(getState());
+  const contents = site === null ? null : getTabContents(site.tabId);
+  if (region === null || panel?.kind !== "capture" || site === null || contents === null) {
+    return;
+  }
+  // The region is in window points; the page starts at the frame's corner.
+  const left = Math.max(region.x - panel.frame.x, 0);
+  const top = Math.max(region.y - panel.frame.y, 0);
+  const right = Math.min(region.x + region.width - panel.frame.x, panel.frame.width);
+  const bottom = Math.min(region.y + region.height - panel.frame.y, panel.frame.height);
+  if (right - left < MIN_CAPTURE_SIZE_PX || bottom - top < MIN_CAPTURE_SIZE_PX) {
+    return;
+  }
+  const pageRegion = roundRect({ x: left, y: top, width: right - left, height: bottom - top });
+  capturePage(contents, site.host, pageRegion).catch((error) => console.error("Capture failed:", error));
+}
+
+/**
+ * The Control Center's "…" button: the less used page commands, as a native menu under the button.
+ */
+function showSiteMenu(anchor: OverlayRect): void {
+  const window = getWindow();
+  const site = buildSiteInfo(getState());
+  if (window === null || site === null) {
+    return;
+  }
+  const template: MenuItemConstructorOptions[] = [
+    { label: "Copy Link", click: () => handleSiteCommand("copyLink") },
+    { label: "Reload", enabled: site.isLoaded, click: () => handleSiteCommand("reload") },
+    { label: "Clear Site Data and Reload", enabled: site.isLoaded, click: () => handleSiteCommand("clearSiteData") },
+    { type: "separator" },
+    { label: "Zoom In", enabled: site.isLoaded, click: () => handleSiteCommand("zoomIn") },
+    { label: "Zoom Out", enabled: site.isLoaded, click: () => handleSiteCommand("zoomOut") },
+    { label: `Actual Size (now ${site.zoomPercent}%)`, enabled: site.isLoaded && site.zoomPercent !== 100, click: () => handleSiteCommand("zoomReset") },
+    { type: "separator" },
+    { label: "Zap Elements", enabled: site.isLoaded && site.site !== null, click: () => handleSiteCommand("zap") },
+    { label: "Edit Boost…", enabled: site.site !== null, click: () => openBoostEditor() },
+    { type: "separator" },
+    { label: "Developer Tools", enabled: site.isLoaded, click: () => handleSiteCommand("devTools") },
+  ];
+  const position = roundRect(anchor);
+  Menu.buildFromTemplate(template).popup({ window: window, x: position.x, y: position.y + position.height });
+}
 
 /** Longest text accepted from the overlay. */
 const MAX_TEXT_LENGTH = 8192;
@@ -694,6 +809,22 @@ export function registerOverlayIpc(): void {
   ipcMain.handle(OVERLAY_CHANNELS.showDownload, (event, downloadId: unknown) => {
     if (isFromOverlay(event) && isShortText(downloadId)) {
       showDownloadInFolder(downloadId);
+    }
+  });
+  ipcMain.handle(OVERLAY_CHANNELS.captureRegion, (event, region: unknown) => {
+    if (isFromOverlay(event) && (region === null || isOverlayRect(region))) {
+      handleCaptureRegion(region);
+    }
+  });
+  ipcMain.handle(OVERLAY_CHANNELS.activateExtension, (event, extensionId: unknown, anchor: unknown) => {
+    if (isFromOverlay(event) && isShortText(extensionId) && isOverlayRect(anchor)) {
+      closeOverlay();
+      activateExtensionOfActiveProfile(extensionId, roundRect(anchor));
+    }
+  });
+  ipcMain.handle(OVERLAY_CHANNELS.showSiteMenu, (event, anchor: unknown) => {
+    if (isFromOverlay(event) && isOverlayRect(anchor)) {
+      showSiteMenu(anchor);
     }
   });
   ipcMain.handle(OVERLAY_CHANNELS.peekCommand, (event, command: unknown) => {

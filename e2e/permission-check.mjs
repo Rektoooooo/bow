@@ -92,6 +92,12 @@ const promptText = async () => {
   }
   return null;
 };
+// A closed prompt fades out for a moment (overlay.css panel-out) before its view leaves the window.
+const waitForOverlayGone = async () => {
+  for (let attempt = 0; attempt < 20 && (await isOverlayOnScreen()); attempt++) {
+    await sleep(50);
+  }
+};
 const savedNotificationAnswers = async () =>
   ((await getState()).sitePermissions ?? []).filter((answer) => answer.origin === "https://example.com" && answer.kind === "notifications");
 
@@ -102,6 +108,7 @@ await overlay.click(".permission-button:not(.is-primary)");
 check("Block refuses it", (await waitForPageAnswer()) === "denied");
 check("and is remembered for the site", (await savedNotificationAnswers()).some((answer) => answer.isAllowed === false));
 
+await waitForOverlayGone();
 await askForNotifications();
 const secondAnswer = await waitForPageAnswer();
 const promptShownAgain = await isOverlayOnScreen();

@@ -54,6 +54,9 @@ let recentTabIds: ItemId[] = [];
 /** True while the hidden sidebar shows because the mouse is at the window's left edge. Not saved. */
 let isSidebarPeeking = false;
 
+/** True while the Command Bar is open to make a new tab (RuntimeState.isNewTabPending). */
+let isNewTabPending = false;
+
 /** The sidebar width while its edge is being dragged; null otherwise (the saved width applies). */
 let previewSidebarWidth: number | null = null;
 
@@ -138,7 +141,8 @@ export function setSidebarPeek(isPeeking: boolean): void {
     return;
   }
   isSidebarPeeking = newValue;
-  layoutShownTabViews(mainWindow, currentState, getLayoutOptions());
+  // The page slides aside (and back) together with the sidebar sliding in.
+  layoutShownTabViews(mainWindow, currentState, getLayoutOptions(), true);
   scheduleRuntimePush();
 }
 
@@ -219,7 +223,19 @@ export function collectRuntimeState(): RuntimeState {
     activeDownloadCount: getActiveDownloadCount(),
     isSidebarPeeking: isSidebarPeeking,
     media: findMediaInfo(tabs, getShownTabIds()),
+    isNewTabPending: isNewTabPending,
   };
+}
+
+/**
+ * The Command Bar opened or closed for a new tab: the sidebar moves its highlight to "New Tab" and back.
+ */
+export function setNewTabPending(isPending: boolean): void {
+  if (isNewTabPending === isPending) {
+    return;
+  }
+  isNewTabPending = isPending;
+  scheduleRuntimePush();
 }
 
 /**

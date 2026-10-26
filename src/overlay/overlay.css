@@ -87,8 +87,8 @@ button:disabled {
 
 /* SF Symbols (icons.ts): a mask tinted with the text color, drawn at the symbol's natural size. */
 .icon-symbol {
-  width: var(--symbol-width, 16px);
-  height: var(--symbol-height, 16px);
+  width: calc(var(--symbol-width, 16px) * var(--symbol-scale, 1));
+  height: calc(var(--symbol-height, 16px) * var(--symbol-scale, 1));
   background-color: currentColor;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
@@ -131,9 +131,40 @@ button:disabled {
   }
 }
 
+/* Closing (overlay.ts playClosing, 120 ms = CLOSE_ANIMATION_MS): the panel fades and shrinks a little, the
+   backdrop fades, and nothing takes clicks any more. */
+@keyframes panel-out {
+  to {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.985);
+  }
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+body.is-closing {
+  pointer-events: none;
+}
+
+body.is-closing .panel,
+body.is-closing .capture-layer {
+  animation: panel-out 120ms ease-in forwards;
+}
+
+body.is-closing .backdrop {
+  animation: fade-out 120ms ease-in forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .panel,
-  .backdrop {
+  .backdrop,
+  body.is-closing .panel,
+  body.is-closing .backdrop,
+  body.is-closing .capture-layer {
     animation: none;
   }
 }
@@ -632,116 +663,217 @@ body.dark .command-info-button {
   line-height: 1.5;
 }
 
-/* ---------- Site controls ---------- */
+/* ---------- Control Center (site controls) ----------
+   Measured from the user's Arc screenshot (shot 4, 1 px per point): a 232 pt popover 7.5 pt under the toolbar,
+   its right edge 12.5 pt from the window's, with a notch pointing at the sliders button (53 pt from its right
+   edge); 9 pt padding; a 4-column grid of 49 pt columns 6 pt apart for the action buttons (33 pt, dark) and the
+   extension tiles (32 pt, light, 7.5 pt apart); 32 pt round setting icons, white when on and grey when off; a
+   hairline and a "Secure" pill with "…" at the bottom. Top and right follow CARD_INSET_PX + TOOLBAR_HEIGHT_PX. */
 
-.site-controls {
-  top: 44px;
-  right: 14px;
-  width: 300px;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+body {
+  --control-bg: #f5f5f6;
+  --control-action: rgba(0, 0, 0, 0.06);
+  --control-action-hover: rgba(0, 0, 0, 0.1);
+  --control-tile: rgba(0, 0, 0, 0.045);
+  --control-tile-hover: rgba(0, 0, 0, 0.08);
+  --control-badge-on: #ffffff;
+  --control-badge-on-ink: rgba(0, 0, 0, 0.75);
+  --control-badge-off: rgba(0, 0, 0, 0.1);
+  --control-badge-off-ink: rgba(0, 0, 0, 0.5);
 }
 
-.site-header {
+/* Measured: panel about #33373c over a dark page, buttons #1f2123, tiles #393f44, grey badge #5a5d61. */
+body.dark {
+  --control-bg: #323438;
+  --control-action: rgba(0, 0, 0, 0.38);
+  --control-action-hover: rgba(0, 0, 0, 0.5);
+  --control-tile: rgba(255, 255, 255, 0.06);
+  --control-tile-hover: rgba(255, 255, 255, 0.1);
+  --control-badge-on: #f2f2f2;
+  --control-badge-on-ink: rgba(0, 0, 0, 0.78);
+  --control-badge-off: rgba(255, 255, 255, 0.19);
+  --control-badge-off-ink: rgba(0, 0, 0, 0.6);
+}
+
+.control-center {
+  top: 50px;
+  right: 12px;
+  width: 232px;
+  padding: 9px 9px 10px;
+  border-radius: 13px;
+  background: var(--control-bg);
+  transform-origin: calc(100% - 53px) 0;
+}
+
+/* The notch: a turned square whose two upper edges carry the panel's border. */
+.control-notch {
+  position: absolute;
+  top: -6px;
+  right: 47px;
+  width: 11px;
+  height: 11px;
+  border-top: 1px solid var(--panel-border);
+  border-left: 1px solid var(--panel-border);
+  border-top-left-radius: 3px;
+  background: var(--control-bg);
+  transform: rotate(45deg);
+}
+
+.control-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 7px 6px;
+}
+
+.control-actions {
+  gap: 6px;
+}
+
+.control-action,
+.control-tile,
+.control-more {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  color: var(--ink-soft);
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+
+.control-action {
+  --symbol-scale: 1.05;
+  height: 33px;
+  border-radius: 9px;
+  background: var(--control-action);
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
+}
+
+.control-action:hover:not(:disabled) {
+  background: var(--control-action-hover);
+  color: var(--ink);
+}
+
+.control-tile {
+  height: 32px;
+  border-radius: 8px;
+  background: var(--control-tile);
+}
+
+.control-tile:hover {
+  background: var(--control-tile-hover);
+  color: var(--ink);
+}
+
+.control-tile-image {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.control-section + .control-section {
+  margin-top: 6px;
+}
+
+.control-heading {
+  margin: 9px 0 8px 1px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.control-setting {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 7px;
+  width: 100%;
+  min-height: 43px;
+  padding: 0 4px 0 1px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  text-align: left;
+  transition: background-color var(--motion-fast) var(--motion-ease);
 }
 
-.site-header-icon {
-  color: var(--muted);
+.control-setting:hover {
+  background: var(--control-tile);
 }
 
-.site-header-text {
+.control-setting-badge {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--control-badge-off);
+  color: var(--control-badge-off-ink);
+  transition: background-color var(--motion-medium) var(--motion-ease), color var(--motion-medium) var(--motion-ease);
+}
+
+.control-setting.is-on .control-setting-badge {
+  background: var(--control-badge-on);
+  color: var(--control-badge-on-ink);
+}
+
+.control-setting-text {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 
-.site-host {
+.control-setting-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--ink);
+  font-size: 13px;
   font-weight: 600;
 }
 
-.site-security {
+.control-setting-state {
   color: var(--muted);
   font-size: 12px;
 }
 
-.site-tiles {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+.control-divider {
+  height: 1px;
+  margin: 9px 1px 10px;
+  background: var(--line);
 }
 
-.site-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  padding: 10px 2px 8px;
-  border: 0;
-  border-radius: 10px;
-  background: var(--field);
-}
-
-.site-tile:hover:not(:disabled) {
-  background: var(--highlight);
-}
-
-.site-tile-label {
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.site-row {
+.control-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
 }
 
-.site-row-column {
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-.site-row-label {
+.control-security {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px 0 9px;
+  border-radius: 8px;
+  background: var(--control-tile);
+  color: var(--ink);
+  font-size: 13.5px;
   font-weight: 600;
 }
 
-.site-row-note {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.45;
+.control-more {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: none;
 }
 
-.site-zoom {
-  display: flex;
-  align-items: center;
-  gap: 2px;
+.control-more:hover {
+  background: var(--control-tile);
+  color: var(--ink);
 }
 
-.site-zoom-button,
-.site-zoom-value {
-  min-width: 30px;
-  height: 26px;
-  border: 0;
-  border-radius: 7px;
-  background: var(--field);
-}
-
-.site-zoom-value {
-  min-width: 52px;
-  font-variant-numeric: tabular-nums;
-}
-
+/* Buttons in other panels (Boost editor). */
 .site-buttons {
   display: flex;
   gap: 6px;
@@ -756,31 +888,48 @@ body.dark .command-info-button {
   font-weight: 500;
 }
 
-.site-button:hover:not(:disabled),
-.site-zoom-button:hover:not(:disabled),
-.site-zoom-value:hover:not(:disabled) {
+.site-button:hover:not(:disabled) {
   background: var(--highlight);
 }
 
-.site-url {
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted);
-  font-size: 11px;
-  user-select: text;
+/* ---------- Capture (drag over the page) ---------- */
+
+.capture-layer {
+  position: fixed;
+  inset: 0;
+  cursor: crosshair;
+}
+
+.capture-page {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  transition: background-color var(--motion-fast) var(--motion-ease);
+}
+
+.capture-layer.is-selecting .capture-page {
+  background: transparent;
+}
+
+.capture-hint {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+.capture-selection {
+  position: absolute;
+  border: 1.5px solid #fff;
+  border-radius: 2px;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.3);
 }
 
 /* ---------- Boosts ---------- */
-
-.site-boost-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-}
 
 .site-row-column .site-buttons {
   width: 100%;
@@ -1136,14 +1285,3 @@ body[data-panel="theme"] .backdrop {
   color: var(--chip-active-ink);
 }
 
-.site-permission {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.site-permission-name {
-  flex: 1;
-  color: var(--ink);
-  font-size: 13px;
-}

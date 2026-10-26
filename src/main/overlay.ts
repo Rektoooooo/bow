@@ -9,7 +9,8 @@
  *
  * Data flow:
  *   overlayController.ts showOverlay(message, bounds) → view added on top → "overlay:show" → overlay.ts draws
- *   Escape / click outside → overlay calls close → hideOverlay() → view removed, focus back to the page
+ *   Escape / click outside → overlay calls close → hideOverlay() → "overlay:closing" (the panel animates out) →
+ *   view removed shortly after; the page has the keyboard at once
  */
 import { WebContentsView } from "electron";
 import type { BrowserWindow, WebContents } from "electron";
@@ -20,6 +21,12 @@ import type { Bounds } from "./layout";
 
 /** Fully transparent, so only the panel itself is drawn over the page. */
 const TRANSPARENT_BACKGROUND = "#00000000";
+
+/** How long a closing panel animates out before the view leaves the window (= panel-out in overlay.css). */
+const CLOSE_ANIMATION_MS = 120;
+
+/** The pending removal of a closing overlay; a panel opening meanwhile cancels it. */
+let removalTimer: NodeJS.Timeout | null = null;
 
 let overlayView: WebContentsView | null = null;
 let isShown = false;
@@ -58,6 +65,10 @@ export async function showOverlay(window: BrowserWindow, bounds: Bounds, message
   if (overlayView === null) {
     return;
   }
+  if (removalTimer !== null) {
+    clearTimeout(removalTimer);
+    removalTimer = null;
+  }
   overlayView.setBounds(bounds);
   // Adding a view that is already a child moves it to the top.
   window.contentView.addChildView(overlayView);
@@ -67,14 +78,21 @@ export async function showOverlay(window: BrowserWindow, bounds: Bounds, message
 }
 
 /**
- * Takes the overlay out of the window.
+ * Takes the overlay out of the window: the panel animates out first, then the view goes.
  */
 export function hideOverlay(window: BrowserWindow): void {
   if (overlayView === null || !isShown) {
     return;
   }
-  window.contentView.removeChildView(overlayView);
   isShown = false;
+  const view = overlayView;
+  view.webContents.send(OVERLAY_CHANNELS.closing);
+  removalTimer = setTimeout(() => {
+    removalTimer = null;
+    if (!window.isDestroyed()) {
+      window.contentView.removeChildView(view);
+    }
+  }, CLOSE_ANIMATION_MS);
 }
 
 /**

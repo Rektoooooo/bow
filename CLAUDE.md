@@ -19,8 +19,10 @@ source ~/.nvm/nvm.sh && nvm use   # Arc account only: Node 24 from .nvmrc
 npm install
 npm start            # build + open the browser
 npm test             # Vitest unit tests (pure state rules, ranking, importers)
-npm run e2e          # build + drive the real app: check-app, check-overlay, check-extensions, permission-check
+npm run e2e          # build + drive the real app: check-app, check-overlay, check-extensions, permission-check,
+                     # check-motion (layout changes glide instead of jumping)
 node e2e/window-shot.mjs   # README screenshots from sample data → docs/screenshot-*.png
+node e2e/arc-compare.mjs   # side-by-side crops with the user's Arc screenshots (reference/, local only) → e2e/output
 npm run package      # release/Sidebar Browser-darwin-arm64/Sidebar Browser.app (ad-hoc signed, git-ignored)
 node e2e/check-package.mjs # checks that packaged app (Info.plist, menu, links from other apps)
 tools/make-icon.sh   # redraws build/icon.icns from tools/make-icon.cjs (our own icon design)

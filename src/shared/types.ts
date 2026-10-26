@@ -243,6 +243,8 @@ export interface RuntimeState {
   isSidebarPeeking: boolean;
   /** A tab playing (or paused) media in the background, shown as a small player above the bottom bar. */
   media: MediaInfo | null;
+  /** True while the Command Bar is open to make a new tab: "New Tab" is highlighted instead of the tab, like Arc. */
+  isNewTabPending: boolean;
 }
 
 /** What the sidebar's small media player shows. */

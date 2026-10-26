@@ -36,6 +36,10 @@ const CHANNELS: typeof OVERLAY_CHANNELS = {
   showDownload: "overlay:show-download",
   openUrl: "overlay:open-url",
   peekCommand: "overlay:peek-command",
+  captureRegion: "overlay:capture-region",
+  activateExtension: "overlay:activate-extension",
+  showSiteMenu: "overlay:show-site-menu",
+  closing: "overlay:closing",
 };
 
 const DISPATCH_CHANNEL: (typeof IPC_CHANNELS)["dispatch"] = "browser:dispatch";
@@ -58,6 +62,9 @@ function createOverlayApi(): OverlayApi {
     onFindProgress: (listener) => {
       ipcRenderer.on(CHANNELS.findProgress, (_event: IpcRendererEvent, progress: FindProgress) => listener(progress));
     },
+    onClosing: (listener) => {
+      ipcRenderer.on(CHANNELS.closing, () => listener());
+    },
     query: (text, mode) => ipcRenderer.invoke(CHANNELS.query, text, mode),
     choose: (resultId, typedText, mode) => ipcRenderer.invoke(CHANNELS.choose, resultId, typedText, mode),
     close: () => ipcRenderer.invoke(CHANNELS.close),
@@ -68,6 +75,9 @@ function createOverlayApi(): OverlayApi {
     showDownload: (downloadId) => ipcRenderer.invoke(CHANNELS.showDownload, downloadId),
     openUrl: (url) => ipcRenderer.invoke(CHANNELS.openUrl, url),
     peekCommand: (command) => ipcRenderer.invoke(CHANNELS.peekCommand, command),
+    captureRegion: (region) => ipcRenderer.invoke(CHANNELS.captureRegion, region),
+    activateExtension: (extensionId, anchor) => ipcRenderer.invoke(CHANNELS.activateExtension, extensionId, anchor),
+    showSiteMenu: (anchor) => ipcRenderer.invoke(CHANNELS.showSiteMenu, anchor),
     getSymbols: () => ipcRenderer.invoke(SYMBOLS_CHANNEL),
   };
 }

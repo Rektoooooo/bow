@@ -95,6 +95,13 @@ export const SPLIT_GAP_PX = 6;
 /** Corner radius of the web page card, in pixels. */
 export const CARD_RADIUS_PX = 10;
 
+/**
+ * How long the page card takes to move when the layout changes (⌘S, the sidebar peeking in, split panes). The main
+ * process glides the page view along a cubic ease-out, 1 − (1 − t)³; the sidebar page moves its card with the same
+ * duration and curve (--motion-layout in sidebar.css). Our choice, close to Arc's sidebar slide.
+ */
+export const LAYOUT_MOTION_MS = 260;
+
 /** The first extension update check runs this long after startup, so it never slows the start. Our choice. */
 export const EXTENSION_UPDATE_FIRST_CHECK_MS = 60 * 1000;
 

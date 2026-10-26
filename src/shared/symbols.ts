@@ -50,7 +50,7 @@ export const SYMBOL_NAMES = {
   puzzle: "puzzlepiece.extension",
   share: "square.and.arrow.up",
   boost: "paintbrush.pointed",
-  capture: "viewfinder",
+  capture: "text.viewfinder",
   info: "info.circle",
   gear: "gearshape",
   pin: "pin",

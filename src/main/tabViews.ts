@@ -19,8 +19,8 @@
  */
 import { WebContentsView } from "electron";
 import * as path from "node:path";
-import type { BrowserWindow, ContextMenuParams, HandlerDetails, WebContents } from "electron";
-import { CARD_RADIUS_PX } from "../shared/settings";
+import type { BrowserWindow, ContextMenuParams, HandlerDetails, Rectangle, WebContents } from "electron";
+import { CARD_RADIUS_PX, LAYOUT_MOTION_MS } from "../shared/settings";
 import type { BrowserState, ItemId, TabItem, TabRuntimeInfo } from "../shared/types";
 import { computeCardBounds, computePaneBounds } from "./layout";
 import type { CardLayoutOptions } from "./layout";
@@ -68,6 +68,79 @@ const viewProfileIds = new Map<ItemId, string>();
 
 /** The tabs whose views are in the window right now, in pane order. */
 let shownTabIds: ItemId[] = [];
+
+/** Where each shown view was last sent (it may still be gliding there), so an unchanged layout sends nothing. */
+const targetBounds = new WeakMap<WebContentsView, Rectangle>();
+
+/** A view moving to a new place: where it started, where it goes, and when. */
+interface Glide {
+  from: Rectangle;
+  to: Rectangle;
+  startedAt: number;
+}
+
+/** The views gliding right now. */
+const glides = new Map<WebContentsView, Glide>();
+let glideTimer: NodeJS.Timeout | null = null;
+
+/** Steps per second of a glide: twice a 60 Hz display's, so each refresh shows a fresh place. Our choice. */
+const GLIDE_STEP_MS = 8;
+
+/**
+ * Cubic ease-out: fast at first, settling softly. The same curve as --motion-layout-ease in sidebar.css.
+ */
+function easeOut(progress: number): number {
+  return 1 - (1 - progress) ** 3;
+}
+
+/**
+ * The rectangle a fraction of the way from one to another, in whole points.
+ */
+function interpolateBounds(from: Rectangle, to: Rectangle, fraction: number): Rectangle {
+  return {
+    x: Math.round(from.x + (to.x - from.x) * fraction),
+    y: Math.round(from.y + (to.y - from.y) * fraction),
+    width: Math.round(from.width + (to.width - from.width) * fraction),
+    height: Math.round(from.height + (to.height - from.height) * fraction),
+  };
+}
+
+/**
+ * Moves every gliding view one step; stops when all have arrived.
+ */
+function stepGlides(): void {
+  const now = performance.now();
+  for (const [view, glide] of glides) {
+    const progress = Math.min((now - glide.startedAt) / LAYOUT_MOTION_MS, 1);
+    view.setBounds(interpolateBounds(glide.from, glide.to, easeOut(progress)));
+    if (progress >= 1) {
+      glides.delete(view);
+    }
+  }
+  if (glides.size === 0 && glideTimer !== null) {
+    clearInterval(glideTimer);
+    glideTimer = null;
+  }
+}
+
+/**
+ * Starts a view gliding from where it is now (also mid-glide) to its new place.
+ */
+function glideTo(view: WebContentsView, bounds: Rectangle): void {
+  glides.set(view, { from: view.getBounds(), to: bounds, startedAt: performance.now() });
+  if (glideTimer === null) {
+    glideTimer = setInterval(stepGlides, GLIDE_STEP_MS);
+  }
+  stepGlides();
+}
+
+/**
+ * Puts a view in place at once, ending any glide it was in.
+ */
+function placeAt(view: WebContentsView, bounds: Rectangle): void {
+  glides.delete(view);
+  view.setBounds(bounds);
+}
 
 /** The tab whose pane has focus (the selected tab), or null. */
 let focusedTabId: ItemId | null = null;
@@ -309,9 +382,10 @@ export function computeVisibleTabIds(state: BrowserState): ItemId[] {
 }
 
 /**
- * Places the shown views: one card, or the card divided into split panes.
+ * Places the shown views: one card, or the card divided into split panes. With isAnimated, views already on screen
+ * glide to their new place (⌘S, the sidebar peeking in, split changes); window resizes and drags follow at once.
  */
-export function layoutShownTabViews(window: BrowserWindow, state: BrowserState, layoutOptions: CardLayoutOptions): void {
+export function layoutShownTabViews(window: BrowserWindow, state: BrowserState, layoutOptions: CardLayoutOptions, isAnimated: boolean = false): void {
   const contentSize = window.getContentSize();
   const contentWidth = contentSize[0] ?? 0;
   const contentHeight = contentSize[1] ?? 0;
@@ -326,8 +400,25 @@ export function layoutShownTabViews(window: BrowserWindow, state: BrowserState, 
   for (let index = 0; index < shownTabIds.length; index++) {
     const view = tabViews.get(shownTabIds[index] as ItemId);
     const bounds = paneBounds[index];
-    if (view !== undefined && bounds !== undefined) {
-      view.setBounds(bounds);
+    if (view === undefined || bounds === undefined) {
+      continue;
+    }
+    const previousTarget = targetBounds.get(view);
+    const isSameTarget =
+      previousTarget !== undefined &&
+      previousTarget.x === bounds.x &&
+      previousTarget.y === bounds.y &&
+      previousTarget.width === bounds.width &&
+      previousTarget.height === bounds.height;
+    if (isSameTarget) {
+      continue;
+    }
+    targetBounds.set(view, bounds);
+    // A view that was off screen (just added) appears in place; only views already showing glide.
+    if (isAnimated && previousTarget !== undefined && previousTarget.width > 0) {
+      glideTo(view, bounds);
+    } else {
+      placeAt(view, bounds);
     }
   }
 }
@@ -353,7 +444,8 @@ export function syncTabViews(window: BrowserWindow, state: BrowserState, layoutO
   const sameTabsShown = visibleTabIds.length === shownTabIds.length && visibleTabIds.every((tabId, index) => shownTabIds[index] === tabId);
   focusedTabId = getSelectedTabId(state);
   if (sameTabsShown) {
-    layoutShownTabViews(window, state, layoutOptions);
+    // Same pages, new places: the sidebar was hidden or shown, or a split changed. They glide there.
+    layoutShownTabViews(window, state, layoutOptions, true);
     return false;
   }
 
@@ -362,6 +454,8 @@ export function syncTabViews(window: BrowserWindow, state: BrowserState, layoutO
     if (view !== undefined && !visibleTabIds.includes(shownTabId)) {
       // The page keeps running after it leaves the window, so audio keeps playing.
       window.contentView.removeChildView(view);
+      targetBounds.delete(view);
+      glides.delete(view);
     }
   }
 

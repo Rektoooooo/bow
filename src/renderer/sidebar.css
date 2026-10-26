@@ -45,7 +45,7 @@
   --card-radius: 10px; /* = CARD_RADIUS_PX */
   --toolbar-height: 32px; /* = TOOLBAR_HEIGHT_PX (31 + hairline) */
   --header-height: 43px; /* Favorites start 43 pt from the top in Arc */
-  --row-height: 35px;
+  --row-height: 35.33px; /* Arc's long lists: 40.33 pt per row with the 5 pt gap */
   --row-gap: 5px;
   --row-radius: 10px;
 
@@ -54,6 +54,10 @@
   --motion-medium: 200ms;
   --motion-slow: 260ms;
   --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Layout changes (⌘S, peek, split) move the native page view too (tabViews.ts glides it): same duration
+     (= LAYOUT_MOTION_MS) and exactly the same curve, a cubic ease-out 1 − (1 − t)³, so card and page move as one. */
+  --motion-layout: 260ms;
+  --motion-layout-ease: cubic-bezier(0.333, 1, 0.667, 1);
 
   --grain-opacity: 0;
 
@@ -156,7 +160,7 @@ body {
   -webkit-font-smoothing: auto;
   user-select: none;
   overflow: hidden;
-  transition: grid-template-columns var(--motion-slow) var(--motion-ease);
+  transition: grid-template-columns var(--motion-layout) var(--motion-layout-ease);
 }
 
 /* Film grain over the frame. Our own noise, drawn by an SVG filter. */
@@ -189,7 +193,7 @@ body.sidebar-hidden.sidebar-peeking .sidebar {
   z-index: 2;
   background: linear-gradient(165deg, var(--frame-1), var(--frame-2) 55%, var(--frame-3));
   box-shadow: 8px 0 24px rgba(0, 0, 0, 0.18);
-  animation: sidebar-slide-in var(--motion-medium) var(--motion-ease);
+  animation: sidebar-slide-in var(--motion-layout) var(--motion-layout-ease);
 }
 
 @keyframes sidebar-slide-in {
@@ -759,6 +763,12 @@ button:disabled {
   color: var(--muted);
 }
 
+/* Highlighted while the Command Bar makes a new tab: full text color, like a selected tab (Arc's shot 3). */
+.new-tab-row.is-selected,
+.new-tab-row.is-selected .row-icon-slot {
+  color: var(--ink);
+}
+
 .list-end-zone {
   min-height: 40px;
   border-radius: var(--row-radius);
@@ -981,7 +991,7 @@ button:disabled {
   min-width: 0;
   min-height: 0;
   padding: var(--card-inset) var(--card-inset) var(--card-inset) var(--card-gap);
-  transition: padding var(--motion-slow) var(--motion-ease);
+  transition: padding var(--motion-layout) var(--motion-layout-ease);
 }
 
 body.sidebar-hidden .main-column {
@@ -1011,7 +1021,7 @@ body.sidebar-hidden .main-column {
   border-bottom: 1px solid var(--hairline);
   color: var(--toolbar-ink);
   -webkit-app-region: drag;
-  transition: padding var(--motion-slow) var(--motion-ease);
+  transition: padding var(--motion-layout) var(--motion-layout-ease);
 }
 
 /* With the sidebar hidden, the toolbar starts right of the traffic lights. */

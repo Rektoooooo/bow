@@ -30,7 +30,10 @@ export interface RowContext {
   onRenameFinished: () => void;
 }
 
-/** Indent per folder level, in pixels. Measured on the user's Arc: children sit 16 pt further right. */
+/**
+ * Indent per folder level, in pixels. Measured on the user's Arc: a child row, its highlight included, starts about
+ * 16 pt further right (the highlight of a selected child begins at 22.5 pt, a top-level one at 7).
+ */
 const INDENT_PER_LEVEL_PX = 16;
 
 /** Left padding of a row at the top level. */
@@ -126,11 +129,12 @@ function createTabTitle(tab: TabItem, context: RowContext): HTMLElement {
 }
 
 /**
- * Sets a row's indent for its folder depth.
+ * Sets a row's indent for its folder depth: the whole row moves right, like Arc's, not just its content.
  */
 function setIndent(row: HTMLElement, depth: number, basePadding: number = ROW_BASE_PADDING_PX): void {
   row.style.setProperty("--depth", String(depth));
-  row.style.paddingLeft = `${basePadding + depth * INDENT_PER_LEVEL_PX}px`;
+  row.style.marginLeft = `${depth * INDENT_PER_LEVEL_PX}px`;
+  row.style.paddingLeft = `${basePadding}px`;
 }
 
 /**

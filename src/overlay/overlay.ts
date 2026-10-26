@@ -22,6 +22,7 @@ import { renderPeekFrame } from "./peekFrame.js";
 import { renderPermissionPrompt } from "./permissionPrompt.js";
 import { renderThemeEditor } from "./themeEditor.js";
 import { renderSiteControls } from "./siteControls.js";
+import { renderCapture } from "./capture.js";
 import { buildSiteSearchUrl, findSiteSearch } from "../shared/siteSearch.js";
 import type { SiteSearch } from "../shared/siteSearch.js";
 
@@ -57,6 +58,9 @@ const COMMAND_BAR_TIPS: { keys: string; text: string }[] = [
   { keys: "⌘⇧C", text: "Copy the current page's address" },
   { keys: "Esc", text: "Close" },
 ];
+
+/** How long a closing panel animates out (= panel-out in overlay.css and CLOSE_ANIMATION_MS in main's overlay.ts). */
+const CLOSE_ANIMATION_MS = 120;
 
 /** Placeholder text per Command Bar mode. */
 const PLACEHOLDERS: Record<CommandBarMode, string> = {
@@ -385,10 +389,12 @@ function showPanel(message: OverlayShowMessage): void {
   if (host === null || backdrop === null) {
     return;
   }
+  document.body.classList.remove("is-closing");
   document.body.classList.toggle("dark", message.isDark);
   document.body.dataset.panel = message.panel.kind;
-  // The Find bar's and a permission prompt's overlay is only as big as the card, so it needs no backdrop.
-  backdrop.hidden = message.panel.kind === "find" || message.panel.kind === "permission";
+  // The Find bar's and a permission prompt's overlay is only as big as the card, so it needs no backdrop; Capture
+  // draws its own dimming.
+  backdrop.hidden = message.panel.kind === "find" || message.panel.kind === "permission" || message.panel.kind === "capture";
 
   if (message.panel.kind === "commandBar") {
     renderCommandBar(host, message.panel.mode, message.panel.initialText);
@@ -417,6 +423,28 @@ function showPanel(message: OverlayShowMessage): void {
   if (message.panel.kind === "permission") {
     renderPermissionPrompt(host, message.panel);
   }
+  if (message.panel.kind === "capture") {
+    renderCapture(host, message.panel);
+  }
+}
+
+/**
+ * The panel is closing: it fades out, then the page is cleared, so the next panel never flashes the old one.
+ */
+function playClosing(): void {
+  const host = document.getElementById("panel");
+  const backdrop = document.getElementById("backdrop");
+  document.body.classList.add("is-closing");
+  window.setTimeout(() => {
+    if (!document.body.classList.contains("is-closing")) {
+      return;
+    }
+    host?.replaceChildren();
+    if (backdrop !== null) {
+      backdrop.hidden = true;
+    }
+    commandInput = null;
+  }, CLOSE_ANIMATION_MS);
 }
 
 /**
@@ -425,6 +453,7 @@ function showPanel(message: OverlayShowMessage): void {
 function startOverlay(): void {
   window.overlayApi.getSymbols().then(installSymbols).catch(() => undefined);
   window.overlayApi.onShow(showPanel);
+  window.overlayApi.onClosing(playClosing);
   window.overlayApi.onResults((query, lines) => {
     if (commandInput === null || commandInput.value !== query || siteSearch !== null) {
       return;

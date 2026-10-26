@@ -82,37 +82,47 @@ User: "poorly polished, icons weird, not smooth — make it 1:1 with my Arc scre
 limit, UI-test until perfect." Skip Arc Max (AI) and server features (sync, sharing, accounts).
 
 ### 3.1 Motion foundation
-- [ ] Keyed, in-place sidebar rendering (rows created once per key, updated on push) + delegated events
-- [ ] CSS motion system: hover/selection transitions, row enter/leave + FLIP, folder open/close, Space slide,
+- [x] Keyed, in-place sidebar rendering (rows created once per key, updated on push) + delegated events
+- [x] CSS motion system: hover/selection transitions, row enter/leave + FLIP, folder open/close, Space slide,
       theme cross-fade, reduced motion
-- [ ] Native view motion: animated bounds for ⌘S, sidebar peek, split, Peek grow/shrink
-- [ ] Overlay open/close animations (incl. Command Bar, Library), no stale-frame flash, no re-animating site controls
+- [x] Native view motion for ⌘S and the sidebar peek: the main process glides the page view (tabViews.ts, cubic
+      ease-out, 260 ms) and the sidebar page moves its card on the same curve. Electron's own
+      `setBounds(…, {animate})` reports the end place at once and could not be verified without screen recording,
+      so we step it ourselves (e2e/check-motion.mjs proves the in-between places).
+- [ ] Glide for split panes and Peek grow/shrink
+- [x] Panels animate in (centering moved to `translate`), the Command Bar highlight moves without rebuilding rows,
+      the Control Center redraws in place instead of animating in again
+- [ ] Panels animate out (needs a "closing" round trip before the overlay view is removed)
 
 ### 3.2 Arc's look 1:1
-- [ ] SF Symbols rendered by macOS for every icon (CSS mask, tintable); native menu icons
-- [ ] Palette engine (frame #313131 for black/dark, white/black overlay alphas) + Arc theme import (windowTheme)
-- [ ] Card with the toolbar inside, hairline, per-site toolbar tint (50-site cache), "Show full URL" option
-      **Waits on the clipping spike** (needs Screen Recording for Claude, granted by the user; works after a Claude
-      restart): a `View` at (50,50,400,300) with `setBorderRadius(40)`, child `WebContentsView` filling it with a red
-      page, `screencapture -l <window id>`, read the corners. Clips → card = parent View with the toolbar as its own
-      WebContentsView + page views (square top corners, round bottom). Doesn't clip → keep the toolbar in the sidebar
-      page, uniform page radius, toolbar tinted from the page's top strip (notches invisible), hairline.
-      Measurements (Arc, user's screenshots, 0.985 px/pt): sidebar padding 8, width 247, card gap 7 left, insets 10
-      top/right/bottom, radius 10, toolbar 32 + 1 px hairline, soft card shadow (≈8 px gradient right/bottom),
-      Favorites tiles 45 tall / 8 gap / radius 10, title row 30, rows 36 + 5 gap, text 13.5/500 (folders 600),
-      divider 20, bottom icons centered 25 pt above the bottom, traffic lights at ≈(13,18).
-- [ ] Sidebar to the measurements (tiles, rows, Space title, divider/Clear, New Tab, bottom bar)
-- [ ] Command Bar (shot 3), Control Center (shot 4), Library, Peek frame, Find, prompts, editors, Little Window
+Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 × 1032 pt at 56, 38 in the image).
+`node e2e/arc-compare.mjs` renders our window at that size and writes side-by-side crops + our element boxes.
+- [x] SF Symbols rendered by macOS for every icon (CSS mask, tintable, per-context scale) · [ ] native menu icons
+- [x] Palette engine (frame #313131 for black/dark; light shows dark colors as #e6e6e6) + Arc theme import with
+      intensity; Spaces without a theme get Arc's neutral grey
+- [x] Card with the toolbar inside (uniform page radius, toolbar tinted per site from the page's top row, 50-site
+      cache), link icon + host/path like Arc · [ ] "Show full URL" option
+- [x] Sidebar to the measurements: width 242 (rows 7…241.5), card at 249, toolbar 31 + hairline, Favorites at 43,
+      46 tall, 7 apart; rows 35.33 on a 40.33 pitch (long lists), Space title as tall as a row, children indented
+      as whole rows by 16, divider only while Today has tabs (10.5 under the last pinned row), New Tab highlighted
+      while the Command Bar makes a new tab, our own folder drawings in Arc's proportions, traffic lights (12, 16)
+- [x] Overlay strengths calibrated to Arc's pixels (Chromium blends in the display's color space)
+- [x] Command Bar (shot 3): 750 wide a third down, 62 input row with tips, 44 rows titled only, inverted arrow
+- [x] Control Center (shot 4): Share sheet, Boost, Screenshot, Capture (drag a region), extension grid with +,
+      Settings rows (sound, zoom, Boost, permission answers), Secure pill, "…" native menu
+- [ ] Library, Peek frame, Find, prompts, editors, Little Window, status bubble, crash page in the same language
+- [ ] Verify the traffic lights and native rendering once screen recording works (Claude restart)
 
 ### 3.3 Remaining Arc features
 - [ ] Tab hover previews · [ ] Recent-tab switcher (⌃Tab) · [ ] Inline URL autocomplete · [ ] Tidy titles
-- [ ] Capture + Library Media · [ ] Library Spaces/Boosts · [ ] Notes · [ ] Easels · [ ] Boost fonts/colors/JS
+- [x] Capture (Control Center) · [ ] Library Media · [ ] Library Spaces/Boosts · [ ] Notes · [ ] Easels · [ ] Boost fonts/colors/JS
 - [ ] Sound effects · [ ] Alternate app icons · [ ] Ad & tracker blocking · [ ] Translate page · [ ] Handoff
 - [ ] Import from Chrome/Brave/Edge/Safari · [ ] First-run onboarding
 
 ### 3.4 Verification
-- [ ] e2e/arc-compare.mjs (side-by-side with the reference, sampled colors/sizes within tolerance)
-- [ ] Motion checks (intermediate frames, long-task probe, 300-tab sidebar)
+- [x] e2e/arc-compare.mjs (side-by-side with the reference; positions match within about a point)
+- [x] Motion checks for ⌘S, peek and resize (e2e/check-motion.mjs, part of `npm run e2e`)
+- [ ] Long-task probe, 300-tab sidebar
 - [ ] Hands-on runs of the packaged app; all suites green; docs + teardown page current
 
 ## Review (2026-10-26, end of the Arc-parity session)

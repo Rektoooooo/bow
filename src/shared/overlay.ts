@@ -30,7 +30,16 @@ export type OverlayPanel =
   | { kind: "boost"; site: string; css: string }
   | { kind: "theme"; spaceId: string; spaceName: string; spaceIcon: string; theme: SpaceTheme; sidebarWidth: number; presets: { label: string; colors: string[]; appearance: ThemeAppearance }[] }
   | { kind: "peek"; frame: { x: number; y: number; width: number; height: number }; url: string; title: string }
-  | { kind: "permission"; requestId: string; host: string; kinds: SitePermissionKind[]; appName: string | null };
+  | { kind: "permission"; requestId: string; host: string; kinds: SitePermissionKind[]; appName: string | null }
+  | { kind: "capture"; frame: { x: number; y: number; width: number; height: number } };
+
+/** A rectangle in the overlay page, which covers the window (so also in window coordinates). */
+export interface OverlayRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 /** The Peek header's buttons. */
 export type PeekCommand = "openAsTab" | "split" | "close";
@@ -106,6 +115,8 @@ export interface SiteInfo {
   profileId: string;
   origin: string | null;
   permissions: { kind: SitePermissionKind; isAllowed: boolean }[];
+  /** The profile's turned-on extensions, for the Control Center's grid. */
+  extensions: { id: string; name: string; iconUrl: string | null }[];
 }
 
 /** Everything the overlay needs to draw a panel. */
@@ -118,7 +129,20 @@ export interface OverlayShowMessage {
 }
 
 /** Commands the site controls can send. */
-export type SiteCommand = "copyLink" | "screenshot" | "toggleMute" | "devTools" | "zoomIn" | "zoomOut" | "zoomReset" | "clearSiteData" | "reload" | "zap";
+export type SiteCommand =
+  | "copyLink"
+  | "share"
+  | "screenshot"
+  | "capture"
+  | "toggleMute"
+  | "devTools"
+  | "zoomIn"
+  | "zoomOut"
+  | "zoomReset"
+  | "clearSiteData"
+  | "reload"
+  | "zap"
+  | "addExtension";
 
 /** Find-in-page progress. */
 export interface FindProgress {
@@ -132,6 +156,8 @@ export interface OverlayApi {
   onResults(listener: (query: string, lines: CommandBarLine[]) => void): void;
   onLibraryUpdate(listener: (library: LibraryData) => void): void;
   onFindProgress(listener: (progress: FindProgress) => void): void;
+  /** The panel is closing: play the closing animation and clear the page (the view goes away right after). */
+  onClosing(listener: () => void): void;
   query(text: string, mode: CommandBarMode): Promise<CommandBarLine[]>;
   choose(resultId: string | null, typedText: string, mode: CommandBarMode): Promise<void>;
   close(): Promise<void>;
@@ -143,6 +169,11 @@ export interface OverlayApi {
   showDownload(downloadId: string): Promise<void>;
   openUrl(url: string): Promise<void>;
   peekCommand(command: PeekCommand): Promise<void>;
+  /** Capture: the part of the page the user dragged out (null: cancelled). */
+  captureRegion(region: OverlayRect | null): Promise<void>;
+  /** The Control Center: open an extension's popup under its tile, or the "…" menu under the button. */
+  activateExtension(extensionId: string, anchor: OverlayRect): Promise<void>;
+  showSiteMenu(anchor: OverlayRect): Promise<void>;
   /** The SF Symbols our icons use, rendered by macOS. */
   getSymbols(): Promise<Record<string, SymbolImage>>;
 }
@@ -163,4 +194,8 @@ export const OVERLAY_CHANNELS = {
   showDownload: "overlay:show-download",
   openUrl: "overlay:open-url",
   peekCommand: "overlay:peek-command",
+  captureRegion: "overlay:capture-region",
+  activateExtension: "overlay:activate-extension",
+  showSiteMenu: "overlay:show-site-menu",
+  closing: "overlay:closing",
 } as const;
