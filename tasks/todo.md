@@ -92,3 +92,6 @@ and every Arc behavior we can observe is written down before Arc shuts down.
 - [ ] Ghidra pass when RAM allows (Command Bar ranking, Peek triggers, sync merge, Easel captures)
 - [ ] Easels, Notes, multiple main windows, tab hover previews, built-in ad blocking, screen sharing
 - [ ] Sign and notarize the app (needs a Developer ID) so it runs on other Macs
+- [ ] Adding a Web Store extension to a second profile re-downloads into the folder the first profile has loaded;
+      reuse the existing copy instead (rare)
+- [ ] Toolbar "Adding…" state resets on any redraw during the download (cosmetic; one download only)

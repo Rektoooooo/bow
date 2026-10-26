@@ -5,8 +5,9 @@
  *   replace the empty starter Spaces, switch to the first imported Space and report what happened.
  *
  * Data source:
- *   ~/Library/Application Support/Arc/StorableSidebar.json (or a file the user picks), StorableArchiveItems.json and
- *   the favicon cache folders next to it, and the History databases under Arc's User Data folder.
+ *   ~/Library/Application Support/Arc/StorableSidebar.json (or a file the user picks, such as a backup of that
+ *   folder), and next to it StorableArchiveItems.json, the favicon cache folders, and "User Data" with the History
+ *   databases and the extensions.
  *
  * Data flow:
  *   menu → importFromArc() → importArcSidebar() → importArcArchive() → attachArcFavicons() → applyChange()
@@ -29,9 +30,6 @@ import { removeEmptySpaces, switchSpace } from "./spaces";
 
 /** Where Arc keeps its sidebar on the account that uses it (docs/research/arc-data-model.md). */
 const ARC_SIDEBAR_FILE = path.join(app.getPath("home"), "Library", "Application Support", "Arc", "StorableSidebar.json");
-
-/** Arc's own folder; its History databases are below it (arcHistoryImport.ts). */
-const ARC_FOLDER = path.join(app.getPath("home"), "Library", "Application Support", "Arc");
 
 const ARCHIVE_FILE_NAME = "StorableArchiveItems.json";
 
@@ -162,9 +160,12 @@ export async function importFromArc(): Promise<void> {
     return switchSpace(withoutStarters, firstNewSpace.id, Date.now());
   });
 
-  const historyPagesImported = importHistoryEntries(await readArcHistory(ARC_FOLDER));
+  // History and extensions come from the folder of the chosen sidebar file: Arc's own folder, or a backup copy of it
+  // (with its "User Data" folder) once Arc is gone.
+  const arcFolder = path.dirname(filePath);
+  const historyPagesImported = importHistoryEntries(await readArcHistory(arcFolder));
   // After the sidebar, which creates the profiles the extensions belong to.
-  const extensionsReport = importArcExtensions(ARC_FOLDER);
+  const extensionsReport = importArcExtensions(arcFolder);
 
   await dialog.showMessageBox(window, {
     type: "info",
