@@ -6,17 +6,17 @@
 import { describe, expect, it } from "vitest";
 import { parseAction } from "../src/main/ipc";
 import { computeCardBounds, computePaneBounds } from "../src/main/layout";
-import { CARD_INSET_PX, SIDEBAR_WIDTH_PX, SPLIT_GAP_PX, TOOLBAR_HEIGHT_PX } from "../src/shared/settings";
+import { CARD_GAP_PX, CARD_INSET_PX, SIDEBAR_WIDTH_PX, SPLIT_GAP_PX, TOOLBAR_HEIGHT_PX } from "../src/shared/settings";
 
 describe("computeCardBounds", () => {
-  it("places the card right of the sidebar and below the toolbar", () => {
+  it("places the page right of the sidebar, below the card's toolbar, inset like Arc's card", () => {
     const card = computeCardBounds(1280, 820, { isSidebarVisible: true, isToolbarVisible: true });
 
     expect(card).toEqual({
-      x: SIDEBAR_WIDTH_PX + CARD_INSET_PX,
-      y: TOOLBAR_HEIGHT_PX,
-      width: 1280 - SIDEBAR_WIDTH_PX - 2 * CARD_INSET_PX,
-      height: 820 - TOOLBAR_HEIGHT_PX - CARD_INSET_PX,
+      x: SIDEBAR_WIDTH_PX + CARD_GAP_PX,
+      y: CARD_INSET_PX + TOOLBAR_HEIGHT_PX,
+      width: 1280 - SIDEBAR_WIDTH_PX - CARD_GAP_PX - CARD_INSET_PX,
+      height: 820 - CARD_INSET_PX - TOOLBAR_HEIGHT_PX - CARD_INSET_PX,
     });
   });
 

@@ -1,59 +1,134 @@
 /*
   WHY this file exists:
-    Look of the window's own page: the sidebar, the toolbar and the colored frame around the page card.
-    Sizes must match shared/settings.ts, because main.ts places the page card using those same numbers.
+    Look of the window's own page: the sidebar, and the page card with its toolbar, like Arc's. Sizes and colors are
+    measured from the user's Arc screenshots (reference/arc-ui, 0.985 px per pt; see docs/research/arc-findings.md
+    and tasks/todo.md 3.2). Sizes must match shared/settings.ts, because main.ts places the web page with them.
 
   Data source:
-    CSS variables set by theme.ts from the active Space's theme (--frame-color-1…3, --grain-opacity,
-    data-appearance on <html>).
+    CSS variables set by theme.ts from the active Space's theme (--frame-1…3 computed like Arc's frame,
+    --grain-opacity, data-appearance on <html>) and by sidebar.ts (--sidebar-width, the toolbar tint).
 
-  Layout: two columns (sidebar | main column); the main column is the toolbar row above the card slot.
-  Colors are defined once with light-dark(), and data-appearance picks light, dark or the system setting.
+  Layout: two columns (sidebar | main column). The main column holds the page card: the toolbar on top and the card
+  slot below it, where main.ts places the web page. Every color except the frame is a white (dark) or black (light)
+  overlay on the frame, with the strengths measured in Arc.
 */
 
-:root {
-  --sidebar-width: 240px; /* = SIDEBAR_WIDTH_PX; sidebar.ts sets the saved width */
-  --card-inset: 8px; /* = CARD_INSET_PX */
-  --card-radius: 10px; /* = CARD_RADIUS_PX */
-  --toolbar-height: 40px; /* = TOOLBAR_HEIGHT_PX */
-  --row-height: 32px;
-  --row-radius: 8px;
+/* Registered so theme changes cross-fade instead of jumping. */
+@property --frame-1 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #313131;
+}
 
-  --frame-color-1: #e9d8d4; /* replaced per Space by theme.ts */
-  --frame-color-2: #e9d8d4;
-  --frame-color-3: #e9d8d4;
+@property --frame-2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #313131;
+}
+
+@property --frame-3 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #313131;
+}
+
+@property --card-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #2a2a2c;
+}
+
+:root {
+  --sidebar-width: 247px; /* = SIDEBAR_WIDTH_PX; sidebar.ts sets the saved width */
+  --card-inset: 10px; /* = CARD_INSET_PX */
+  --card-gap: 7px; /* = CARD_GAP_PX */
+  --card-radius: 10px; /* = CARD_RADIUS_PX */
+  --toolbar-height: 33px; /* = TOOLBAR_HEIGHT_PX (32 + hairline) */
+  --header-height: 46px;
+  --row-height: 36px;
+  --row-gap: 5px;
+  --row-radius: 10px;
+
+  /* Motion, close to Arc's: quick and soft. */
+  --motion-fast: 120ms;
+  --motion-medium: 200ms;
+  --motion-slow: 260ms;
+  --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
   --grain-opacity: 0;
 
-  /* Dark frames keep a hint of the Space color over a near-black base, like Arc's dark themes. */
-  --dark-base: #1c1c1e;
-  --frame-1: light-dark(var(--frame-color-1), color-mix(in oklab, var(--frame-color-1) 20%, var(--dark-base)));
-  --frame-2: light-dark(var(--frame-color-2), color-mix(in oklab, var(--frame-color-2) 20%, var(--dark-base)));
-  --frame-3: light-dark(var(--frame-color-3), color-mix(in oklab, var(--frame-color-3) 20%, var(--dark-base)));
-
-  --ink: light-dark(rgba(0, 0, 0, 0.86), rgba(255, 255, 255, 0.92));
-  --muted: light-dark(rgba(0, 0, 0, 0.5), rgba(255, 255, 255, 0.5));
-  --faint: light-dark(rgba(0, 0, 0, 0.3), rgba(255, 255, 255, 0.28));
-  --line: light-dark(rgba(0, 0, 0, 0.1), rgba(255, 255, 255, 0.1));
-  --row-hover: light-dark(rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.07));
-  --row-selected: light-dark(rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.14));
-  --row-shadow: light-dark(0 1px 2px rgba(0, 0, 0, 0.1), none);
-  --tile: light-dark(rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.08));
-  --tile-selected: light-dark(rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.2));
-  --field: light-dark(rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.09));
-  --letter-icon: light-dark(rgba(0, 0, 0, 0.1), rgba(255, 255, 255, 0.14));
-  --drop-line: light-dark(rgba(0, 0, 0, 0.55), rgba(255, 255, 255, 0.7));
-  --card-empty: light-dark(rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.04));
-  --focus-ring: light-dark(rgba(0, 0, 0, 0.4), rgba(255, 255, 255, 0.5));
-
-  color-scheme: light dark;
+  transition:
+    --frame-1 var(--motion-slow) var(--motion-ease),
+    --frame-2 var(--motion-slow) var(--motion-ease),
+    --frame-3 var(--motion-slow) var(--motion-ease),
+    --card-bg var(--motion-slow) var(--motion-ease);
 }
 
-:root[data-appearance="light"] {
-  color-scheme: light;
-}
-
+/* Dark: white overlays (measured on the user's Arc: selected row 22 %, Favorites tile 12 %, divider 16 %). */
 :root[data-appearance="dark"] {
   color-scheme: dark;
+  --ink: rgba(255, 255, 255, 0.88);
+  --muted: rgba(255, 255, 255, 0.45);
+  --icon: rgba(255, 255, 255, 0.58);
+  --faint: rgba(255, 255, 255, 0.22);
+  --dot: rgba(255, 255, 255, 0.2);
+  --line: rgba(255, 255, 255, 0.16);
+  --row-hover: rgba(255, 255, 255, 0.09);
+  --row-selected: rgba(255, 255, 255, 0.22);
+  --row-shadow: none;
+  --tile: rgba(255, 255, 255, 0.12);
+  --tile-hover: rgba(255, 255, 255, 0.17);
+  --tile-selected: rgba(255, 255, 255, 0.26);
+  --field: rgba(255, 255, 255, 0.09);
+  --letter-icon: rgba(255, 255, 255, 0.14);
+  --drop-line: rgba(255, 255, 255, 0.7);
+  --focus-ring: rgba(255, 255, 255, 0.5);
+  --card-bg-default: #2a2a2c;
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 3px 12px rgba(0, 0, 0, 0.28);
+  --card-empty: rgba(255, 255, 255, 0.03);
+}
+
+/* Light: black overlays, white selection with a soft shadow (Arc's light Spaces). */
+:root[data-appearance="light"] {
+  color-scheme: light;
+  --ink: rgba(0, 0, 0, 0.85);
+  --muted: rgba(0, 0, 0, 0.45);
+  --icon: rgba(0, 0, 0, 0.5);
+  --faint: rgba(0, 0, 0, 0.25);
+  --dot: rgba(0, 0, 0, 0.2);
+  --line: rgba(0, 0, 0, 0.1);
+  --row-hover: rgba(255, 255, 255, 0.45);
+  --row-selected: rgba(255, 255, 255, 0.92);
+  --row-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+  --tile: rgba(255, 255, 255, 0.45);
+  --tile-hover: rgba(255, 255, 255, 0.62);
+  --tile-selected: rgba(255, 255, 255, 0.95);
+  --field: rgba(255, 255, 255, 0.6);
+  --letter-icon: rgba(0, 0, 0, 0.1);
+  --drop-line: rgba(0, 0, 0, 0.55);
+  --focus-ring: rgba(0, 0, 0, 0.4);
+  --card-bg-default: #f7f7f7;
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 3px 12px rgba(0, 0, 0, 0.1);
+  --card-empty: rgba(0, 0, 0, 0.02);
+}
+
+/* The toolbar's own text colors follow its tint (sidebar.ts sets data-toolbar-tone from the tint's brightness). */
+:root {
+  --card-bg: var(--card-bg-default);
+}
+
+:root[data-toolbar-tone="dark"] {
+  --toolbar-ink: rgba(255, 255, 255, 0.92);
+  --toolbar-icon: rgba(255, 255, 255, 0.58);
+  --toolbar-hover: rgba(255, 255, 255, 0.1);
+  --hairline: rgba(255, 255, 255, 0.06);
+}
+
+:root[data-toolbar-tone="light"] {
+  --toolbar-ink: rgba(0, 0, 0, 0.85);
+  --toolbar-icon: rgba(0, 0, 0, 0.5);
+  --toolbar-hover: rgba(0, 0, 0, 0.06);
+  --hairline: rgba(0, 0, 0, 0.08);
 }
 
 * {
@@ -72,10 +147,11 @@ body {
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   background: linear-gradient(165deg, var(--frame-1), var(--frame-2) 55%, var(--frame-3));
   color: var(--ink);
-  font: 13px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font: 13.5px/1.25 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   user-select: none;
   overflow: hidden;
+  transition: grid-template-columns var(--motion-slow) var(--motion-ease);
 }
 
 /* Film grain over the frame. Our own noise, drawn by an SVG filter. */
@@ -97,7 +173,7 @@ body.sidebar-hidden .sidebar {
   visibility: hidden;
 }
 
-/* Hidden sidebar, pointer at the left edge: the sidebar shows over the toolbar while main.ts slides the page aside. */
+/* Hidden sidebar, pointer at the left edge: the sidebar shows over the card while main.ts slides the page aside. */
 body.sidebar-hidden.sidebar-peeking .sidebar {
   visibility: visible;
   position: absolute;
@@ -107,14 +183,13 @@ body.sidebar-hidden.sidebar-peeking .sidebar {
   width: var(--sidebar-width);
   z-index: 2;
   background: linear-gradient(165deg, var(--frame-1), var(--frame-2) 55%, var(--frame-3));
-  box-shadow: 1px 0 0 var(--line), 8px 0 24px rgba(0, 0, 0, 0.12);
-  animation: sidebar-slide-in 140ms ease-out;
+  box-shadow: 8px 0 24px rgba(0, 0, 0, 0.18);
+  animation: sidebar-slide-in var(--motion-medium) var(--motion-ease);
 }
 
 @keyframes sidebar-slide-in {
   from {
-    transform: translateX(-24px);
-    opacity: 0;
+    transform: translateX(calc(-1 * var(--sidebar-width)));
   }
 }
 
@@ -126,7 +201,7 @@ body.sidebar-hidden.sidebar-peeking .sidebar {
 body.sidebar-hidden .reveal-edge {
   display: block;
   position: absolute;
-  top: var(--toolbar-height);
+  top: 0;
   bottom: 0;
   left: 0;
   width: var(--card-inset);
@@ -178,7 +253,7 @@ button:disabled {
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  padding: 0 6px 6px 8px;
+  padding: 0 0 0 8px;
 }
 
 /* The top strip holds the traffic lights; it also drags the window. */
@@ -186,12 +261,13 @@ button:disabled {
   flex: none;
   display: flex;
   align-items: center;
-  height: var(--toolbar-height);
+  height: var(--header-height);
   -webkit-app-region: drag;
 }
 
+/* Up to the sidebar toggle, which sits right of the traffic lights (centered about 93 pt from the left in Arc). */
 .traffic-light-space {
-  width: 68px;
+  width: 71px;
   flex: none;
 }
 
@@ -202,7 +278,6 @@ button:disabled {
 }
 
 .header-button,
-.toolbar-button,
 .bottom-button {
   display: grid;
   place-items: center;
@@ -211,7 +286,16 @@ button:disabled {
   border: 0;
   border-radius: 7px;
   background: none;
-  color: var(--muted);
+  color: var(--icon);
+  transition:
+    background-color var(--motion-fast) linear,
+    color var(--motion-fast) linear;
+}
+
+.header-button:hover:not(:disabled),
+.bottom-button:hover:not(:disabled) {
+  background: var(--row-hover);
+  color: var(--ink);
 }
 
 /* A download in progress: a small dot on the Library button. */
@@ -231,45 +315,39 @@ button:disabled {
   animation: loading-pulse 1s ease-in-out infinite;
 }
 
-.header-button:hover:not(:disabled),
-.toolbar-button:hover:not(:disabled),
-.bottom-button:hover:not(:disabled) {
-  background: var(--row-hover);
-  color: var(--ink);
-}
-
-/* Favorites: big tiles in a grid at the top, like Arc. */
+/* Favorites: tiles in rows of up to four that share the width, like Arc. */
 .favorites {
   flex: none;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
-  gap: 7px;
-  padding: 2px 2px 10px;
+  grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+  gap: 8px;
+  padding-bottom: 12px;
 }
 
 .favorite-tile {
   position: relative;
   display: grid;
   place-items: center;
-  height: 44px;
+  height: 45px;
   border-radius: 10px;
   background: var(--tile);
-  opacity: 0.8;
-}
-
-.favorite-tile.is-loaded {
-  opacity: 1;
+  transition:
+    background-color var(--motion-fast) linear,
+    transform var(--motion-fast) var(--motion-ease),
+    opacity var(--motion-fast) linear;
 }
 
 .favorite-tile:hover {
-  opacity: 1;
-  filter: brightness(1.06);
+  background: var(--tile-hover);
+}
+
+.favorite-tile:active {
+  transform: scale(0.96);
 }
 
 .favorite-tile.is-selected {
   background: var(--tile-selected);
   box-shadow: var(--row-shadow);
-  opacity: 1;
 }
 
 .tile-audio-dot {
@@ -284,7 +362,7 @@ button:disabled {
 /* The space after the tiles: a drop target that only takes room while something is dragged. */
 .favorites-end-zone {
   display: none;
-  min-height: 44px;
+  min-height: 45px;
   border-radius: 10px;
 }
 
@@ -304,7 +382,7 @@ button:disabled {
 }
 
 .is-dragging .favorites.is-empty .favorites-end-zone {
-  min-height: 44px;
+  min-height: 45px;
   box-shadow: inset 0 0 0 1px var(--line);
 }
 
@@ -340,43 +418,41 @@ button:disabled {
 }
 
 .space-content.slide-from-right {
-  animation: slide-from-right 220ms ease-out;
+  animation: slide-from-right var(--motion-slow) var(--motion-ease);
 }
 
 .space-content.slide-from-left {
-  animation: slide-from-left 220ms ease-out;
+  animation: slide-from-left var(--motion-slow) var(--motion-ease);
 }
 
 @keyframes slide-from-right {
   from {
-    transform: translateX(28px);
+    transform: translateX(40px);
     opacity: 0;
   }
 }
 
 @keyframes slide-from-left {
   from {
-    transform: translateX(-28px);
+    transform: translateX(-40px);
     opacity: 0;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .space-content.slide-from-right,
-  .space-content.slide-from-left {
-    animation: none;
-  }
-}
-
+/* The Space's name above Pinned: small, muted, its icon where row icons sit. */
 .space-title {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   height: 30px;
-  padding: 0 4px 0 9px;
+  margin-bottom: var(--row-gap);
+  padding: 0 6px 0 8px;
   border-radius: var(--row-radius);
   color: var(--muted);
+  font-size: 12px;
   font-weight: 600;
+  transition: background-color var(--motion-fast) linear;
 }
 
 .space-title:hover {
@@ -384,7 +460,7 @@ button:disabled {
 }
 
 .space-title-icon {
-  width: 16px;
+  width: 20px;
   text-align: center;
   font-size: 13px;
 }
@@ -400,20 +476,25 @@ button:disabled {
 .item-list {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: var(--row-gap);
 }
 
 /* ---------- Rows ---------- */
 
 .row {
   position: relative;
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 9px;
-  min-height: var(--row-height);
-  padding-right: 4px;
+  gap: 8px;
+  height: var(--row-height);
+  padding-right: 6px;
   border-radius: var(--row-radius);
   font-weight: 500;
+  transition:
+    background-color var(--motion-fast) linear,
+    box-shadow var(--motion-fast) linear,
+    opacity var(--motion-fast) linear;
 }
 
 .row:hover {
@@ -435,13 +516,36 @@ button:disabled {
   flex: none;
   display: grid;
   place-items: center;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   color: var(--muted);
+}
+
+.folder-row {
+  font-weight: 600;
 }
 
 .folder-icon {
   color: var(--ink);
+}
+
+/* Arc's folder: an outline with a dark inside (the SF Symbol folder over folder.fill). */
+.folder-glyph {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.folder-glyph > .icon-symbol {
+  grid-area: 1 / 1;
+}
+
+.folder-glyph-fill {
+  color: rgba(0, 0, 0, 0.85);
+}
+
+:root[data-appearance="light"] .folder-glyph-fill {
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .favicon {
@@ -485,11 +589,11 @@ button:disabled {
 /* The "back to pinned URL" button covers the favicon on hover. */
 .row-reset {
   position: absolute;
-  inset: -3px;
+  inset: -2px;
   display: none;
   place-items: center;
   border: 0;
-  border-radius: 5px;
+  border-radius: 6px;
   background: var(--row-selected);
   color: var(--ink);
 }
@@ -512,21 +616,31 @@ button:disabled {
 
 .row-action {
   flex: none;
-  display: none;
+  display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border: 0;
   border-radius: 6px;
   background: none;
-  color: var(--muted);
+  color: var(--icon);
+  opacity: 0;
+  transition:
+    opacity var(--motion-fast) linear,
+    background-color var(--motion-fast) linear;
+}
+
+/* Hover buttons fade in instead of popping, and take no clicks while invisible. */
+.row-action:not(.is-visible) {
+  pointer-events: none;
 }
 
 .row:hover .row-action,
 .row:focus-within .row-action,
 .space-title:hover .row-action,
 .row-action.is-visible {
-  display: grid;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .row-action:hover {
@@ -537,8 +651,8 @@ button:disabled {
 .rename-input {
   width: 100%;
   border: 0;
-  border-radius: 5px;
-  padding: 3px 5px;
+  border-radius: 6px;
+  padding: 4px 6px;
   background: var(--field);
   color: var(--ink);
   font: inherit;
@@ -564,14 +678,15 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 26px;
+  height: 30px;
   padding: 0 6px;
-  border-radius: 6px;
+  border-radius: 8px;
+  transition: background-color var(--motion-fast) linear;
 }
 
 .split-pane + .split-pane {
   border-left: 1px solid var(--line);
-  border-radius: 0 6px 6px 0;
+  border-radius: 0 8px 8px 0;
 }
 
 .split-pane.is-focused {
@@ -585,13 +700,13 @@ button:disabled {
   white-space: nowrap;
 }
 
-/* Divider between Pinned and Today, with Clear on hover. */
+/* Divider between Pinned and Today, with "Clear" on hover. */
 .today-divider {
   position: relative;
   display: flex;
   align-items: center;
-  height: 22px;
-  margin: 6px 6px 2px;
+  height: 21px;
+  margin: 0 10px;
 }
 
 .divider-line {
@@ -611,6 +726,7 @@ button:disabled {
   font-size: 11px;
   font-weight: 600;
   opacity: 0;
+  transition: opacity var(--motion-fast) linear;
 }
 
 .today-divider:hover .divider-clear,
@@ -623,13 +739,13 @@ button:disabled {
 }
 
 .new-tab-row {
-  color: var(--muted);
+  margin-bottom: var(--row-gap);
   padding-left: 8px;
+  color: var(--muted);
 }
 
 .new-tab-row .row-icon-slot {
-  font-size: 17px;
-  font-weight: 400;
+  color: var(--muted);
 }
 
 .list-end-zone {
@@ -643,8 +759,8 @@ button:disabled {
 .drop-after::after {
   content: "";
   position: absolute;
-  left: 6px;
-  right: 6px;
+  left: 8px;
+  right: 8px;
   height: 2px;
   border-radius: 1px;
   background: var(--drop-line);
@@ -652,28 +768,28 @@ button:disabled {
 }
 
 .drop-before::before {
-  top: -1px;
+  top: calc(-1px - var(--row-gap) / 2);
 }
 
 .drop-after::after {
-  bottom: -1px;
+  bottom: calc(-1px - var(--row-gap) / 2);
 }
 
 .favorite-tile.drop-before::before,
 .favorite-tile.drop-after::after {
-  top: 6px;
-  bottom: 6px;
+  top: 8px;
+  bottom: 8px;
   width: 2px;
   height: auto;
 }
 
 .favorite-tile.drop-before::before {
-  left: -4px;
+  left: -5px;
   right: auto;
 }
 
 .favorite-tile.drop-after::after {
-  right: -4px;
+  right: -5px;
   left: auto;
 }
 
@@ -702,8 +818,8 @@ button:disabled {
 
 .sidebar-resizer {
   position: absolute;
-  top: var(--toolbar-height);
-  right: -3px;
+  top: var(--header-height);
+  right: -4px;
   bottom: 0;
   width: 8px;
   cursor: col-resize;
@@ -721,6 +837,11 @@ button:disabled {
   user-select: none;
 }
 
+/* While resizing, the width follows the pointer exactly. */
+.is-resizing {
+  transition: none;
+}
+
 /* ---------- Media player (a tab playing in the background) ---------- */
 
 .media-player {
@@ -729,7 +850,7 @@ button:disabled {
   align-items: center;
   gap: 2px;
   margin: 4px 0 2px;
-  padding: 4px 4px 4px 6px;
+  padding: 4px 4px 4px 8px;
   border-radius: 10px;
   background: var(--tile);
 }
@@ -767,13 +888,14 @@ button:disabled {
   border-radius: 7px;
   background: none;
   color: var(--ink);
+  transition: background-color var(--motion-fast) linear;
 }
 
 .media-button:hover {
   background: var(--row-hover);
 }
 
-/* ---------- Bottom bar ---------- */
+/* ---------- Bottom bar: Library, the Space switcher, + ---------- */
 
 .bottom-bar {
   flex: none;
@@ -781,7 +903,7 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 4px;
-  padding-top: 6px;
+  height: 50px;
 }
 
 .space-switcher {
@@ -789,7 +911,7 @@ button:disabled {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 2px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -801,6 +923,7 @@ button:disabled {
   border: 0;
   border-radius: 7px;
   background: none;
+  transition: background-color var(--motion-fast) linear;
 }
 
 .space-button:hover {
@@ -813,13 +936,18 @@ button:disabled {
 }
 
 .space-button-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--faint);
+  background: var(--dot);
+  transition: background-color var(--motion-fast) linear;
 }
 
-/* The active Space shows its emoji; the others show a dot, and their emoji while the switcher is hovered. */
+.space-button:hover .space-button-dot {
+  background: var(--muted);
+}
+
+/* The active Space shows its icon; the others a dot, and their icon while the switcher is hovered. */
 .space-button.is-active .space-button-icon,
 .space-switcher:hover .space-button-icon {
   display: block;
@@ -834,41 +962,63 @@ button:disabled {
   opacity: 0.6;
 }
 
-/* ---------- Main column: toolbar + card ---------- */
+/* ---------- Main column: the page card (toolbar on top, the web page below) ---------- */
 
 .main-column {
   display: grid;
-  grid-template-rows: var(--toolbar-height) minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
+  padding: var(--card-inset) var(--card-inset) var(--card-inset) var(--card-gap);
+  transition: padding var(--motion-slow) var(--motion-ease);
+}
+
+body.sidebar-hidden .main-column {
+  padding-left: var(--card-inset);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-radius: var(--card-radius);
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
 }
 
 .toolbar {
+  position: relative;
+  flex: none;
   display: grid;
   grid-template-columns: 1fr minmax(0, auto) 1fr;
   align-items: center;
   gap: 8px;
-  padding: 0 var(--card-inset) 0 calc(var(--card-inset) - 2px);
+  height: var(--toolbar-height);
+  padding: 0 6px 0 8px;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--toolbar-ink);
   -webkit-app-region: drag;
+  transition: padding var(--motion-slow) var(--motion-ease);
 }
 
-/* Loading glow: a soft moving line just above the page card while the page loads. */
-.toolbar {
-  position: relative;
+/* With the sidebar hidden, the toolbar starts right of the traffic lights. */
+body.sidebar-hidden .toolbar {
+  padding-left: 72px;
 }
 
+/* Loading glow: a soft line moving along the toolbar's bottom edge while the page loads. */
 .toolbar.is-loading::after {
   content: "";
   position: absolute;
-  left: var(--card-inset);
-  right: var(--card-inset);
-  bottom: 0;
+  left: 0;
+  right: 0;
+  bottom: -1px;
   height: 2px;
-  border-radius: 1px;
-  background: linear-gradient(90deg, transparent, var(--ink), transparent);
+  background: linear-gradient(90deg, transparent, var(--toolbar-ink), transparent);
   background-size: 40% 100%;
   background-repeat: no-repeat;
-  opacity: 0.55;
+  opacity: 0.5;
   animation: loading-glow 1.1s ease-in-out infinite;
 }
 
@@ -881,22 +1031,10 @@ button:disabled {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .toolbar.is-loading::after {
-    animation: none;
-    background: var(--faint);
-  }
-}
-
-/* With the sidebar hidden, the toolbar starts under the traffic lights. */
-.sidebar-hidden .toolbar {
-  padding-left: 76px;
-}
-
 .toolbar-group {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 8px;
 }
 
 .toolbar-group > * {
@@ -905,6 +1043,26 @@ button:disabled {
 
 .toolbar-right {
   justify-content: flex-end;
+  gap: 7px;
+}
+
+.toolbar-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--toolbar-icon);
+  transition:
+    background-color var(--motion-fast) linear,
+    color var(--motion-fast) linear;
+}
+
+.toolbar-button:hover:not(:disabled) {
+  background: var(--toolbar-hover);
+  color: var(--toolbar-ink);
 }
 
 .address-pill {
@@ -913,23 +1071,24 @@ button:disabled {
   gap: 6px;
   max-width: 460px;
   height: 26px;
-  padding: 0 12px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   background: none;
-  color: var(--ink);
-  font-weight: 500;
+  color: var(--toolbar-ink);
+  font-size: 13px;
+  font-weight: 600;
   -webkit-app-region: no-drag;
+  transition: background-color var(--motion-fast) linear;
 }
 
 .address-pill:hover {
-  background: var(--row-hover);
+  background: var(--toolbar-hover);
 }
 
 .address-icon {
-  color: var(--muted);
-  width: 13px;
-  height: 13px;
+  color: var(--toolbar-icon);
+  transform: scale(0.85);
 }
 
 .address-text {
@@ -939,12 +1098,39 @@ button:disabled {
   white-space: nowrap;
 }
 
-/* Card slot: covered by the tab's web view whenever a tab is open. */
+/* "Add Extension" on a Chrome Web Store extension page. */
+.toolbar-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--toolbar-hover);
+  color: var(--toolbar-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+  transition: background-color var(--motion-fast) linear;
+}
+
+.toolbar-pill:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+
+.toolbar-pill:disabled {
+  opacity: 0.6;
+}
+
+/* The card's page area: covered by the tab's web view whenever a tab is open. */
 .card-slot {
+  flex: 1;
+  min-height: 0;
   display: grid;
   place-items: center;
-  margin: 0 var(--card-inset) var(--card-inset) var(--card-inset);
-  border-radius: var(--card-radius);
   background: var(--card-empty);
 }
 
@@ -953,6 +1139,7 @@ button:disabled {
   flex-direction: column;
   gap: 4px;
   text-align: center;
+  color: var(--toolbar-ink);
 }
 
 .empty-card[hidden] {
@@ -967,31 +1154,26 @@ button:disabled {
 
 .empty-hint {
   margin: 0;
-  color: var(--muted);
+  opacity: 0.55;
 }
 
-/* "Add Extension" on a Chrome Web Store extension page. */
-.toolbar-pill {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  height: 26px;
-  padding: 0 10px 0 8px;
-  border: 0;
-  border-radius: 8px;
-  background: var(--row-hover);
-  color: var(--ink);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  -webkit-app-region: no-drag;
-}
+/* ---------- Less motion when the system asks for it ---------- */
 
-.toolbar-pill:hover:not(:disabled) {
-  background: var(--row-selected, var(--row-hover));
-}
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  body,
+  .main-column,
+  .toolbar,
+  .row,
+  .favorite-tile,
+  .row-action {
+    transition: none;
+  }
 
-.toolbar-pill:disabled {
-  opacity: 0.6;
+  .space-content.slide-from-right,
+  .space-content.slide-from-left,
+  body.sidebar-hidden.sidebar-peeking .sidebar,
+  .toolbar.is-loading::after {
+    animation: none;
+  }
 }

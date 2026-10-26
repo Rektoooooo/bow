@@ -217,11 +217,11 @@ describe("importing Spaces", () => {
     expect(state.spaces).toHaveLength(2);
   });
 
-  it("reads a flat theme and a clamped gradient theme", () => {
+  it("reads a flat theme and a clamped gradient theme, with Arc's intensity (full when missing)", () => {
     const { state: imported } = importArcSidebar(buildTwoSpaceFile(), createInitialState(), ONE_PM);
 
-    expect(imported.spaces[2].theme).toEqual({ colors: ["#336699"], appearance: "light", grain: 0.25 });
-    expect(imported.spaces[3].theme).toEqual({ colors: ["#ff0000", "#00ff00", "#0000ff"], appearance: "dark", grain: 1 });
+    expect(imported.spaces[2].theme).toEqual({ colors: ["#336699"], appearance: "light", grain: 0.25, intensity: 1 });
+    expect(imported.spaces[3].theme).toEqual({ colors: ["#ff0000", "#00ff00", "#0000ff"], appearance: "dark", grain: 1, intensity: 0.5 });
   });
 
   it("falls back to the default theme and icon when Arc has none", () => {
@@ -230,7 +230,7 @@ describe("importing Spaces", () => {
 
     const { state: imported } = importArcSidebar(buildArcFile(spaces, items, []), createInitialState(), ONE_PM);
 
-    expect(imported.spaces[2].theme).toEqual({ colors: ["#d9d4e9"], appearance: "auto", grain: 0 });
+    expect(imported.spaces[2].theme).toEqual({ colors: ["#000000"], appearance: "auto", grain: 0 });
     expect(imported.spaces[2].icon).toBe("✦");
   });
 

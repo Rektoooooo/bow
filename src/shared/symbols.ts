@@ -28,6 +28,7 @@ export const SYMBOL_NAMES = {
   plus: "plus",
   archive: "archivebox.fill",
   folder: "folder",
+  folderFill: "folder.fill",
   chevronRight: "chevron.right",
   chevronDown: "chevron.down",
   close: "xmark",

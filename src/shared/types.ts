@@ -85,6 +85,8 @@ export interface SpaceTheme {
   appearance: ThemeAppearance;
   /** Film-grain texture strength, 0 (none) to 1. */
   grain: number;
+  /** How strongly the color tints the frame, 0 to 1 (Arc's intensity). Missing means 1, so older files load. */
+  intensity?: number;
 }
 
 /** A named workspace with its own Pinned and Today tabs. */
@@ -227,6 +229,8 @@ export interface TabRuntimeInfo {
   isAudible: boolean;
   canGoBack: boolean;
   canGoForward: boolean;
+  /** The color the toolbar takes on this page (sampled from the page's top, remembered per site), or null. */
+  toolbarColor: string | null;
 }
 
 /** Live facts main.ts sends next to the state. Nothing here is saved. */

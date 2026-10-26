@@ -1,7 +1,8 @@
 /**
  * WHY this file exists:
- *   The page "card" sits right of the sidebar and below the toolbar, inset from the window edges. A split view
- *   divides that card into panes. The arithmetic lives here, without Electron, so it can be tested.
+ *   The page card sits right of the sidebar, inset from the window edges, like Arc's: the toolbar at its top (drawn
+ *   by the sidebar page), the web page below it. computeCardBounds() returns where the web page goes. A split view
+ *   divides that area into panes. The arithmetic lives here, without Electron, so it can be tested.
  *
  * Data source:
  *   The window's content size and the layout constants in shared/settings.ts.
@@ -9,7 +10,7 @@
  * Data flow:
  *   tabViews.ts → computeCardBounds() → computePaneBounds() → WebContentsView.setBounds()
  */
-import { CARD_INSET_PX, SIDEBAR_WIDTH_PX, SPLIT_GAP_PX, TOOLBAR_HEIGHT_PX } from "../shared/settings";
+import { CARD_GAP_PX, CARD_INSET_PX, SIDEBAR_WIDTH_PX, SPLIT_GAP_PX, TOOLBAR_HEIGHT_PX } from "../shared/settings";
 import type { SplitOrientation } from "../shared/types";
 
 /** A rectangle in window content coordinates, in pixels. */
@@ -31,14 +32,15 @@ export interface CardLayoutOptions {
 }
 
 /**
- * Returns where the page card goes. With the sidebar hidden the card fills the window minus the inset.
+ * Returns where the web page goes inside the card: below the card's toolbar, inset from the window edges, right of
+ * the sidebar. With the sidebar hidden the card fills the window minus the inset.
  * Sizes never go below zero, because Electron rejects negative sizes.
- * Example: content 1280×820, sidebar and toolbar visible → { x: 248, y: 40, width: 1024, height: 772 }
+ * Example: content 1280×820, sidebar and toolbar visible → { x: 254, y: 43, width: 1016, height: 767 }
  */
 export function computeCardBounds(contentWidth: number, contentHeight: number, options: CardLayoutOptions): Bounds {
   const sidebarWidth = options.sidebarWidth ?? SIDEBAR_WIDTH_PX;
-  const left = options.isSidebarVisible ? sidebarWidth + CARD_INSET_PX : CARD_INSET_PX;
-  const top = options.isToolbarVisible ? TOOLBAR_HEIGHT_PX : CARD_INSET_PX;
+  const left = options.isSidebarVisible ? sidebarWidth + CARD_GAP_PX : CARD_INSET_PX;
+  const top = options.isToolbarVisible ? CARD_INSET_PX + TOOLBAR_HEIGHT_PX : CARD_INSET_PX;
   const width = contentWidth - left - CARD_INSET_PX;
   const height = contentHeight - top - CARD_INSET_PX;
   // Sliding instead of shrinking keeps the page from re-laying out while the sidebar is only peeking.

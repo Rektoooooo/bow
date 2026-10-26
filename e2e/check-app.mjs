@@ -122,7 +122,11 @@ check("opening example.com adds a Today tab with https://", todayTabs(state)[0]?
 check("page title flows back into the sidebar", titleOk, todayTabs(state)[0]?.title);
 check("toolbar shows the page's host", (await page.textContent(".address-text")) === "example.com");
 const bounds = await tabViewBounds(app);
-check("tab view sits right of the sidebar and below the toolbar", bounds[0]?.x === 248 && bounds[0]?.y === 40, JSON.stringify(bounds));
+// Arc's measured layout: sidebar 247 + gap 7 → x 254; card inset 10 + toolbar 33 → y 43 (shared/settings.ts).
+const PAGE_LEFT = 254;
+const PAGE_TOP = 43;
+const HIDDEN_PAGE_LEFT = 10;
+check("tab view sits right of the sidebar and below the card's toolbar", bounds[0]?.x === PAGE_LEFT && bounds[0]?.y === PAGE_TOP, JSON.stringify(bounds));
 check("empty card hidden while a tab is open", !(await page.isVisible("#empty-card")));
 await page.waitForFunction(() => document.querySelector(".toolbar-left .toolbar-button:nth-child(3)")?.getAttribute("aria-label") === "Reload (⌘R)", null, { timeout: 15000 }).catch(() => undefined);
 await windowShot(app, "02-tab-open");
@@ -204,18 +208,18 @@ check("Clear archives Today tabs and keeps Pinned ones", todayTabs(state).length
 await dispatch(page, { type: "setSidebarVisible", isVisible: false });
 await page.waitForTimeout(400);
 const hiddenBounds = await tabViewBounds(app);
-check("hiding the sidebar widens the page card", hiddenBounds.length === 1 && hiddenBounds[0].x === 8, JSON.stringify(hiddenBounds));
+check("hiding the sidebar widens the page card", hiddenBounds.length === 1 && hiddenBounds[0].x === HIDDEN_PAGE_LEFT, JSON.stringify(hiddenBounds));
 // Touching the window's left edge shows the hidden sidebar; the page slides aside without resizing.
 await page.mouse.move(400, 400);
 await page.mouse.move(3, 400);
 await page.waitForTimeout(500);
 const peekBounds = await tabViewBounds(app);
 const sidebarShows = await page.evaluate(() => getComputedStyle(document.getElementById("sidebar")).visibility === "visible");
-check("touching the left edge shows the hidden sidebar and slides the page", sidebarShows && peekBounds[0]?.x === 248 && peekBounds[0]?.width === hiddenBounds[0]?.width, JSON.stringify(peekBounds));
+check("touching the left edge shows the hidden sidebar and slides the page", sidebarShows && peekBounds[0]?.x === HIDDEN_PAGE_LEFT + 247 && peekBounds[0]?.width === hiddenBounds[0]?.width, JSON.stringify(peekBounds));
 await page.mouse.move(900, 400);
 await page.waitForTimeout(700);
 const afterLeaveBounds = await tabViewBounds(app);
-check("moving away hides it again", afterLeaveBounds[0]?.x === 8, JSON.stringify(afterLeaveBounds));
+check("moving away hides it again", afterLeaveBounds[0]?.x === HIDDEN_PAGE_LEFT, JSON.stringify(afterLeaveBounds));
 await dispatch(page, { type: "setSidebarVisible", isVisible: true });
 
 // Dragging the sidebar's right edge resizes it (saved); dragging far left hides it.
@@ -229,7 +233,7 @@ await page.mouse.up();
 await page.waitForTimeout(500);
 state = await getState(page);
 const resizedBounds = await tabViewBounds(app);
-check("dragging the sidebar edge resizes it and moves the page", state.settings.sidebarWidth === 320 && resizedBounds[0]?.x === 328, `${state.settings.sidebarWidth} ${JSON.stringify(resizedBounds)}`);
+check("dragging the sidebar edge resizes it and moves the page", state.settings.sidebarWidth === 320 && resizedBounds[0]?.x === 320 + 7, `${state.settings.sidebarWidth} ${JSON.stringify(resizedBounds)}`);
 await page.mouse.move(318, 300);
 await page.mouse.down();
 await page.mouse.move(60, 300, { steps: 6 });
@@ -242,9 +246,10 @@ await page.waitForTimeout(300);
 
 await page.click(".space-button:nth-child(2)");
 await page.waitForFunction(() => document.querySelector(".space-title-name")?.textContent?.includes("Work"), null, { timeout: 5000 });
-const frameColor = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--frame-color-1").trim());
+// The frame color is computed from the theme like Arc's (themePalette.ts); Work's pale blue in light mode keeps its color.
+const frameColor = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--frame-1").trim());
 check("switching to Work shows an empty Space", await page.isVisible("#empty-card"));
-check("the frame takes the Work Space's color", frameColor === "#d4dfe9", frameColor);
+check("the frame takes the Work Space's color", frameColor === "rgb(212, 223, 233)" || frameColor === "#d4dfe9", frameColor);
 await windowShot(app, "04-work-space");
 await page.click(".space-button:nth-child(1)");
 await page.waitForTimeout(400);

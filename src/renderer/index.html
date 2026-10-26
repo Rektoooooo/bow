@@ -36,13 +36,16 @@
     <!-- With the sidebar hidden, touching the window's left edge shows it for a moment, like Arc. -->
     <div id="reveal-edge" class="reveal-edge"></div>
     <section id="main-column" class="main-column">
-      <header id="toolbar" class="toolbar" aria-label="Page controls"></header>
-      <main id="card-slot" class="card-slot">
-        <div id="empty-card" class="empty-card">
-          <p class="empty-title">No tab open</p>
-          <p class="empty-hint">Press ⌘T to search or type an address.</p>
-        </div>
-      </main>
+      <!-- The page card, like Arc's: the toolbar on top, the page (a native view placed by main.ts) below it. -->
+      <div id="card" class="card">
+        <header id="toolbar" class="toolbar" aria-label="Page controls"></header>
+        <main id="card-slot" class="card-slot">
+          <div id="empty-card" class="empty-card">
+            <p class="empty-title">No tab open</p>
+            <p class="empty-hint">Press ⌘T to search or type an address.</p>
+          </div>
+        </main>
+      </div>
     </section>
     <script type="module" src="./sidebar.js"></script>
   </body>

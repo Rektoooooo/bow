@@ -59,8 +59,11 @@ export const SPLIT_PANES_LIMIT = 4;
 /** The profile every new install starts with. Its pages use the session partition "persist:profile-default". */
 export const DEFAULT_PROFILE_ID = "profile-default";
 
-/** Default sidebar width in pixels (the sidebar page sets --sidebar-width from the saved width). */
-export const SIDEBAR_WIDTH_PX = 240;
+/**
+ * Default sidebar width in pixels, from the window edge to the right edge of the sidebar's content (the sidebar page
+ * sets --sidebar-width from the saved width). Measured on the user's Arc: 8 pt padding + 239 pt of content.
+ */
+export const SIDEBAR_WIDTH_PX = 247;
 
 /** Narrowest and widest sidebar the edge can be dragged to. Our choice; Arc's limits are compiled constants. */
 export const SIDEBAR_MIN_WIDTH_PX = 180;
@@ -69,11 +72,20 @@ export const SIDEBAR_MAX_WIDTH_PX = 420;
 /** Letting go of the edge below this width hides the sidebar, like dragging Arc's sidebar fully to the left. */
 export const SIDEBAR_COLLAPSE_WIDTH_PX = 130;
 
-/** Gap between the window edge and the web page card, in pixels. Must match --card-inset in sidebar.css. */
-export const CARD_INSET_PX = 8;
+/**
+ * Gap between the window edge and the page card (top, right, bottom, and left while the sidebar is hidden).
+ * Measured on the user's Arc: about 10 pt. Must match --card-inset in sidebar.css.
+ */
+export const CARD_INSET_PX = 10;
 
-/** Height of the toolbar above the card (back, forward, reload, address, site controls). Must match --toolbar-height in sidebar.css. */
-export const TOOLBAR_HEIGHT_PX = 40;
+/** Gap between the sidebar's content and the page card. Measured on the user's Arc: 7 pt. Must match --card-gap. */
+export const CARD_GAP_PX = 7;
+
+/**
+ * Height of the toolbar at the top of the page card (back, forward, reload, address, site controls), including the
+ * 1 px hairline under it. Measured on the user's Arc: 32 pt + hairline. Must match --toolbar-height in sidebar.css.
+ */
+export const TOOLBAR_HEIGHT_PX = 33;
 
 /** Gap between the panes of a split view, in pixels. Our choice; Arc's panes sit a few pixels apart. */
 export const SPLIT_GAP_PX = 6;

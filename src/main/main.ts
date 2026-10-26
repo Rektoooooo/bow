@@ -40,6 +40,7 @@ import { startTrackingDownloads } from "./downloads";
 import { getExtensionMenuItems, initializeExtensionHost, prepareExtensions } from "./extensionHost";
 import { initializePermissionPrompts } from "./permissionPrompts";
 import { registerSymbolIpc } from "./symbols";
+import { loadToolbarColors } from "./toolbarTint";
 import { updateExtensionsFromWebStore } from "./extensionsController";
 import { isRecordableUrl } from "./history";
 import { addVisit, loadHistory, saveHistoryNow, setVisitTitle } from "./historyStore";
@@ -69,14 +70,20 @@ const WINDOW_HEIGHT_PX = 820;
 const MIN_WINDOW_WIDTH_PX = 640;
 const MIN_WINDOW_HEIGHT_PX = 400;
 
-/** Where macOS draws the close/minimize/zoom buttons, so they sit in the sidebar's top strip. */
-const TRAFFIC_LIGHT_POSITION = { x: 16, y: 14 };
+/**
+ * Where macOS draws the close/minimize/zoom buttons, so they sit in the sidebar's top strip. Measured on the user's
+ * Arc: the first button's center is about 20 pt from the left and 25 pt from the top.
+ */
+const TRAFFIC_LIGHT_POSITION = { x: 13, y: 18 };
 
 /** When this run of the app started. Auto-archive counts inactivity from here at the earliest. */
 const launchedAt = Date.now();
 
 /** The browser window. */
 let mainWindow: BrowserWindow | null = null;
+
+/** Where the per-site toolbar colors are remembered (like Arc's TopBarColorCache). */
+const TOOLBAR_COLORS_FILE_NAME = "toolbar-colors.json";
 
 /** Links from other apps that arrived before the app was ready; null once they have been opened. */
 let pendingExternalUrls: string[] | null = [];
@@ -260,6 +267,7 @@ function findUrlArgument(argumentList: string[]): string | null {
 async function handleAppReady(): Promise<void> {
   initializeState(getStateFilePath(), Date.now());
   loadHistory();
+  loadToolbarColors(path.join(app.getPath("userData"), TOOLBAR_COLORS_FILE_NAME), scheduleRuntimePush);
 
   // Our own pages (sidebar, overlay, Little Window bar) use the default session; lock it down like the profiles.
   restrictWebPermissions(session.defaultSession);

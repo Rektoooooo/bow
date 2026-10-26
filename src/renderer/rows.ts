@@ -30,8 +30,8 @@ export interface RowContext {
   onRenameFinished: () => void;
 }
 
-/** Indent per folder level, in pixels. Our choice; Arc indents children by about one icon width. */
-const INDENT_PER_LEVEL_PX = 14;
+/** Indent per folder level, in pixels. Measured on the user's Arc: children sit 16 pt further right. */
+const INDENT_PER_LEVEL_PX = 16;
 
 /** Left padding of a row at the top level. */
 const ROW_BASE_PADDING_PX = 8;
@@ -183,6 +183,15 @@ export function renderTabRow(tab: TabItem, location: ItemLocation, index: number
 }
 
 /**
+ * Arc's closed folder: the outline in the text color over a dark inside (the SF Symbols folder over folder.fill).
+ */
+function createClosedFolderGlyph(): HTMLElement {
+  const glyph = createElement("span", "folder-glyph");
+  glyph.append(createIcon("folderFill", "icon folder-glyph-fill"), createIcon("folder"));
+  return glyph;
+}
+
+/**
  * True when the selected tab sits somewhere inside a folder (at any depth).
  */
 function folderContainsTab(state: BrowserState, folder: FolderItem, tabId: ItemId | null): boolean {
@@ -220,7 +229,7 @@ export function renderFolderRows(folder: FolderItem, location: ItemLocation, ind
   row.tabIndex = 0;
 
   const iconSlot = createElement("span", "row-icon-slot folder-icon");
-  iconSlot.append(createIcon(folder.isOpen ? "folderOpen" : "folder"));
+  iconSlot.append(folder.isOpen ? createIcon("folderOpen") : createClosedFolderGlyph());
   row.append(iconSlot);
 
   const title = createElement("span", "row-title");

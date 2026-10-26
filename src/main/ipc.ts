@@ -127,7 +127,8 @@ function isTheme(value: unknown): boolean {
   const colorsOk = value.colors.every((color) => typeof color === "string" && HEX_COLOR_PATTERN.test(color));
   const appearanceOk = value.appearance === "light" || value.appearance === "dark" || value.appearance === "auto";
   const grainOk = typeof value.grain === "number" && value.grain >= 0 && value.grain <= 1;
-  return colorCountOk && colorsOk && appearanceOk && grainOk;
+  const intensityOk = value.intensity === undefined || (typeof value.intensity === "number" && value.intensity >= 0 && value.intensity <= 1);
+  return colorCountOk && colorsOk && appearanceOk && grainOk && intensityOk;
 }
 
 /**

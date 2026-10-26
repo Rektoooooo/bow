@@ -26,8 +26,8 @@ import type { MorphOptions } from "./morph.js";
 import { renderFavoriteTile, renderItemRows } from "./rows.js";
 import type { RowContext } from "./rows.js";
 import { installSidebarEvents } from "./sidebarEvents.js";
-import { installSymbols } from "./icons.js";
-import { applySpaceTheme } from "./theme.js";
+import { createIcon, installSymbols } from "./icons.js";
+import { applySpaceTheme, onSystemAppearanceChange } from "./theme.js";
 import { renderToolbar } from "./toolbar.js";
 
 /** Horizontal scroll distance (in wheel delta units) that counts as a swipe to the next Space. Our choice. */
@@ -240,7 +240,8 @@ function renderNewTabRow(space: Space): HTMLElement {
   row.dataset.row = "new-tab";
   row.setAttribute("role", "button");
   row.tabIndex = 0;
-  const iconSlot = createElement("span", "row-icon-slot", "+");
+  const iconSlot = createElement("span", "row-icon-slot");
+  iconSlot.append(createIcon("plus"));
   row.append(iconSlot, createElement("span", "row-title", "New Tab"));
   markListDropZone(row, { kind: "today", spaceId: space.id }, "start");
   return row;
@@ -368,6 +369,35 @@ function renderMediaPlayer(state: BrowserState): void {
   player.hidden = false;
 }
 
+/** Brightness (0…1) above which the toolbar's text and icons turn dark. */
+const LIGHT_TOOLBAR_LUMINANCE = 0.55;
+
+/**
+ * Returns a "#rrggbb" color's perceived brightness, 0 (black) to 1 (white).
+ */
+function getLuminance(hex: string): number {
+  const red = parseInt(hex.slice(1, 3), 16) / 255;
+  const green = parseInt(hex.slice(3, 5), 16) / 255;
+  const blue = parseInt(hex.slice(5, 7), 16) / 255;
+  return 0.299 * red + 0.587 * green + 0.114 * blue;
+}
+
+/**
+ * Tints the card's toolbar with the selected page's color, like Arc, with text and icons that stay readable on it.
+ * Without a known color the card takes the theme's default.
+ */
+function applyToolbarTint(selectedTabId: ItemId | null): void {
+  const root = document.documentElement;
+  const color = selectedTabId === null ? null : currentRuntime.tabs[selectedTabId]?.toolbarColor ?? null;
+  if (color === null || !/^#[0-9a-f]{6}$/.test(color)) {
+    root.style.removeProperty("--card-bg");
+    root.dataset.toolbarTone = root.dataset.appearance === "light" ? "light" : "dark";
+    return;
+  }
+  root.style.setProperty("--card-bg", color);
+  root.dataset.toolbarTone = getLuminance(color) > LIGHT_TOOLBAR_LUMINANCE ? "light" : "dark";
+}
+
 /**
  * Shows the "No tab open" message only while the active Space has no selected tab.
  */
@@ -423,6 +453,7 @@ function renderAll(): void {
   renderMediaPlayer(state);
   renderBottomBar(state);
   renderToolbar(state, currentRuntime, context.selectedTabId);
+  applyToolbarTint(context.selectedTabId);
   updateEmptyCard(context.selectedTabId);
   updateDocumentTitle(state, context.selectedTabId);
 }
@@ -598,6 +629,8 @@ async function startSidebar(): Promise<void> {
   setUpSidebarResizer();
 
   window.browserApi.getSymbols().then(installSymbols).catch(() => undefined);
+  // Themes set to "auto" follow macOS between light and dark.
+  onSystemAppearanceChange(() => renderAll());
   currentRuntime = await window.browserApi.getRuntimeState();
   currentState = await window.browserApi.getState();
   renderAll();

@@ -63,8 +63,11 @@ const ARC_ICON_TO_EMOJI: Record<string, string> = {
   rss: "📡",
 };
 
-/** The theme of a new Space when Arc's theme is missing or unreadable. Same pale lilac Arc starts new Spaces with. */
-const DEFAULT_THEME_COLOR = "#d9d4e9";
+/**
+ * The theme of a Space whose Arc theme is missing or unreadable: Arc's neutral look (its saved palette for an uncolored
+ * Space is grey: #313131 dark, #e5e5e5 light), which themePalette.ts draws from black.
+ */
+const DEFAULT_THEME_COLOR = "#000000";
 
 /** A theme is one to three key colors (docs/research/arc-data-model.md, "Space theme"). */
 const THEME_COLORS_LIMIT = 3;
@@ -248,10 +251,18 @@ function readThemeColors(themeBackground: JsonObject): string[] {
 }
 
 /**
- * Reads the grain strength. Arc's description puts `modifiers` next to the color choice, inside it, or on the
- * background itself depending on the theme kind, so all three places are tried in that order.
+ * Reads the grain strength (Arc's noiseFactor).
  */
 function readThemeGrain(themeBackground: JsonObject): number {
+  return readThemeModifier(themeBackground, "noiseFactor") ?? 0;
+}
+
+/**
+ * Reads one of the theme's modifiers (noiseFactor = grain, intensityFactor = intensity), clamped to 0…1, or null.
+ * Arc's description puts `modifiers` next to the color choice, inside it, or on the background itself depending on
+ * the theme kind, so all of those places are tried in that order.
+ */
+function readThemeModifier(themeBackground: JsonObject, modifierName: string): number | null {
   const style = readObject(themeBackground, "style");
   const colorChoice = readObject(readObject(style, "color"), "_0");
   const singleColor = readObject(readObject(colorChoice, "blendedSingleColor"), "_0");
@@ -259,12 +270,12 @@ function readThemeGrain(themeBackground: JsonObject): number {
   const modifierHolders = [style, singleColor, gradient, themeBackground];
 
   for (const modifierHolder of modifierHolders) {
-    const noiseFactor = readNumber(readObject(modifierHolder, "modifiers"), "noiseFactor");
-    if (noiseFactor !== null) {
-      return clampBetween(noiseFactor, 0, 1);
+    const value = readNumber(readObject(modifierHolder, "modifiers"), modifierName);
+    if (value !== null) {
+      return clampBetween(value, 0, 1);
     }
   }
-  return 0;
+  return null;
 }
 
 function readThemeAppearance(themeBackground: JsonObject): ThemeAppearance {
@@ -297,6 +308,7 @@ function readArcTheme(customInfo: unknown): SpaceTheme {
     colors: colors,
     appearance: readThemeAppearance(themeBackgroundPayload),
     grain: readThemeGrain(themeBackgroundPayload),
+    intensity: readThemeModifier(themeBackgroundPayload, "intensityFactor") ?? 1,
   };
 }
 

@@ -25,6 +25,7 @@ import type { BrowserState, ItemId, TabItem, TabRuntimeInfo } from "../shared/ty
 import { computeCardBounds, computePaneBounds } from "./layout";
 import type { CardLayoutOptions } from "./layout";
 import { getProfileSession } from "./profiles";
+import { getToolbarColor, sampleToolbarColorSoon } from "./toolbarTint";
 import { getSelectedTabId } from "./state";
 import { findProfileIdOfItem, findSplitOfTab, findTab } from "./tree";
 import { DEFAULT_PROFILE_ID } from "../shared/settings";
@@ -199,6 +200,7 @@ function watchTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvent
   });
   contents.on("did-navigate-in-page", (_event, url) => {
     events.onRuntimeChanged();
+    sampleIfShown(tabId, contents);
     if (isRecordableTabUrl(url)) {
       events.onPageChanged(tabId, url, contents.getTitle());
     }
@@ -211,13 +213,25 @@ function watchTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvent
   });
   contents.on("dom-ready", () => events.onDomReady(tabId, contents));
   contents.on("did-start-loading", () => events.onRuntimeChanged());
-  contents.on("did-stop-loading", () => events.onRuntimeChanged());
+  contents.on("did-stop-loading", () => {
+    events.onRuntimeChanged();
+    sampleIfShown(tabId, contents);
+  });
   contents.on("audio-state-changed", () => events.onRuntimeChanged());
   contents.on("context-menu", (_event, params) => {
     events.onContextMenu(tabId, contents, params);
   });
   contents.setWindowOpenHandler((details) => handleWindowOpen(tabId, contents, details, events));
   view.setBorderRadius(CARD_RADIUS_PX);
+}
+
+/**
+ * Samples a page's toolbar color when it is on screen (pages off screen cannot be captured).
+ */
+function sampleIfShown(tabId: ItemId, contents: WebContents): void {
+  if (shownTabIds.includes(tabId)) {
+    sampleToolbarColorSoon(contents);
+  }
 }
 
 /**
@@ -355,6 +369,10 @@ export function syncTabViews(window: BrowserWindow, state: BrowserState, layoutO
     const tab = findTab(state, tabId) as TabItem;
     const view = tabViews.get(tabId) ?? createTabView(state, tab, events);
     window.contentView.addChildView(view);
+    // A page coming on screen may be on a site whose toolbar color is not known yet.
+    if (getToolbarColor(view.webContents.getURL()) === null) {
+      sampleToolbarColorSoon(view.webContents);
+    }
   }
   shownTabIds = visibleTabIds;
   layoutShownTabViews(window, state, layoutOptions);
@@ -377,6 +395,7 @@ export function collectTabRuntime(): Record<ItemId, TabRuntimeInfo> {
       isAudible: contents.isCurrentlyAudible(),
       canGoBack: contents.navigationHistory.canGoBack(),
       canGoForward: contents.navigationHistory.canGoForward(),
+      toolbarColor: getToolbarColor(contents.getURL()),
     };
   }
   return runtimeState;
