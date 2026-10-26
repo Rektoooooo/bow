@@ -31,6 +31,7 @@ import type {
   TabItem,
   ThemeAppearance,
 } from "../shared/types";
+import { arcProfileFolderToProfileId } from "./arcExtensionsImport";
 import { DEFAULT_SPACE_ICON, SPACES_LIMIT } from "./spaces";
 
 /** Arc stores times as seconds since 2001-01-01; Unix time starts in 1970. Source: docs/research/arc-data-model.md. */
@@ -40,7 +41,6 @@ const MILLISECONDS_PER_SECOND = 1000;
 /** Prefixes that keep imported ids apart from ids this browser creates itself, and make a re-import recognizable. */
 const SPACE_ID_PREFIX = "arc-space-";
 const ITEM_ID_PREFIX = "arc-";
-const PROFILE_ID_PREFIX = "arc-profile-";
 
 const FALLBACK_SPACE_NAME = "Imported Space";
 const FALLBACK_FOLDER_TITLE = "Folder";
@@ -333,9 +333,7 @@ function resolveProfileId(context: ImportContext, arcProfileKey: unknown): Profi
     return null;
   }
 
-  const lowercaseName = directoryBasename.toLowerCase();
-  const dashedName = lowercaseName.replaceAll(" ", "-");
-  const profileId = PROFILE_ID_PREFIX + dashedName;
+  const profileId = arcProfileFolderToProfileId(directoryBasename);
   const profileExists = context.profiles.some((profile) => profile.id === profileId);
   if (!profileExists) {
     context.profiles.push({ id: profileId, name: directoryBasename, favoriteIds: [] });

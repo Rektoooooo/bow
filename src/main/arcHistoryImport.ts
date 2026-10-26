@@ -27,7 +27,7 @@ const execFileAsync = promisify(execFile);
 /** The sqlite3 command line tool that ships with macOS. */
 const SQLITE_COMMAND = "/usr/bin/sqlite3";
 
-const USER_DATA_FOLDER_NAME = "User Data";
+export const USER_DATA_FOLDER_NAME = "User Data";
 const HISTORY_FILE_NAME = "History";
 /** Files SQLite keeps next to the database; recent visits may only be in them. */
 const HISTORY_COMPANION_FILE_NAMES = ["History-wal", "History-journal"];
@@ -45,7 +45,7 @@ const SQLITE_MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
  * Returns the profile folders in "User Data" that have a History file. Empty when there are none or the folder
  * cannot be read.
  */
-function findProfileFolders(arcFolder: string): string[] {
+export function findProfileFolders(arcFolder: string): string[] {
   const userDataFolder = path.join(arcFolder, USER_DATA_FOLDER_NAME);
   if (!fs.existsSync(userDataFolder)) {
     return [];
