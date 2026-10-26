@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { findTabsToArchive, getInactiveDurationMs, pruneArchive } from "../src/main/autoArchive";
 import { addToFavorites, createInitialState, pinTab } from "../src/main/state";
 import { splitTabs } from "../src/main/split";
-import { ARCHIVE_RETENTION_MS, DAY_MS, HOUR_MS } from "../src/shared/settings";
+import { ARCHIVE_LIMIT, DAY_MS, HOUR_MS } from "../src/shared/settings";
 import type { ArchivedTab, BrowserState, ItemId, TabItem } from "../src/shared/types";
 
 const NINE_AM = Date.UTC(2026, 9, 26, 9, 0, 0);
@@ -139,24 +139,20 @@ describe("pruneArchive", () => {
     return { tab: makeTab(archivedAt, { id: id }), fromSpaceId: null, archivedAt: archivedAt, reason: "auto" };
   }
 
-  it("removes archive entries older than the retention period", () => {
-    const now = NINE_AM;
-    const oldEntry = makeArchiveEntry("tab-old", now - ARCHIVE_RETENTION_MS - DAY_MS);
-    const recentEntry = makeArchiveEntry("tab-recent", now - DAY_MS);
-    const state: BrowserState = { ...createInitialState(), archive: [recentEntry, oldEntry] };
+  it(`keeps only the newest ${ARCHIVE_LIMIT} entries, like Arc`, () => {
+    // Newest first: entry 0 is the most recent.
+    const entries = Array.from({ length: ARCHIVE_LIMIT + 5 }, (_value, index) => makeArchiveEntry(`tab-${index}`, NINE_AM - index * DAY_MS));
+    const state: BrowserState = { ...createInitialState(), archive: entries };
 
-    const prunedState = pruneArchive(state, now);
+    const prunedState = pruneArchive(state);
 
-    expect(prunedState.archive).toEqual([recentEntry]);
+    expect(prunedState.archive).toHaveLength(ARCHIVE_LIMIT);
+    expect(prunedState.archive[0]?.tab.id).toBe("tab-0");
   });
 
-  it("keeps archive entries inside the retention period and returns the same state", () => {
-    const now = NINE_AM;
-    const recentEntry = makeArchiveEntry("tab-recent", now - DAY_MS);
-    const state: BrowserState = { ...createInitialState(), archive: [recentEntry] };
+  it("returns the same state when the archive is within the limit", () => {
+    const state: BrowserState = { ...createInitialState(), archive: [makeArchiveEntry("tab-recent", NINE_AM)] };
 
-    const prunedState = pruneArchive(state, now);
-
-    expect(prunedState).toBe(state);
+    expect(pruneArchive(state)).toBe(state);
   });
 });

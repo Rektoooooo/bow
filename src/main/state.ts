@@ -14,7 +14,7 @@
  *   - When nothing changes, return the same state object, so main.ts can skip saving.
  *   - `now` is always a parameter; nothing here reads the clock.
  */
-import { DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_LIMIT } from "../shared/settings";
+import { ARCHIVE_LIMIT, DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_LIMIT } from "../shared/settings";
 import type { ArchiveReason, ArchivedTab, BrowserState, FolderItem, ItemId, ItemLocation, Space, SpaceId, TabItem } from "../shared/types";
 import {
   collectTabIds,
@@ -574,7 +574,9 @@ export function moveTabsToArchive(state: BrowserState, tabIds: ItemId[], now: nu
   }
   changedState = deleteItems(changedState, existingTabIds);
   changedState = dissolveSmallSplits(changedState);
-  changedState = { ...changedState, archive: [...newArchiveEntries, ...changedState.archive] };
+  // Newest first, and only the newest ARCHIVE_LIMIT are kept, like Arc.
+  const archive = [...newArchiveEntries, ...changedState.archive].slice(0, ARCHIVE_LIMIT);
+  changedState = { ...changedState, archive: archive };
   return repairSelections(changedState);
 }
 
@@ -801,5 +803,5 @@ export function addPageToArchive(state: BrowserState, page: LoosePage, now: numb
   }
   const tab: TabItem = { ...createTab(page.url, now), title: page.title.trim() === "" ? page.url : page.title, faviconUrl: page.faviconUrl };
   const entry: ArchivedTab = { tab: tab, fromSpaceId: null, archivedAt: now, reason: reason };
-  return { ...state, archive: [entry, ...state.archive] };
+  return { ...state, archive: [entry, ...state.archive].slice(0, ARCHIVE_LIMIT) };
 }

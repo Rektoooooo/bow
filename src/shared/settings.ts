@@ -41,11 +41,11 @@ export const IN_USE_REFRESH_INTERVAL_MS = 1 * MINUTE_MS;
 /** How often the sweeper looks for tabs to archive. Same as Arc: its archive batches are exactly 5 minutes apart. */
 export const ARCHIVE_SWEEP_INTERVAL_MS = 5 * MINUTE_MS;
 
-/** How often old archive entries are deleted. Our choice. */
+/** How often the archive is trimmed to ARCHIVE_LIMIT (archiving also trims it). Our choice. */
 export const ARCHIVE_PRUNE_INTERVAL_MS = 1 * HOUR_MS;
 
-/** How long archived tabs are kept before they are deleted. Our choice: Arc instead appears to keep the newest 250. */
-export const ARCHIVE_RETENTION_MS = 30 * DAY_MS;
+/** How many archived tabs are kept; older ones are deleted. Same as Arc: a real user's archive held exactly 250. */
+export const ARCHIVE_LIMIT = 250;
 
 /** A Little Window left alone this long is archived and closed. Same as Arc's Little Arc default (6 h, measured). */
 export const LITTLE_WINDOW_ARCHIVE_AFTER_MS = 6 * HOUR_MS;

@@ -313,7 +313,8 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
     "p",
     "library-setting-note",
     "Today tabs you have not used for this long move to the Archive, checked every 5 minutes, like Arc (default 12 hours). " +
-      "Pinned tabs and Favorites never do. Time while the browser is closed does not count. Little Windows archive after 6 hours.",
+      "Pinned tabs and Favorites never do. Time while the browser is closed does not count. Little Windows archive after 6 hours. " +
+      "The Archive keeps your newest 250 tabs, like Arc.",
   );
   settings.append(row, explanation);
   body.replaceChildren(settings);

@@ -9,9 +9,9 @@
  *
  * Data flow:
  *   main.ts timer fires → findTabsToArchive() → state.moveTabsToArchive(…, "auto")
- *   main.ts prune timer → pruneArchive() → archive without entries older than the retention period
+ *   main.ts prune timer → pruneArchive() → archive trimmed to the newest ARCHIVE_LIMIT entries
  */
-import { ARCHIVE_RETENTION_MS } from "../shared/settings";
+import { ARCHIVE_LIMIT } from "../shared/settings";
 import type { BrowserState, ItemId, TabItem } from "../shared/types";
 import { collectTabIdsInList, findTab } from "./tree";
 
@@ -74,17 +74,13 @@ function listTodayTabs(state: BrowserState): TabItem[] {
 }
 
 /**
- * Deletes archive entries older than ARCHIVE_RETENTION_MS.
- * Returns the same state object when nothing was old enough, so main.ts can skip saving.
- * Example: retention 30 days, entry archived 31 days ago → removed
+ * Keeps the newest ARCHIVE_LIMIT archive entries (the archive is newest first) and deletes the rest, like Arc.
+ * Returns the same state object when nothing had to go, so main.ts can skip saving.
+ * Example: limit 250, 260 entries → the 10 oldest are removed
  */
-export function pruneArchive(state: BrowserState, now: number): BrowserState {
-  const oldestAllowedArchivedAt = now - ARCHIVE_RETENTION_MS;
-  const keptEntries = state.archive.filter((entry) => entry.archivedAt >= oldestAllowedArchivedAt);
-
-  const nothingRemoved = keptEntries.length === state.archive.length;
-  if (nothingRemoved) {
+export function pruneArchive(state: BrowserState): BrowserState {
+  if (state.archive.length <= ARCHIVE_LIMIT) {
     return state;
   }
-  return { ...state, archive: keptEntries };
+  return { ...state, archive: state.archive.slice(0, ARCHIVE_LIMIT) };
 }

@@ -176,10 +176,10 @@ async function runArchiveSweep(): Promise<void> {
 }
 
 /**
- * Deletes archive entries past the retention period.
+ * Trims the archive to the newest ARCHIVE_LIMIT entries.
  */
 function pruneOldArchiveEntries(): void {
-  applyChange((state) => pruneArchive(state, Date.now()));
+  applyChange((state) => pruneArchive(state));
 }
 
 /**

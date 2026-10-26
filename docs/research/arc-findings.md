@@ -111,8 +111,8 @@ tab's `timeLastActiveAt`), the preferences plist, and Arc's public help center. 
 | Last-active refresh (`itemLastActiveDateUpdateTimer`) | **Every 60 seconds, for the visible tab** | Live sampling of `StorableSidebar.json` for 7 minutes while Arc ran: only the visible tab's `timeLastActiveAt` changed, each time by +60.0 s (±0.1 s). See [Last-active refresh](#last-active-refresh). |
 | `itemsToExclude` | **Unknown.** It sits in the auto-archive state next to `autoArchiveStartTime`; most likely the tabs live right now | Swift metadata only |
 
-Our browser uses the same values: 12 h threshold, 5-minute sweep, 1-minute refresh of tabs in use, launch rule. We keep archive entries for
-30 days instead of a 250-item cap; see `src/shared/settings.ts`.
+Our browser uses the same values: 12 h threshold, 5-minute sweep, 1-minute refresh of tabs in use, launch rule,
+Little Windows after 6 h, and an archive of the newest 250 entries; see `src/shared/settings.ts`.
 
 ### Last-active refresh
 
