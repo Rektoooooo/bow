@@ -4,7 +4,8 @@
  *
  * Data source:
  *   The "Archive tabs after" choices copy the option list Arc offers (found in Arc 1.170.0's binary).
- *   Every other value is our own choice; Arc's timer intervals are still unknown.
+ *   The auto-archive timings match what Arc does, measured from a real user's Arc files on 2026-10-26
+ *   (docs/research/arc-findings.md §2). Layout values are our own choice.
  *
  * Data flow:
  *   main.ts (timers, window layout) and sidebar.ts (settings menu) import these constants
@@ -31,19 +32,19 @@ export const ARCHIVE_THRESHOLD_OPTIONS: ArchiveThresholdOption[] = [
   { label: "Never", valueMs: null },
 ];
 
-/** Default for a fresh install. Our choice: long enough to last a workday. */
+/** Default for a fresh install. Same as Arc: 12 hours (help center + measured idle times at archive). */
 export const DEFAULT_ARCHIVE_AFTER_MS = 12 * HOUR_MS;
 
-/** How often visible, audible and picture-in-picture tabs get their last-active time refreshed. Our choice. */
+/** How often visible, audible and picture-in-picture tabs get their last-active time refreshed. Arc refreshes the visible tab every 60 s (measured). */
 export const IN_USE_REFRESH_INTERVAL_MS = 1 * MINUTE_MS;
 
-/** How often the sweeper looks for tabs to archive. Our choice; checking more often buys nothing at a 1-hour minimum. */
+/** How often the sweeper looks for tabs to archive. Same as Arc: its archive batches are exactly 5 minutes apart. */
 export const ARCHIVE_SWEEP_INTERVAL_MS = 5 * MINUTE_MS;
 
 /** How often old archive entries are deleted. Our choice. */
 export const ARCHIVE_PRUNE_INTERVAL_MS = 1 * HOUR_MS;
 
-/** How long archived tabs are kept before they are deleted. Our choice. */
+/** How long archived tabs are kept before they are deleted. Our choice: Arc instead appears to keep the newest 250. */
 export const ARCHIVE_RETENTION_MS = 30 * DAY_MS;
 
 /** Sidebar width in pixels. Must match --sidebar-width in sidebar.css. */

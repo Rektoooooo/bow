@@ -6,13 +6,15 @@ Public repo: https://github.com/Rektoooooo/sidebar-browser
 ## Start here
 
 1. Read the newest file in `.handoffs/`. It has the full history, decisions, status and next steps.
-2. Arc research: `docs/research/arc-findings.md` (text) and `docs/arc-teardown.html` (feature map, all 52 features).
+2. Arc research: `docs/research/arc-findings.md` (text), `docs/research/arc-data-model.md` (how Arc stores the
+   sidebar and archive on disk) and `docs/arc-teardown.html` (feature map, all 52 features).
 3. Reverse-engineering tools and how to resume the Ghidra pass: `docs/research/reverse-engineering-setup.md`.
 4. Open work: `tasks/todo.md`.
 
 ## Commands
 
 ```bash
+source ~/.nvm/nvm.sh && nvm use   # Arc account only: Node 24 from .nvmrc
 npm install
 npm start            # build + open the browser
 npm test             # 20 Vitest unit tests (state + auto-archive rules)
@@ -63,8 +65,9 @@ The owner must be able to explain every line to a reviewer:
 - `main` tracks `origin` = `https://github.com/Rektoooooo/sidebar-browser.git` (public).
 - Commits in this repo use the repo-local author `Rektoooooo <95218813+Rektoooooo@users.noreply.github.com>`
   (already set in `.git/config`). Do not commit with the machine's global identity, which is a work address.
-- `gh` on this Mac has two accounts; the **active one is a work account** and must stay active. Do not
-  `gh auth switch`. Use the personal token per command:
+- Run `gh auth status` first. On the Arc account (below) the only gh account is Rektoooooo, so
+  plain `git push` works. On the other account, gh has two accounts and the **active one is a work account** that
+  must stay active: do not `gh auth switch`; use the personal token per command:
 
   ```bash
   GH_TOKEN="$(gh auth token --user Rektoooooo)" gh repo view Rektoooooo/sidebar-browser
@@ -74,11 +77,18 @@ The owner must be able to explain every line to a reviewer:
 
 ## This Mac (gotchas)
 
-- Homebrew belongs to another macOS account: `brew install` fails. Install tools into `~/.local` instead
-  (Node 24.22.1 is there and first on PATH).
-- 16 GB RAM, often two macOS accounts logged in and swap nearly full. Check `sysctl vm.swapusage` before heavy
-  work like a Ghidra import.
-- The shell has no Screen Recording permission: `screencapture` fails; `e2e/window-shot.mjs` composites instead.
+One Mac, two macOS accounts. Check which one you are on (`whoami`).
+
+- **The Arc account** (the one that uses Arc and owns Homebrew; clone at `~/Developer/sidebar-browser`):
+  Homebrew works. The default `node` is Homebrew 23.10, which Vitest 5 rejects; Node 24 is installed with nvm,
+  which the shell does not load. Prefix commands with
+  `source ~/.nvm/nvm.sh && nvm use` (reads `.nvmrc`). Arc's real data is here; a full copy is in
+  `~/Arc-Backup-2026-10-26/` (personal, never commit it). REA and Ghidra are not installed on this account.
+- **The other account** (where milestone 1 was built): Homebrew belongs to the Arc account, so `brew install`
+  fails. Tools live in `~/.local` (Node 24.22.1 first on PATH, JDK 21, Ghidra 12.1.4, REA).
+- 16 GB RAM and swap is often full. Check `sysctl vm.swapusage` before heavy work like a Ghidra import.
+- Screenshots: `e2e/window-shot.mjs` composites window captures, so it works without Screen Recording permission.
+- `reference/` (git-ignored) holds the user's Arc screenshots. They show personal bookmarks: never commit them.
 
 ## Arc material
 
