@@ -290,6 +290,9 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   setTidyTitles: { isOn: isBoolean },
   createNote: {},
   createEasel: {},
+  finishWelcome: {},
+  setAsDefaultBrowser: {},
+  translatePage: {},
 };
 
 /**

@@ -30,7 +30,8 @@ import { showMenuRequest } from "./menus";
 import type { MenuHost } from "./menus";
 import { hideTabPreview, openBoostEditor, openCommandBar, openLibrary, openSiteControls, openThemeEditor, runSiteCommand, showTabPreview } from "./overlayController";
 import { setDeveloperMode } from "../shared/developerMode";
-import { openDeveloperTool } from "./pageCommands";
+import { openDeveloperTool, translatePage } from "./pageCommands";
+import { setAsDefaultBrowser } from "./defaultBrowser";
 import { setSplitOrientation, separateTabFromSplit, splitTabs, unsplit } from "./split";
 import {
   addToFavorites,
@@ -52,6 +53,7 @@ import {
   setTidyTitles,
   createNote,
   createEasel,
+  finishWelcome,
   setPinnedSectionOpen,
   setSidebarVisible,
   setSidebarWidth,
@@ -299,6 +301,18 @@ export function runAction(action: BrowserAction): void {
       applyChange((state) => setAdBlockForSite(state, action.site, action.isOn));
       reapplyCosmeticFiltersToAllPages();
       return;
+    case "finishWelcome":
+      return applyChange((state) => finishWelcome(state));
+    case "setAsDefaultBrowser":
+      setAsDefaultBrowser().catch((error) => console.error("Setting the default browser failed:", error));
+      return;
+    case "translatePage": {
+      const contents = getFocusedContents();
+      if (contents !== null) {
+        translatePage(contents);
+      }
+      return;
+    }
     case "createEasel":
       return applyChange((state) => createEasel(state, createId("easel", now), now));
     case "createNote":

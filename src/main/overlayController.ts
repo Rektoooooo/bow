@@ -37,7 +37,7 @@ import { DEFAULT_PROFILE_ID, SIDEBAR_WIDTH_PX } from "../shared/settings";
 import type { Bounds } from "./layout";
 import { getOverlayContents, hideOverlay, sendToOverlay, setOverlayBounds, showOverlay } from "./overlay";
 import { closePeek, isPeekOpen, openPeekAsTab, openPeekInSplit } from "./peek";
-import { toggleDevTools, zoomPage } from "./pageCommands";
+import { toggleDevTools, translatePage, zoomPage } from "./pageCommands";
 import { splitTabs } from "./split";
 import { getSelectedTabId, openTab, selectTab } from "./state";
 import { loadUrlInTab, openLinkInNewTab, setMuted } from "./tabActions";
@@ -46,6 +46,7 @@ import { findProfileIdOfItem, findTab, getActiveSpace } from "./tree";
 import { getPermissionOrigin, getSitePermissions } from "./sitePermissions";
 import { looksLikeWebAddress, normalizeTypedInput } from "./urls";
 import { isDeveloperModeOn } from "../shared/developerMode";
+import { listImportSources } from "./browserImportController";
 import { describeAdBlock, getBlockedCount, isAdBlockActiveFor } from "./adBlock";
 
 /** DuckDuckGo's suggestion service; it is also the browser's search engine (urls.ts). */
@@ -342,6 +343,15 @@ export function openCommandBar(mode: CommandBarMode): void {
   const initialText = mode === "editUrl" && selectedTab !== undefined ? selectedTab.url : "";
   latestQuery = initialText;
   openPanel({ kind: "commandBar", mode: mode, initialText: initialText });
+}
+
+/**
+ * The first-start tour (overlay/welcome.ts), with the browsers this Mac has to import from.
+ */
+export function openWelcome(): void {
+  const state = getState();
+  const presets = THEME_PRESETS.map((preset) => ({ label: preset.label, colors: preset.colors, appearance: preset.appearance }));
+  openPanel({ kind: "welcome", spaceId: state.activeSpaceId, importSources: listImportSources(), presets: presets });
 }
 
 export function openLibrary(section: LibrarySection = "archive"): void {
@@ -870,6 +880,17 @@ function handleCaptureRegion(region: OverlayRect | null): void {
 }
 
 /**
+ * Translates the selected page (pageCommands.ts), closing the Control Center first.
+ */
+function handleTranslate(): void {
+  closeOverlay();
+  const contents = getFocusedContents();
+  if (contents !== null) {
+    translatePage(contents);
+  }
+}
+
+/**
  * The Control Center's "…" button: the less used page commands, as a native menu under the button.
  */
 function showSiteMenu(anchor: OverlayRect): void {
@@ -889,6 +910,8 @@ function showSiteMenu(anchor: OverlayRect): void {
     { type: "separator" },
     { label: "Zap Elements", enabled: site.isLoaded && site.site !== null, click: () => handleSiteCommand("zap") },
     { label: "Edit Boost…", enabled: site.site !== null, click: () => openBoostEditor() },
+    { type: "separator" },
+    { label: "Translate Page (Google Translate)", enabled: site.isLoaded, click: () => handleTranslate() },
     { type: "separator" },
     { label: "Developer Tools", enabled: site.isLoaded, click: () => handleSiteCommand("devTools") },
   ];

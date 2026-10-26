@@ -36,7 +36,7 @@ const usageTexts = [infoPlist.NSCameraUsageDescription, infoPlist.NSMicrophoneUs
 check("Info.plist explains camera, microphone and location use", usageTexts.every((text) => typeof text === "string" && text.startsWith("Websites you allow")), usageTexts.join(" | "));
 check("the app icon is ours", fs.readFileSync(path.join(bundlePath, "Contents", "Resources", infoPlist.CFBundleIconFile)).equals(fs.readFileSync(path.join(appDir, "build", "icon.icns"))));
 
-const app = await _electron.launch({ executablePath, args: [`--user-data-dir=${userDataDir}`], timeout: 30000 });
+const app = await _electron.launch({ executablePath, args: [`--user-data-dir=${userDataDir}`, "--skip-welcome"], timeout: 30000 });
 const deadline = Date.now() + 30000;
 let page = null;
 while (page === null && Date.now() < deadline) {

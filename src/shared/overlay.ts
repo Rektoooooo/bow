@@ -47,7 +47,8 @@ export type OverlayPanel =
   | { kind: "permission"; requestId: string; host: string; kinds: SitePermissionKind[]; appName: string | null }
   | { kind: "capture"; frame: { x: number; y: number; width: number; height: number } }
   | { kind: "switcher"; tabs: SwitcherTab[]; index: number }
-  | { kind: "preview"; frame: OverlayRect; tabId: string; title: string; url: string; faviconUrl: string | null; snapshotUrl: string };
+  | { kind: "preview"; frame: OverlayRect; tabId: string; title: string; url: string; faviconUrl: string | null; snapshotUrl: string }
+  | { kind: "welcome"; spaceId: string; importSources: { id: string; label: string }[]; presets: { label: string; colors: string[]; appearance: ThemeAppearance }[] };
 
 /** One card of the recent-tab switcher (⌃Tab): most recently used first, the selected tab at index 0. */
 export interface SwitcherTab {

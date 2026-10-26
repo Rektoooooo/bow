@@ -763,6 +763,16 @@ export function setSoundEffects(state: BrowserState, isOn: boolean): BrowserStat
 }
 
 /**
+ * Remembers that the first-start tour was finished or skipped.
+ */
+export function finishWelcome(state: BrowserState): BrowserState {
+  if (state.settings.hasSeenWelcome === true) {
+    return state;
+  }
+  return { ...state, settings: { ...state.settings, hasSeenWelcome: true } };
+}
+
+/**
  * Turns tidy titles for pinned tabs on or off.
  */
 export function setTidyTitles(state: BrowserState, isOn: boolean): BrowserState {

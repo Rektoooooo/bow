@@ -11,6 +11,7 @@
  *   page events → tabViewEvents → applyChange() / history / menus
  */
 import { app, BrowserWindow, session } from "electron";
+import * as fs from "node:fs";
 import * as path from "node:path";
 import {
   ARCHIVE_PRUNE_INTERVAL_MS,
@@ -51,7 +52,8 @@ import { applyBoostToPage, runBoostJavaScript } from "./boostPages";
 import { createStatusBubble, showLinkStatus } from "./statusBubble";
 import { initializePeek, openPeek, relayoutPeek } from "./peek";
 import { createOverlayView, getOverlayContents } from "./overlay";
-import { refreshOpenPanel, registerOverlayIpc, relayoutOverlay, setCommandActionRegistry } from "./overlayController";
+import { openWelcome, refreshOpenPanel, registerOverlayIpc, relayoutOverlay, setCommandActionRegistry } from "./overlayController";
+import { startHandoff } from "./handoff";
 import { onProfileSessionCreated, restrictWebPermissions, useChromeUserAgent } from "./profiles";
 import { moveTabsToArchive, setNoteTitle, updateTabFavicon, updateTabPage } from "./state";
 import { getStateFilePath } from "./store";
@@ -83,6 +85,9 @@ const MIN_WINDOW_HEIGHT_PX = 400;
  * the user's Arc (1 px per pt): the close button's center is at 19, 22.5 pt.
  */
 const TRAFFIC_LIGHT_POSITION = { x: 12, y: 16 };
+
+/** Command-line flag that skips the first-start tour (the end-to-end checks start with empty data folders). */
+const SKIP_WELCOME_FLAG = "--skip-welcome";
 
 /** How many of the Library's captures an easel offers to place. Our choice. */
 const EASEL_CAPTURE_CHOICES = 40;
@@ -278,6 +283,8 @@ function findUrlArgument(argumentList: string[]): string | null {
  * shows the selected tab and starts the timers.
  */
 async function handleAppReady(): Promise<void> {
+  // A start without a saved state is the first one: the welcome tour shows (tests pass --skip-welcome).
+  const isFirstStart = !fs.existsSync(getStateFilePath()) && !process.argv.includes(SKIP_WELCOME_FLAG);
   initializeState(getStateFilePath(), Date.now());
   loadHistory();
   loadToolbarColors(path.join(app.getPath("userData"), TOOLBAR_COLORS_FILE_NAME), scheduleRuntimePush);
@@ -352,6 +359,15 @@ async function handleAppReady(): Promise<void> {
   pruneOldArchiveEntries();
   startAutoArchiveTimers();
   startExtensionUpdates();
+  startHandoff();
+  if (isFirstStart && getState().settings.hasSeenWelcome !== true) {
+    // Once the sidebar has drawn, so the tour opens over a finished window.
+    if (mainWindow.webContents.isLoading()) {
+      mainWindow.webContents.once("did-finish-load", () => openWelcome());
+    } else {
+      openWelcome();
+    }
+  }
 }
 
 /**

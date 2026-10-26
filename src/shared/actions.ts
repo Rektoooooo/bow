@@ -118,7 +118,10 @@ export type BrowserAction =
   | { type: "hideTabPreview" }
   | { type: "setTidyTitles"; isOn: boolean }
   | { type: "createNote" }
-  | { type: "createEasel" };
+  | { type: "createEasel" }
+  | { type: "finishWelcome" }
+  | { type: "setAsDefaultBrowser" }
+  | { type: "translatePage" };
 
 /** Every action type, for checking an incoming `type` string. */
 export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
@@ -196,4 +199,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setTidyTitles",
   "createNote",
   "createEasel",
+  "finishWelcome",
+  "setAsDefaultBrowser",
+  "translatePage",
 ];

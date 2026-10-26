@@ -44,7 +44,7 @@ fs.writeFileSync(
 
 const app = await _electron.launch({
   executablePath: createRequire(import.meta.url)("electron"),
-  args: [`--user-data-dir=${userDataDir}`, appDir],
+  args: [`--user-data-dir=${userDataDir}`, "--skip-welcome", appDir],
   timeout: 30000,
 });
 let sidebar;

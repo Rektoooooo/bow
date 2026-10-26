@@ -105,6 +105,20 @@ async function simulateDrag(page, sourceSelector, targetSelector, verticalFracti
 // ---------- first run ----------
 let { app, page, mainLog, consoleErrors } = await launch(userDataDir);
 await page.waitForSelector(".space-title", { timeout: 15000 });
+// The first start shows the welcome tour (import, a look, shortcuts, default browser); Skip ends it for good.
+const welcomeOverlay = await (async () => {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const overlayPage = app.windows().find((candidate) => candidate.url().endsWith("/overlay/overlay.html"));
+    if (overlayPage) return overlayPage;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return null;
+})();
+const welcomeTitle = welcomeOverlay === null ? null : await welcomeOverlay.waitForSelector(".welcome-title", { timeout: 8000 }).then((title) => title.textContent()).catch(() => null);
+check("the first start shows the welcome tour", welcomeTitle === "Welcome", String(welcomeTitle));
+await welcomeOverlay?.click(".welcome-skip").catch(() => undefined);
+await page.waitForTimeout(500);
+check("Skip ends the tour for good", (await getState(page)).settings.hasSeenWelcome === true);
 check("preload exposes window.browserApi", (await page.evaluate(() => typeof window.browserApi)) === "object");
 check("sidebar shows the Personal Space title", (await page.textContent(".space-title-name")).includes("Personal"));
 check("empty card shows with no tabs", await page.isVisible("#empty-card"));

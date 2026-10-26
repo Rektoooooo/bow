@@ -1026,6 +1026,125 @@ body.dark {
   font-size: 12px;
 }
 
+/* ---------- Welcome (first start) ---------- */
+
+.welcome {
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 48px));
+  min-height: 380px;
+  padding: 28px 28px 18px;
+  border-radius: 18px;
+}
+
+.welcome-body {
+  flex: 1;
+}
+
+.welcome-title {
+  margin: 0 0 10px;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.welcome-text {
+  margin: 0 0 18px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.welcome-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.welcome-choice {
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--field);
+  font-weight: 600;
+  transition: background-color var(--motion-fast) var(--motion-ease);
+}
+
+.welcome-choice:hover {
+  background: var(--highlight);
+}
+
+.welcome-theme::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--swatch);
+  vertical-align: -1px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.welcome-shortcuts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 18px;
+}
+
+.welcome-shortcut {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.welcome-shortcut kbd {
+  min-width: 52px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: var(--field);
+  font: 600 12px -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  text-align: center;
+}
+
+.welcome-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.welcome-footer .site-button {
+  flex: none;
+}
+
+.welcome-skip {
+  background: none;
+  color: var(--muted);
+}
+
+.welcome-dots {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.welcome-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line);
+  transition: background-color var(--motion-fast) var(--motion-ease);
+}
+
+.welcome-dot.is-active {
+  background: var(--ink);
+}
+
 /* ---------- Capture (drag over the page) ---------- */
 
 .capture-layer {

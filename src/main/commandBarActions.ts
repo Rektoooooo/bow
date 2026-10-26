@@ -47,6 +47,7 @@ function buildFixedActions(host: CommandActionHost): FixedAction[] {
     { entry: { id: "new-folder", title: "New Folder", keywords: ["create folder"] }, run: () => commands.newFolder() },
     { entry: { id: "new-note", title: "New Note", keywords: ["note", "write", "text"] }, run: () => commands.newNote() },
     { entry: { id: "new-easel", title: "New Easel", keywords: ["easel", "board", "canvas", "draw"] }, run: () => commands.newEasel() },
+    { entry: { id: "translate-page", title: "Translate Page (Google Translate)", keywords: ["translate", "language"] }, run: () => host.runAction({ type: "translatePage" }) },
     { entry: { id: "edit-theme", title: "Edit Theme", keywords: ["space color", "gradient", "appearance"] }, run: () => host.runAction({ type: "openThemeEditor", spaceId: host.getState().activeSpaceId }) },
     { entry: { id: "toggle-sidebar", title: "Toggle Sidebar", keywords: ["hide sidebar", "show sidebar"] }, run: () => commands.toggleSidebar() },
     { entry: { id: "copy-url", title: "Copy URL", keywords: ["copy link", "copy address"] }, run: () => commands.copySelectedUrl("plain") },

@@ -23,7 +23,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const app = await _electron.launch({
   executablePath: createRequire(import.meta.url)("electron"),
-  args: [`--user-data-dir=${userDataDir}`, appDir],
+  args: [`--user-data-dir=${userDataDir}`, "--skip-welcome", appDir],
   timeout: 30000,
 });
 // Pick our pages by URL: a restored tab's page can open first.

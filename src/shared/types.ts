@@ -142,6 +142,8 @@ export interface BrowserSettings {
   appIcon?: string;
   /** Pinned tabs show tidy titles (shared/tidyTitles.ts). Optional: missing means on, like Arc. */
   areTitlesTidy?: boolean;
+  /** The first-start tour was finished or skipped (overlay/welcome.ts). Optional: missing means not yet. */
+  hasSeenWelcome?: boolean;
 }
 
 /** How a link-routing rule compares an address. */

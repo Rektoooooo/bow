@@ -9,7 +9,7 @@
  * Data flow:
  *   appMenu.ts ⌘+ → main.ts → zoomPage(contents, "in")
  */
-import { clipboard } from "electron";
+import { app, clipboard } from "electron";
 import type { WebContents } from "electron";
 import type { DeveloperTool } from "../shared/actions";
 import type { TabItem } from "../shared/types";
@@ -79,6 +79,24 @@ export async function openDeveloperTool(contents: WebContents, tool: DeveloperTo
     }
     await new Promise((resolve) => setTimeout(resolve, DEVTOOLS_READY_WAIT_MS));
   }
+}
+
+/** Google Translate's page translator: it shows the page translated, links included. A third-party service. */
+const TRANSLATE_URL = "https://translate.google.com/translate";
+
+/**
+ * Translates the page into the Mac's language through Google Translate (Arc's "Translate page" used a translation
+ * service too). Pages that are not on the web are left alone.
+ */
+export function translatePage(contents: WebContents): void {
+  const pageUrl = contents.getURL();
+  if (!pageUrl.startsWith("http://") && !pageUrl.startsWith("https://")) {
+    return;
+  }
+  const systemLanguage = app.getPreferredSystemLanguages()[0] ?? "en";
+  const targetLanguage = systemLanguage.split("-")[0] ?? "en";
+  const translateUrl = `${TRANSLATE_URL}?sl=auto&tl=${encodeURIComponent(targetLanguage)}&u=${encodeURIComponent(pageUrl)}`;
+  contents.loadURL(translateUrl).catch(() => undefined);
 }
 
 /**

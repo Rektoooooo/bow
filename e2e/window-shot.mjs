@@ -51,7 +51,7 @@ fs.writeFileSync(path.join(userDataDir, "browser-state.json"), JSON.stringify(sa
 
 const app = await _electron.launch({
   executablePath: createRequire(import.meta.url)("electron"),
-  args: [`--user-data-dir=${userDataDir}`, appDir],
+  args: [`--user-data-dir=${userDataDir}`, "--skip-welcome", appDir],
   colorScheme: "dark",
   timeout: 30000,
 });

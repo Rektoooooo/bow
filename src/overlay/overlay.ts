@@ -25,6 +25,7 @@ import { renderSiteControls } from "./siteControls.js";
 import { renderCapture } from "./capture.js";
 import { handleSwitcherKey, installSwitcherMessages, renderSwitcher } from "./switcher.js";
 import { renderTabPreview } from "./tabPreview.js";
+import { renderWelcome } from "./welcome.js";
 import { buildSiteSearchUrl, findSiteSearch } from "../shared/siteSearch.js";
 import type { SiteSearch } from "../shared/siteSearch.js";
 import { findInlineCompletion } from "../shared/inlineCompletion.js";
@@ -494,6 +495,9 @@ function showPanel(message: OverlayShowMessage): void {
   }
   if (message.panel.kind === "preview") {
     renderTabPreview(host, message.panel);
+  }
+  if (message.panel.kind === "welcome") {
+    renderWelcome(host, message.panel);
   }
 }
 
