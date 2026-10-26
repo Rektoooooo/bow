@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_extensionName__",
+  "default_locale": "en",
+  "version": "1.0.0",
+  "description": "Test extension for e2e/check-extensions.mjs: marks example.com pages and shows the active tab in its popup.",
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [{ "matches": ["https://example.com/*", "https://example.org/*"], "js": ["content.js"], "run_at": "document_end" }],
+  "action": { "default_popup": "popup.html", "default_title": "Marker" },
+  "icons": { "32": "icon-32.png" },
+  "permissions": ["tabs"]
+}

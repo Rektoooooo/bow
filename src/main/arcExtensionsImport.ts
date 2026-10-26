@@ -171,7 +171,9 @@ function scanProfileFolder(profileFolder: string, scan: ArcExtensionScan): void 
   }
   let extensionIds: string[];
   try {
-    extensionIds = fs.readdirSync(extensionsFolder);
+    // Only folders are extensions; Finder's .DS_Store and similar files are not.
+    const entries = fs.readdirSync(extensionsFolder, { withFileTypes: true });
+    extensionIds = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
   } catch {
     scan.skippedUnreadable += 1;
     return;

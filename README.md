@@ -31,8 +31,9 @@ Window, or in a Space when an Air Traffic Control rule matches. The app is signe
 notarized, so copy the built app rather than downloading it elsewhere.
 
 To bring over your Arc setup: **File › Import from Arc…** reads Arc's files on this Mac (read-only) and adds your
-Spaces, Favorites, pinned folders and tabs, Today tabs, Space themes, Arc's cached icons, your archive (newest 250)
-and your browsing history. Running it twice adds nothing twice.
+Spaces, Favorites, pinned folders and tabs, Today tabs, Space themes, Arc's cached icons, your archive (newest 250),
+your browsing history and your Chrome Web Store extensions (copied, so they survive Arc; each keeps the on/off it had
+in Arc). Running it twice adds nothing twice.
 
 ## What works
 
@@ -75,7 +76,17 @@ and your browsing history. Running it twice adds nothing twice.
 - Site controls (copy link, screenshot, mute, inspect, zoom, clear site data), Find in page, downloads, a
   right-click menu in pages, and automatic Picture-in-Picture when you leave a tab playing a video.
 
-**Library** (⇧⌘L): the Archive (search, filter by reason, click to restore), History, Downloads and Settings.
+**Extensions**
+- Chrome extensions per profile, like Arc: imported from Arc or loaded from a folder (Library › Extensions ›
+  Load Unpacked…). Content scripts and Manifest V3 service workers run in Electron itself; the
+  [electron-chrome-extensions](https://github.com/samuelmaddock/electron-browser-shell) library (MIT) adds the
+  browser parts: the puzzle button in the toolbar opens an extension's popup, `chrome.tabs` knows the selected tab,
+  extensions can open tabs, and their items appear in the page's right-click menu.
+- Some extensions need Chrome features Electron does not have (side panels, tab capture); those load but only
+  partly work.
+
+**Library** (⇧⌘L): the Archive (search, filter by reason, click to restore), History, Downloads, Extensions and
+Settings.
 
 ## Auto-archive, like Arc
 
@@ -103,7 +114,7 @@ Same keys as Arc. ⌘T new tab, ⌘L edit address, ⌘W close, ⇧⌘T reopen, �
 | `src/preload` | Before each of our pages loads | The only bridges between our pages and the app |
 | `src/shared` | Both | Data types, settings with their sources, message names |
 | `tests` | Vitest | Rules for state, Spaces, splits, auto-archive, ranking, history, the Arc importers |
-| `e2e` | Playwright + Electron | The real app driven end to end, the permission check, the packaged app, the README screenshots |
+| `e2e` | Playwright + Electron | The real app driven end to end, extensions (with a synthetic test extension), the permission check, the packaged app, the README screenshots |
 | `build`, `tools` | — | The app icon (our own drawing) and Info.plist additions; scripts that draw the icon and package the app |
 | `docs` | — | Screenshots, `arc-teardown.html` (Arc's 52 features), `research/` (findings, Arc's data model, RE setup) |
 
@@ -117,8 +128,9 @@ Three ideas keep it simple:
 
 ## Security
 
-- Web pages run sandboxed with no preload and cannot talk to the app. Our own pages only accept their own messages,
-  and every message field is checked.
+- Web pages run sandboxed and cannot talk to the app. They get no preload script, except in a profile that has
+  extensions: there the extension library's preload runs in an isolated world, so page scripts see nothing new.
+  Our own pages only accept their own messages, and every message field is checked.
 - Every profile's session refuses website permissions (camera, microphone, location, notifications) except full
   screen and clipboard writes, until a permission prompt exists. `e2e/permission-check.mjs` proves it.
 - Our pages cannot navigate away or open windows, and only load their own scripts.

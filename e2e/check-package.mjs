@@ -1,6 +1,6 @@
 // Checks the packaged app (npm run package first): it starts, knows it is "Sidebar Browser", declares http and https
-// so macOS can make it the default browser, offers "Set as Default Browser…", and opens a link from another app in
-// a Little Window.
+// so macOS can make it the default browser, offers "Set as Default Browser…", opens a link from another app in a
+// Little Window, and runs a Chrome extension (so the extension library and its preload made it into the package).
 // usage: npm run package && node e2e/check-package.mjs
 // Uses a throwaway --user-data-dir folder and never changes the default browser.
 import { _electron } from "playwright-core";
@@ -64,6 +64,24 @@ while ((await windowCount()) === windowsBefore && Date.now() < littleDeadline) {
   await new Promise((resolve) => setTimeout(resolve, 200));
 }
 check("a link from another app opens a Little Window", (await windowCount()) === windowsBefore + 1);
+// The synthetic test extension: Load Unpacked (dialog answered), then its content script must mark a page.
+const fixtureDir = path.join(appDir, "e2e", "fixtures", "extension-marker");
+await app.evaluate(({ dialog }, folder) => {
+  dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [folder] });
+}, fixtureDir);
+await page.evaluate(() => window.browserApi.dispatch({ type: "loadUnpackedExtension" }));
+await page.evaluate(() => window.browserApi.dispatch({ type: "openTab", typedText: "example.com" }));
+let marker = "no page";
+const markerDeadline = Date.now() + 15000;
+while (marker !== "on" && Date.now() < markerDeadline) {
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  marker = await app.evaluate(async ({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+    const view = win?.contentView.children.find((child) => child.webContents?.getURL().startsWith("https://"));
+    return view === undefined ? "no page" : view.webContents.executeJavaScript("document.documentElement.dataset.fixtureMarker ?? 'absent'");
+  });
+}
+check("a Chrome extension runs in the packaged app", marker === "on", marker);
 check("no page errors in the sidebar", consoleErrors.length === 0, consoleErrors.join(" | "));
 
 await app.close();

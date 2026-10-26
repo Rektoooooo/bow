@@ -31,6 +31,7 @@ import {
 } from "./browserCore";
 import { createCommandActionRegistry } from "./commandBarActions";
 import { startTrackingDownloads } from "./downloads";
+import { getExtensionMenuItems, initializeExtensionHost, prepareExtensions } from "./extensionHost";
 import { isRecordableUrl } from "./history";
 import { addVisit, loadHistory, saveHistoryNow, setVisitTitle } from "./historyStore";
 import { registerIpcHandlers } from "./ipc";
@@ -96,7 +97,7 @@ const tabViewEvents: TabViewEvents = {
     openPeek(url, tabId);
     return true;
   },
-  onContextMenu: (_tabId, contents, params) => showPageContextMenu(menuHost, contents, params),
+  onContextMenu: (_tabId, contents, params) => showPageContextMenu(menuHost, contents, params, getExtensionMenuItems(contents, params)),
   onDomReady: (_tabId, contents) => {
     applyBoostToPage(contents, getState()).catch(() => undefined);
   },
@@ -235,7 +236,7 @@ function findUrlArgument(argumentList: string[]): string | null {
  * Runs once Electron is ready: loads the state, opens the window and overlay, connects IPC and menus,
  * shows the selected tab and starts the timers.
  */
-function handleAppReady(): void {
+async function handleAppReady(): Promise<void> {
   initializeState(getStateFilePath(), Date.now());
   loadHistory();
 
@@ -258,6 +259,9 @@ function handleAppReady(): void {
   registerLittleWindowIpc();
   setCommandActionRegistry(createCommandActionRegistry({ commands: appMenuCommands, runAction: runAction, getState: getState }));
   installAppMenu(appMenuCommands);
+  // Extensions load before the first page, so their content scripts reach the pages restored at startup.
+  initializeExtensionHost(tabViewEvents);
+  await prepareExtensions();
 
   mainWindow = createMainWindow();
   // Little Windows cannot live without the main window; closing it ends the app.

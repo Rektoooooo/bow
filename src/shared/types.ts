@@ -160,6 +160,22 @@ export interface Boost {
   isEnabled: boolean;
 }
 
+/**
+ * A Chrome extension added to one profile (Arc's extensions are per profile too). The extension's files live in
+ * `path`: a copy in our data folder (imported from Arc) or the user's own folder (Load Unpacked).
+ * Example: { id: "eimadpbcbfnmbkopoojfekhnkhdbieeh", profileId: "profile-default", name: "Dark Reader", … }
+ */
+export interface InstalledExtension {
+  /** Chrome's extension id. For Web Store extensions it is the Web Store id (Chromium derives it from the manifest key). */
+  id: string;
+  profileId: ProfileId;
+  name: string;
+  version: string;
+  path: string;
+  isEnabled: boolean;
+  source: "arc" | "unpacked";
+}
+
 /** Everything the browser saves to disk. */
 export interface BrowserState {
   /** Raise this number when the saved shape changes, and add an upgrade step to migrate.ts. */
@@ -179,6 +195,8 @@ export interface BrowserState {
   routingRules?: RoutingRule[];
   /** Boosts, one per site. Optional, so files saved before it existed still load. */
   boosts?: Boost[];
+  /** Chrome extensions per profile. Optional, so files saved before it existed still load. */
+  extensions?: InstalledExtension[];
 }
 
 /**

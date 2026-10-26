@@ -18,7 +18,7 @@ export type CommandBarResultKind = "navigate" | "search" | "tab" | "history" | "
 
 export type CommandBarMode = "newTab" | "editUrl" | "splitWith";
 
-export type LibrarySection = "archive" | "history" | "downloads" | "settings";
+export type LibrarySection = "archive" | "history" | "downloads" | "extensions" | "settings";
 
 /** Which panel the overlay shows. */
 export type OverlayPanel =
@@ -63,6 +63,21 @@ export interface HistoryLine {
 }
 
 /** What the Library shows. */
+/** One extension as the Library lists it. */
+export interface ExtensionLine {
+  id: string;
+  profileId: string;
+  profileName: string;
+  name: string;
+  version: string;
+  isEnabled: boolean;
+  source: "arc" | "unpacked";
+  /** The extension's icon as a data: URL, or null when it has none. */
+  iconUrl: string | null;
+  /** Why it failed to load, or null. */
+  loadError: string | null;
+}
+
 export interface LibraryData {
   archive: ArchivedTab[];
   spaces: { id: string; name: string; icon: string }[];
@@ -70,6 +85,7 @@ export interface LibraryData {
   downloads: DownloadRecord[];
   archiveAfterMs: number | null;
   routingRules: RoutingRule[];
+  extensions: ExtensionLine[];
 }
 
 /** What the site controls show about the selected page. */

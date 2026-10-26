@@ -9,15 +9,19 @@
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.renderer.json && cp src/renderer/index.html src/renderer/sidebar.css dist/web/renderer/ && cp src/overlay/overlay.html src/overlay/overlay.css dist/web/overlay/ && cp src/little/little.html src/little/little.css dist/web/little/ && mkdir -p dist/web/crash dist/web/status && cp src/crash/crash.html src/crash/crash.css dist/web/crash/ && cp src/status/status.html src/status/status.css dist/web/status/",
     "start": "npm run build && electron .",
     "test": "vitest run",
-    "e2e": "npm run build && node e2e/check-app.mjs && node e2e/check-overlay.mjs && node e2e/permission-check.mjs",
+    "e2e": "npm run build && node e2e/check-app.mjs && node e2e/check-overlay.mjs && node e2e/check-extensions.mjs && node e2e/permission-check.mjs",
     "package": "tools/package-mac.sh"
   },
   "devDependencies": {
     "@electron/packager": "20.3.0",
+    "@types/chrome": "0.0.332",
     "@types/node": "24.19.2",
     "electron": "44.9.3",
     "playwright-core": "1.64.0",
     "typescript": "6.0.3",
     "vitest": "5.0.5"
+  },
+  "dependencies": {
+    "electron-chrome-extensions": "4.10.0"
   }
 }

@@ -82,7 +82,12 @@ export type BrowserAction =
   | { type: "openLibrary" }
   | { type: "openSiteControls" }
   | { type: "openThemeEditor"; spaceId: SpaceId }
-  | { type: "showMenu"; request: MenuRequest };
+  | { type: "showMenu"; request: MenuRequest }
+  | { type: "setExtensionEnabled"; profileId: string; extensionId: string; isEnabled: boolean }
+  | { type: "removeExtension"; profileId: string; extensionId: string }
+  | { type: "loadUnpackedExtension" }
+  | { type: "importFromArc" }
+  | { type: "showExtensionsMenu"; anchor: { x: number; y: number; width: number; height: number } };
 
 /** Every action type, for checking an incoming `type` string. */
 export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
@@ -136,4 +141,9 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "openSiteControls",
   "openThemeEditor",
   "showMenu",
+  "setExtensionEnabled",
+  "removeExtension",
+  "loadUnpackedExtension",
+  "importFromArc",
+  "showExtensionsMenu",
 ];

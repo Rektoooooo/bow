@@ -10,7 +10,7 @@
  * Data flow:
  *   "overlay:show" (library) → renderLibrary() → a section → click Restore → dispatch restoreArchivedTab → close
  */
-import type { HistoryLine, LibraryData, LibrarySection } from "../shared/overlay";
+import type { ExtensionLine, HistoryLine, LibraryData, LibrarySection } from "../shared/overlay";
 import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS } from "../shared/settings.js";
 import type { ArchiveReason, ArchivedTab } from "../shared/types";
 import { createElement, createFavicon, createIconButton, createTextButton, dispatch, getDisplayHost } from "../renderer/dom.js";
@@ -27,6 +27,7 @@ const SECTIONS: { id: LibrarySection; label: string }[] = [
   { id: "archive", label: "Archive" },
   { id: "history", label: "History" },
   { id: "downloads", label: "Downloads" },
+  { id: "extensions", label: "Extensions" },
   { id: "settings", label: "Settings" },
 ];
 
@@ -287,6 +288,69 @@ function renderDownloadsSection(body: HTMLElement, data: LibraryData): void {
 }
 
 /**
+ * Builds one extension line: icon, name, version and where it came from, an On/Off switch and Remove.
+ */
+function createExtensionLine(extension: ExtensionLine): HTMLElement {
+  const line = createElement("div", "library-line extension-line");
+  line.classList.toggle("is-off", !extension.isEnabled);
+  const icon = document.createElement("img");
+  icon.className = "extension-icon";
+  icon.alt = "";
+  if (extension.iconUrl !== null) {
+    icon.src = extension.iconUrl;
+  }
+  const text = createElement("span", "library-line-text");
+  text.append(createElement("span", "library-line-title", extension.name));
+  const origin = extension.source === "arc" ? "from Arc" : "unpacked";
+  const meta = extension.loadError === null ? `${extension.version} · ${origin}` : `Could not load: ${extension.loadError}`;
+  text.append(createElement("span", "library-line-meta", meta));
+  const switchButton = createTextButton(extension.isEnabled ? "On" : "Off", extension.isEnabled ? "library-chip is-active" : "library-chip", () =>
+    dispatch({ type: "setExtensionEnabled", profileId: extension.profileId, extensionId: extension.id, isEnabled: !extension.isEnabled }),
+  );
+  switchButton.title = extension.isEnabled ? "Turn off" : "Turn on";
+  const removeButton = createIconButton("trash", "Remove extension", "library-line-icon-button", () =>
+    dispatch({ type: "removeExtension", profileId: extension.profileId, extensionId: extension.id }),
+  );
+  line.append(icon, text, switchButton, removeButton);
+  return line;
+}
+
+/**
+ * Builds the Extensions section: Load Unpacked and Import from Arc, then each profile's extensions.
+ */
+function renderExtensionsSection(body: HTMLElement, data: LibraryData): void {
+  const section = createElement("div", "library-extensions");
+  const toolbar = createElement("div", "library-toolbar");
+  toolbar.append(
+    createTextButton("Load Unpacked…", "library-chip", () => dispatch({ type: "loadUnpackedExtension" })),
+    createTextButton("Import from Arc…", "library-chip", () => dispatch({ type: "importFromArc" })),
+  );
+  section.append(toolbar);
+  section.append(
+    createElement(
+      "p",
+      "library-setting-note",
+      "Chrome extensions run per profile, like in Arc. Open one from the puzzle button in the toolbar. " +
+        "Reload open pages after adding or turning one on. Extensions that need Chrome features this browser lacks may only partly work.",
+    ),
+  );
+  if (data.extensions.length === 0) {
+    section.append(createElement("p", "library-empty", "No extensions yet. Import your Arc extensions, or load an unpacked extension folder."));
+  }
+  const profileIds = Array.from(new Set(data.extensions.map((extension) => extension.profileId)));
+  for (const profileId of profileIds) {
+    const profileExtensions = data.extensions.filter((extension) => extension.profileId === profileId);
+    if (profileIds.length > 1) {
+      section.append(createElement("h2", "library-setting-heading", `Profile: ${profileExtensions[0]?.profileName ?? profileId}`));
+    }
+    const list = createElement("div", "library-list");
+    list.append(...profileExtensions.map((extension) => createExtensionLine(extension)));
+    section.append(list);
+  }
+  body.replaceChildren(section);
+}
+
+/**
  * Builds the Settings section: when unused tabs are archived.
  */
 function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
@@ -386,6 +450,9 @@ function renderBody(data: LibraryData): void {
   }
   if (section === "downloads") {
     renderDownloadsSection(body, data);
+  }
+  if (section === "extensions") {
+    renderExtensionsSection(body, data);
   }
   if (section === "settings") {
     renderSettingsSection(body, data);

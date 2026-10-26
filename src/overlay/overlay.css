@@ -434,6 +434,27 @@ button:disabled {
   padding: 20px 24px;
 }
 
+.library-extensions {
+  padding: 16px 20px;
+}
+
+.library-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.extension-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.extension-line.is-off .extension-icon,
+.extension-line.is-off .library-line-title {
+  opacity: 0.45;
+}
+
 .library-setting-row {
   display: flex;
   align-items: center;

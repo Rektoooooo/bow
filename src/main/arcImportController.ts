@@ -1,6 +1,6 @@
 /**
  * WHY this file exists:
- *   File › Import from Arc… brings the user's Arc sidebar, archive and history into this browser. The pure reader (arcImport.ts) does the
+ *   File › Import from Arc… brings the user's Arc sidebar, archive, history and extensions into this browser. The pure reader (arcImport.ts) does the
  *   translating; this file does the parts around it: find or ask for the file, read it, attach Arc's cached icons,
  *   replace the empty starter Spaces, switch to the first imported Space and report what happened.
  *
@@ -10,7 +10,7 @@
  *
  * Data flow:
  *   menu → importFromArc() → importArcSidebar() → importArcArchive() → attachArcFavicons() → applyChange()
- *   → readArcHistory() → importHistoryEntries() → summary dialog
+ *   → readArcHistory() → importHistoryEntries() → importArcExtensions() → summary dialog
  */
 import { app, dialog } from "electron";
 import * as fs from "node:fs";
@@ -22,6 +22,8 @@ import { readArcHistory } from "./arcHistoryImport";
 import { importArcSidebar } from "./arcImport";
 import type { ArcImportReport } from "./arcImport";
 import { applyChange, getState, getWindow } from "./browserCore";
+import { importArcExtensions } from "./extensionsController";
+import type { ArcExtensionsImportReport } from "./extensionsController";
 import { importHistoryEntries } from "./historyStore";
 import { removeEmptySpaces, switchSpace } from "./spaces";
 
@@ -65,7 +67,12 @@ async function chooseSidebarFile(): Promise<string | null> {
 /**
  * Builds the summary shown after an import.
  */
-function describeReport(report: ArcImportReport, archiveReport: ArcArchiveImportReport | undefined, historyPagesImported: number): string {
+function describeReport(
+  report: ArcImportReport,
+  archiveReport: ArcArchiveImportReport | undefined,
+  historyPagesImported: number,
+  extensionsReport: ArcExtensionsImportReport,
+): string {
   const skippedCount = Object.values(report.skippedByKind).reduce((sum, count) => sum + count, 0);
   const lines = [
     `Spaces: ${report.spacesImported} (already imported before: ${report.spacesAlreadyImported})`,
@@ -85,6 +92,9 @@ function describeReport(report: ArcImportReport, archiveReport: ArcArchiveImport
     lines.push(`Archived tabs: ${archiveReport.archivedImported}`);
   }
   lines.push(`History: ${historyPagesImported} pages`);
+  const turnedOff = extensionsReport.importedTurnedOff > 0 ? ` (${extensionsReport.importedTurnedOff} off, as they were in Arc)` : "";
+  const alreadyAdded = extensionsReport.alreadyAdded > 0 ? `, already added before: ${extensionsReport.alreadyAdded}` : "";
+  lines.push(`Extensions: ${extensionsReport.imported}${turnedOff}${alreadyAdded}`);
   return lines.join("\n");
 }
 
@@ -153,10 +163,12 @@ export async function importFromArc(): Promise<void> {
   });
 
   const historyPagesImported = importHistoryEntries(await readArcHistory(ARC_FOLDER));
+  // After the sidebar, which creates the profiles the extensions belong to.
+  const extensionsReport = importArcExtensions(ARC_FOLDER);
 
   await dialog.showMessageBox(window, {
     type: "info",
     message: result.report.spacesImported > 0 ? "Imported your Arc sidebar" : "Nothing new to import",
-    detail: describeReport(result.report, archiveReports[0], historyPagesImported),
+    detail: describeReport(result.report, archiveReports[0], historyPagesImported, extensionsReport),
   });
 }

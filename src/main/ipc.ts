@@ -146,6 +146,16 @@ function isMenuRequest(value: unknown): boolean {
   return value.menu === "plus" || value.menu === "sidebar" || value.menu === "split";
 }
 
+/**
+ * True for a rectangle in window coordinates (where a toolbar button sits).
+ */
+function isAnchor(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return isWholeNumber(value.x) && isWholeNumber(value.y) && isWholeNumber(value.width) && isWholeNumber(value.height);
+}
+
 /** The fields each action type must carry, and how to check them. */
 const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> = {
   openTab: { typedText: isText },
@@ -198,6 +208,11 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   openSiteControls: {},
   openThemeEditor: { spaceId: isText },
   showMenu: { request: isMenuRequest },
+  setExtensionEnabled: { profileId: isText, extensionId: isText, isEnabled: isBoolean },
+  removeExtension: { profileId: isText, extensionId: isText },
+  loadUnpackedExtension: {},
+  importFromArc: {},
+  showExtensionsMenu: { anchor: isAnchor },
 };
 
 /**

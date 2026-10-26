@@ -1,13 +1,15 @@
 /**
  * WHY this file exists:
  *   The row above the page, like the user's Arc with "Show toolbar" on: back, forward, reload, the page's address
- *   (click it to edit, like ⌘L), site controls and split view. It redraws from the state and the runtime facts.
+ *   (click it to edit, like ⌘L), extensions, site controls and split view. It redraws from the state and the runtime
+ *   facts.
  *
  * Data source:
  *   The selected tab (BrowserState) and its runtime facts (can go back/forward, loading).
  *
  * Data flow:
- *   sidebar.ts renderAll() → renderToolbar() → buttons → dispatch(navigate / openCommandBar / openSiteControls / showMenu)
+ *   sidebar.ts renderAll() → renderToolbar() → buttons → dispatch(navigate / openCommandBar / showExtensionsMenu /
+ *   openSiteControls / showMenu)
  */
 import type { BrowserState, ItemId, RuntimeState } from "../shared/types";
 import { createElement, createIconButton, dispatch, getDisplayHost } from "./dom.js";
@@ -34,6 +36,26 @@ function createAddressPill(url: string | null): HTMLElement {
     dispatch({ type: "openCommandBar", mode: mode });
   });
   return pill;
+}
+
+/**
+ * True when the active Space's profile has an extension turned on (the toolbar then shows the extensions button).
+ */
+function hasActiveExtensions(state: BrowserState): boolean {
+  const activeSpace = state.spaces.find((space) => space.id === state.activeSpaceId);
+  return (state.extensions ?? []).some((extension) => extension.profileId === activeSpace?.profileId && extension.isEnabled);
+}
+
+/**
+ * Builds the extensions button. The menu and an extension's popup open below it, so it sends where it sits.
+ */
+function createExtensionsButton(): HTMLButtonElement {
+  const button = createIconButton("puzzle", "Extensions", "toolbar-button", () => {
+    const box = button.getBoundingClientRect();
+    const anchor = { x: Math.round(box.left), y: Math.round(box.top), width: Math.round(box.width), height: Math.round(box.height) };
+    dispatch({ type: "showExtensionsMenu", anchor: anchor });
+  });
+  return button;
 }
 
 /**
@@ -75,6 +97,9 @@ export function renderToolbar(state: BrowserState, runtime: RuntimeState, select
   siteButton.disabled = selectedTab === null;
   const splitButton = createIconButton("split", "Split view", "toolbar-button", () => dispatch({ type: "showMenu", request: { menu: "split" } }));
   splitButton.disabled = selectedTab === null;
+  if (hasActiveExtensions(state)) {
+    rightGroup.append(createExtensionsButton());
+  }
   rightGroup.append(siteButton, splitButton);
 
   toolbar.replaceChildren(leftGroup, centerGroup, rightGroup);

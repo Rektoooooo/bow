@@ -23,6 +23,17 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 - `webContents.removeInsertedCSS()` does not remove CSS inserted with `{ cssOrigin: "user" }` (Electron 44). Insert
   Boost CSS with the default author origin, and serialize insert/remove per page.
 
+- `addAfterSyncHook` hooks run only when the set of *shown page views* changes, not on every state change. Anything
+  that must follow the state (extensions turning on/off) listens with `onStateChanged` in `browserCore.ts`.
+- An e2e check that passes without the fix it is meant to cover proves nothing: run it against the old code first.
+  Playwright's separate `fill` and `press` calls are slower than our IPC, so "fast typing" races need same-tick
+  events, and a stale result only matters if its id also exists in the new results.
+
+## Dependencies
+- Check a package's license **per version** and diff a just-published release against the previous one before
+  adding it (electron-chrome-extensions 4.9 was GPL with a runtime license check; 4.10, one day old, is MIT and only
+  removed that check). Pin exact versions.
+
 ## This Mac
 - Two macOS accounts; facts differ per account (Homebrew owner, Node location, gh accounts). Check `whoami` and the
   "This Mac" section of `CLAUDE.md` before installing anything.

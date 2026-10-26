@@ -63,6 +63,11 @@ and every Arc behavior we can observe is written down before Arc shuts down.
 - [x] Profiles UI (Space menu › Profile), private windows (⇧⌘N), resizable sidebar, unread dot, window bounds remembered
 
 - [x] Air Traffic Control (route links from other apps to a Space), theme editor, Boosts (CSS + Zap)
+- [x] Link status bubble, crashed-tab page, loading glow
+- [x] Packaged app (`npm run package`), own icon, Set as Default Browser, links that launch the app
+- [x] Chrome extensions: load unpacked, import the user's Arc extensions per profile (keep Arc's on/off),
+      Library › Extensions (on/off, remove), toolbar extensions menu with action popups
+- [ ] Command Bar: Tab to search a site (YouTube, Wikipedia, GitHub, …)
 
 ### 2.7 Wrap-up
 - [ ] Unit tests for every pure module; e2e rewritten for the new UI; permission check still passing
@@ -70,4 +75,4 @@ and every Arc behavior we can observe is written down before Arc shuts down.
 
 ## Later
 - [ ] Ghidra pass when RAM allows (Command Bar ranking, Peek triggers, sync merge, Easel captures)
-- [ ] Boosts, Easels, Air Traffic Control, multiple windows, incognito
+- [ ] Easels, Notes, multiple main windows, tab hover previews, built-in ad blocking

@@ -67,6 +67,16 @@ export function addAfterSyncHook(hook: () => void): void {
   afterSyncHooks.push(hook);
 }
 
+/** Functions to run after every state change, once the views match the new state. */
+const stateChangeListeners: ((state: BrowserState) => void)[] = [];
+
+/**
+ * Registers a function to run after every state change (extensionHost.ts loads and unloads extensions this way).
+ */
+export function onStateChanged(listener: (state: BrowserState) => void): void {
+  stateChangeListeners.push(listener);
+}
+
 /**
  * Loads the saved state (or a fresh one). Runs once, before anything else reads the state.
  */
@@ -178,6 +188,9 @@ export function applyChange(change: (state: BrowserState) => BrowserState): void
   rememberSelectedTab();
   saveState(stateFilePath, currentState);
   syncViews();
+  for (const listener of stateChangeListeners) {
+    listener(currentState);
+  }
   pushStateToSidebar();
   scheduleRuntimePush();
 }

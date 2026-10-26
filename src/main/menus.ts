@@ -12,7 +12,7 @@
  *   page right-click → tabViews.ts onContextMenu → showPageContextMenu() → Menu.popup
  */
 import { app, clipboard, dialog, Menu } from "electron";
-import type { BrowserWindow, ContextMenuParams, MenuItemConstructorOptions, WebContents } from "electron";
+import type { BrowserWindow, ContextMenuParams, MenuItem, MenuItemConstructorOptions, WebContents } from "electron";
 import type { BrowserAction, MenuRequest, SidebarCommand } from "../shared/actions";
 import type { BrowserState, ItemId, Space, TabItem } from "../shared/types";
 import { getSelectedTabId, listVisibleTabIds } from "./state";
@@ -39,7 +39,7 @@ const SEARCH_LABEL_MAX_LENGTH = 30;
 /**
  * Shows a menu at the mouse position in the main window.
  */
-function popUp(host: MenuHost, template: MenuItemConstructorOptions[]): void {
+function popUp(host: MenuHost, template: (MenuItemConstructorOptions | MenuItem)[]): void {
   const window = host.getWindow();
   if (window === null || template.length === 0) {
     return;
@@ -401,14 +401,17 @@ function buildTextItems(host: MenuHost, params: ContextMenuParams): MenuItemCons
 }
 
 /**
- * Shows the right-click menu inside a web page: link, image and text commands, then navigation and Inspect.
+ * Shows the right-click menu inside a web page: link, image and text commands, the page's extension items
+ * (chrome.contextMenus), then navigation and Inspect.
  */
-export function showPageContextMenu(host: MenuHost, contents: WebContents, params: ContextMenuParams): void {
+export function showPageContextMenu(host: MenuHost, contents: WebContents, params: ContextMenuParams, extensionItems: MenuItem[] = []): void {
   const history = contents.navigationHistory;
-  const template: MenuItemConstructorOptions[] = [
+  const extensionPart: (MenuItemConstructorOptions | MenuItem)[] = extensionItems.length === 0 ? [] : [...extensionItems, { type: "separator" }];
+  const template: (MenuItemConstructorOptions | MenuItem)[] = [
     ...buildLinkItems(host, params),
     ...buildImageItems(host, contents, params),
     ...buildTextItems(host, params),
+    ...extensionPart,
     { label: "Back", enabled: history.canGoBack(), click: () => history.goBack() },
     { label: "Forward", enabled: history.canGoForward(), click: () => history.goForward() },
     { label: "Reload", click: () => contents.reload() },

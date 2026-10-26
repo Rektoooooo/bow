@@ -17,6 +17,10 @@ import { dismissMedia, toggleMediaPlayback } from "./media";
 import { addRoutingRule, removeRoutingRule } from "./routing";
 import { deleteBoost, setBoostCss, setBoostEnabled } from "./boosts";
 import { reapplyBoostsToAllPages } from "./boostPages";
+import { importFromArc } from "./arcImportController";
+import { showExtensionsMenu } from "./extensionHost";
+import { removeExtension, setExtensionEnabled } from "./extensionList";
+import { loadUnpackedExtension } from "./extensionsController";
 import { showMenuRequest } from "./menus";
 import type { MenuHost } from "./menus";
 import { openBoostEditor, openCommandBar, openLibrary, openSiteControls, openThemeEditor } from "./overlayController";
@@ -216,5 +220,17 @@ export function runAction(action: BrowserAction): void {
       return openThemeEditor(action.spaceId);
     case "showMenu":
       return showMenuRequest(menuHost, action.request);
+    case "setExtensionEnabled":
+      return applyChange((state) => setExtensionEnabled(state, action.profileId, action.extensionId, action.isEnabled));
+    case "removeExtension":
+      return applyChange((state) => removeExtension(state, action.profileId, action.extensionId));
+    case "loadUnpackedExtension":
+      loadUnpackedExtension().catch((error) => console.error("Load Unpacked failed:", error));
+      return;
+    case "importFromArc":
+      importFromArc().catch((error) => console.error("Import from Arc failed:", error));
+      return;
+    case "showExtensionsMenu":
+      return showExtensionsMenu(action.anchor);
   }
 }

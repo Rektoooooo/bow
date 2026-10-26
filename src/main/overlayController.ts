@@ -24,6 +24,7 @@ import { rankCommandBarResults } from "./commandBar";
 import type { CommandBarResult } from "./commandBar";
 import type { CommandActionRegistry } from "./commandBarActions";
 import { getDownloads, showDownloadInFolder } from "./downloads";
+import { getExtensionIconUrl, getExtensionLoadError } from "./extensionHost";
 import { searchHistory } from "./history";
 import { clearHistory, getHistory } from "./historyStore";
 import { computeCardBounds } from "./layout";
@@ -133,6 +134,17 @@ function buildLibraryData(state: BrowserState): LibraryData {
     downloads: getDownloads(),
     archiveAfterMs: state.settings.archiveAfterMs,
     routingRules: state.routingRules ?? [],
+    extensions: (state.extensions ?? []).map((extension) => ({
+      id: extension.id,
+      profileId: extension.profileId,
+      profileName: state.profiles.find((profile) => profile.id === extension.profileId)?.name ?? "",
+      name: extension.name,
+      version: extension.version,
+      isEnabled: extension.isEnabled,
+      source: extension.source,
+      iconUrl: getExtensionIconUrl(extension),
+      loadError: extension.isEnabled ? getExtensionLoadError(extension.profileId, extension.id) : null,
+    })),
   };
 }
 

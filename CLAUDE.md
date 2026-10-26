@@ -19,7 +19,7 @@ source ~/.nvm/nvm.sh && nvm use   # Arc account only: Node 24 from .nvmrc
 npm install
 npm start            # build + open the browser
 npm test             # Vitest unit tests (pure state rules, ranking, importers)
-npm run e2e          # build + drive the real app: check-app.mjs, check-overlay.mjs, permission-check.mjs
+npm run e2e          # build + drive the real app: check-app, check-overlay, check-extensions, permission-check
 node e2e/window-shot.mjs   # README screenshots from sample data → docs/screenshot-*.png
 npm run package      # release/Sidebar Browser-darwin-arm64/Sidebar Browser.app (ad-hoc signed, git-ignored)
 node e2e/check-package.mjs # checks that packaged app (Info.plist, menu, links from other apps)
@@ -56,7 +56,14 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   Arc's help center, or "our choice").
 - **Channel names** live in `src/shared/ipcChannels.ts` and `src/shared/overlay.ts`. Sandboxed preloads cannot import
   our files, so they repeat the names typed as `typeof …` (the build fails on a mismatch).
-- **Security:** web pages get no preload and stay sandboxed; every profile session refuses website permissions
+- **Extensions.** `extensionList.ts` (pure, `BrowserState.extensions`, per profile) says what should run;
+  `extensionHost.ts` makes each profile session match it on every state change (`onStateChanged`) and loads before
+  the first page at startup. Electron runs content scripts and MV3 service workers; `electron-chrome-extensions`
+  (MIT since 4.10.0, pinned; 4.9 and older are GPL with a license check) adds tabs, popups and context menus. Its
+  `api` is private in the typings; we call `api.browserAction.activateClick` for our own toolbar menu. Test
+  extensions are synthetic (`e2e/fixtures/`), never copied from a real profile.
+- **Security:** web pages stay sandboxed and get no preload, except in a profile that has extensions: there the
+  extension library's preload runs in an isolated world (page scripts see nothing new); every profile session refuses website permissions
   except `fullscreen` and `clipboard-sanitized-write` (`profiles.ts`, installed when the session is created); our
   pages block `will-navigate` and `window.open`. `e2e/permission-check.mjs` proves it. Keep it passing.
 - Build output: `dist/node` (main + preloads, CommonJS) and `dist/web` (sidebar, overlay and Little Window pages,

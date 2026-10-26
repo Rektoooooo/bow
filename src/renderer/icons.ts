@@ -44,6 +44,7 @@ const ICON_PATHS = {
   expand: "M9.5 3.5h3v3M6.5 12.5h-3v-3M12.5 3.5 9 7M3.5 12.5 7 9",
   play: "M5.5 3.8v8.4L12 8z",
   pause: "M5.5 4v8M10.5 4v8",
+  puzzle: "M3.5 5.5h2.5a1.5 1.5 0 1 1 3 0h2.5v2.5a1.5 1.5 0 1 1 0 3v2.5h-8z",
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;
