@@ -40,6 +40,10 @@ const CHANNELS: typeof OVERLAY_CHANNELS = {
   activateExtension: "overlay:activate-extension",
   showSiteMenu: "overlay:show-site-menu",
   closing: "overlay:closing",
+  switcherStep: "overlay:switcher-step",
+  switcherCommit: "overlay:switcher-commit",
+  chooseTab: "overlay:choose-tab",
+  mediaCommand: "overlay:media-command",
 };
 
 const DISPATCH_CHANNEL: (typeof IPC_CHANNELS)["dispatch"] = "browser:dispatch";
@@ -65,6 +69,14 @@ function createOverlayApi(): OverlayApi {
     onClosing: (listener) => {
       ipcRenderer.on(CHANNELS.closing, () => listener());
     },
+    onSwitcherStep: (listener) => {
+      ipcRenderer.on(CHANNELS.switcherStep, (_event: IpcRendererEvent, step: number) => listener(step));
+    },
+    onSwitcherCommit: (listener) => {
+      ipcRenderer.on(CHANNELS.switcherCommit, () => listener());
+    },
+    chooseTab: (tabId) => ipcRenderer.invoke(CHANNELS.chooseTab, tabId),
+    mediaCommand: (mediaId, command) => ipcRenderer.invoke(CHANNELS.mediaCommand, mediaId, command),
     query: (text, mode) => ipcRenderer.invoke(CHANNELS.query, text, mode),
     choose: (resultId, typedText, mode) => ipcRenderer.invoke(CHANNELS.choose, resultId, typedText, mode),
     close: () => ipcRenderer.invoke(CHANNELS.close),

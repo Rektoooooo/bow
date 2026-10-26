@@ -397,9 +397,13 @@ check("hovering a link shows where it goes, and leaving hides it", bubbleText?.s
 await app.evaluate(({ webContents }) => {
   webContents.getAllWebContents().find((contents) => contents.getURL().includes("example.com/boost")).forcefullyCrashRenderer();
 });
-await sidebar.waitForTimeout(2500);
+// The crash page can take a few seconds to appear when the machine is busy.
+let crashPage;
+for (let attempt = 0; attempt < 30 && crashPage === undefined; attempt++) {
+  await sidebar.waitForTimeout(200);
+  crashPage = app.windows().find((page) => page.url().includes("/crash/crash.html"));
+}
 state = await getState();
-const crashPage = app.windows().find((page) => page.url().includes("/crash/crash.html"));
 check("a crashed page shows the crash page, and the tab keeps its address", crashPage !== undefined && selectedTab(state)?.url.startsWith("https://example.com/boost"), `${crashPage?.url().slice(-60)} tab=${selectedTab(state)?.url}`);
 // Playwright still sees the crashed page object, so the link is clicked from the main process instead.
 await app.evaluate(({ webContents }) => {
@@ -497,14 +501,37 @@ await overlay.mouse.move(pageFrame.x + 40, pageFrame.y + 40);
 await overlay.mouse.down();
 await overlay.mouse.move(pageFrame.x + 140, pageFrame.y + 90, { steps: 5 });
 await overlay.mouse.up();
+// Like Arc, pictures land in the Library (Media), kept in the app's data folder.
+const capturesDir = path.join(userDataDir, "Captures");
 let capturedFiles = [];
 for (let attempt = 0; attempt < 25 && capturedFiles.length === 0; attempt += 1) {
   await sidebar.waitForTimeout(200);
-  capturedFiles = fs.readdirSync(captureDir).filter((name) => name.endsWith(".png"));
+  capturedFiles = fs.existsSync(capturesDir) ? fs.readdirSync(capturesDir).filter((name) => name.endsWith(".png")) : [];
 }
-const capturedSize = await app.evaluate(({ nativeImage }, filePath) => (filePath === null ? null : nativeImage.createFromPath(filePath).getSize()), capturedFiles.length === 1 ? path.join(captureDir, capturedFiles[0]) : null);
-check("Capture saves exactly the dragged part of the page", capturedSize?.width === 100 && capturedSize?.height === 50, `${capturedFiles.join(",")} ${JSON.stringify(capturedSize)}`);
+const capturedSize = await app.evaluate(({ nativeImage }, filePath) => (filePath === null ? null : nativeImage.createFromPath(filePath).getSize()), capturedFiles.length === 1 ? path.join(capturesDir, capturedFiles[0]) : null);
+check("Capture keeps exactly the dragged part of the page", capturedSize?.width === 100 && capturedSize?.height === 50, `${capturedFiles.join(",")} ${JSON.stringify(capturedSize)}`);
 check("and closes the capture layer", !(await overlayIsShown()));
+await dispatch({ type: "openLibrary" });
+await overlay.waitForSelector(".library-tab[data-section='media']", { timeout: 5000 });
+await overlay.click(".library-tab[data-section='media']");
+await overlay.waitForTimeout(300);
+const mediaTiles = await overlay.$$eval(".media-tile img", (images) => images.length);
+check("the capture shows in Library › Media with its thumbnail", mediaTiles === 1, String(mediaTiles));
+await overlay.click(".library-tab[data-section='spaces']");
+await overlay.waitForTimeout(200);
+const spaceLines = await overlay.$$eval(".space-line", (lines) => lines.length);
+check("Library › Spaces lists every Space", spaceLines === (await getState()).spaces.length, String(spaceLines));
+await overlay.click(".library-tab[data-section='boosts']");
+await overlay.waitForTimeout(200);
+const boostTitles = await overlay.$$eval(".library-line .library-line-title", (titles) => titles.map((title) => title.textContent));
+check("Library › Boosts lists the sites with a Boost", boostTitles.includes("example.com"), boostTitles.join(","));
+await overlay.click(".library-tab[data-section='settings']");
+await overlay.waitForTimeout(200);
+await overlay.click(".library-setting-row:has-text('Sound effects') .library-chip");
+await sidebar.waitForTimeout(300);
+check("Library › Settings turns sound effects off", (await getState()).settings.areSoundEffectsOn === false);
+await overlay.press("body", "Escape");
+await sidebar.waitForTimeout(300);
 await app.evaluate(({ clipboard }, text) => clipboard.writeText(text), clipboardTextBefore);
 
 // Developer Mode, Arc's per-site switch in the Control Center: the toolbar turns into the striped developer bar with
@@ -561,6 +588,54 @@ await app.evaluate(({ webContents }) => webContents.getAllWebContents().find((co
 await dispatch({ type: "setDeveloperMode", site: "example.com", isOn: false });
 await sidebar.waitForTimeout(400);
 check("and switching it off brings the normal toolbar back", (await sidebar.$(".toolbar.is-developer")) === null && (await sidebar.$(".tab-row.is-developer")) === null);
+
+// The recent-tab switcher (⌃Tab, Arc's): cards of the recently used tabs with pictures of their pages; letting go of
+// ⌃ switches to the highlighted one, which starts on the previously used tab.
+const findMenuItemByLabel = (label) =>
+  app.evaluate(({ Menu }, wanted) => {
+    const search = (items) => {
+      for (const item of items) {
+        if (item.label === wanted) return item;
+        const inside = item.submenu ? search(item.submenu.items) : null;
+        if (inside) return inside;
+      }
+      return null;
+    };
+    const item = search(Menu.getApplicationMenu().items);
+    item?.click();
+    return item !== null;
+  }, label);
+state = await getState();
+const tabBeforeSwitch = selectedTab(state)?.id;
+await commandBar("newTab", "example.com/switcher");
+await waitForSelectedUrl("example.com/switcher");
+await sidebar.waitForTimeout(1500);
+await findMenuItemByLabel("Recent Tab");
+await overlay.waitForSelector(".switcher:not([hidden]) .switcher-card", { timeout: 5000 }).catch(() => undefined);
+const switcherCards = await overlay.$$eval(".switcher-card", (cards) => cards.map((card) => ({ highlighted: card.classList.contains("is-highlighted"), picture: card.querySelector("img") !== null })));
+check("⌃Tab shows the recent tabs, starting on the previous one, with pictures", switcherCards.length >= 2 && switcherCards[1]?.highlighted === true && switcherCards[0]?.picture === true, JSON.stringify(switcherCards.slice(0, 3)));
+await overlay.keyboard.down("Control");
+await overlay.keyboard.up("Control");
+await sidebar.waitForTimeout(600);
+state = await getState();
+check("letting go of ⌃ switches to the highlighted tab", selectedTab(state)?.id === tabBeforeSwitch && !(await overlayIsShown()), `${selectedTab(state)?.url}`);
+
+// Inline completion, like Arc's: typing the start of a known address finishes it in the input, the added part
+// selected, so Return goes there and typing on replaces it.
+await dispatch({ type: "openCommandBar", mode: "newTab" });
+await overlay.waitForSelector(".command-input", { timeout: 5000 });
+await overlay.locator(".command-input").pressSequentially("exam", { delay: 40 });
+await overlay.waitForTimeout(600);
+const completion = await overlay.evaluate(() => {
+  const input = document.querySelector(".command-input");
+  return { value: input.value, start: input.selectionStart, end: input.selectionEnd };
+});
+check("typing finishes a known address inline, the added part selected", completion.value === "example.com" && completion.start === 4 && completion.end === 11, JSON.stringify(completion));
+await overlay.press(".command-input", "Backspace");
+await overlay.waitForTimeout(400);
+const afterBackspace = await overlay.inputValue(".command-input");
+check("deleting removes the completion instead of completing again", afterBackspace === "exam", afterBackspace);
+await overlay.press(".command-input", "Escape");
 
 await app.close();
 const failed = results.filter((result) => !result.ok).length;

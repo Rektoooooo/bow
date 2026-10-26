@@ -134,6 +134,8 @@ export interface BrowserSettings {
   isSidebarVisible: boolean;
   /** The sidebar's width in pixels, set by dragging its edge. Optional: missing means SIDEBAR_WIDTH_PX. */
   sidebarWidth?: number;
+  /** Short sounds on some actions (renderer/sounds.ts). Optional: missing means on, like Arc. */
+  areSoundEffectsOn?: boolean;
 }
 
 /** How a link-routing rule compares an address. */

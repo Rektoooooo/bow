@@ -19,7 +19,21 @@ export type CommandBarResultKind = "navigate" | "search" | "tab" | "history" | "
 
 export type CommandBarMode = "newTab" | "editUrl" | "splitWith";
 
-export type LibrarySection = "archive" | "history" | "downloads" | "extensions" | "settings";
+export type LibrarySection = "archive" | "history" | "media" | "downloads" | "spaces" | "boosts" | "extensions" | "settings";
+
+/** A screenshot or capture kept in the Library (captures.ts). */
+export interface MediaLine {
+  id: string;
+  title: string;
+  url: string;
+  createdAt: number;
+  width: number;
+  height: number;
+  thumbnailUrl: string | null;
+}
+
+/** What the Library's Media buttons do with a picture. */
+export type MediaCommand = "copy" | "reveal" | "save" | "delete";
 
 /** Which panel the overlay shows. */
 export type OverlayPanel =
@@ -31,7 +45,18 @@ export type OverlayPanel =
   | { kind: "theme"; spaceId: string; spaceName: string; spaceIcon: string; theme: SpaceTheme; sidebarWidth: number; presets: { label: string; colors: string[]; appearance: ThemeAppearance }[] }
   | { kind: "peek"; frame: { x: number; y: number; width: number; height: number }; url: string; title: string }
   | { kind: "permission"; requestId: string; host: string; kinds: SitePermissionKind[]; appName: string | null }
-  | { kind: "capture"; frame: { x: number; y: number; width: number; height: number } };
+  | { kind: "capture"; frame: { x: number; y: number; width: number; height: number } }
+  | { kind: "switcher"; tabs: SwitcherTab[]; index: number };
+
+/** One card of the recent-tab switcher (⌃Tab): most recently used first, the selected tab at index 0. */
+export interface SwitcherTab {
+  tabId: string;
+  title: string;
+  url: string;
+  faviconUrl: string | null;
+  /** A small picture of the page from while it was showing (tabSnapshots.ts), or null. */
+  snapshotUrl: string | null;
+}
 
 /** A rectangle in the overlay page, which covers the window (so also in window coordinates). */
 export interface OverlayRect {
@@ -89,12 +114,36 @@ export interface ExtensionLine {
   loadError: string | null;
 }
 
+/** A Space as the Library lists it. */
+export interface LibrarySpace {
+  id: string;
+  name: string;
+  icon: string;
+  /** The theme's first color, for a swatch. */
+  color: string | null;
+  pinnedCount: number;
+  todayCount: number;
+  profileName: string;
+  isActive: boolean;
+}
+
+/** A Boost as the Library lists it. */
+export interface LibraryBoost {
+  site: string;
+  isEnabled: boolean;
+  zapCount: number;
+  hasCss: boolean;
+}
+
 export interface LibraryData {
   archive: ArchivedTab[];
-  spaces: { id: string; name: string; icon: string }[];
+  spaces: LibrarySpace[];
+  boosts: LibraryBoost[];
   history: HistoryLine[];
   downloads: DownloadRecord[];
+  media: MediaLine[];
   archiveAfterMs: number | null;
+  areSoundEffectsOn: boolean;
   routingRules: RoutingRule[];
   extensions: ExtensionLine[];
 }
@@ -160,6 +209,11 @@ export interface OverlayApi {
   onFindProgress(listener: (progress: FindProgress) => void): void;
   /** The panel is closing: play the closing animation and clear the page (the view goes away right after). */
   onClosing(listener: () => void): void;
+  /** The switcher: ⌃Tab pressed again (+1) or ⌃⇧Tab (−1), and ⌃ let go while the page still had the keyboard. */
+  onSwitcherStep(listener: (step: number) => void): void;
+  onSwitcherCommit(listener: () => void): void;
+  /** The switcher picked a tab. */
+  chooseTab(tabId: string): Promise<void>;
   query(text: string, mode: CommandBarMode): Promise<CommandBarLine[]>;
   choose(resultId: string | null, typedText: string, mode: CommandBarMode): Promise<void>;
   close(): Promise<void>;
@@ -176,6 +230,8 @@ export interface OverlayApi {
   /** The Control Center: open an extension's popup under its tile, or the "…" menu under the button. */
   activateExtension(extensionId: string, anchor: OverlayRect): Promise<void>;
   showSiteMenu(anchor: OverlayRect): Promise<void>;
+  /** Library › Media: copy, show in Finder, save to Downloads or delete a picture. */
+  mediaCommand(mediaId: string, command: MediaCommand): Promise<void>;
   /** The SF Symbols our icons use, rendered by macOS. */
   getSymbols(): Promise<Record<string, SymbolImage>>;
 }
@@ -200,4 +256,8 @@ export const OVERLAY_CHANNELS = {
   activateExtension: "overlay:activate-extension",
   showSiteMenu: "overlay:show-site-menu",
   closing: "overlay:closing",
+  switcherStep: "overlay:switcher-step",
+  switcherCommit: "overlay:switcher-commit",
+  chooseTab: "overlay:choose-tab",
+  mediaCommand: "overlay:media-command",
 } as const;

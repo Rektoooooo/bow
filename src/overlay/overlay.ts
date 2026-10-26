@@ -23,8 +23,11 @@ import { renderPermissionPrompt } from "./permissionPrompt.js";
 import { renderThemeEditor } from "./themeEditor.js";
 import { renderSiteControls } from "./siteControls.js";
 import { renderCapture } from "./capture.js";
+import { handleSwitcherKey, installSwitcherMessages, renderSwitcher } from "./switcher.js";
 import { buildSiteSearchUrl, findSiteSearch } from "../shared/siteSearch.js";
 import type { SiteSearch } from "../shared/siteSearch.js";
+import { findInlineCompletion } from "../shared/inlineCompletion.js";
+import type { CompletionCandidate } from "../shared/inlineCompletion.js";
 
 declare global {
   interface Window {
@@ -77,6 +80,15 @@ let commandInput: HTMLInputElement | null = null;
 
 /** Whether the info button's tips are showing in place of the results. */
 let isShowingTips = false;
+
+/** What the user typed, without the inline completion shown after it. */
+let typedText = "";
+
+/** True after typing a character; deleting turns completion off until the next character, like Chrome and Arc. */
+let isCompletionAllowed = false;
+
+/** Lines whose address can be completed to (searches cannot). */
+const COMPLETABLE_KINDS: CommandBarLine["kind"][] = ["tab", "history", "navigate"];
 
 /** Counts queries, so a slow answer to an old query does not replace a newer one. */
 let queryCounter = 0;
@@ -199,15 +211,15 @@ function createTips(): HTMLElement {
  * Picks a line (or, with no lines, what was typed). In site search mode it opens the site's search for the text.
  */
 function chooseLine(index: number): void {
-  const typedText = commandInput === null ? "" : commandInput.value;
+  const inputText = commandInput === null ? "" : commandInput.value;
   if (siteSearch !== null) {
-    if (typedText.trim() !== "") {
-      window.overlayApi.choose(null, buildSiteSearchUrl(siteSearch, typedText), commandMode);
+    if (inputText.trim() !== "") {
+      window.overlayApi.choose(null, buildSiteSearchUrl(siteSearch, inputText), commandMode);
     }
     return;
   }
   const line = commandLines[index];
-  window.overlayApi.choose(line === undefined ? null : line.id, typedText, commandMode);
+  window.overlayApi.choose(line === undefined ? null : line.id, inputText, commandMode);
 }
 
 /**
@@ -246,6 +258,7 @@ function enterSiteSearch(site: SiteSearch): void {
     siteChip.textContent = site.name;
     siteChip.hidden = false;
   }
+  typedText = "";
   if (commandInput !== null) {
     commandInput.value = "";
     commandInput.placeholder = `Search ${site.name}…`;
@@ -293,6 +306,33 @@ async function runQuery(text: string): Promise<void> {
   commandLines = lines;
   highlightedIndex = 0;
   drawCommandLines();
+  showInlineCompletion();
+}
+
+/**
+ * Finishes the typed address in the input from the best matching result, the added part selected so typing on
+ * replaces it, and highlights that result so Return opens it.
+ */
+function showInlineCompletion(): void {
+  const input = commandInput;
+  const isCaretAtEnd = input !== null && input.selectionStart === input.value.length;
+  if (input === null || !isCompletionAllowed || siteSearch !== null || input.value !== typedText || !isCaretAtEnd) {
+    return;
+  }
+  const candidates: CompletionCandidate[] = [];
+  for (const line of commandLines) {
+    if (line.url !== null && COMPLETABLE_KINDS.includes(line.kind)) {
+      candidates.push({ lineId: line.id, url: line.url });
+    }
+  }
+  const completion = findInlineCompletion(typedText, candidates);
+  if (completion === null) {
+    return;
+  }
+  input.value = completion.text;
+  input.setSelectionRange(typedText.length, completion.text.length);
+  const lineIndex = commandLines.findIndex((line) => line.id === completion.lineId);
+  highlightLine(lineIndex === -1 ? 0 : lineIndex, false);
 }
 
 /**
@@ -302,7 +342,8 @@ function handleCommandKeys(event: KeyboardEvent): void {
   if (event.key === "Tab") {
     // Keep the focus in the input either way.
     event.preventDefault();
-    const site = siteSearch === null && commandInput !== null ? findSiteSearch(commandInput.value) : null;
+    // The typed text, not an inline completion after it ("youtu", not "youtube.com").
+    const site = siteSearch === null ? findSiteSearch(typedText) : null;
     if (site !== null) {
       enterSiteSearch(site);
     }
@@ -336,6 +377,8 @@ function renderCommandBar(host: HTMLElement, mode: CommandBarMode, initialText: 
   highlightedIndex = 0;
   siteSearch = null;
   isShowingTips = false;
+  typedText = initialText;
+  isCompletionAllowed = false;
 
   const panel = createElement("div", "panel command-bar");
   panel.setAttribute("role", "dialog");
@@ -350,7 +393,11 @@ function renderCommandBar(host: HTMLElement, mode: CommandBarMode, initialText: 
   input.placeholder = PLACEHOLDERS[mode];
   input.value = initialText;
   input.setAttribute("aria-label", PLACEHOLDERS[mode]);
-  input.addEventListener("input", () => handleCommandInput(input.value));
+  input.addEventListener("input", (event) => {
+    isCompletionAllowed = (event as InputEvent).inputType === "insertText";
+    typedText = input.value;
+    handleCommandInput(input.value);
+  });
   input.addEventListener("keydown", handleCommandKeys);
   const chip = createElement("span", "command-site-chip");
   chip.hidden = true;
@@ -426,6 +473,9 @@ function showPanel(message: OverlayShowMessage): void {
   if (message.panel.kind === "capture") {
     renderCapture(host, message.panel);
   }
+  if (message.panel.kind === "switcher") {
+    renderSwitcher(host, message.panel);
+  }
 }
 
 /**
@@ -454,8 +504,9 @@ function startOverlay(): void {
   window.overlayApi.getSymbols().then(installSymbols).catch(() => undefined);
   window.overlayApi.onShow(showPanel);
   window.overlayApi.onClosing(playClosing);
+  installSwitcherMessages();
   window.overlayApi.onResults((query, lines) => {
-    if (commandInput === null || commandInput.value !== query || siteSearch !== null) {
+    if (commandInput === null || typedText !== query || siteSearch !== null) {
       return;
     }
     const highlightedId = commandLines[highlightedIndex]?.id;
@@ -465,7 +516,16 @@ function startOverlay(): void {
     drawCommandLines();
   });
   document.getElementById("backdrop")?.addEventListener("mousedown", () => closeOverlay());
+  document.addEventListener("keyup", (event) => {
+    if (handleSwitcherKey(event)) {
+      event.preventDefault();
+    }
+  });
   document.addEventListener("keydown", (event) => {
+    if (handleSwitcherKey(event)) {
+      event.preventDefault();
+      return;
+    }
     if (event.key === "Escape") {
       event.preventDefault();
       closeOverlay();

@@ -29,6 +29,7 @@ import { installSidebarEvents } from "./sidebarEvents.js";
 import { createIcon, installSymbols } from "./icons.js";
 import { applySpaceTheme, onSystemAppearanceChange } from "./theme.js";
 import { createNavigationButtons, renderToolbar } from "./toolbar.js";
+import { playSound } from "./sounds.js";
 import { isDeveloperModeOn } from "../shared/developerMode.js";
 
 /** Horizontal scroll distance (in wheel delta units) that counts as a swipe to the next Space. Our choice. */
@@ -527,17 +528,29 @@ function setUpSidebarPeek(): void {
     cancelHide();
     dispatch({ type: "setSidebarPeek", isPeeking: true });
   });
-  sidebar.addEventListener("mouseenter", cancelHide);
-  sidebar.addEventListener("mouseleave", () => {
-    if (!currentRuntime.isSidebarPeeking) {
+  const scheduleHide = (): void => {
+    if (!currentRuntime.isSidebarPeeking || peekHideTimer !== null) {
       return;
     }
-    cancelHide();
     peekHideTimer = window.setTimeout(() => {
       peekHideTimer = null;
       dispatch({ type: "setSidebarPeek", isPeeking: false });
     }, PEEK_HIDE_DELAY_MS);
+  };
+  // The pointer's place decides, not enter/leave events: the sidebar appears under a pointer that is already there,
+  // and the browser does not report entering it then. Over the sidebar keeps it; anywhere right of it hides it.
+  document.addEventListener("mousemove", (event) => {
+    if (!currentRuntime.isSidebarPeeking) {
+      return;
+    }
+    if (event.clientX <= sidebar.getBoundingClientRect().right) {
+      cancelHide();
+      return;
+    }
+    scheduleHide();
   });
+  // Moving onto the web page leaves this page altogether.
+  document.documentElement.addEventListener("mouseleave", scheduleHide);
 }
 
 /**
@@ -598,6 +611,12 @@ function setUpSidebarResizer(): void {
  * Handles requests from the main process that only this page can carry out (inline editing).
  */
 function handleSidebarCommand(command: SidebarCommand): void {
+  if (command.kind === "playSound") {
+    if (currentState?.settings.areSoundEffectsOn !== false) {
+      playSound(command.sound);
+    }
+    return;
+  }
   if (command.kind === "beginRename") {
     renamingItemId = command.itemId;
   }
@@ -611,12 +630,50 @@ function handleSidebarCommand(command: SidebarCommand): void {
 }
 
 /**
+ * Counts the split views in a state.
+ */
+function countSplits(state: BrowserState): number {
+  return Object.values(state.items).filter((item) => item.kind === "split").length;
+}
+
+/**
+ * Plays Arc-like sounds for what just changed: a Space switch, Today cleared, a tab closed (archived by hand), a new
+ * split view. Off when the user turned sound effects off.
+ */
+function playSoundForChange(previous: BrowserState, next: BrowserState): void {
+  if (next.settings.areSoundEffectsOn === false) {
+    return;
+  }
+  if (previous.activeSpaceId !== next.activeSpaceId) {
+    playSound("switchSpace");
+    return;
+  }
+  const newestArchived = next.archive[0];
+  const isArchiveGrown = next.archive.length > previous.archive.length && newestArchived !== previous.archive[0];
+  if (isArchiveGrown && newestArchived?.reason === "clear-button") {
+    playSound("clearToday");
+    return;
+  }
+  if (isArchiveGrown && newestArchived?.reason === "manual") {
+    playSound("closeTab");
+    return;
+  }
+  if (countSplits(next) > countSplits(previous)) {
+    playSound("split");
+  }
+}
+
+/**
  * Entry point: subscribes to state and runtime pushes, wires page-wide events, and draws the first state.
  */
 async function startSidebar(): Promise<void> {
   window.browserApi.onStateChanged((state) => {
+    const previousState = currentState;
     currentState = state;
     renderAll();
+    if (previousState !== null) {
+      playSoundForChange(previousState, state);
+    }
   });
   window.browserApi.onRuntimeChanged((runtime) => {
     currentRuntime = runtime;

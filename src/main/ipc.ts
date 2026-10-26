@@ -65,6 +65,13 @@ function isDeveloperTool(value: unknown): boolean {
   return value === "console" || value === "network" || value === "inspect";
 }
 
+/** An import source id from browserImportController.ts: "safari" or "chromium:<browser>:<profile folder>". */
+const IMPORT_SOURCE_PATTERN = /^(safari|chromium:[a-z]+:(Default|Profile \d+))$/;
+
+function isImportSource(value: unknown): boolean {
+  return typeof value === "string" && IMPORT_SOURCE_PATTERN.test(value);
+}
+
 function isToolbarSiteCommand(value: unknown): boolean {
   return value === "copyLink" || value === "capture" || value === "screenshot";
 }
@@ -74,6 +81,10 @@ const SITE_PATTERN = /^[a-z0-9.-]{1,253}$/;
 
 function isSite(value: unknown): boolean {
   return typeof value === "string" && SITE_PATTERN.test(value);
+}
+
+function isOptionalSite(value: unknown): boolean {
+  return value === undefined || isSite(value);
 }
 
 /** Boost CSS may be longer than other text; boosts.ts refuses anything above its own limit too. */
@@ -152,7 +163,7 @@ function isMenuRequest(value: unknown): boolean {
   if (value.menu === "space") {
     return isText(value.spaceId);
   }
-  return value.menu === "plus" || value.menu === "sidebar" || value.menu === "split" || value.menu === "reload";
+  return value.menu === "plus" || value.menu === "sidebar" || value.menu === "split" || value.menu === "reload" || value.menu === "import";
 }
 
 /**
@@ -220,7 +231,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   setBoostCss: { site: isSite, css: isBoostCss },
   setBoostEnabled: { site: isSite, isEnabled: isBoolean },
   deleteBoost: { site: isSite },
-  openBoostEditor: {},
+  openBoostEditor: { site: isOptionalSite },
   toggleMediaPlayback: {},
   dismissMedia: {},
   navigate: { command: isNavigationCommand },
@@ -241,6 +252,8 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   setDeveloperMode: { site: isSite, isOn: isBoolean },
   openDeveloperTool: { tool: isDeveloperTool },
   runSiteCommand: { command: isToolbarSiteCommand },
+  importFromBrowser: { sourceId: isImportSource },
+  setSoundEffects: { isOn: isBoolean },
 };
 
 /**

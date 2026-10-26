@@ -718,6 +718,16 @@ export function setArchiveAfter(state: BrowserState, archiveAfterMs: number | nu
 }
 
 /**
+ * Turns the sound effects on or off.
+ */
+export function setSoundEffects(state: BrowserState, isOn: boolean): BrowserState {
+  if ((state.settings.areSoundEffectsOn ?? true) === isOn) {
+    return state;
+  }
+  return { ...state, settings: { ...state.settings, areSoundEffectsOn: isOn } };
+}
+
+/**
  * Sets the sidebar's width, kept between SIDEBAR_MIN_WIDTH_PX and SIDEBAR_MAX_WIDTH_PX.
  */
 export function setSidebarWidth(state: BrowserState, width: number): BrowserState {

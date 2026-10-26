@@ -255,6 +255,47 @@ await windowShot(app, "04-work-space");
 await page.click(".space-button:nth-child(1)");
 await page.waitForTimeout(400);
 
+// Import From Browser: a made-up Chrome profile in a throwaway home folder. Its bookmarks arrive as one folder at
+// the end of Pinned, keeping their folders; non-web addresses are left out. The summary dialog is answered here.
+const fakeHome = path.join(outDir, "fake-home");
+const chromeProfile = path.join(fakeHome, "Library", "Application Support", "Google", "Chrome", "Default");
+fs.rmSync(fakeHome, { recursive: true, force: true });
+fs.mkdirSync(chromeProfile, { recursive: true });
+const chromeBookmarks = {
+  roots: {
+    bookmark_bar: {
+      type: "folder",
+      name: "Bookmarks bar",
+      children: [
+        { type: "url", name: "Example", url: "https://example.com/" },
+        { type: "folder", name: "Reading", children: [{ type: "url", name: "Wikipedia", url: "https://www.wikipedia.org/" }] },
+        { type: "url", name: "Settings", url: "chrome://settings/" },
+      ],
+    },
+    other: { type: "folder", name: "Other bookmarks", children: [] },
+  },
+};
+fs.writeFileSync(path.join(chromeProfile, "Bookmarks"), JSON.stringify(chromeBookmarks));
+const realHome = await app.evaluate(({ app: electronApp, dialog }, home) => {
+  const previousHome = electronApp.getPath("home");
+  electronApp.setPath("home", home);
+  dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false });
+  return previousHome;
+}, fakeHome);
+await dispatch(page, { type: "importFromBrowser", sourceId: "chromium:chrome:Default" });
+await page.waitForTimeout(800);
+await app.evaluate(({ app: electronApp }, home) => electronApp.setPath("home", home), realHome);
+state = await getState(page);
+const importedFolder = pinnedItems(state).at(-1);
+const importedChildren = importedFolder?.kind === "folder" ? importedFolder.childIds.map((id) => state.items[id]) : [];
+const barFolder = importedChildren[0];
+const barChildren = barFolder?.kind === "folder" ? barFolder.childIds.map((id) => state.items[id]) : [];
+check(
+  "Import From Browser adds Chrome's bookmarks as one folder, keeping its folders and only web addresses",
+  importedFolder?.title === "Google Chrome Bookmarks" && barChildren.map((item) => item.title).join(",") === "Example,Reading",
+  `${importedFolder?.title} › ${barFolder?.title} › ${barChildren.map((item) => item.title).join(",")}`,
+);
+
 // A site without /favicon.ico answers 404; Chromium logs that as a console error, but it is expected, not a bug.
 const realErrors = consoleErrors.filter((message) => !message.startsWith("Failed to load resource"));
 check("no errors in the sidebar console", realErrors.length === 0, realErrors.join(" | "));

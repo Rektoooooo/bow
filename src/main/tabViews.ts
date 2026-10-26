@@ -26,6 +26,7 @@ import { computeCardBounds, computePaneBounds } from "./layout";
 import type { CardLayoutOptions } from "./layout";
 import { getProfileSession } from "./profiles";
 import { getToolbarColor, sampleToolbarColorSoon } from "./toolbarTint";
+import { captureSnapshotSoon, forgetSnapshot } from "./tabSnapshots";
 import { getSelectedTabId } from "./state";
 import { findProfileIdOfItem, findSplitOfTab, findTab } from "./tree";
 import { DEFAULT_PROFILE_ID } from "../shared/settings";
@@ -299,11 +300,25 @@ function watchTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvent
 }
 
 /**
- * Samples a page's toolbar color when it is on screen (pages off screen cannot be captured).
+ * Samples a page's toolbar color and keeps a picture of it when it is on screen (pages off screen cannot be
+ * captured).
  */
 function sampleIfShown(tabId: ItemId, contents: WebContents): void {
   if (shownTabIds.includes(tabId)) {
     sampleToolbarColorSoon(contents);
+    captureSnapshotSoon(tabId, contents);
+  }
+}
+
+/**
+ * Refreshes the pictures of the pages on screen (main.ts calls this every SNAPSHOT_REFRESH_MS).
+ */
+export function refreshShownSnapshots(): void {
+  for (const tabId of shownTabIds) {
+    const contents = tabViews.get(tabId)?.webContents;
+    if (contents !== undefined && !contents.isLoading()) {
+      captureSnapshotSoon(tabId, contents);
+    }
   }
 }
 
@@ -355,6 +370,7 @@ export function destroyTabView(window: BrowserWindow, tabId: ItemId): void {
   window.contentView.removeChildView(view);
   view.webContents.close();
   tabViews.delete(tabId);
+  forgetSnapshot(tabId);
   viewProfileIds.delete(tabId);
   shownTabIds = shownTabIds.filter((shownId) => shownId !== tabId);
   if (focusedTabId === tabId) {
@@ -467,6 +483,7 @@ export function syncTabViews(window: BrowserWindow, state: BrowserState, layoutO
     if (getToolbarColor(view.webContents.getURL()) === null) {
       sampleToolbarColorSoon(view.webContents);
     }
+    captureSnapshotSoon(tabId, view.webContents);
   }
   shownTabIds = visibleTabIds;
   layoutShownTabViews(window, state, layoutOptions);

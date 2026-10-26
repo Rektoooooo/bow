@@ -96,6 +96,15 @@ describe("parseAction", () => {
     expect(parseAction({ type: "showMenu", request: { menu: "reload" } })).not.toBeNull();
   });
 
+  it("checks the import source, the Boost editor's site and the sound switch", () => {
+    expect(parseAction({ type: "importFromBrowser", sourceId: "chromium:chrome:Profile 2" })).not.toBeNull();
+    expect(parseAction({ type: "importFromBrowser", sourceId: "chromium:chrome:../../etc" })).toBeNull();
+    expect(parseAction({ type: "openBoostEditor" })).not.toBeNull();
+    expect(parseAction({ type: "openBoostEditor", site: "example.com" })).not.toBeNull();
+    expect(parseAction({ type: "openBoostEditor", site: "<script>" })).toBeNull();
+    expect(parseAction({ type: "setSoundEffects", isOn: "yes" })).toBeNull();
+  });
+
   it("refuses theme colors that are not plain hex, because they end up in CSS", () => {
     const badTheme = { colors: ["red; background: url(https://evil.example)"], appearance: "auto", grain: 0 };
     const goodTheme = { colors: ["#112233", "#445566"], appearance: "dark", grain: 0.5 };

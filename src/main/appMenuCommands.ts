@@ -12,12 +12,12 @@
 import type { AppMenuCommands } from "./appMenu";
 import { importFromArc } from "./arcImportController";
 import { setAsDefaultBrowser } from "./defaultBrowser";
-import { applyChange, getRecentTabIds, getState } from "./browserCore";
+import { applyChange, getState } from "./browserCore";
 import { openLittleWindow } from "./littleWindow";
-import { findNextMatch, openCommandBar, openFind, openLibrary, runSiteCommand } from "./overlayController";
+import { findNextMatch, openCommandBar, openFind, openLibrary, openTabSwitcher, runSiteCommand } from "./overlayController";
 import { copyTabUrl, toggleDevTools, zoomPage } from "./pageCommands";
 import { closePeek, isPeekOpen, openPeekAsTab } from "./peek";
-import { showMenuRequest } from "./menus";
+import { buildImportMenu, showMenuRequest } from "./menus";
 import { menuHost } from "./actionRunner";
 import {
   clearTodayTabs,
@@ -80,12 +80,7 @@ export const appMenuCommands: AppMenuCommands = {
   },
   cycleTab: (offset) => selectTabIfAny(findNeighbourTabId(getState(), offset)),
   selectTabNumber: (tabNumber) => selectTabIfAny(findTabIdByNumber(getState(), tabNumber)),
-  selectRecentTab: () => {
-    const state = getState();
-    const selectedTabId = getSelectedTabId(state);
-    const previousTabId = getRecentTabIds().find((tabId) => tabId !== selectedTabId && findTab(state, tabId) !== undefined);
-    selectTabIfAny(previousTabId ?? null);
-  },
+  switchRecentTab: (step) => openTabSwitcher(step),
   clearTodayTabs: () => applyChange((state) => clearTodayTabs(state, Date.now())),
   addSplitPane: () => {
     if (getSelectedId() !== null) {
@@ -121,6 +116,7 @@ export const appMenuCommands: AppMenuCommands = {
   findNext: (forward) => findNextMatch(forward),
   openLibrary: () => openLibrary(),
   openLittleWindow: () => openLittleWindow(null),
+  buildImportMenu: () => buildImportMenu(menuHost),
   importFromArc: () => {
     importFromArc().catch((error) => console.error("Import from Arc failed:", error));
   },

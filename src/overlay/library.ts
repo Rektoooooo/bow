@@ -10,7 +10,7 @@
  * Data flow:
  *   "overlay:show" (library) → renderLibrary() → a section → click Restore → dispatch restoreArchivedTab → close
  */
-import type { ExtensionLine, HistoryLine, LibraryData, LibrarySection } from "../shared/overlay";
+import type { ExtensionLine, HistoryLine, LibraryBoost, LibraryData, LibrarySection, LibrarySpace, MediaLine } from "../shared/overlay";
 import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS } from "../shared/settings.js";
 import type { ArchiveReason, ArchivedTab } from "../shared/types";
 import { createElement, createFavicon, createIconButton, createTextButton, dispatch, getDisplayHost } from "../renderer/dom.js";
@@ -26,7 +26,10 @@ const REASON_LABELS: Record<ArchiveReason, string> = {
 const SECTIONS: { id: LibrarySection; label: string }[] = [
   { id: "archive", label: "Archive" },
   { id: "history", label: "History" },
+  { id: "media", label: "Media" },
   { id: "downloads", label: "Downloads" },
+  { id: "spaces", label: "Spaces" },
+  { id: "boosts", label: "Boosts" },
   { id: "extensions", label: "Extensions" },
   { id: "settings", label: "Settings" },
 ];
@@ -287,6 +290,131 @@ function renderDownloadsSection(body: HTMLElement, data: LibraryData): void {
   body.replaceChildren(list);
 }
 
+/**
+ * One picture in Media: its thumbnail, the page it shows and when, and Copy / Show in Finder / Save / Delete on hover.
+ */
+function createMediaTile(media: MediaLine, now: number): HTMLElement {
+  const tile = createElement("div", "media-tile");
+  tile.dataset.mediaId = media.id;
+  const picture = createElement("div", "media-picture");
+  if (media.thumbnailUrl !== null) {
+    const image = document.createElement("img");
+    image.src = media.thumbnailUrl;
+    image.alt = "";
+    picture.append(image);
+  }
+  const actions = createElement("div", "media-actions");
+  actions.append(
+    createIconButton("copy", "Copy", "media-action", () => window.overlayApi.mediaCommand(media.id, "copy")),
+    createIconButton("folder", "Show in Finder", "media-action", () => window.overlayApi.mediaCommand(media.id, "reveal")),
+    createIconButton("download", "Save to Downloads", "media-action", () => window.overlayApi.mediaCommand(media.id, "save")),
+    createIconButton("trash", "Delete", "media-action", () => window.overlayApi.mediaCommand(media.id, "delete")),
+  );
+  picture.append(actions);
+  const caption = createElement("div", "media-caption");
+  caption.append(
+    createElement("span", "library-line-title", media.title === "" ? getDisplayHost(media.url) : media.title),
+    createElement("span", "library-line-meta", `${media.width} × ${media.height} · ${formatTimeAgo(media.createdAt, now)}`),
+  );
+  tile.append(picture, caption);
+  return tile;
+}
+
+/**
+ * Builds the Media section: screenshots and captures, newest first, as a grid (Arc keeps them in its Library).
+ */
+function renderMediaSection(body: HTMLElement, data: LibraryData): void {
+  if (data.media.length === 0) {
+    body.replaceChildren(createElement("p", "library-empty", "Screenshots and captures from the Control Center land here (and on the clipboard)."));
+    return;
+  }
+  const grid = createElement("div", "media-grid");
+  const now = Date.now();
+  grid.append(...data.media.map((media) => createMediaTile(media, now)));
+  body.replaceChildren(grid);
+}
+
+/**
+ * One Space: its color and icon, its name and what it holds, Switch, Edit Theme and the Space's own menu.
+ */
+function createSpaceLine(space: LibrarySpace): HTMLElement {
+  const line = createElement("div", "library-line space-line");
+  line.classList.toggle("is-active", space.isActive);
+  const swatch = createElement("span", "space-swatch", space.icon);
+  if (space.color !== null && /^#[0-9a-fA-F]{6}$/.test(space.color)) {
+    swatch.style.background = space.color;
+  }
+  const text = createElement("span", "library-line-text");
+  text.append(createElement("span", "library-line-title", space.isActive ? `${space.name} · open now` : space.name));
+  const profile = space.profileName === "" ? "" : ` · profile ${space.profileName}`;
+  text.append(createElement("span", "library-line-meta", `${space.pinnedCount} pinned · ${space.todayCount} today${profile}`));
+  const switchButton = createTextButton("Switch", "library-chip", () => {
+    dispatch({ type: "switchSpace", spaceId: space.id });
+    window.overlayApi.close();
+  });
+  switchButton.disabled = space.isActive;
+  const themeButton = createTextButton("Edit Theme…", "library-chip", () => dispatch({ type: "openThemeEditor", spaceId: space.id }));
+  const menuButton = createIconButton("more", "Rename, profile, delete…", "library-line-icon-button", () =>
+    dispatch({ type: "showMenu", request: { menu: "space", spaceId: space.id } }),
+  );
+  line.append(swatch, text, switchButton, themeButton, menuButton);
+  return line;
+}
+
+/**
+ * Builds the Spaces section: every Space with what it holds, like Arc's Library.
+ */
+function renderSpacesSection(body: HTMLElement, data: LibraryData): void {
+  const list = createElement("div", "library-list");
+  list.append(...data.spaces.map((space) => createSpaceLine(space)));
+  body.replaceChildren(list);
+}
+
+/**
+ * Sums up a Boost in a few words, e.g. "2 zapped · CSS".
+ */
+function describeBoost(boost: LibraryBoost): string {
+  const parts: string[] = [];
+  if (boost.zapCount > 0) {
+    parts.push(`${boost.zapCount} zapped`);
+  }
+  if (boost.hasCss) {
+    parts.push("CSS");
+  }
+  return parts.length === 0 ? "No changes yet" : parts.join(" · ");
+}
+
+/**
+ * One Boost: its site and what it changes, On/Off, Edit and Delete.
+ */
+function createBoostLine(boost: LibraryBoost): HTMLElement {
+  const line = createElement("div", "library-line");
+  line.classList.toggle("is-off", !boost.isEnabled);
+  line.append(createFavicon(null, `https://${boost.site}/`));
+  const text = createElement("span", "library-line-text");
+  text.append(createElement("span", "library-line-title", boost.site), createElement("span", "library-line-meta", describeBoost(boost)));
+  const switchButton = createTextButton(boost.isEnabled ? "On" : "Off", boost.isEnabled ? "library-chip is-active" : "library-chip", () =>
+    dispatch({ type: "setBoostEnabled", site: boost.site, isEnabled: !boost.isEnabled }),
+  );
+  const editButton = createTextButton("Edit…", "library-chip", () => dispatch({ type: "openBoostEditor", site: boost.site }));
+  const deleteButton = createIconButton("trash", "Delete Boost", "library-line-icon-button", () => dispatch({ type: "deleteBoost", site: boost.site }));
+  line.append(text, switchButton, editButton, deleteButton);
+  return line;
+}
+
+/**
+ * Builds the Boosts section: every site you changed, like Arc's Library.
+ */
+function renderBoostsSection(body: HTMLElement, data: LibraryData): void {
+  if (data.boosts.length === 0) {
+    body.replaceChildren(createElement("p", "library-empty", "Boosts change how a site looks. Open the Control Center on a site and choose Boost."));
+    return;
+  }
+  const list = createElement("div", "library-list");
+  list.append(...data.boosts.map((boost) => createBoostLine(boost)));
+  body.replaceChildren(list);
+}
+
 /** Where an extension came from, as its line says it. */
 const EXTENSION_ORIGINS: Record<ExtensionLine["source"], string> = {
   arc: "from Arc",
@@ -389,7 +517,18 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
       "Pinned tabs and Favorites never do. Time while the browser is closed does not count. Little Windows archive after 6 hours. " +
       "The Archive keeps your newest 250 tabs, like Arc.",
   );
-  settings.append(row, explanation, renderRoutingSettings(data));
+  const soundRow = createElement("div", "library-setting-row");
+  const areSoundsOn = data.areSoundEffectsOn;
+  soundRow.append(
+    createElement("span", "library-setting-label", "Sound effects"),
+    createTextButton(areSoundsOn ? "On" : "Off", areSoundsOn ? "library-chip is-active" : "library-chip", () => dispatch({ type: "setSoundEffects", isOn: !areSoundsOn })),
+  );
+  const importRow = createElement("div", "library-setting-row");
+  importRow.append(
+    createElement("span", "library-setting-label", "Bookmarks and history from another browser"),
+    createTextButton("Import…", "library-chip", () => dispatch({ type: "showMenu", request: { menu: "import" } })),
+  );
+  settings.append(row, explanation, soundRow, importRow, renderRoutingSettings(data));
   body.replaceChildren(settings);
 }
 
@@ -457,8 +596,17 @@ function renderBody(data: LibraryData): void {
   if (section === "history") {
     renderHistorySection(body, data);
   }
+  if (section === "media") {
+    renderMediaSection(body, data);
+  }
   if (section === "downloads") {
     renderDownloadsSection(body, data);
+  }
+  if (section === "spaces") {
+    renderSpacesSection(body, data);
+  }
+  if (section === "boosts") {
+    renderBoostsSection(body, data);
   }
   if (section === "extensions") {
     renderExtensionsSection(body, data);
@@ -513,7 +661,7 @@ function handleLibraryUpdate(updated: LibraryData): void {
   if (section === "archive") {
     drawArchiveLines(updated);
   }
-  if (section === "downloads" || section === "settings") {
+  if (section === "downloads" || section === "settings" || section === "media" || section === "spaces" || section === "boosts") {
     renderBody(updated);
   }
 }

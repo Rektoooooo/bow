@@ -25,7 +25,8 @@ export interface AppMenuCommands {
   duplicateSelected(): void;
   cycleTab(offset: number): void;
   selectTabNumber(tabNumber: number): void;
-  selectRecentTab(): void;
+  /** ⌃Tab / ⌃⇧Tab: the recent-tab switcher, one step forward or back. */
+  switchRecentTab(step: number): void;
   clearTodayTabs(): void;
   addSplitPane(): void;
   closeSplitPane(): void;
@@ -43,6 +44,8 @@ export interface AppMenuCommands {
   openLibrary(): void;
   openLittleWindow(): void;
   importFromArc(): void;
+  /** The import menu's items (Arc first); the File menu shows the browser part. */
+  buildImportMenu(): MenuItemConstructorOptions[];
   openUrlInNewTab(url: string): void;
   openPeekAsTab(): void;
   openPrivateWindow(): void;
@@ -105,6 +108,7 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
         { label: "Reopen Closed Tab", accelerator: "CommandOrControl+Shift+T", click: () => commands.reopenClosedTab() },
         { type: "separator" },
         { label: "Import from Arc…", click: () => commands.importFromArc() },
+        { label: "Import From Browser", submenu: commands.buildImportMenu().slice(2) },
         { type: "separator" },
         { label: "Print…", accelerator: "CommandOrControl+P", click: () => commands.printPage() },
       ],
@@ -166,7 +170,8 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
         { type: "separator" },
         { label: "Next Tab", accelerator: "CommandOrControl+Alt+Down", click: () => commands.cycleTab(1) },
         { label: "Previous Tab", accelerator: "CommandOrControl+Alt+Up", click: () => commands.cycleTab(-1) },
-        { label: "Recent Tab", accelerator: "Control+Tab", click: () => commands.selectRecentTab() },
+        { label: "Recent Tab", accelerator: "Control+Tab", click: () => commands.switchRecentTab(1) },
+        { label: "Recent Tab, Backwards", accelerator: "Control+Shift+Tab", click: () => commands.switchRecentTab(-1) },
         ...buildNumberedItems("Tab", "CommandOrControl", (number) => commands.selectTabNumber(number)),
         { type: "separator" },
         { label: "Add Split View", accelerator: "Control+Shift+=", click: () => commands.addSplitPane() },

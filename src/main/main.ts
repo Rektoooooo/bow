@@ -57,7 +57,9 @@ import { moveTabsToArchive, updateTabFavicon, updateTabPage } from "./state";
 import { getStateFilePath } from "./store";
 import { loadWindowBounds, rememberWindowBounds } from "./windowState";
 import { openLinkInNewTab } from "./tabActions";
-import { getShownTabIds, getTabViews, layoutShownTabViews } from "./tabViews";
+import { getShownTabIds, getTabViews, layoutShownTabViews, refreshShownSnapshots } from "./tabViews";
+import { SNAPSHOT_REFRESH_MS } from "./tabSnapshots";
+import { loadCaptures } from "./captures";
 import { findRootLocation, findTab } from "./tree";
 import { isSameSite } from "./urls";
 import type { TabViewEvents } from "./tabViews";
@@ -269,6 +271,9 @@ async function handleAppReady(): Promise<void> {
   initializeState(getStateFilePath(), Date.now());
   loadHistory();
   loadToolbarColors(path.join(app.getPath("userData"), TOOLBAR_COLORS_FILE_NAME), scheduleRuntimePush);
+  loadCaptures(app.getPath("userData"));
+  // Pictures of the pages on screen stay fresh for the recent-tab switcher and previews.
+  setInterval(refreshShownSnapshots, SNAPSHOT_REFRESH_MS);
 
   // Our own pages (sidebar, overlay, Little Window bar) use the default session; lock it down like the profiles.
   restrictWebPermissions(session.defaultSession);

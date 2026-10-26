@@ -18,6 +18,7 @@ import { addRoutingRule, removeRoutingRule } from "./routing";
 import { deleteBoost, setBoostCss, setBoostEnabled } from "./boosts";
 import { reapplyBoostsToAllPages } from "./boostPages";
 import { importFromArc } from "./arcImportController";
+import { importFromBrowser } from "./browserImportController";
 import { showExtensionsMenu } from "./extensionHost";
 import { setExtensionEnabled } from "./extensionList";
 import { checkForExtensionUpdatesNow, installFromWebStore, loadUnpackedExtension, removeExtensionAndCopy } from "./extensionsController";
@@ -43,6 +44,7 @@ import {
   restoreArchivedTab,
   selectTab,
   setArchiveAfter,
+  setSoundEffects,
   setPinnedSectionOpen,
   setSidebarVisible,
   setSidebarWidth,
@@ -201,7 +203,7 @@ export function runAction(action: BrowserAction): void {
       applyChange((state) => deleteBoost(state, action.site));
       return reapplyBoostsToAllPages(getState());
     case "openBoostEditor":
-      return openBoostEditor();
+      return openBoostEditor(action.site);
     case "createProfileForSpace":
       return applyChange((state) => {
         const created = createProfile(state, "", now);
@@ -259,5 +261,10 @@ export function runAction(action: BrowserAction): void {
     }
     case "runSiteCommand":
       return runSiteCommand(action.command);
+    case "setSoundEffects":
+      return applyChange((state) => setSoundEffects(state, action.isOn));
+    case "importFromBrowser":
+      importFromBrowser(action.sourceId).catch((error) => console.error("Import from browser failed:", error));
+      return;
   }
 }

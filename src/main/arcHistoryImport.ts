@@ -63,7 +63,7 @@ export function findProfileFolders(arcFolder: string): string[] {
 /**
  * Reads the history of one profile through a copy of its database. Throws when the copy or the query fails.
  */
-async function readProfileHistory(profileFolder: string): Promise<HistoryEntry[]> {
+export async function readProfileHistory(profileFolder: string): Promise<HistoryEntry[]> {
   const temporaryFolder = fs.mkdtempSync(path.join(os.tmpdir(), "arc-history-"));
   try {
     for (const fileName of [HISTORY_FILE_NAME, ...HISTORY_COMPANION_FILE_NAMES]) {

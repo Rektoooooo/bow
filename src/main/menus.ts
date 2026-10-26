@@ -19,6 +19,7 @@ import { getSelectedTabId, listVisibleTabIds } from "./state";
 import { applyPreset, GRAIN_CHOICES, THEME_PRESETS } from "./themePresets";
 import { findLocation, findRootLocation, findSpace, findSplitOfTab, findTab } from "./tree";
 import { SEARCH_URL_PREFIX } from "./urls";
+import { listImportSources } from "./browserImportController";
 
 /** What the menus need from main.ts. */
 export interface MenuHost {
@@ -279,6 +280,20 @@ function buildSpaceMenu(host: MenuHost, space: Space): MenuItemConstructorOption
 }
 
 /**
+ * The Library's "Import…" button: Arc, then every browser profile on this Mac with bookmarks or history.
+ */
+export function buildImportMenu(host: MenuHost): MenuItemConstructorOptions[] {
+  const browserItems: MenuItemConstructorOptions[] = listImportSources().map((source) => ({
+    label: `${source.label}…`,
+    click: () => host.runAction({ type: "importFromBrowser", sourceId: source.id }),
+  }));
+  if (browserItems.length === 0) {
+    browserItems.push({ label: "No other browsers found", enabled: false });
+  }
+  return [{ label: "Arc…", click: () => host.runAction({ type: "importFromArc" }) }, { type: "separator" }, ...browserItems];
+}
+
+/**
  * Developer Mode's reload ▾: the reloads a web developer needs, like Chrome's long-press on reload.
  */
 function buildReloadMenu(host: MenuHost): MenuItemConstructorOptions[] {
@@ -337,6 +352,10 @@ export function showMenuRequest(host: MenuHost, request: MenuRequest): void {
   }
   if (request.menu === "reload") {
     popUp(host, buildReloadMenu(host));
+    return;
+  }
+  if (request.menu === "import") {
+    popUp(host, buildImportMenu(host));
     return;
   }
   if (request.menu === "space") {

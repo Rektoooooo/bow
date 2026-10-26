@@ -29,6 +29,7 @@ import {
   toggleFolder,
   unpinTab,
   updateTabPage,
+  setSoundEffects,
 } from "../src/main/state";
 import { findLocation, findTab } from "../src/main/tree";
 import { getSiteKey, isSameSite, normalizeTypedInput } from "../src/main/urls";
@@ -431,5 +432,16 @@ describe("setSidebarWidth", () => {
     expect(setSidebarWidth(createInitialState(), 50).settings.sidebarWidth).toBe(SIDEBAR_MIN_WIDTH_PX);
     expect(setSidebarWidth(createInitialState(), 900).settings.sidebarWidth).toBe(SIDEBAR_MAX_WIDTH_PX);
     expect(setSidebarWidth(createInitialState(), 300.4).settings.sidebarWidth).toBe(300);
+  });
+});
+
+describe("sound effects setting", () => {
+  it("is on until turned off, and leaves the state alone when nothing changes", () => {
+    const state = createInitialState();
+    const off = setSoundEffects(state, false);
+
+    expect(state.settings.areSoundEffectsOn ?? true).toBe(true);
+    expect(off.settings.areSoundEffectsOn).toBe(false);
+    expect(setSoundEffects(state, true)).toBe(state);
   });
 });

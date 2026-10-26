@@ -12,14 +12,15 @@
  *   ⌘T → openCommandBar() → showOverlay → overlay types → "overlay:query" → rankCommandBarResults → lines
  *   (suggestions arrive later as "overlay:results") → "overlay:choose" → close overlay → run the result
  */
-import { app, clipboard, ClipboardItem, ipcMain, Menu, nativeTheme, net, ShareMenu } from "electron";
+import { app, clipboard, ipcMain, Menu, nativeTheme, net, ShareMenu } from "electron";
 import type { IpcMainInvokeEvent, MenuItemConstructorOptions, Rectangle, WebContents } from "electron";
-import * as fs from "node:fs";
-import * as path from "node:path";
 import { OVERLAY_CHANNELS } from "../shared/overlay";
-import type { CommandBarLine, CommandBarMode, LibraryData, LibrarySection, OverlayPanel, OverlayRect, SiteCommand, SiteInfo } from "../shared/overlay";
+import type { CommandBarLine, CommandBarMode, LibraryData, LibrarySection, OverlayPanel, OverlayRect, SiteCommand, SiteInfo, SwitcherTab } from "../shared/overlay";
+import { getSnapshot } from "./tabSnapshots";
+import { copyPngToClipboard, listCaptures, runCaptureCommand, saveCapture } from "./captures";
+import type { CaptureCommand } from "./captures";
 import type { BrowserState, ItemId, SitePermissionKind } from "../shared/types";
-import { applyChange, getLayoutOptions, getRecentTabIds, getState, getWindow, setNewTabPending } from "./browserCore";
+import { applyChange, getLayoutOptions, getRecentTabIds, getState, getWindow, sendSidebarCommand, setNewTabPending } from "./browserCore";
 import { rankCommandBarResults } from "./commandBar";
 import type { CommandBarResult } from "./commandBar";
 import type { CommandActionRegistry } from "./commandBarActions";
@@ -170,10 +171,30 @@ function buildLibraryData(state: BrowserState): LibraryData {
     .map((entry) => ({ url: entry.url, title: entry.title, lastVisitAt: entry.lastVisitAt }));
   return {
     archive: state.archive,
-    spaces: state.spaces.map((space) => ({ id: space.id, name: space.name, icon: space.icon })),
+    spaces: state.spaces.map((space) => ({
+      id: space.id,
+      name: space.name,
+      icon: space.icon,
+      color: space.theme.colors[0] ?? null,
+      pinnedCount: space.pinnedIds.length,
+      todayCount: space.todayIds.length,
+      profileName: state.profiles.find((profile) => profile.id === space.profileId)?.name ?? "",
+      isActive: space.id === state.activeSpaceId,
+    })),
+    boosts: (state.boosts ?? []).map((boost) => ({ site: boost.site, isEnabled: boost.isEnabled, zapCount: boost.zappedSelectors.length, hasCss: boost.css.trim() !== "" })),
     history: historyLines,
     downloads: getDownloads(),
+    media: listCaptures(LIBRARY_MEDIA_LIMIT).map((record) => ({
+      id: record.id,
+      title: record.title,
+      url: record.url,
+      createdAt: record.createdAt,
+      width: record.width,
+      height: record.height,
+      thumbnailUrl: record.thumbnailUrl,
+    })),
     archiveAfterMs: state.settings.archiveAfterMs,
+    areSoundEffectsOn: state.settings.areSoundEffectsOn !== false,
     routingRules: state.routingRules ?? [],
     extensions: (state.extensions ?? []).map((extension) => ({
       id: extension.id,
@@ -232,9 +253,9 @@ function buildSiteInfo(state: BrowserState): SiteInfo | null {
 /**
  * Opens the Boost CSS editor for the selected tab's site.
  */
-export function openBoostEditor(): void {
+export function openBoostEditor(requestedSite?: string): void {
   const state = getState();
-  const site = buildSiteInfo(state)?.site ?? null;
+  const site = requestedSite ?? buildSiteInfo(state)?.site ?? null;
   if (site === null) {
     return;
   }
@@ -320,6 +341,65 @@ export function openThemeEditor(spaceId: string): void {
   const presets = THEME_PRESETS.map((preset) => ({ label: preset.label, colors: preset.colors, appearance: preset.appearance }));
   const sidebarWidth = getLayoutOptions().sidebarWidth ?? SIDEBAR_WIDTH_PX;
   openPanel({ kind: "theme", spaceId: space.id, spaceName: space.name, spaceIcon: space.icon, theme: space.theme, sidebarWidth: sidebarWidth, presets: presets });
+}
+
+/** Most tabs the recent-tab switcher shows. Our choice: a row that fits a laptop screen. */
+const SWITCHER_TABS_LIMIT = 8;
+
+/** How long we listen for ⌃ being let go on the page before the switcher's own page takes over. Our choice. */
+const CONTROL_RELEASE_WATCH_MS = 3000;
+
+/**
+ * Notices ⌃ being let go while the page still has the keyboard (in the moment before the switcher's page gets it),
+ * so a quick ⌃Tab tap still switches.
+ */
+function watchControlRelease(contents: WebContents | null): void {
+  if (contents === null) {
+    return;
+  }
+  const listener = (_event: Electron.Event, input: Electron.Input): void => {
+    if (input.type !== "keyUp" || input.key !== "Control") {
+      return;
+    }
+    contents.off("before-input-event", listener);
+    if (shownPanel?.kind === "switcher") {
+      sendToOverlay(OVERLAY_CHANNELS.switcherCommit);
+    }
+  };
+  contents.on("before-input-event", listener);
+  setTimeout(() => {
+    if (!contents.isDestroyed()) {
+      contents.off("before-input-event", listener);
+    }
+  }, CONTROL_RELEASE_WATCH_MS);
+}
+
+/**
+ * ⌃Tab: the recent-tab switcher, most recently used first. While it is open, each ⌃Tab moves one card on; letting go
+ * of ⌃ switches to the highlighted tab (the switcher's page and watchControlRelease() notice that).
+ */
+export function openTabSwitcher(step: number): void {
+  if (shownPanel?.kind === "switcher") {
+    sendToOverlay(OVERLAY_CHANNELS.switcherStep, step);
+    return;
+  }
+  const state = getState();
+  const selectedTabId = getSelectedTabId(state);
+  const recentIds = getRecentTabIds().filter((tabId) => tabId !== selectedTabId);
+  const orderedIds = selectedTabId === null ? recentIds : [selectedTabId, ...recentIds];
+  const tabs: SwitcherTab[] = [];
+  for (const tabId of orderedIds) {
+    const tab = findTab(state, tabId);
+    if (tab === undefined || tabs.length >= SWITCHER_TABS_LIMIT) {
+      continue;
+    }
+    tabs.push({ tabId: tab.id, title: tab.customTitle ?? tab.title, url: tab.url, faviconUrl: tab.faviconUrl, snapshotUrl: getSnapshot(tab.id) });
+  }
+  if (tabs.length < 2) {
+    return;
+  }
+  watchControlRelease(getFocusedContents());
+  openPanel({ kind: "switcher", tabs: tabs, index: step > 0 ? 1 : tabs.length - 1 });
 }
 
 export function openSiteControls(): void {
@@ -540,20 +620,17 @@ function handleChoose(resultId: string | null, typedText: string, mode: CommandB
 }
 
 /**
- * Saves a picture of the visible page (or a part of it) into Downloads and copies it, like Arc's screenshot and
- * capture.
+ * Takes a picture of the visible page (or a part of it), copies it and keeps it in the Library's Media, like Arc's
+ * screenshot and capture.
  */
-async function capturePage(contents: WebContents, host: string, region?: Rectangle): Promise<void> {
+async function capturePage(contents: WebContents, region?: Rectangle): Promise<void> {
   const image = await contents.capturePage(region);
-  const pngBytes = image.toPNG();
-  // Electron 44's clipboard follows the web's async Clipboard API: an item per MIME type.
-  // Blob wants a plain Uint8Array view, not Node's Buffer type.
-  const pngView = new Uint8Array(pngBytes.buffer as ArrayBuffer, pngBytes.byteOffset, pngBytes.byteLength);
-  await clipboard.write([new ClipboardItem({ "image/png": new Blob([pngView], { type: "image/png" }) })]);
-  const timestamp = new Date().toISOString().slice(0, 19).replaceAll(":", "-");
-  const safeHost = host.replace(/[^a-zA-Z0-9.-]/g, "_");
-  const filePath = path.join(app.getPath("downloads"), `Screenshot ${safeHost} ${timestamp}.png`);
-  fs.writeFileSync(filePath, pngBytes);
+  await copyPngToClipboard(image.toPNG());
+  saveCapture(image, contents.getTitle(), contents.getURL(), Date.now());
+  refreshOpenPanel();
+  if (getState().settings.areSoundEffectsOn !== false) {
+    sendSidebarCommand({ kind: "playSound", sound: "capture" });
+  }
 }
 
 /**
@@ -601,7 +678,7 @@ function handleSiteCommand(command: SiteCommand): void {
   }
   if (command === "screenshot") {
     closeOverlay();
-    capturePage(contents, site.host).catch((error) => console.error("Screenshot failed:", error));
+    capturePage(contents).catch((error) => console.error("Screenshot failed:", error));
     return;
   }
   if (command === "devTools") {
@@ -682,6 +759,12 @@ const SITE_COMMANDS: SiteCommand[] = [
   "addExtension",
 ];
 
+/** What the Library's Media buttons may ask for. */
+const MEDIA_COMMANDS: CaptureCommand[] = ["copy", "reveal", "save", "delete"];
+
+/** Pictures the Library's Media lists (their thumbnails travel with the message). Our choice. */
+const LIBRARY_MEDIA_LIMIT = 120;
+
 /** Where the Control Center's "+" tile goes to find extensions. */
 const CHROME_WEB_STORE_URL = "https://chromewebstore.google.com/";
 
@@ -727,7 +810,7 @@ function handleCaptureRegion(region: OverlayRect | null): void {
     return;
   }
   const pageRegion = roundRect({ x: left, y: top, width: right - left, height: bottom - top });
-  capturePage(contents, site.host, pageRegion).catch((error) => console.error("Capture failed:", error));
+  capturePage(contents, pageRegion).catch((error) => console.error("Capture failed:", error));
 }
 
 /**
@@ -812,6 +895,22 @@ export function registerOverlayIpc(): void {
     if (isFromOverlay(event) && isShortText(downloadId)) {
       showDownloadInFolder(downloadId);
     }
+  });
+  ipcMain.handle(OVERLAY_CHANNELS.mediaCommand, (event, mediaId: unknown, command: unknown) => {
+    if (!isFromOverlay(event) || !isShortText(mediaId) || !MEDIA_COMMANDS.includes(command as CaptureCommand)) {
+      return;
+    }
+    const isListChanged = runCaptureCommand(mediaId, command as CaptureCommand, app.getPath("downloads"));
+    if (isListChanged) {
+      refreshOpenPanel();
+    }
+  });
+  ipcMain.handle(OVERLAY_CHANNELS.chooseTab, (event, tabId: unknown) => {
+    if (!isFromOverlay(event) || !isShortText(tabId) || findTab(getState(), tabId) === undefined) {
+      return;
+    }
+    closeOverlay();
+    applyChange((state) => selectTab(state, tabId, Date.now()));
   });
   ipcMain.handle(OVERLAY_CHANNELS.captureRegion, (event, region: unknown) => {
     if (isFromOverlay(event) && (region === null || isOverlayRect(region))) {

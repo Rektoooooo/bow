@@ -28,13 +28,18 @@ export type MenuRequest =
   | { menu: "plus" }
   | { menu: "sidebar" }
   | { menu: "split" }
-  | { menu: "reload" };
+  | { menu: "reload" }
+  | { menu: "import" };
 
 /**
  * Requests from the main process to the sidebar page, for things only the page can do (inline editing).
  * Example: the tab menu's "Rename…" sends { kind: "beginRename", itemId }.
  */
+/** The short sounds the sidebar page can play (renderer/sounds.ts). */
+export type SoundName = "closeTab" | "clearToday" | "switchSpace" | "split" | "capture";
+
 export type SidebarCommand =
+  | { kind: "playSound"; sound: SoundName }
   | { kind: "beginRename"; itemId: ItemId }
   | { kind: "beginSpaceRename"; spaceId: SpaceId }
   | { kind: "beginSpaceIconEdit"; spaceId: SpaceId };
@@ -81,7 +86,7 @@ export type BrowserAction =
   | { type: "setBoostCss"; site: string; css: string }
   | { type: "setBoostEnabled"; site: string; isEnabled: boolean }
   | { type: "deleteBoost"; site: string }
-  | { type: "openBoostEditor" }
+  | { type: "openBoostEditor"; site?: string }
   | { type: "toggleMediaPlayback" }
   | { type: "dismissMedia" }
   | { type: "navigate"; command: NavigationCommand }
@@ -101,7 +106,9 @@ export type BrowserAction =
   | { type: "checkExtensionUpdates" }
   | { type: "setDeveloperMode"; site: string; isOn: boolean }
   | { type: "openDeveloperTool"; tool: DeveloperTool }
-  | { type: "runSiteCommand"; command: ToolbarSiteCommand };
+  | { type: "runSiteCommand"; command: ToolbarSiteCommand }
+  | { type: "importFromBrowser"; sourceId: string }
+  | { type: "setSoundEffects"; isOn: boolean };
 
 /** Every action type, for checking an incoming `type` string. */
 export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
@@ -167,4 +174,6 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setDeveloperMode",
   "openDeveloperTool",
   "runSiteCommand",
+  "importFromBrowser",
+  "setSoundEffects",
 ];
