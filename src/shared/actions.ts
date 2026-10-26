@@ -10,7 +10,7 @@
  * Data flow:
  *   sidebar.ts → window.browserApi.dispatch(action) → preload → ipc.ts parseAction() → main.ts runAction()
  */
-import type { ItemId, ItemLocation, SpaceId, SpaceTheme, SplitOrientation } from "./types";
+import type { ItemId, ItemLocation, RoutingMatchType, SpaceId, SpaceTheme, SplitOrientation } from "./types";
 
 /** Toolbar and keyboard navigation commands for the page on screen. */
 export type NavigationCommand = "back" | "forward" | "reload" | "stop";
@@ -69,6 +69,8 @@ export type BrowserAction =
   | { type: "setSidebarWidth"; width: number; isFinal: boolean }
   | { type: "setSpaceProfile"; spaceId: SpaceId; profileId: string }
   | { type: "createProfileForSpace"; spaceId: SpaceId }
+  | { type: "addRoutingRule"; matchType: RoutingMatchType; value: string; spaceId: SpaceId }
+  | { type: "removeRoutingRule"; ruleId: string }
   | { type: "toggleMediaPlayback" }
   | { type: "dismissMedia" }
   | { type: "navigate"; command: NavigationCommand }
@@ -115,6 +117,8 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setSidebarWidth",
   "setSpaceProfile",
   "createProfileForSpace",
+  "addRoutingRule",
+  "removeRoutingRule",
   "toggleMediaPlayback",
   "dismissMedia",
   "navigate",

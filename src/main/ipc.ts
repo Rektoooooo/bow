@@ -61,6 +61,10 @@ function isNavigationCommand(value: unknown): boolean {
   return value === "back" || value === "forward" || value === "reload" || value === "stop";
 }
 
+function isRoutingMatchType(value: unknown): boolean {
+  return value === "contains" || value === "is";
+}
+
 function isCommandBarMode(value: unknown): boolean {
   return value === "newTab" || value === "editUrl";
 }
@@ -166,6 +170,8 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   setSidebarWidth: { width: isWholeNumber, isFinal: isBoolean },
   setSpaceProfile: { spaceId: isText, profileId: isText },
   createProfileForSpace: { spaceId: isText },
+  addRoutingRule: { matchType: isRoutingMatchType, value: isText, spaceId: isText },
+  removeRoutingRule: { ruleId: isText },
   toggleMediaPlayback: {},
   dismissMedia: {},
   navigate: { command: isNavigationCommand },

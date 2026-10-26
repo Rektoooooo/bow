@@ -316,8 +316,54 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
       "Pinned tabs and Favorites never do. Time while the browser is closed does not count. Little Windows archive after 6 hours. " +
       "The Archive keeps your newest 250 tabs, like Arc.",
   );
-  settings.append(row, explanation);
+  settings.append(row, explanation, renderRoutingSettings(data));
   body.replaceChildren(settings);
+}
+
+/**
+ * Builds the Air Traffic Control settings: the rules that send links from other apps to a Space, and a form to add one.
+ */
+function renderRoutingSettings(data: LibraryData): HTMLElement {
+  const section = createElement("div", "library-routing");
+  section.append(createElement("h2", "library-setting-heading", "Links from other apps"));
+  section.append(createElement("p", "library-setting-note", "Links you open in other apps open in a Little Window, unless a rule below sends them to a Space (Arc's Air Traffic Control)."));
+
+  for (const rule of data.routingRules) {
+    const space = data.spaces.find((candidate) => candidate.id === rule.spaceId);
+    const spaceLabel = space === undefined ? "a deleted Space" : `${space.icon} ${space.name}`;
+    const line = createElement("div", "library-line routing-rule");
+    const verb = rule.matchType === "contains" ? "contains" : "is";
+    line.append(createElement("span", "library-line-title", `If the address ${verb} “${rule.value}” → ${spaceLabel}`));
+    line.append(createIconButton("trash", "Remove rule", "library-line-icon-button", () => dispatch({ type: "removeRoutingRule", ruleId: rule.id })));
+    section.append(line);
+  }
+
+  const form = document.createElement("form");
+  form.className = "routing-form";
+  const matchSelect = document.createElement("select");
+  matchSelect.className = "library-select";
+  matchSelect.append(new Option("Address contains", "contains"), new Option("Address is", "is"));
+  const valueInput = document.createElement("input");
+  valueInput.className = "library-search";
+  valueInput.placeholder = "github.com";
+  valueInput.setAttribute("aria-label", "Address part");
+  const spaceSelect = document.createElement("select");
+  spaceSelect.className = "library-select";
+  for (const space of data.spaces) {
+    spaceSelect.append(new Option(`${space.icon} ${space.name}`, space.id));
+  }
+  const addButton = document.createElement("button");
+  addButton.type = "submit";
+  addButton.className = "library-chip is-active";
+  addButton.textContent = "Add Rule";
+  form.append(matchSelect, valueInput, spaceSelect, addButton);
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const matchType = matchSelect.value === "is" ? "is" : "contains";
+    dispatch({ type: "addRoutingRule", matchType: matchType, value: valueInput.value, spaceId: spaceSelect.value });
+  });
+  section.append(form);
+  return section;
 }
 
 /**
@@ -391,7 +437,7 @@ function handleLibraryUpdate(updated: LibraryData): void {
   if (section === "archive") {
     drawArchiveLines(updated);
   }
-  if (section === "downloads") {
+  if (section === "downloads" || section === "settings") {
     renderBody(updated);
   }
 }

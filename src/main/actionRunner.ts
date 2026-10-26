@@ -14,6 +14,7 @@ import { SIDEBAR_COLLAPSE_WIDTH_PX } from "../shared/settings";
 import type { SpaceTheme } from "../shared/types";
 import { applyChange, getState, getWindow, previewSidebarWidthWhileDragging, scheduleRuntimePush, sendSidebarCommand, setSidebarPeek } from "./browserCore";
 import { dismissMedia, toggleMediaPlayback } from "./media";
+import { addRoutingRule, removeRoutingRule } from "./routing";
 import { showMenuRequest } from "./menus";
 import type { MenuHost } from "./menus";
 import { openCommandBar, openLibrary, openSiteControls } from "./overlayController";
@@ -175,6 +176,10 @@ export function runAction(action: BrowserAction): void {
       return resizeSidebar(action.width, action.isFinal);
     case "setSpaceProfile":
       return applyChange((state) => setSpaceProfile(state, action.spaceId, action.profileId));
+    case "addRoutingRule":
+      return applyChange((state) => addRoutingRule(state, action.matchType, action.value, action.spaceId, now));
+    case "removeRoutingRule":
+      return applyChange((state) => removeRoutingRule(state, action.ruleId));
     case "createProfileForSpace":
       return applyChange((state) => {
         const created = createProfile(state, "", now);

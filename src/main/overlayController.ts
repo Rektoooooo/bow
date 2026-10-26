@@ -127,6 +127,7 @@ function buildLibraryData(state: BrowserState): LibraryData {
     history: historyLines,
     downloads: getDownloads(),
     archiveAfterMs: state.settings.archiveAfterMs,
+    routingRules: state.routingRules ?? [],
   };
 }
 

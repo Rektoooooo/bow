@@ -11,7 +11,7 @@
  *   main.ts openOverlay(panel) → "overlay:show" → overlay.ts draws the panel
  *   overlay.ts → overlayApi.query / choose / siteCommand / find → main.ts
  */
-import type { ArchivedTab, ItemId } from "./types";
+import type { ArchivedTab, ItemId, RoutingRule } from "./types";
 
 /** What a Command Bar line does when chosen. */
 export type CommandBarResultKind = "navigate" | "search" | "tab" | "history" | "action";
@@ -67,6 +67,7 @@ export interface LibraryData {
   history: HistoryLine[];
   downloads: DownloadRecord[];
   archiveAfterMs: number | null;
+  routingRules: RoutingRule[];
 }
 
 /** What the site controls show about the selected page. */

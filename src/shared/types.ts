@@ -133,6 +133,20 @@ export interface BrowserSettings {
   sidebarWidth?: number;
 }
 
+/** How a link-routing rule compares an address. */
+export type RoutingMatchType = "contains" | "is";
+
+/**
+ * Arc's Air Traffic Control: a link from another app whose address matches goes straight to a Space instead of a
+ * Little Window. Example: { matchType: "contains", value: "github.com", spaceId: "space-work" }
+ */
+export interface RoutingRule {
+  id: string;
+  matchType: RoutingMatchType;
+  value: string;
+  spaceId: SpaceId;
+}
+
 /** Everything the browser saves to disk. */
 export interface BrowserState {
   /** Raise this number when the saved shape changes, and add an upgrade step to migrate.ts. */
@@ -148,6 +162,8 @@ export interface BrowserState {
   /** Newest first. */
   archive: ArchivedTab[];
   settings: BrowserSettings;
+  /** Air Traffic Control rules, checked in order. Optional, so files saved before it existed still load. */
+  routingRules?: RoutingRule[];
 }
 
 /**

@@ -451,6 +451,23 @@ button:disabled {
   font: inherit;
 }
 
+.library-setting-heading {
+  margin: 28px 0 0;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.routing-rule {
+  min-height: 38px;
+}
+
+.routing-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .library-setting-note {
   margin: 12px 0 0;
   color: var(--muted);

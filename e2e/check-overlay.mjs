@@ -320,6 +320,24 @@ await app.evaluate(({ BrowserWindow }) => {
 await sidebar.waitForTimeout(500);
 check("closing a private window archives nothing", (await getState()).archive.length === archiveCountBefore);
 
+// Air Traffic Control: a second launch with a link hands it to this app (the path links from other apps take).
+// A matching rule sends it to its Space; without one it opens in a Little Window.
+const { spawn } = await import("node:child_process");
+function openFromAnotherApp(url) {
+  const secondLaunch = spawn(createRequire(import.meta.url)("electron"), [`--user-data-dir=${userDataDir}`, appDir, url], { stdio: "ignore" });
+  return new Promise((resolve) => secondLaunch.on("exit", resolve));
+}
+state = await getState();
+const workSpace = state.spaces[1];
+await dispatch({ type: "addRoutingRule", matchType: "contains", value: "example.com/routed", spaceId: workSpace.id });
+await openFromAnotherApp("https://example.com/routed");
+await sidebar.waitForTimeout(1500);
+state = await getState();
+check("a link from another app that matches a rule opens in that rule's Space", state.activeSpaceId === workSpace.id && selectedTab(state)?.url.startsWith("https://example.com/routed"), `${state.activeSpaceId} ${selectedTab(state)?.url}`);
+await openFromAnotherApp("https://example.com/not-routed");
+const routedLittle = await findPage("/little/little.html").catch(() => null);
+check("a link that matches no rule opens in a Little Window", routedLittle !== null);
+
 await app.close();
 const failed = results.filter((result) => !result.ok).length;
 console.log(`\n${results.length - failed}/${results.length} overlay checks passed.`);
