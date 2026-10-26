@@ -2,7 +2,8 @@
 //   The look is meant to match Arc 1:1. This script renders our window at the size of the user's Arc screenshots
 //   (reference/arc-ui, git-ignored) with a made-up sidebar of the same shape, and writes side-by-side crops
 //   (Arc left, ours right) of the parts that matter, so differences are visible at a glance.
-// Data source: reference/arc-ui/1.webp (sidebar + toolbar), 3.webp (Command Bar) and 4.webp (Control Center): a 1888 × 1032 pt window,
+// Data source: reference/arc-ui/1.webp (sidebar + toolbar), 3.webp (Command Bar), 4.webp (Control Center) and
+//   5.webp (a site in Developer Mode): a 1888 × 1032 pt window,
 //   captured at 1 px per point with macOS's window shadow around it (window at 56, 38 in the image).
 // Data flow: sample state → app at 1888 × 1032 → captureWindow() → crops → e2e/output/arc-compare/*.png
 // usage: npm run build && node e2e/arc-compare.mjs   (needs the reference screenshots; they are never committed)
@@ -32,6 +33,8 @@ const REGIONS = [
   { name: "4-control-center", shot: 4, x: 1630, y: 36, width: 258, height: 480, zoom: 2 },
   { name: "4-sidebar-top", shot: 4, x: 0, y: 90, width: 300, height: 330, zoom: 2 },
   { name: "4-sidebar-bottom", shot: 4, x: 0, y: 690, width: 300, height: 330, zoom: 2 },
+  { name: "5-toolbar-left", shot: 5, x: 0, y: 0, width: 560, height: 60, zoom: 2 },
+  { name: "5-toolbar-right", shot: 5, x: 1560, y: 0, width: 328, height: 60, zoom: 2 },
 ];
 
 if (!fs.existsSync(path.join(referenceDir, "1.webp"))) {
@@ -149,6 +152,10 @@ await overlay.mouse.move(0, 0);
 await overlay.waitForTimeout(800);
 ours[4] = await captureWindow(app);
 await overlay.keyboard.press("Escape");
+await sidebar.waitForTimeout(300);
+await sidebar.evaluate(() => window.browserApi.dispatch({ type: "setDeveloperMode", site: "ycombinator.com", isOn: true }));
+await sidebar.waitForTimeout(1200);
+ours[5] = await captureWindow(app);
 
 // Crop and pair with the helper window's canvas (the app's own renderer decodes WebP and PNG).
 const pairs = await app.evaluate(async ({ BrowserWindow }, job) => {
@@ -188,17 +195,20 @@ const pairs = await app.evaluate(async ({ BrowserWindow }, job) => {
     1: `data:image/webp;base64,${fs.readFileSync(path.join(referenceDir, "1.webp")).toString("base64")}`,
     3: `data:image/webp;base64,${fs.readFileSync(path.join(referenceDir, "3.webp")).toString("base64")}`,
     4: `data:image/webp;base64,${fs.readFileSync(path.join(referenceDir, "4.webp")).toString("base64")}`,
+    5: `data:image/webp;base64,${fs.readFileSync(path.join(referenceDir, "5.webp")).toString("base64")}`,
   },
   ours: {
     1: `data:image/png;base64,${ours[1].toString("base64")}`,
     3: `data:image/png;base64,${ours[3].toString("base64")}`,
     4: `data:image/png;base64,${ours[4].toString("base64")}`,
+    5: `data:image/png;base64,${ours[5].toString("base64")}`,
   },
 });
 
 fs.writeFileSync(path.join(outDir, "ours-1.png"), ours[1]);
 fs.writeFileSync(path.join(outDir, "ours-3.png"), ours[3]);
 fs.writeFileSync(path.join(outDir, "ours-4.png"), ours[4]);
+fs.writeFileSync(path.join(outDir, "ours-5.png"), ours[5]);
 for (const pair of pairs) {
   fs.writeFileSync(path.join(outDir, `${pair.name}.png`), Buffer.from(pair.png, "base64"));
 }

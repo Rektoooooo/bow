@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { parseAction } from "../src/main/ipc";
 import { computeCardBounds, computePaneBounds } from "../src/main/layout";
-import { CARD_GAP_PX, CARD_INSET_PX, SIDEBAR_WIDTH_PX, SPLIT_GAP_PX, TOOLBAR_HEIGHT_PX } from "../src/shared/settings";
+import { CARD_GAP_PX, CARD_INSET_PX, DEVELOPER_TOOLBAR_HEIGHT_PX, SIDEBAR_WIDTH_PX, SPLIT_GAP_PX, TOOLBAR_HEIGHT_PX } from "../src/shared/settings";
 
 describe("computeCardBounds", () => {
   it("places the page right of the sidebar, below the card's toolbar, inset like Arc's card", () => {
@@ -18,6 +18,13 @@ describe("computeCardBounds", () => {
       width: 1280 - SIDEBAR_WIDTH_PX - CARD_GAP_PX - CARD_INSET_PX,
       height: 820 - CARD_INSET_PX - TOOLBAR_HEIGHT_PX - CARD_INSET_PX,
     });
+  });
+
+  it("puts the page lower under Developer Mode's taller toolbar", () => {
+    const card = computeCardBounds(1280, 820, { isSidebarVisible: true, isToolbarVisible: true, isDeveloperToolbar: true });
+
+    expect(card.y).toBe(CARD_INSET_PX + DEVELOPER_TOOLBAR_HEIGHT_PX);
+    expect(card.height).toBe(820 - CARD_INSET_PX - DEVELOPER_TOOLBAR_HEIGHT_PX - CARD_INSET_PX);
   });
 
   it("slides the card right without resizing it while the hidden sidebar peeks", () => {
@@ -76,6 +83,17 @@ describe("parseAction", () => {
   it("refuses an archive threshold that is not one of the menu choices", () => {
     expect(parseAction({ type: "setArchiveAfter", archiveAfterMs: 0 })).toBeNull();
     expect(parseAction({ type: "setArchiveAfter", archiveAfterMs: null })).not.toBeNull();
+  });
+
+  it("accepts Developer Mode's actions only with known tools, commands and plain site names", () => {
+    expect(parseAction({ type: "setDeveloperMode", site: "example.com", isOn: true })).not.toBeNull();
+    expect(parseAction({ type: "setDeveloperMode", site: "Example.com/<x>", isOn: true })).toBeNull();
+    expect(parseAction({ type: "openDeveloperTool", tool: "network" })).not.toBeNull();
+    expect(parseAction({ type: "openDeveloperTool", tool: "sources" })).toBeNull();
+    expect(parseAction({ type: "runSiteCommand", command: "capture" })).not.toBeNull();
+    expect(parseAction({ type: "runSiteCommand", command: "clearSiteData" })).toBeNull();
+    expect(parseAction({ type: "navigate", command: "emptyCacheAndReload" })).not.toBeNull();
+    expect(parseAction({ type: "showMenu", request: { menu: "reload" } })).not.toBeNull();
   });
 
   it("refuses theme colors that are not plain hex, because they end up in CSS", () => {

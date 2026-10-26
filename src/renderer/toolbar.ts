@@ -1,8 +1,10 @@
 /**
  * WHY this file exists:
  *   The row above the page, like the user's Arc with "Show toolbar" on: back, forward, reload, the page's address
- *   (click it to edit, like ⌘L), extensions, site controls and split view. It redraws from the state and the runtime
- *   facts.
+ *   (click it to edit, like ⌘L), extensions, site controls and split view. A site in Developer Mode gets Arc's
+ *   developer toolbar instead (shot 5): striped, the full address in monospace, copy / capture / screenshot and the
+ *   developer tools; back, forward and reload move to the sidebar's top strip. It redraws from the state and the
+ *   runtime facts.
  *
  * Data source:
  *   The selected tab (BrowserState) and its runtime facts (can go back/forward, loading).
@@ -11,7 +13,8 @@
  *   sidebar.ts renderAll() → renderToolbar() → morph.ts keeps the buttons → clicks handled by sidebarEvents.ts
  *   (navigate / openCommandBar / showExtensionsMenu / openSiteControls / showMenu / installWebStoreExtension)
  */
-import type { BrowserState, ItemId, RuntimeState } from "../shared/types";
+import type { BrowserState, ItemId, RuntimeState, TabItem, TabRuntimeInfo } from "../shared/types";
+import { isDeveloperModeOn } from "../shared/developerMode.js";
 import { createActionButton, createElement, getDisplayHost } from "./dom.js";
 import { createIcon } from "./icons.js";
 import { morphChildren } from "./morph.js";
@@ -58,6 +61,85 @@ function createAddressPill(url: string | null): HTMLElement {
 }
 
 /**
+ * Back, forward and reload (stop while loading). In Developer Mode reload gets Arc's ▾ menu (hard reload, empty
+ * cache). The sidebar's top strip uses them too.
+ */
+export function createNavigationButtons(selectedTab: TabItem | null, runtimeInfo: TabRuntimeInfo | undefined, className: string, withReloadMenu: boolean): HTMLElement[] {
+  const backButton = createActionButton("back", "Back (⌘[)", className, "navigate", { command: "back" });
+  backButton.disabled = runtimeInfo?.canGoBack !== true;
+  const forwardButton = createActionButton("forward", "Forward (⌘])", className, "navigate", { command: "forward" });
+  forwardButton.disabled = runtimeInfo?.canGoForward !== true;
+  const isLoading = runtimeInfo?.isLoading === true;
+  const reloadButton = isLoading
+    ? createActionButton("stop", "Stop (⌘.)", className, "navigate", { command: "stop" })
+    : createActionButton("reload", "Reload (⌘R)", className, "navigate", { command: "reload" });
+  reloadButton.disabled = selectedTab === null;
+  if (!withReloadMenu) {
+    return [backButton, forwardButton, reloadButton];
+  }
+  const reloadMenuButton = createActionButton("chevronDown", "Reload options", `${className} reload-menu-button`, "reload-menu");
+  reloadMenuButton.disabled = selectedTab === null;
+  return [backButton, forwardButton, reloadButton, reloadMenuButton];
+}
+
+/**
+ * The full address as Developer Mode shows it ("https://example.com/path?query"), without the lone "/" of a front page.
+ */
+function getFullAddress(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const isFrontPage = parsed.pathname === "/" && parsed.search === "" && parsed.hash === "";
+    return isFrontPage ? `${parsed.protocol}//${parsed.host}` : url;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Developer Mode's address: the lock (opens the Control Center, where Developer Mode is switched off) and the full
+ * address in monospace (click to edit, like ⌘L).
+ */
+function createDeveloperAddress(url: string): HTMLElement {
+  const address = createElement("div", "developer-address");
+  address.dataset.key = "developer-address";
+  const isSecure = url.startsWith("https://");
+  const lockButton = createActionButton(isSecure ? "lock" : "globe", "Site controls and Developer Mode", "toolbar-button developer-lock", "site-controls");
+  const urlButton = document.createElement("button");
+  urlButton.type = "button";
+  urlButton.className = "developer-url";
+  urlButton.dataset.action = "open-command-bar";
+  urlButton.dataset.mode = "editUrl";
+  urlButton.title = url;
+  urlButton.setAttribute("aria-label", `Edit address ${url}`);
+  urlButton.textContent = getFullAddress(url);
+  address.append(lockButton, urlButton);
+  return address;
+}
+
+/** A hairline between groups of developer buttons. */
+function createSeparator(key: string): HTMLElement {
+  const separator = createElement("span", "toolbar-separator");
+  separator.dataset.key = key;
+  return separator;
+}
+
+/**
+ * Developer Mode's buttons, in Arc's groups: copy the address | capture, screenshot | console, network, inspect.
+ */
+function createDeveloperButtons(isLoaded: boolean): HTMLElement[] {
+  const copyButton = createActionButton("link", "Copy Address (⇧⌘C)", "toolbar-button", "site-command", { command: "copyLink" });
+  const captureButton = createActionButton("capture", "Capture Part of the Page", "toolbar-button", "site-command", { command: "capture" });
+  const screenshotButton = createActionButton("camera", "Take Screenshot", "toolbar-button", "site-command", { command: "screenshot" });
+  const consoleButton = createActionButton("terminal", "Console", "toolbar-button", "developer-tool", { tool: "console" });
+  const networkButton = createActionButton("network", "Network", "toolbar-button", "developer-tool", { tool: "network" });
+  const inspectButton = createActionButton("scope", "Inspect an Element", "toolbar-button", "developer-tool", { tool: "inspect" });
+  for (const button of [captureButton, screenshotButton, consoleButton, networkButton, inspectButton]) {
+    button.disabled = !isLoaded;
+  }
+  return [copyButton, createSeparator("separator-copy"), captureButton, screenshotButton, createSeparator("separator-capture"), consoleButton, networkButton, inspectButton, createSeparator("separator-tools")];
+}
+
+/**
  * True when the active Space's profile has an extension turned on (the toolbar then shows the extensions button).
  */
 function hasActiveExtensions(state: BrowserState): boolean {
@@ -101,28 +183,34 @@ export function renderToolbar(state: BrowserState, runtime: RuntimeState, select
   const selectedTab = selectedItem !== undefined && selectedItem.kind === "tab" ? selectedItem : null;
   const runtimeInfo = selectedTabId === null ? undefined : runtime.tabs[selectedTabId];
 
+  const isLoading = runtimeInfo?.isLoading === true;
+  const isDeveloper = selectedTab !== null && isDeveloperModeOn(state, selectedTab.url);
+  const isSidebarVisible = state.settings.isSidebarVisible;
+
   const leftGroup = createElement("div", "toolbar-group toolbar-left");
   leftGroup.dataset.key = "left";
-  if (!state.settings.isSidebarVisible) {
+  if (!isSidebarVisible) {
     leftGroup.append(createActionButton("sidebar", "Show sidebar (⌘S)", "toolbar-button", "show-sidebar"));
   }
-  const backButton = createActionButton("back", "Back (⌘[)", "toolbar-button", "navigate", { command: "back" });
-  backButton.disabled = runtimeInfo?.canGoBack !== true;
-  const forwardButton = createActionButton("forward", "Forward (⌘])", "toolbar-button", "navigate", { command: "forward" });
-  forwardButton.disabled = runtimeInfo?.canGoForward !== true;
-  const isLoading = runtimeInfo?.isLoading === true;
-  const reloadButton = isLoading
-    ? createActionButton("stop", "Stop (⌘.)", "toolbar-button", "navigate", { command: "stop" })
-    : createActionButton("reload", "Reload (⌘R)", "toolbar-button", "navigate", { command: "reload" });
-  reloadButton.disabled = selectedTab === null;
-  leftGroup.append(backButton, forwardButton, reloadButton);
+  // In Developer Mode back/forward/reload sit in the sidebar's top strip, unless the sidebar is hidden.
+  if (!isDeveloper || !isSidebarVisible) {
+    leftGroup.append(...createNavigationButtons(selectedTab, runtimeInfo, "toolbar-button", isDeveloper));
+  }
+  if (isDeveloper && selectedTab !== null) {
+    leftGroup.append(createDeveloperAddress(selectedTab.url));
+  }
 
   const centerGroup = createElement("div", "toolbar-group toolbar-center");
   centerGroup.dataset.key = "center";
-  centerGroup.append(createAddressPill(selectedTab === null ? null : selectedTab.url));
+  if (!isDeveloper) {
+    centerGroup.append(createAddressPill(selectedTab === null ? null : selectedTab.url));
+  }
 
   const rightGroup = createElement("div", "toolbar-group toolbar-right");
   rightGroup.dataset.key = "right";
+  if (isDeveloper) {
+    rightGroup.append(...createDeveloperButtons(runtimeInfo?.isLoaded === true));
+  }
   const addExtensionPill = createAddExtensionPill(state, selectedTab === null ? null : selectedTab.url);
   if (addExtensionPill !== null) {
     rightGroup.append(addExtensionPill);
@@ -130,12 +218,18 @@ export function renderToolbar(state: BrowserState, runtime: RuntimeState, select
   if (hasActiveExtensions(state)) {
     rightGroup.append(createActionButton("puzzle", "Extensions", "toolbar-button", "extensions-menu"));
   }
-  const siteButton = createActionButton("sliders", "Site controls", "toolbar-button", "site-controls");
-  siteButton.disabled = selectedTab === null;
+  // In Developer Mode the lock opens the Control Center instead (Arc's shot 5 has no sliders button).
+  if (!isDeveloper) {
+    const siteButton = createActionButton("sliders", "Site controls", "toolbar-button", "site-controls");
+    siteButton.disabled = selectedTab === null;
+    rightGroup.append(siteButton);
+  }
   const splitButton = createActionButton("split", "Split view", "toolbar-button", "split-menu");
   splitButton.disabled = selectedTab === null;
-  rightGroup.append(siteButton, splitButton);
+  rightGroup.append(splitButton);
 
+  toolbar.classList.toggle("is-developer", isDeveloper);
+  document.documentElement.classList.toggle("is-developer-page", isDeveloper);
   morphChildren(toolbar, [leftGroup, centerGroup, rightGroup], { animate: false });
   // Arc's loading glow: a moving line along the top of the page while it loads.
   toolbar.classList.toggle("is-loading", isLoading);

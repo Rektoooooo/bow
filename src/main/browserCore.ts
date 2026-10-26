@@ -23,6 +23,8 @@ import { findMediaInfo, handleShownTabsChanged } from "./media";
 import type { CardLayoutOptions } from "./layout";
 import { raiseOverlayIfShown } from "./overlay";
 import { getSelectedTabId } from "./state";
+import { findTab } from "./tree";
+import { isDeveloperModeOn } from "../shared/developerMode";
 import { loadState, saveState } from "./store";
 import { collectTabRuntime, getShownTabIds, layoutShownTabViews, syncTabViews } from "./tabViews";
 import type { TabViewEvents } from "./tabViews";
@@ -118,7 +120,16 @@ export function getRecentTabIds(): ItemId[] {
  */
 export function getLayoutOptions(): CardLayoutOptions {
   const sidebarWidth = previewSidebarWidth ?? currentState.settings.sidebarWidth ?? SIDEBAR_WIDTH_PX;
-  return { isSidebarVisible: currentState.settings.isSidebarVisible, isToolbarVisible: true, isSidebarPeeking: isSidebarPeeking, sidebarWidth: sidebarWidth };
+  const selectedTabId = getSelectedTabId(currentState);
+  const selectedTab = selectedTabId === null ? undefined : findTab(currentState, selectedTabId);
+  const isDeveloperToolbar = selectedTab !== undefined && isDeveloperModeOn(currentState, selectedTab.url);
+  return {
+    isSidebarVisible: currentState.settings.isSidebarVisible,
+    isToolbarVisible: true,
+    isSidebarPeeking: isSidebarPeeking,
+    sidebarWidth: sidebarWidth,
+    isDeveloperToolbar: isDeveloperToolbar,
+  };
 }
 
 /**

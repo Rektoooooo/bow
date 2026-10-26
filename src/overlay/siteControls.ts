@@ -129,10 +129,23 @@ function describeBoost(boost: NonNullable<SiteInfo["boost"]>): string {
 }
 
 /**
- * The site's settings: sound always; zoom, Boost and permission answers when the site has them.
+ * The site's settings: Developer Mode and sound always (like Arc's first row); zoom, Boost and permission answers
+ * when the site has them.
  */
 function collectSettingLines(site: SiteInfo): SettingLine[] {
-  const lines: SettingLine[] = [
+  const lines: SettingLine[] = [];
+  const developerSite = site.site;
+  if (developerSite !== null) {
+    lines.push({
+      icon: "hammer",
+      title: "Developer Mode",
+      state: site.isDeveloperMode ? "On" : "Off",
+      isOn: site.isDeveloperMode,
+      hint: site.isDeveloperMode ? "Turn Developer Mode off for this site" : "Full address, developer tools and a marked tab for this site",
+      run: () => dispatch({ type: "setDeveloperMode", site: developerSite, isOn: !site.isDeveloperMode }),
+    });
+  }
+  lines.push(
     {
       icon: site.isMuted ? "speakerMuted" : "speaker",
       title: "Sound",
@@ -141,7 +154,7 @@ function collectSettingLines(site: SiteInfo): SettingLine[] {
       hint: site.isMuted ? "Unmute this tab" : "Mute this tab",
       run: () => window.overlayApi.siteCommand("toggleMute"),
     },
-  ];
+  );
   if (site.zoomPercent !== 100) {
     lines.push({ icon: "zoomIn", title: "Zoom", state: `${site.zoomPercent}%`, isOn: true, hint: "Back to 100%", run: () => window.overlayApi.siteCommand("zoomReset") });
   }

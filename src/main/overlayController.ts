@@ -44,6 +44,7 @@ import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
 import { findProfileIdOfItem, findTab, getActiveSpace } from "./tree";
 import { getPermissionOrigin, getSitePermissions } from "./sitePermissions";
 import { looksLikeWebAddress, normalizeTypedInput } from "./urls";
+import { isDeveloperModeOn } from "../shared/developerMode";
 
 /** DuckDuckGo's suggestion service; it is also the browser's search engine (urls.ts). */
 const SUGGESTION_URL_PREFIX = "https://duckduckgo.com/ac/?type=list&q=";
@@ -223,6 +224,7 @@ function buildSiteInfo(state: BrowserState): SiteInfo | null {
     profileId: profileId,
     origin: origin,
     permissions: permissions,
+    isDeveloperMode: isDeveloperModeOn(state, tab.url),
     extensions: listExtensionTiles(state, profileId),
   };
 }

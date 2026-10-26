@@ -18,6 +18,7 @@ import type { BrowserState, FolderItem, ItemId, ItemLocation, RuntimeState, Side
 import { createActionButton, createElement, createFavicon, dispatch, getDisplayHost } from "./dom.js";
 import { createIcon } from "./icons.js";
 import { encodeLocation, markDraggable, markDropTarget } from "./dragDrop.js";
+import { isDeveloperModeOn } from "../shared/developerMode.js";
 
 /** Everything a row needs to know to draw itself. */
 export interface RowContext {
@@ -162,7 +163,16 @@ export function renderTabRow(tab: TabItem, location: ItemLocation, index: number
   }
 
   row.append(createTabIconSlot(tab, runtimeInfo?.isLoading === true));
-  row.append(createTabTitle(tab, context));
+  // A site in Developer Mode: Arc outlines its tabs in dashed yellow and puts the host under the title (shot 5).
+  const isDeveloper = isDeveloperModeOn(context.state, tab.url);
+  row.classList.toggle("is-developer", isDeveloper);
+  if (isDeveloper) {
+    const textStack = createElement("span", "row-text-stack");
+    textStack.append(createTabTitle(tab, context), createElement("span", "row-subtitle", getDisplayHost(tab.url)));
+    row.append(textStack);
+  } else {
+    row.append(createTabTitle(tab, context));
+  }
   if (tab.isUnread === true && !isSelected) {
     const unreadDot = createElement("span", "unread-dot");
     unreadDot.title = "Changed since you last looked";

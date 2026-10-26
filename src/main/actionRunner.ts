@@ -25,7 +25,10 @@ import { answerPermissionPrompt } from "./permissionPrompts";
 import { removePermissionAnswer } from "./sitePermissions";
 import { showMenuRequest } from "./menus";
 import type { MenuHost } from "./menus";
-import { openBoostEditor, openCommandBar, openLibrary, openSiteControls, openThemeEditor } from "./overlayController";
+import { openBoostEditor, openCommandBar, openLibrary, openSiteControls, openThemeEditor, runSiteCommand } from "./overlayController";
+import { setDeveloperMode } from "../shared/developerMode";
+import { openDeveloperTool } from "./pageCommands";
+import { getFocusedContents } from "./tabViews";
 import { setSplitOrientation, separateTabFromSplit, splitTabs, unsplit } from "./split";
 import {
   addToFavorites,
@@ -245,5 +248,16 @@ export function runAction(action: BrowserAction): void {
     case "checkExtensionUpdates":
       checkForExtensionUpdatesNow().catch((error) => console.error("Checking for extension updates failed:", error));
       return;
+    case "setDeveloperMode":
+      return applyChange((state) => setDeveloperMode(state, action.site, action.isOn));
+    case "openDeveloperTool": {
+      const contents = getFocusedContents();
+      if (contents !== null) {
+        openDeveloperTool(contents, action.tool).catch((error) => console.error("Opening the developer tools failed:", error));
+      }
+      return;
+    }
+    case "runSiteCommand":
+      return runSiteCommand(action.command);
   }
 }

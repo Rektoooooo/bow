@@ -58,7 +58,15 @@ function isOrientation(value: unknown): boolean {
 }
 
 function isNavigationCommand(value: unknown): boolean {
-  return value === "back" || value === "forward" || value === "reload" || value === "stop";
+  return ["back", "forward", "reload", "stop", "hardReload", "emptyCacheAndReload"].includes(value as string);
+}
+
+function isDeveloperTool(value: unknown): boolean {
+  return value === "console" || value === "network" || value === "inspect";
+}
+
+function isToolbarSiteCommand(value: unknown): boolean {
+  return value === "copyLink" || value === "capture" || value === "screenshot";
 }
 
 /** A site key such as "github.com": letters, digits, dots and dashes only. */
@@ -144,7 +152,7 @@ function isMenuRequest(value: unknown): boolean {
   if (value.menu === "space") {
     return isText(value.spaceId);
   }
-  return value.menu === "plus" || value.menu === "sidebar" || value.menu === "split";
+  return value.menu === "plus" || value.menu === "sidebar" || value.menu === "split" || value.menu === "reload";
 }
 
 /**
@@ -230,6 +238,9 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   removeSitePermission: { profileId: isText, origin: isText, kind: isSitePermissionKind },
   installWebStoreExtension: { extensionId: isExtensionId },
   checkExtensionUpdates: {},
+  setDeveloperMode: { site: isSite, isOn: isBoolean },
+  openDeveloperTool: { tool: isDeveloperTool },
+  runSiteCommand: { command: isToolbarSiteCommand },
 };
 
 /**

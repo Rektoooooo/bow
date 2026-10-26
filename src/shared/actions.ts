@@ -13,7 +13,13 @@
 import type { ItemId, ItemLocation, RoutingMatchType, SitePermissionKind, SpaceId, SpaceTheme, SplitOrientation } from "./types";
 
 /** Toolbar and keyboard navigation commands for the page on screen. */
-export type NavigationCommand = "back" | "forward" | "reload" | "stop";
+export type NavigationCommand = "back" | "forward" | "reload" | "stop" | "hardReload" | "emptyCacheAndReload";
+
+/** Developer Mode's toolbar buttons that open the page's developer tools on a panel, or pick an element. */
+export type DeveloperTool = "console" | "network" | "inspect";
+
+/** The page commands the toolbar may run itself (Developer Mode's copy, capture and screenshot buttons). */
+export type ToolbarSiteCommand = "copyLink" | "capture" | "screenshot";
 
 /** Which native menu the sidebar wants to show (main.ts builds it, so it can call Electron). */
 export type MenuRequest =
@@ -21,7 +27,8 @@ export type MenuRequest =
   | { menu: "space"; spaceId: SpaceId }
   | { menu: "plus" }
   | { menu: "sidebar" }
-  | { menu: "split" };
+  | { menu: "split" }
+  | { menu: "reload" };
 
 /**
  * Requests from the main process to the sidebar page, for things only the page can do (inline editing).
@@ -91,7 +98,10 @@ export type BrowserAction =
   | { type: "answerPermissionPrompt"; requestId: string; isAllowed: boolean }
   | { type: "removeSitePermission"; profileId: string; origin: string; kind: SitePermissionKind }
   | { type: "installWebStoreExtension"; extensionId: string }
-  | { type: "checkExtensionUpdates" };
+  | { type: "checkExtensionUpdates" }
+  | { type: "setDeveloperMode"; site: string; isOn: boolean }
+  | { type: "openDeveloperTool"; tool: DeveloperTool }
+  | { type: "runSiteCommand"; command: ToolbarSiteCommand };
 
 /** Every action type, for checking an incoming `type` string. */
 export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
@@ -154,4 +164,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "removeSitePermission",
   "installWebStoreExtension",
   "checkExtensionUpdates",
+  "setDeveloperMode",
+  "openDeveloperTool",
+  "runSiteCommand",
 ];

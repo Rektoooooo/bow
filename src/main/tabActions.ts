@@ -110,6 +110,16 @@ export function navigateFocusedPage(command: NavigationCommand): void {
   if (command === "stop") {
     contents.stop();
   }
+  if (command === "hardReload") {
+    contents.reloadIgnoringCache();
+  }
+  if (command === "emptyCacheAndReload") {
+    // Like Chrome's "Empty Cache and Hard Reload": the profile's whole HTTP cache goes, then the page reloads.
+    contents.session
+      .clearCache()
+      .then(() => contents.reloadIgnoringCache())
+      .catch((error) => console.error("Emptying the cache failed:", error));
+  }
 }
 
 /**

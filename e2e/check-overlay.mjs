@@ -479,13 +479,14 @@ await dispatch({ type: "openSiteControls" });
 await overlay.waitForSelector(".control-center", { timeout: 5000 });
 const actionLabels = await overlay.$$eval(".control-action", (buttons) => buttons.map((button) => button.getAttribute("aria-label")));
 check("the Control Center shows Share, Boost, Screenshot and Capture", actionLabels.join("|") === "Share|Boost this site|Take Screenshot|Capture Part of the Page", actionLabels.join("|"));
-const soundBefore = await overlay.textContent(".control-setting .control-setting-state");
-await overlay.click(".control-setting");
-await overlay.waitForFunction(() => document.querySelector(".control-setting .control-setting-state")?.textContent === "Muted", null, { timeout: 3000 }).catch(() => undefined);
-const soundAfter = await overlay.textContent(".control-setting .control-setting-state");
+const soundSetting = '.control-setting:has(.control-setting-title:text-is("Sound"))';
+const soundBefore = await overlay.textContent(`${soundSetting} .control-setting-state`);
+await overlay.click(soundSetting);
+await overlay.waitForFunction(() => [...document.querySelectorAll(".control-setting-state")].some((state) => state.textContent === "Muted"), null, { timeout: 3000 }).catch(() => undefined);
+const soundAfter = await overlay.textContent(`${soundSetting} .control-setting-state`);
 const panelsAfterToggle = await overlay.$$eval(".control-center", (panels) => panels.length);
 check("the Sound setting mutes the tab, shown in the same panel", soundBefore === "On" && soundAfter === "Muted" && selectedTab(await getState())?.isMuted === true && panelsAfterToggle === 1, `${soundBefore} → ${soundAfter}`);
-await overlay.click(".control-setting");
+await overlay.click(soundSetting);
 await overlay.click('.control-action[aria-label="Capture Part of the Page"]');
 await overlay.waitForSelector(".capture-layer", { timeout: 5000 });
 const pageFrame = await overlay.evaluate(() => {
@@ -505,6 +506,61 @@ const capturedSize = await app.evaluate(({ nativeImage }, filePath) => (filePath
 check("Capture saves exactly the dragged part of the page", capturedSize?.width === 100 && capturedSize?.height === 50, `${capturedFiles.join(",")} ${JSON.stringify(capturedSize)}`);
 check("and closes the capture layer", !(await overlayIsShown()));
 await app.evaluate(({ clipboard }, text) => clipboard.writeText(text), clipboardTextBefore);
+
+// Developer Mode, Arc's per-site switch in the Control Center: the toolbar turns into the striped developer bar with
+// the full address, back/forward/reload move to the sidebar's top strip, the tab gets its dashed outline, the page
+// moves down under the taller bar, and the Network button opens the developer tools on that panel.
+await commandBar("newTab", "example.com/developer");
+await waitForSelectedUrl("example.com/developer");
+await sidebar.waitForTimeout(1500);
+await dispatch({ type: "openSiteControls" });
+await overlay.waitForSelector(".control-center", { timeout: 5000 });
+const firstSetting = await overlay.textContent(".control-setting .control-setting-title");
+await overlay.click(".control-setting");
+await sidebar.waitForSelector(".toolbar.is-developer", { timeout: 5000 }).catch(() => undefined);
+const developerUrl = await sidebar.textContent(".developer-url").catch(() => null);
+const developerRow = await sidebar.$(".tab-row.is-selected.is-developer .row-subtitle");
+const headerNavigation = await sidebar.$$eval(".header-navigation .header-button", (buttons) => buttons.map((button) => button.dataset.action));
+await sidebar.waitForTimeout(600);
+const developerPageTop = await app.evaluate(({ BrowserWindow }) => {
+  const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  const view = win.contentView.children.find((child) => child.webContents?.getURL().includes("example.com/developer"));
+  return view?.getBounds().y ?? null;
+});
+check(
+  "Developer Mode from the Control Center: developer bar, outlined tab, page under the taller bar",
+  firstSetting === "Developer Mode" && developerUrl === "https://example.com/developer" && developerRow !== null && developerPageTop === 48 && headerNavigation.join(",") === "navigate,navigate,navigate,reload-menu",
+  `${firstSetting} | ${developerUrl} | row ${developerRow !== null} | top ${developerPageTop} | ${headerNavigation.join(",")}`,
+);
+await sidebar.click('.toolbar-button[data-tool="network"]');
+let shownPanel = null;
+for (let attempt = 0; attempt < 30 && shownPanel !== "network"; attempt++) {
+  await sidebar.waitForTimeout(250);
+  shownPanel = await app.evaluate(async ({ webContents }) => {
+    const page = webContents.getAllWebContents().find((contents) => contents.getURL().includes("example.com/developer"));
+    const devTools = page?.devToolsWebContents;
+    if (!devTools) return null;
+    // The developer tools' selected tab, found through their shadow roots ("tab-network").
+    const script = `(() => {
+      const walk = (root) => {
+        for (const element of root.querySelectorAll("*")) {
+          if (element.getAttribute("role") === "tab" && element.getAttribute("aria-selected") === "true") return element.id;
+          const inside = element.shadowRoot ? walk(element.shadowRoot) : null;
+          if (inside) return inside;
+        }
+        return null;
+      };
+      return walk(document);
+    })()`;
+    const selectedTab = await devTools.executeJavaScript(script).catch(() => null);
+    return selectedTab === null ? null : selectedTab.replace("tab-", "");
+  });
+}
+check("its Network button opens the developer tools on the Network panel", shownPanel === "network", String(shownPanel));
+await app.evaluate(({ webContents }) => webContents.getAllWebContents().find((contents) => contents.getURL().includes("example.com/developer"))?.closeDevTools());
+await dispatch({ type: "setDeveloperMode", site: "example.com", isOn: false });
+await sidebar.waitForTimeout(400);
+check("and switching it off brings the normal toolbar back", (await sidebar.$(".toolbar.is-developer")) === null && (await sidebar.$(".tab-row.is-developer")) === null);
 
 await app.close();
 const failed = results.filter((result) => !result.ok).length;

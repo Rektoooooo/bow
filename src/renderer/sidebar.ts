@@ -28,7 +28,8 @@ import type { RowContext } from "./rows.js";
 import { installSidebarEvents } from "./sidebarEvents.js";
 import { createIcon, installSymbols } from "./icons.js";
 import { applySpaceTheme, onSystemAppearanceChange } from "./theme.js";
-import { renderToolbar } from "./toolbar.js";
+import { createNavigationButtons, renderToolbar } from "./toolbar.js";
+import { isDeveloperModeOn } from "../shared/developerMode.js";
 
 /** Horizontal scroll distance (in wheel delta units) that counts as a swipe to the next Space. Our choice. */
 const SWIPE_THRESHOLD = 60;
@@ -103,13 +104,25 @@ function createRowContext(state: BrowserState): RowContext {
 /**
  * Draws the sidebar header buttons next to the traffic lights.
  */
-function renderHeader(): void {
+function renderHeader(state: BrowserState): void {
   const header = document.getElementById("sidebar-header-buttons");
   if (header === null) {
     return;
   }
   const hideButton = createActionButton("sidebar", "Hide sidebar (⌘S)", "header-button", "hide-sidebar");
-  morphChildren(header, [hideButton], { animate: false });
+  hideButton.dataset.key = "hide-sidebar";
+  const buttons: HTMLElement[] = [hideButton];
+  // A site in Developer Mode: back, forward and reload ▾ move up here, right-aligned (Arc's shot 5).
+  const selectedTabId = getSelectedTabId(state);
+  const selectedItem = selectedTabId === null ? undefined : state.items[selectedTabId];
+  const selectedTab = selectedItem !== undefined && selectedItem.kind === "tab" ? selectedItem : null;
+  if (selectedTab !== null && isDeveloperModeOn(state, selectedTab.url)) {
+    const navigation = createElement("div", "header-navigation");
+    navigation.dataset.key = "navigation";
+    navigation.append(...createNavigationButtons(selectedTab, currentRuntime.tabs[selectedTab.id], "header-button", true));
+    buttons.push(navigation);
+  }
+  morphChildren(header, buttons, { animate: false });
 }
 
 /**
@@ -377,6 +390,14 @@ function renderMediaPlayer(state: BrowserState): void {
 const LIGHT_TOOLBAR_LUMINANCE = 0.55;
 
 /**
+ * A page whose top is nearly black gets a grey toolbar instead, like Arc's: GitHub's #010409 header shows a #424242
+ * toolbar in the user's screenshots (shots 3 and 4), while Google's #202124 is matched as is (shot 1). One sample
+ * each side, so the threshold sits between them.
+ */
+const NEAR_BLACK_LUMINANCE = 0.06;
+const NEAR_BLACK_TOOLBAR_COLOR = "#424242";
+
+/**
  * Returns a "#rrggbb" color's perceived brightness, 0 (black) to 1 (white).
  */
 function getLuminance(hex: string): number {
@@ -398,8 +419,9 @@ function applyToolbarTint(selectedTabId: ItemId | null): void {
     root.dataset.toolbarTone = root.dataset.appearance === "light" ? "light" : "dark";
     return;
   }
-  root.style.setProperty("--card-bg", color);
-  root.dataset.toolbarTone = getLuminance(color) > LIGHT_TOOLBAR_LUMINANCE ? "light" : "dark";
+  const shownColor = getLuminance(color) < NEAR_BLACK_LUMINANCE ? NEAR_BLACK_TOOLBAR_COLOR : color;
+  root.style.setProperty("--card-bg", shownColor);
+  root.dataset.toolbarTone = getLuminance(shownColor) > LIGHT_TOOLBAR_LUMINANCE ? "light" : "dark";
 }
 
 /**
@@ -446,7 +468,7 @@ function renderAll(): void {
   // A Space switch replaces the whole list: it slides in instead of every row growing in one by one.
   const isSpaceSwitch = lastRenderedSpaceId !== null && lastRenderedSpaceId !== state.activeSpaceId;
   const motion: MorphOptions = { animate: hasRenderedOnce && !isSpaceSwitch };
-  renderHeader();
+  renderHeader(state);
   renderFavorites(state, space, context, motion);
   renderSpaceContent(state, space, context, motion);
   const content = document.getElementById("space-content");

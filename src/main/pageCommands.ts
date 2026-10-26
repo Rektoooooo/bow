@@ -11,7 +11,12 @@
  */
 import { clipboard } from "electron";
 import type { WebContents } from "electron";
+import type { DeveloperTool } from "../shared/actions";
 import type { TabItem } from "../shared/types";
+
+/** Developer tools start in their own page; wait for their API up to this many times this long (our choice). */
+const DEVTOOLS_READY_ATTEMPTS = 40;
+const DEVTOOLS_READY_WAIT_MS = 100;
 
 /** Zoom steps, the same ladder Chrome uses, so ⌘+ and ⌘- feel familiar. */
 const ZOOM_FACTORS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5];
@@ -47,6 +52,33 @@ export function toggleDevTools(contents: WebContents): void {
     return;
   }
   contents.openDevTools({ mode: "detach" });
+}
+
+/**
+ * Developer Mode's toolbar: opens the page's developer tools on a panel (Console, Network) or starts picking an
+ * element (Inspect). DevToolsAPI is the embedder interface Chromium's developer tools expose to their host.
+ */
+export async function openDeveloperTool(contents: WebContents, tool: DeveloperTool): Promise<void> {
+  if (!contents.isDevToolsOpened()) {
+    const opened = new Promise<void>((resolve) => contents.once("devtools-opened", () => resolve()));
+    contents.openDevTools({ mode: "detach" });
+    await opened;
+  }
+  const devTools = contents.devToolsWebContents;
+  if (devTools === null) {
+    return;
+  }
+  devTools.focus();
+  const script = tool === "inspect" ? "DevToolsAPI.enterInspectElementMode()" : `DevToolsAPI.showPanel(${JSON.stringify(tool)})`;
+  // The developer tools page may still be starting; it accepts the call once its API is there.
+  for (let attempt = 0; attempt < DEVTOOLS_READY_ATTEMPTS; attempt++) {
+    const isReady = await devTools.executeJavaScript("typeof DevToolsAPI !== 'undefined' && typeof DevToolsAPI.showPanel === 'function'");
+    if (isReady === true) {
+      await devTools.executeJavaScript(script);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, DEVTOOLS_READY_WAIT_MS));
+  }
 }
 
 /**

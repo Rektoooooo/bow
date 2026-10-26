@@ -217,6 +217,11 @@ export interface BrowserState {
   extensions?: InstalledExtension[];
   /** Answers to sites' permission requests. Optional, so files saved before it existed still load. */
   sitePermissions?: SitePermission[];
+  /**
+   * Developer Mode turned on or off by the user, by site (shared/developerMode.ts; local servers are on unless set).
+   * Optional, so files saved before it existed still load.
+   */
+  developerModeSites?: Record<string, boolean>;
 }
 
 /**

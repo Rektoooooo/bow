@@ -64,6 +64,10 @@ export const SYMBOL_NAMES = {
   note: "note.text",
   clock: "clock.arrow.circlepath",
   checkmark: "checkmark",
+  hammer: "hammer",
+  terminal: "apple.terminal",
+  network: "network",
+  scope: "scope",
 } as const;
 
 /** An icon drawn from an SF Symbol. */

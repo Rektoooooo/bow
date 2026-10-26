@@ -89,6 +89,12 @@ export const CARD_GAP_PX = 7;
  */
 export const TOOLBAR_HEIGHT_PX = 32;
 
+/**
+ * The toolbar of a site in Developer Mode is taller, with the full address. Measured on the user's Arc (shot 5):
+ * the page starts at 48 pt instead of 42. Must match --developer-toolbar-height in sidebar.css.
+ */
+export const DEVELOPER_TOOLBAR_HEIGHT_PX = 38;
+
 /** Gap between the panes of a split view, in pixels. Our choice; Arc's panes sit a few pixels apart. */
 export const SPLIT_GAP_PX = 6;
 

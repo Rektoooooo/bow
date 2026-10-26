@@ -13,7 +13,7 @@
  *   click / double-click / right-click / middle-click / Enter → find the element → dispatch(action), or tell
  *   sidebar.ts to start an inline rename
  */
-import type { NavigationCommand } from "../shared/actions.js";
+import type { DeveloperTool, NavigationCommand, ToolbarSiteCommand } from "../shared/actions.js";
 import { dispatch } from "./dom.js";
 
 /** What only sidebar.ts can do: inline editing lives in its page state. */
@@ -74,6 +74,12 @@ function runButtonAction(button: HTMLElement): void {
       return dispatch({ type: "openSiteControls" });
     case "split-menu":
       return dispatch({ type: "showMenu", request: { menu: "split" } });
+    case "reload-menu":
+      return dispatch({ type: "showMenu", request: { menu: "reload" } });
+    case "site-command":
+      return dispatch({ type: "runSiteCommand", command: (data.command ?? "copyLink") as ToolbarSiteCommand });
+    case "developer-tool":
+      return dispatch({ type: "openDeveloperTool", tool: (data.tool ?? "console") as DeveloperTool });
     case "extensions-menu":
       return dispatchExtensionsMenu(button);
     case "add-extension":

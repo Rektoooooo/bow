@@ -281,10 +281,31 @@ button:disabled {
 }
 
 .header-buttons {
+  flex: 1;
   display: flex;
   gap: 2px;
   margin-top: 9px;
   -webkit-app-region: no-drag;
+}
+
+/* Developer Mode: back, forward and reload ▾ at the strip's right end (Arc's shot 5: centered at 153, 185.5, 212
+   and 227 pt). */
+.header-navigation {
+  display: flex;
+  margin: 0 8px 0 auto;
+}
+
+.header-navigation .header-button {
+  width: 26px;
+}
+
+.header-navigation .header-button:first-child {
+  margin-right: 6px;
+}
+
+.header-navigation .reload-menu-button {
+  --symbol-scale: 0.7;
+  width: 14px;
 }
 
 .header-button,
@@ -620,6 +641,28 @@ button:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* A site in Developer Mode (Arc's shot 5): a dashed yellow outline (measured #e7d354) and the host under the title. */
+.row.is-developer {
+  outline: 2px dashed #e7d354;
+  outline-offset: -2px;
+}
+
+.row-text-stack {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.row-subtitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .away-slash {
@@ -1090,6 +1133,79 @@ body.sidebar-hidden .toolbar {
 .toolbar-button:hover:not(:disabled) {
   background: var(--toolbar-hover);
   color: var(--toolbar-ink);
+}
+
+/* ---------- Developer Mode toolbar (Arc's shot 5) ----------
+   Taller (= DEVELOPER_TOOLBAR_HEIGHT_PX), striped (#282828 / #2c2c2c bands about 15 pt wide, measured), no
+   hairline; the lock and the full address in 11 pt monospace on the left; copy | capture, screenshot | console,
+   network, inspect | extensions, split on the right, 28 pt apart with hairlines between the groups. */
+:root.is-developer-page {
+  --toolbar-height: 38px;
+}
+
+.toolbar.is-developer {
+  grid-template-columns: minmax(0, 1fr) 0 auto;
+  padding-top: 3px;
+  border-bottom-color: transparent;
+}
+
+:root[data-appearance="dark"] .toolbar.is-developer {
+  --toolbar-ink: rgba(255, 255, 255, 0.86);
+  --toolbar-icon: rgba(255, 255, 255, 0.72);
+  --toolbar-hover: rgba(255, 255, 255, 0.08);
+  background: repeating-linear-gradient(135deg, #282828 0 15px, #2c2c2c 15px 30px);
+}
+
+:root[data-appearance="light"] .toolbar.is-developer {
+  --toolbar-ink: rgba(0, 0, 0, 0.82);
+  --toolbar-icon: rgba(0, 0, 0, 0.6);
+  --toolbar-hover: rgba(0, 0, 0, 0.06);
+  background: repeating-linear-gradient(135deg, #f0f0f0 0 15px, #e9e9e9 15px 30px);
+}
+
+.toolbar.is-developer .toolbar-right {
+  gap: 0;
+}
+
+.developer-address {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+}
+
+.developer-lock {
+  color: var(--toolbar-ink);
+}
+
+.developer-url {
+  min-width: 0;
+  height: 24px;
+  padding: 0 4px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--toolbar-ink);
+  font: 500 11px/24px ui-monospace, "SF Mono", Menlo, monospace;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+  transition: background-color var(--motion-fast) linear;
+}
+
+.developer-url:hover {
+  background: var(--toolbar-hover);
+}
+
+.toolbar-separator {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  margin: 0 12px;
+  background: var(--toolbar-icon);
+  opacity: 0.25;
 }
 
 .address-pill {

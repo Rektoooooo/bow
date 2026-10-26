@@ -41,6 +41,16 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 - On macOS, `getUserMedia` waits on the system's camera/microphone dialog before our permission handler runs, so
   e2e checks use notifications for the prompt flow.
 
+## Matching Arc from screenshots
+- When a reference screenshot shows a state I don't recognize, ask the user what it shows before deriving a feature
+  from it. (Shot 5 was Arc's per-site Developer Mode; I had planned it as a global "Show full URL" option.)
+- The user's screenshots are 1 px per point (macOS window shadow: window at 56, 38). Measure with
+  `node e2e/arc-compare.mjs` and pixel scans, never by eye; a wrong scale (I first assumed 0.985) shifts everything.
+- Chromium blends translucent colors in the display's color space, so an rgba overlay comes out brighter than the
+  sRGB arithmetic says. Calibrate alphas against the reference pixels, not by computing them.
+- `View.setBounds(…, { animate })` reports the end place at once and cannot be verified without screen recording;
+  step the bounds ourselves when motion must be provable.
+
 ## Dependencies
 - Check a package's license **per version** and diff a just-published release against the previous one before
   adding it (electron-chrome-extensions 4.9 was GPL with a runtime license check; 4.10, one day old, is MIT and only

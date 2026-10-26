@@ -279,6 +279,17 @@ function buildSpaceMenu(host: MenuHost, space: Space): MenuItemConstructorOption
 }
 
 /**
+ * Developer Mode's reload ▾: the reloads a web developer needs, like Chrome's long-press on reload.
+ */
+function buildReloadMenu(host: MenuHost): MenuItemConstructorOptions[] {
+  return [
+    { label: "Reload", accelerator: "CommandOrControl+R", click: () => host.runAction({ type: "navigate", command: "reload" }) },
+    { label: "Hard Reload", accelerator: "CommandOrControl+Shift+R", click: () => host.runAction({ type: "navigate", command: "hardReload" }) },
+    { label: "Empty Cache and Hard Reload", click: () => host.runAction({ type: "navigate", command: "emptyCacheAndReload" }) },
+  ];
+}
+
+/**
  * The + menu at the bottom of the sidebar.
  */
 function buildPlusMenu(host: MenuHost): MenuItemConstructorOptions[] {
@@ -322,6 +333,10 @@ export function showMenuRequest(host: MenuHost, request: MenuRequest): void {
   }
   if (request.menu === "split") {
     popUp(host, buildToolbarSplitMenu(host));
+    return;
+  }
+  if (request.menu === "reload") {
+    popUp(host, buildReloadMenu(host));
     return;
   }
   if (request.menu === "space") {

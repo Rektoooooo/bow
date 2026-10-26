@@ -101,7 +101,11 @@ Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 �
 - [x] Palette engine (frame #313131 for black/dark; light shows dark colors as #e6e6e6) + Arc theme import with
       intensity; Spaces without a theme get Arc's neutral grey
 - [x] Card with the toolbar inside (uniform page radius, toolbar tinted per site from the page's top row, 50-site
-      cache), link icon + host/path like Arc · [ ] "Show full URL" option
+      cache, near-black tops shown #424242 like Arc's GitHub), link icon + host/path like Arc
+- [x] Developer Mode per site (shot 5 was this, not a "full URL" option): striped 38 pt toolbar, full address in
+      monospace, copy / capture / screenshot / console / network / inspect, nav buttons in the sidebar's strip with
+      reload ▾, dashed yellow tab outline with the host; on by default for local servers
+- [ ] Arc's global "Show full URLs" preference (toolbarShowFullURLsEnabledPreference exists in its plist)
 - [x] Sidebar to the measurements: width 242 (rows 7…241.5), card at 249, toolbar 31 + hairline, Favorites at 43,
       46 tall, 7 apart; rows 35.33 on a 40.33 pitch (long lists), Space title as tall as a row, children indented
       as whole rows by 16, divider only while Today has tabs (10.5 under the last pinned row), New Tab highlighted

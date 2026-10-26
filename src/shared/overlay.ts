@@ -115,6 +115,8 @@ export interface SiteInfo {
   profileId: string;
   origin: string | null;
   permissions: { kind: SitePermissionKind; isAllowed: boolean }[];
+  /** Arc's per-site Developer Mode (shared/developerMode.ts). */
+  isDeveloperMode: boolean;
   /** The profile's turned-on extensions, for the Control Center's grid. */
   extensions: { id: string; name: string; iconUrl: string | null }[];
 }

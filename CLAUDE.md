@@ -5,8 +5,8 @@ Public repo: https://github.com/Rektoooooo/sidebar-browser
 
 ## Start here
 
-1. Read the newest file in `.handoffs/` (`2026-10-26-arc-parity.md`, then the older one). It has the history,
-   decisions, status and next steps.
+1. Read the newest file in `.handoffs/` (`2026-10-26-arc-look.md`, then `2026-10-26-arc-parity.md` and the oldest).
+   They have the history, decisions, how the look is measured, status and next steps.
 2. Arc research: `docs/research/arc-findings.md` (text), `docs/research/arc-data-model.md` (how Arc stores the
    sidebar and archive on disk) and `docs/arc-teardown.html` (feature map, all 53 features, with what is built here).
 3. Reverse-engineering tools and how to resume the Ghidra pass: `docs/research/reverse-engineering-setup.md`.
