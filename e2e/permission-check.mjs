@@ -103,7 +103,8 @@ const savedNotificationAnswers = async () =>
 
 await askForNotifications();
 const firstPrompt = await promptText();
-check("a site asking for notifications gets a prompt", firstPrompt?.includes("example.com wants to show notifications"), firstPrompt ?? "no prompt");
+check("a site asking for notifications gets a prompt", /example\.com wants to\s*show notifications/i.test(firstPrompt ?? ""), firstPrompt ?? "no prompt");
+await overlay.screenshot({ path: path.join(outDir, "permission-prompt.png") }).catch(() => undefined);
 await overlay.click(".permission-button:not(.is-primary)");
 check("Block refuses it", (await waitForPageAnswer()) === "denied");
 check("and is remembered for the site", (await savedNotificationAnswers()).some((answer) => answer.isAllowed === false));
@@ -133,7 +134,7 @@ check("and saves nothing", (await savedNotificationAnswers()).length === 0);
 const answersBefore = ((await getState()).sitePermissions ?? []).length;
 await inTab("location.href = 'mailto:someone@example.com'; true");
 const appPrompt = await promptText();
-check("a link to an app asks first, naming the app", appPrompt?.includes("example.com wants to open "), appPrompt ?? "no prompt");
+check("a link to an app asks first, naming the app", /example\.com wants to\s*open /i.test(appPrompt ?? ""), appPrompt ?? "no prompt");
 await overlay.click(".permission-button:not(.is-primary)");
 await sleep(400);
 check("Block keeps the app closed and saves nothing", !(await isOverlayOnScreen()) && ((await getState()).sitePermissions ?? []).length === answersBefore);

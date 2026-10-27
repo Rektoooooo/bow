@@ -1,7 +1,8 @@
 /**
  * WHY this file exists:
- *   The permission prompt: "meet.google.com wants to use your camera and microphone" (or "zoom.us wants to open
- *   zoom.us") with Block and Allow, in a small card at the page's top left, like Arc's (Chromium's) bubble.
+ *   The permission prompt: "meet.google.com wants to" over "Use your camera and microphone" (or "Open zoom.us"),
+ *   with Block and Allow, in a small card at the page's top left, laid out like Arc's (Chromium's) bubble: the site,
+ *   then what it wants with its icon, then the answers. Always two lines, so the fixed-size card has no empty gap.
  *
  * Data source:
  *   The "permission" panel from permissionPrompts.ts (which site, what it wants, the request id).
@@ -14,6 +15,16 @@ import type { OverlayPanel } from "../shared/overlay";
 import type { SitePermissionKind } from "../shared/types";
 import { createElement, createTextButton, dispatch } from "../renderer/dom.js";
 import { createIcon } from "../renderer/icons.js";
+import type { IconName } from "../renderer/icons.js";
+
+/** The icon next to what a site wants, by the first kind it asks for. */
+const KIND_ICONS: Record<SitePermissionKind, IconName> = {
+  camera: "video",
+  microphone: "microphone",
+  notifications: "bell",
+  location: "location",
+  clipboard: "clipboard",
+};
 
 /** What each kind lets a site do, as the end of "… wants to". */
 const KIND_PHRASES: Record<SitePermissionKind, string> = {
@@ -46,17 +57,21 @@ export function renderPermissionPrompt(host: HTMLElement, panel: Extract<Overlay
   const card = createElement("div", "panel permission-prompt");
   card.setAttribute("role", "alertdialog");
   card.setAttribute("aria-label", "Permission request");
-  const text = createElement("div", "permission-text");
-  text.append(createIcon("lock", "icon permission-icon"));
-  const message = createElement("p", "permission-message");
+  const title = createElement("p", "permission-title");
+  title.append(createElement("strong", "permission-host", panel.host), " wants to");
   const wish = panel.appName === null ? describePermissionKinds(panel.kinds) : `open ${panel.appName}`;
-  message.append(createElement("strong", "permission-host", panel.host), ` wants to ${wish}`);
-  text.append(message);
+  const firstKind = panel.kinds[0];
+  const kindIcon: IconName = firstKind === undefined ? "lock" : KIND_ICONS[firstKind];
+  const request = createElement("div", "permission-request");
+  const wishText = wish.charAt(0).toUpperCase() + wish.slice(1);
+  request.append(createIcon(panel.appName === null ? kindIcon : "link", "icon permission-icon"), createElement("span", "permission-wish", wishText));
   const buttons = createElement("div", "permission-buttons");
   buttons.append(
     createTextButton("Block", "permission-button", () => dispatch({ type: "answerPermissionPrompt", requestId: panel.requestId, isAllowed: false })),
     createTextButton("Allow", "permission-button is-primary", () => dispatch({ type: "answerPermissionPrompt", requestId: panel.requestId, isAllowed: true })),
   );
+  const text = createElement("div", "permission-text");
+  text.append(title, request);
   card.append(text, buttons);
   host.replaceChildren(card);
 }

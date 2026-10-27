@@ -115,7 +115,8 @@ Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 �
 - [x] Control Center (shot 4): Share sheet, Boost, Screenshot, Capture (drag a region), extension grid with +,
       Settings rows (sound, zoom, Boost, permission answers), Secure pill, "…" native menu
 - [x] Library (grouped settings with switches), Find, theme editor (with intensity), Boost editor, Little Window
-      reviewed in the same language · [ ] Peek frame, permission prompt, status bubble, crash page review
+      reviewed in the same language · [x] permission prompt (two lines like Chromium's bubble, no empty gap)
+      · [ ] Peek frame, status bubble, crash page review
 - [ ] Verify the traffic lights and native rendering once screen recording works (Claude restart)
 
 ### 3.3 Remaining Arc features

@@ -1695,22 +1695,39 @@ body.is-closing .peek-header {
 
 .permission-text {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.permission-title {
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13.5px;
+  line-height: 1.35;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.permission-request {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.permission-wish {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .permission-icon {
   flex: none;
-  margin-top: 2px;
   color: var(--muted);
-}
-
-.permission-message {
-  margin: 0;
-  color: var(--ink);
-  font-size: 13.5px;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
 }
 
 .permission-buttons {
