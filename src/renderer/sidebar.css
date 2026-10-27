@@ -811,7 +811,9 @@ button:disabled {
   fill: rgba(255, 255, 255, 0.9);
 }
 
+/* flex: none: in a narrow place (a split view's pane) the title shrinks, never the icon. */
 .favicon {
+  flex: none;
   display: grid;
   place-items: center;
   width: 16px;
