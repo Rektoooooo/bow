@@ -132,6 +132,13 @@ export const APP_UPDATE_FIRST_CHECK_MS = 2 * 60 * 1000;
 /** Then Bow looks for a new version this often. Our choice: a few times a day, a small file each time. */
 export const APP_UPDATE_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
+/**
+ * A change reaches browser-state.json at most this long after it happened, so a burst (page titles while a page
+ * loads, a drag, typing a name) costs one write instead of one per change. Quitting writes at once. Our choice:
+ * measured 2026-10-27, 20 renames wrote the file 21 times.
+ */
+export const STATE_SAVE_DELAY_MS = 500;
+
 /** Live folders refresh this often. Our choice; Arc does not document its interval. */
 export const LIVE_FOLDER_REFRESH_MS = 10 * 60 * 1000;
 

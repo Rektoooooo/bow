@@ -8,7 +8,8 @@
  *
  * Data flow:
  *   app start → loadState() → upgradeToCurrentVersion() (older files are upgraded) → BrowserState
- *   every change → saveState() → temporary file → renamed over browser-state.json
+ *   changes (at most STATE_SAVE_DELAY_MS apart, and at quit) → saveState() → temporary file → renamed over
+ *   browser-state.json
  */
 import { app } from "electron";
 import * as fs from "node:fs";

@@ -36,6 +36,7 @@ import {
   getWindow,
   initializeState,
   onStateChanged,
+  saveStateNow,
   scheduleRuntimePush,
   setTabViewEvents,
   syncViews,
@@ -402,6 +403,8 @@ function startApp(): void {
   });
   app.whenReady().then(handleAppReady);
   app.on("before-quit", () => saveHistoryNow());
+  // After the windows have closed (closing one changes the state), so the last change reaches the file.
+  app.on("will-quit", () => saveStateNow());
   app.on("window-all-closed", () => {
     app.quit();
   });

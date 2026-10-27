@@ -272,6 +272,8 @@ await dispatch({ type: "deleteItem", itemId: pullsFolder.id });
 state = await getState();
 check("deleting a live folder removes its tabs without filling the Archive", state.items[pullsFolder.id] === undefined && state.archive.length === archiveBefore);
 
+// The state reaches its file within half a second of a change (STATE_SAVE_DELAY_MS).
+await new Promise((resolve) => setTimeout(resolve, 1000));
 const savedState = JSON.parse(fs.readFileSync(path.join(userDataDir, "browser-state.json"), "utf8"));
 const savedFeedFolder = savedState.items[feedFolder.id];
 check("the source is saved with the folder; refresh results are not", savedFeedFolder?.live?.source?.kind === "feed" && savedFeedFolder.live.lastFetch === undefined && savedState.liveFolders === undefined);

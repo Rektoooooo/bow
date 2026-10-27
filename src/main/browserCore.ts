@@ -11,7 +11,7 @@
  *   downloads.ts (download count).
  *
  * Data flow:
- *   any module → applyChange(change) → repair parked windows → saveState() → syncTabViews(every window) → raise
+ *   any module → applyChange(change) → repair parked windows → scheduleSave() → syncTabViews(every window) → raise
  *   overlay → push each window's projected state to its sidebar
  *   page events → scheduleRuntimePush() → one runtime message per window per burst
  *
@@ -20,7 +20,7 @@
 import type { BrowserWindow, WebContents } from "electron";
 import type { SidebarCommand } from "../shared/actions";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
-import { SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_WIDTH_PX } from "../shared/settings";
+import { SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_WIDTH_PX, STATE_SAVE_DELAY_MS } from "../shared/settings";
 import type { BrowserState, ExtensionBeingAdded, ItemId, LiveFolderStatus, RuntimeState, WindowId } from "../shared/types";
 import { getActiveDownloadCount } from "./downloads";
 import { getFaviconAccents } from "./faviconAccents";
@@ -366,6 +366,7 @@ export function handOverDrop(fromWindowId: WindowId, itemId: ItemId, screenX: nu
       continue;
     }
     window.focus();
+    flushStatePush();
     window.webContents.send(IPC_CHANNELS.sidebarCommand, { kind: "dropItemFromOtherWindow", itemId: itemId, clientX: screenX - bounds.x, clientY: screenY - bounds.y });
     return;
   }
@@ -437,6 +438,35 @@ export function syncViews(): void {
   }
 }
 
+/** The pending write of the state, or null when the file is current. */
+let saveTimer: NodeJS.Timeout | null = null;
+
+/**
+ * Writes the state soon: the first change starts the timer, later ones join it, so the file is never more than
+ * STATE_SAVE_DELAY_MS behind.
+ */
+function scheduleSave(): void {
+  if (saveTimer !== null) {
+    return;
+  }
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    saveState(stateFilePath, currentState);
+  }, STATE_SAVE_DELAY_MS);
+}
+
+/**
+ * Writes a pending change now (the app is quitting).
+ */
+export function saveStateNow(): void {
+  if (saveTimer === null) {
+    return;
+  }
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  saveState(stateFilePath, currentState);
+}
+
 /**
  * The one way to change the state. Runs the change function on the current state, then saves,
  * updates the web views and redraws the sidebar.
@@ -458,15 +488,42 @@ export function applyChange(change: (state: BrowserState) => BrowserState): void
     }
   }
   rememberSelectedTab();
-  saveState(stateFilePath, currentState);
+  scheduleSave();
   // At once, not with the runtime push 50 ms later: the lights must go and come with the sidebar's own buttons.
   updateAllWindowButtons();
   syncViews();
   for (const listener of stateChangeListeners) {
     listener(currentState);
   }
-  pushStateToSidebar();
+  scheduleStatePush();
   scheduleRuntimePush();
+}
+
+/** True while a state push waits for the end of this turn of the event loop. */
+let isStatePushPending = false;
+
+/**
+ * Sends the state to the sidebars once this turn of the event loop is done, so the changes one event makes together
+ * (a page's title, address and icon; closing a tab and selecting the next) cost one push per window, not one each.
+ */
+function scheduleStatePush(): void {
+  if (isStatePushPending) {
+    return;
+  }
+  isStatePushPending = true;
+  setImmediate(flushStatePush);
+}
+
+/**
+ * Sends a waiting state push now. A sidebar command about something the last change made (rename the new Space,
+ * drop the item handed over) must arrive after the state that has it.
+ */
+function flushStatePush(): void {
+  if (!isStatePushPending) {
+    return;
+  }
+  isStatePushPending = false;
+  pushStateToSidebar();
 }
 
 /**
@@ -610,5 +667,6 @@ export function sendSidebarCommand(command: SidebarCommand): void {
   if (window === null) {
     return;
   }
+  flushStatePush();
   window.webContents.send(IPC_CHANNELS.sidebarCommand, command);
 }
