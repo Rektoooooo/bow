@@ -1,20 +1,23 @@
 /**
  * WHY this file exists:
  *   Arc's sidebar is arranged by dragging: a tab dragged into Pinned is pinned, into the Favorites row becomes a
- *   Favorite, onto a folder goes inside it, onto a Space button moves it to that Space. This file turns HTML drag and
- *   drop on the sidebar into one "moveItem" action. Links dragged in from a page or another app open as a new tab.
- *   Items can also be dragged into another main window's sidebar: a drag's data stays in the page it started in, so
- *   main tells the other windows which item is being dragged (RuntimeState.itemDraggedInOtherWindow).
+ *   Favorite, onto a folder goes inside it, onto a Space button moves it to that Space. This file turns a drag on the
+ *   sidebar into one "moveItem" action. Items are dragged with pointer events, not the system's drag and drop: the
+ *   user could not even pick a tab up with the system's (2026-10-27), while presses and clicks always arrive. A copy
+ *   of the item follows the pointer. Released over another main window, main hands the drop to that window's
+ *   sidebar. Links dragged in from a page or another app (a system drag) still open as a new tab.
  *
  * Data source:
- *   Drag events, and the drop information each element carries as data attributes (set with markDropTarget() and
- *   markListDropZone()). Nothing is captured when an element is built: the sidebar keeps its elements across
- *   redraws (morph.ts), so a position read when the drop happens is always the current one.
+ *   Pointer events, drag events for links from outside, and the drop information each element carries as data
+ *   attributes (set with markDropTarget() and markListDropZone()). Nothing is captured when an element is built: the
+ *   sidebar keeps its elements across redraws (morph.ts), so a position read when the drop happens is always the
+ *   current one.
  *
  * Data flow:
- *   dragstart on [draggable][data-item-id] → dispatch beginItemDrag → dragover on a [data-drop] element (line or
- *   highlight) → drop → dispatch moveItem / moveItemToSpace / openTab (+ takeItemFromOtherWindow for an item dragged
- *   from another window) → dragend → dispatch endItemDrag
+ *   pointerdown on [draggable][data-item-id] → moved DRAG_THRESHOLD_PX with the button held → dispatch beginItemDrag,
+ *   the copy follows the pointer, the [data-drop] element under it shows a line or highlight → pointerup here →
+ *   dispatch moveItem / moveItemToSpace; pointerup outside the window → dispatch dropItemInOtherWindow (main →
+ *   that sidebar's dropItemSentFromOtherWindow() → moveItem + takeItemFromOtherWindow) → dispatch endItemDrag
  */
 import type { ItemId, ItemLocation } from "../shared/types";
 import { dispatch } from "./dom.js";
@@ -24,6 +27,33 @@ const SIDEBAR_ITEM_TYPE = "application/x-sidebar-item";
 
 /** Part of a folder row (top and bottom) that still means "before" / "after" instead of "inside". */
 const FOLDER_EDGE_FRACTION = 0.25;
+
+/** How far the pointer moves with the button held before a press becomes a drag. Our choice, about macOS's own. */
+const DRAG_THRESHOLD_PX = 4;
+
+/** A place in the page, as pointer and drag events give it. */
+interface PagePoint {
+  clientX: number;
+  clientY: number;
+}
+
+/** A press on an item that may become a drag, and the drag once it is one. */
+interface PointerDrag {
+  pointerId: number;
+  itemId: ItemId;
+  source: HTMLElement;
+  start: PagePoint;
+  /** Where in the item the pointer took hold, so the copy keeps that spot under the pointer. */
+  grip: PagePoint;
+  /** The copy of the item that follows the pointer; null until the press became a drag. */
+  ghost: HTMLElement | null;
+}
+
+/** The press or drag going on, or null. */
+let pointerDrag: PointerDrag | null = null;
+
+/** True right after a drag ended: the click the release fires must not open the item. */
+let isClickAfterDrag = false;
 
 /** CSS classes that show where a drop will land. */
 const DROP_CLASSES = ["drop-before", "drop-after", "drop-into"];
@@ -167,13 +197,13 @@ function openDroppedLink(event: DragEvent): void {
 /**
  * Decides which part of an item target the pointer is over: before, after, or (folders only) inside.
  */
-function findDropZone(event: DragEvent, element: HTMLElement): "before" | "after" | "into" {
+function findDropZone(point: PagePoint, element: HTMLElement): "before" | "after" | "into" {
   const rectangle = element.getBoundingClientRect();
   if (element.dataset.horizontal === "true") {
-    const isLeftHalf = event.clientX < rectangle.left + rectangle.width / 2;
+    const isLeftHalf = point.clientX < rectangle.left + rectangle.width / 2;
     return isLeftHalf ? "before" : "after";
   }
-  const fraction = (event.clientY - rectangle.top) / rectangle.height;
+  const fraction = (point.clientY - rectangle.top) / rectangle.height;
   if (element.dataset.intoFolderId !== undefined) {
     if (fraction < FOLDER_EDGE_FRACTION) {
       return "before";
@@ -198,23 +228,12 @@ function findDropTarget(event: DragEvent): HTMLElement | null {
 }
 
 /**
- * True when something droppable is being dragged over a target: another sidebar item, or a link from outside.
- */
-function acceptsDrag(event: DragEvent, target: HTMLElement): boolean {
-  if (carriesExternalLink(event)) {
-    return true;
-  }
-  const itemId = findDraggedItemId();
-  return itemId !== null && itemId !== target.dataset.itemId;
-}
-
-/**
  * Shows where a drop over `target` would land.
  */
-function showDropFeedback(event: DragEvent, target: HTMLElement): void {
+function showDropFeedback(point: PagePoint, target: HTMLElement): void {
   clearAllDropClasses();
   if (target.dataset.drop === "item") {
-    target.classList.add(`drop-${findDropZone(event, target)}`);
+    target.classList.add(`drop-${findDropZone(point, target)}`);
     return;
   }
   target.classList.add("drop-into");
@@ -223,7 +242,7 @@ function showDropFeedback(event: DragEvent, target: HTMLElement): void {
 /**
  * Carries out a drop of the dragged sidebar item on a target.
  */
-function dropItem(event: DragEvent, target: HTMLElement, itemId: ItemId): void {
+function dropItem(point: PagePoint, target: HTMLElement, itemId: ItemId): void {
   if (target.dataset.drop === "space") {
     const spaceId = target.dataset.spaceId;
     if (spaceId !== undefined) {
@@ -240,7 +259,7 @@ function dropItem(event: DragEvent, target: HTMLElement, itemId: ItemId): void {
     dispatch({ type: "moveItem", itemId: itemId, target: location, index: index });
     return;
   }
-  const zone = findDropZone(event, target);
+  const zone = findDropZone(point, target);
   const intoFolderId = target.dataset.intoFolderId;
   if (zone === "into" && intoFolderId !== undefined) {
     dispatch({ type: "moveItem", itemId: itemId, target: { kind: "folder", folderId: intoFolderId }, index: -1 });
@@ -255,8 +274,8 @@ function dropItem(event: DragEvent, target: HTMLElement, itemId: ItemId): void {
  * Drops an item dragged in another window: it moves like any drop, and then a tab or split comes along into this
  * window with its page (except on a Space button, which only moves it to that Space).
  */
-function dropItemFromOtherWindow(event: DragEvent, target: HTMLElement, itemId: ItemId): void {
-  dropItem(event, target, itemId);
+function dropItemFromOtherWindow(point: PagePoint, target: HTMLElement, itemId: ItemId): void {
+  dropItem(point, target, itemId);
   itemFromOtherWindow = null;
   if (target.dataset.drop !== "space") {
     dispatch({ type: "takeItemFromOtherWindow", itemId: itemId });
@@ -264,35 +283,257 @@ function dropItemFromOtherWindow(event: DragEvent, target: HTMLElement, itemId: 
 }
 
 /**
- * Handles every drag and drop inside `root` with a few listeners on the root itself.
+ * The drop target under a point of the page, or null (the copy that follows the pointer takes no pointer events).
  */
-export function installDragAndDrop(root: HTMLElement): void {
-  root.addEventListener("dragstart", (event) => {
-    const source = event.target instanceof Element ? event.target.closest<HTMLElement>("[draggable='true'][data-item-id]") : null;
-    if (source === null || event.dataTransfer === null) {
+function findDropTargetAt(point: PagePoint): HTMLElement | null {
+  const element = document.elementFromPoint(point.clientX, point.clientY);
+  return element === null ? null : element.closest<HTMLElement>("[data-drop]");
+}
+
+/**
+ * The nearest part of the sidebar around an element that scrolls, or null.
+ */
+function findScrollingParent(element: HTMLElement): HTMLElement | null {
+  for (let parent = element.parentElement; parent !== null; parent = parent.parentElement) {
+    const overflow = getComputedStyle(parent).overflowY;
+    if (overflow === "auto" || overflow === "scroll") {
+      return parent;
+    }
+  }
+  return null;
+}
+
+/** Near a list's top or bottom edge a drag scrolls the list, this far per pointer move. Our choice. */
+const AUTO_SCROLL_EDGE_PX = 28;
+const AUTO_SCROLL_STEP_PX = 12;
+
+/**
+ * Scrolls the list the drag started in when the pointer is near its top or bottom edge, so long lists can be crossed.
+ */
+function scrollNearEdge(source: HTMLElement, point: PagePoint): void {
+  const list = findScrollingParent(source);
+  if (list === null) {
+    return;
+  }
+  const box = list.getBoundingClientRect();
+  if (point.clientY < box.top + AUTO_SCROLL_EDGE_PX) {
+    list.scrollTop -= AUTO_SCROLL_STEP_PX;
+  } else if (point.clientY > box.bottom - AUTO_SCROLL_EDGE_PX) {
+    list.scrollTop += AUTO_SCROLL_STEP_PX;
+  }
+}
+
+/**
+ * The copy of the item that follows the pointer: the item itself, lifted, in its own list (so it looks the same).
+ */
+function createGhost(source: HTMLElement): HTMLElement {
+  const box = source.getBoundingClientRect();
+  const ghost = source.cloneNode(true) as HTMLElement;
+  ghost.classList.add("drag-ghost");
+  ghost.classList.remove("is-dragging");
+  ghost.removeAttribute("data-item-id");
+  ghost.removeAttribute("data-drop");
+  ghost.removeAttribute("draggable");
+  ghost.style.width = `${box.width}px`;
+  ghost.style.height = `${box.height}px`;
+  source.parentElement?.append(ghost);
+  return ghost;
+}
+
+/**
+ * Puts the copy under the pointer, held where the item was taken.
+ */
+function placeGhost(drag: PointerDrag, point: PagePoint): void {
+  if (drag.ghost === null) {
+    return;
+  }
+  drag.ghost.style.left = `${point.clientX - drag.grip.clientX}px`;
+  drag.ghost.style.top = `${point.clientY - drag.grip.clientY}px`;
+}
+
+/**
+ * Shows where a drop at a point would land, or nothing where it cannot land.
+ */
+function showFeedbackAt(point: PagePoint, itemId: ItemId): void {
+  const target = findDropTargetAt(point);
+  if (target === null || target.dataset.itemId === itemId) {
+    clearAllDropClasses();
+    return;
+  }
+  showDropFeedback(point, target);
+}
+
+/**
+ * A press became a drag: the pointer is held by the item, its copy follows the pointer, and redraws wait.
+ */
+function beginDrag(drag: PointerDrag): void {
+  try {
+    drag.source.setPointerCapture(drag.pointerId);
+  } catch {
+    // The pointer is gone already; the drag still ends on the next release or cancel.
+  }
+  drag.ghost = createGhost(drag.source);
+  draggedItemId = drag.itemId;
+  drag.source.classList.add("is-dragging");
+  notifyDragState(true);
+  dispatch({ type: "beginItemDrag", itemId: drag.itemId });
+}
+
+/**
+ * The drag is over (dropped or cancelled): the copy goes, the lines go, redraws go on.
+ */
+function endDrag(drag: PointerDrag): void {
+  drag.ghost?.remove();
+  drag.source.classList.remove("is-dragging");
+  clearAllDropClasses();
+  draggedItemId = null;
+  notifyDragState(false);
+  dispatch({ type: "endItemDrag" });
+}
+
+/**
+ * Drops the dragged item where the pointer was let go: on a target here, or, outside this window, in the main window
+ * under the pointer (main hands it to that sidebar).
+ */
+function dropAt(point: PagePoint, itemId: ItemId): void {
+  const isInsideWindow = point.clientX >= 0 && point.clientY >= 0 && point.clientX < window.innerWidth && point.clientY < window.innerHeight;
+  if (!isInsideWindow) {
+    dispatch({ type: "dropItemInOtherWindow", itemId: itemId, screenX: window.screenX + point.clientX, screenY: window.screenY + point.clientY });
+    return;
+  }
+  const target = findDropTargetAt(point);
+  if (target === null || target.dataset.itemId === itemId) {
+    return;
+  }
+  dropItem(point, target, itemId);
+}
+
+/**
+ * A press on an item (not on a button or field inside it) may become a drag.
+ */
+function handlePointerDown(event: PointerEvent): void {
+  isClickAfterDrag = false;
+  const pressed = event.target instanceof Element ? event.target : null;
+  const source = pressed?.closest<HTMLElement>("[draggable='true'][data-item-id]") ?? null;
+  if (event.button !== 0 || pointerDrag !== null || pressed === null || source === null) {
+    return;
+  }
+  const control = pressed.closest("button, input, textarea, [contenteditable='true']");
+  if (control !== null && control !== source && source.contains(control)) {
+    return;
+  }
+  const box = source.getBoundingClientRect();
+  pointerDrag = {
+    pointerId: event.pointerId,
+    itemId: source.dataset.itemId ?? "",
+    source: source,
+    start: { clientX: event.clientX, clientY: event.clientY },
+    grip: { clientX: event.clientX - box.left, clientY: event.clientY - box.top },
+    ghost: null,
+  };
+}
+
+/**
+ * The pointer moved while an item is pressed: past the threshold it becomes a drag; a drag moves its copy, shows
+ * where it would land and scrolls a long list.
+ */
+function handlePointerMove(event: PointerEvent): void {
+  const drag = pointerDrag;
+  if (drag === null || event.pointerId !== drag.pointerId) {
+    return;
+  }
+  // The button came up where we could not hear it: no drag goes on.
+  if ((event.buttons & 1) === 0) {
+    handlePointerCancel(event);
+    return;
+  }
+  if (drag.ghost === null) {
+    const distance = Math.hypot(event.clientX - drag.start.clientX, event.clientY - drag.start.clientY);
+    if (distance < DRAG_THRESHOLD_PX) {
       return;
     }
-    const itemId = source.dataset.itemId ?? "";
-    event.dataTransfer.setData(SIDEBAR_ITEM_TYPE, itemId);
-    event.dataTransfer.effectAllowed = "move";
-    draggedItemId = itemId;
-    source.classList.add("is-dragging");
-    notifyDragState(true);
-    dispatch({ type: "beginItemDrag", itemId: itemId });
-  });
-  root.addEventListener("dragend", (event) => {
-    if (draggedItemId !== null) {
-      dispatch({ type: "endItemDrag" });
+    beginDrag(drag);
+  }
+  placeGhost(drag, event);
+  showFeedbackAt(event, drag.itemId);
+  scrollNearEdge(drag.source, event);
+}
+
+/**
+ * The button came up: a drag drops (and the click that follows is swallowed), a plain press was a click.
+ */
+function handlePointerUp(event: PointerEvent): void {
+  const drag = pointerDrag;
+  if (drag === null || event.pointerId !== drag.pointerId) {
+    return;
+  }
+  pointerDrag = null;
+  if (drag.ghost === null) {
+    return;
+  }
+  isClickAfterDrag = true;
+  dropAt(event, drag.itemId);
+  endDrag(drag);
+}
+
+/**
+ * The system took the pointer away (or the button came up unheard): the drag ends without a drop.
+ */
+function handlePointerCancel(event: PointerEvent): void {
+  const drag = pointerDrag;
+  if (drag === null || event.pointerId !== drag.pointerId) {
+    return;
+  }
+  pointerDrag = null;
+  if (drag.ghost !== null) {
+    endDrag(drag);
+  }
+}
+
+/**
+ * The release after a drag fires a click on the item; it must not open or select it.
+ */
+function swallowClickAfterDrag(event: MouseEvent): void {
+  if (!isClickAfterDrag) {
+    return;
+  }
+  isClickAfterDrag = false;
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+/**
+ * Drops an item that another window's sidebar was dragging, let go here at a point (main sent it: the drag has no
+ * events in this window). It lands like any drop, and a tab or split comes along into this window.
+ */
+export function dropItemSentFromOtherWindow(itemId: ItemId, point: PagePoint): void {
+  const target = findDropTargetAt(point);
+  if (target === null || target.dataset.itemId === itemId) {
+    return;
+  }
+  dropItemFromOtherWindow(point, target, itemId);
+}
+
+/**
+ * Handles every drag and drop inside `root` with a few listeners on the root itself: pointer events move sidebar
+ * items, drag events bring links in from outside.
+ */
+export function installDragAndDrop(root: HTMLElement): void {
+  root.addEventListener("pointerdown", handlePointerDown);
+  root.addEventListener("pointermove", handlePointerMove);
+  root.addEventListener("pointerup", handlePointerUp);
+  root.addEventListener("pointercancel", handlePointerCancel);
+  root.addEventListener("click", swallowClickAfterDrag, true);
+  // Items never start the system's drag: pointer events move them.
+  root.addEventListener("dragstart", (event) => {
+    const source = event.target instanceof Element ? event.target.closest("[draggable='true'][data-item-id]") : null;
+    if (source !== null) {
+      event.preventDefault();
     }
-    draggedItemId = null;
-    const source = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-item-id]") : null;
-    source?.classList.remove("is-dragging");
-    clearAllDropClasses();
-    notifyDragState(false);
   });
   root.addEventListener("dragover", (event) => {
     const target = findDropTarget(event);
-    if (target === null || !acceptsDrag(event, target)) {
+    if (target === null || !carriesExternalLink(event)) {
       return;
     }
     event.preventDefault();
@@ -304,22 +545,11 @@ export function installDragAndDrop(root: HTMLElement): void {
   });
   root.addEventListener("drop", (event) => {
     const target = findDropTarget(event);
-    if (target === null) {
+    if (target === null || !carriesExternalLink(event)) {
       return;
     }
     event.preventDefault();
     clearAllDropClasses();
-    if (carriesExternalLink(event)) {
-      openDroppedLink(event);
-      return;
-    }
-    if (draggedItemId === null && itemFromOtherWindow !== null && itemFromOtherWindow !== target.dataset.itemId) {
-      dropItemFromOtherWindow(event, target, itemFromOtherWindow);
-      return;
-    }
-    if (draggedItemId === null || draggedItemId === target.dataset.itemId) {
-      return;
-    }
-    dropItem(event, target, draggedItemId);
+    openDroppedLink(event);
   });
 }

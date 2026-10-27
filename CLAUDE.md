@@ -56,7 +56,9 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   Easels follow the same one-window rule). The overlay, Peek and status bubble move to the focused window when they
   open. Each window also has its own sidebar (shown or hidden, width), collapsed Pinned sections and open folders,
   like Arc's StorableWindows; a new window takes the last closed window's sidebar. Items can be dragged from one
-  window's sidebar into another's (main carries the dragged item's id between the windows).
+  window's sidebar into another's: sidebar items move with pointer events, not the system's drag and drop
+  (`dragDrop.ts`; the user could not pick a tab up with the system's), and a release over another window goes to
+  main (`dropItemInOtherWindow` → `handOverDrop` → that sidebar drops at the same spot).
 - **Actions.** The sidebar sends one `BrowserAction` (`src/shared/actions.ts`) on one channel; `ipc.ts` checks every
   field (`parseAction`) and only from our own pages; `actionRunner.ts` runs it. Menu items live in `appMenu.ts`
   (accelerators = Arc's shortcuts) and `appMenuCommands.ts`; the Command Bar's actions reuse them.

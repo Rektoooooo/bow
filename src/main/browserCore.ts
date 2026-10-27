@@ -352,6 +352,23 @@ export function setItemDrag(windowId: WindowId, itemId: ItemId | null): void {
 }
 
 /**
+ * A drag was let go outside its window: the main window under that point of the screen (if any) gets the drop, at
+ * the same spot of its sidebar, and comes to the front. Its sidebar then moves the item and takes it in.
+ */
+export function handOverDrop(fromWindowId: WindowId, itemId: ItemId, screenX: number, screenY: number): void {
+  for (const { windowId, window } of listMainWindows()) {
+    const bounds = window.getContentBounds();
+    const isInside = screenX >= bounds.x && screenX < bounds.x + bounds.width && screenY >= bounds.y && screenY < bounds.y + bounds.height;
+    if (windowId === fromWindowId || !isInside) {
+      continue;
+    }
+    window.focus();
+    window.webContents.send(IPC_CHANNELS.sidebarCommand, { kind: "dropItemFromOtherWindow", itemId: itemId, clientX: screenX - bounds.x, clientY: screenY - bounds.y });
+    return;
+  }
+}
+
+/**
  * A window's sidebar page opened or closed a Note or Easel editor: a window waiting for that editor may draw it now.
  */
 export function reportOpenEditor(windowId: WindowId, tabId: ItemId, isOpen: boolean): void {

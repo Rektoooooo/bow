@@ -83,23 +83,19 @@ const tabViewBounds = (app) => app.evaluate(({ BrowserWindow }) => {
     .map((child) => child.getBounds());
 });
 
-// Playwright's dragAndDrop starts a real macOS drag inside Electron that never completes, so the drag is simulated
-// in the page: the same dragstart / dragover / drop / dragend events, sharing one DataTransfer, at a point inside
-// the target (verticalFraction 0.5 = middle, which for a folder row means "inside").
+// Drags like a user with the mouse: the sidebar moves items with pointer events (dragDrop.ts), so Playwright's mouse
+// is a real drag here. Press on the source, move past the threshold, move to a point inside the target
+// (verticalFraction 0.5 = middle, which for a folder row means "inside"), let go.
 async function simulateDrag(page, sourceSelector, targetSelector, verticalFraction = 0.5) {
-  return page.evaluate(({ sourceSelector, targetSelector, verticalFraction }) => {
-    const source = document.querySelector(sourceSelector);
-    const dataTransfer = new DataTransfer();
-    source.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer }));
-    // The drop target may only appear once the drag has started (the Favorites end zone does).
-    const target = document.querySelector(targetSelector);
-    const rectangle = target.getBoundingClientRect();
-    const point = { clientX: rectangle.left + rectangle.width / 2, clientY: rectangle.top + rectangle.height * verticalFraction };
-    target.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer, ...point }));
-    target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer, ...point }));
-    source.dispatchEvent(new DragEvent("dragend", { bubbles: true, cancelable: true, dataTransfer }));
-    return target.className;
-  }, { sourceSelector, targetSelector, verticalFraction });
+  const source = await page.locator(sourceSelector).first().boundingBox();
+  const start = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 6, start.y + 6, { steps: 2 });
+  // The drop target may only appear once the drag has started (the Favorites end zone does).
+  const target = await page.locator(targetSelector).first().boundingBox();
+  await page.mouse.move(target.x + target.width / 2, target.y + target.height * verticalFraction, { steps: 4 });
+  await page.mouse.up();
 }
 
 // ---------- first run ----------

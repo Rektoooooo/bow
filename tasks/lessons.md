@@ -15,6 +15,9 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   reworded before a push. Write "three of the user's titles", never the titles.
 
 ## Testing
+- Synthetic drag events (and Playwright's) prove nothing about a real macOS drag: our HTML drag and drop passed every
+  test while the user could not pick a tab up at all (2026-10-27). Sidebar items now move with pointer events, which
+  Playwright's mouse drives for real; keep it that way.
 - Playwright's mouse leaves each page's pointer where it last was, and a hover-driven panel that later opens under
   that spot gets a `mouseenter` (removing an unrelated click made the ⌃Tab switcher start on the wrong card). Move
   the pointer somewhere neutral before checking anything that reacts to hover.

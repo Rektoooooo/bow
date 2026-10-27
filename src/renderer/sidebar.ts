@@ -21,7 +21,7 @@ import type { SidebarCommand } from "../shared/actions.js";
 import { LIBRARY_COLUMN_WIDTH_PX, SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_WIDTH_PX } from "../shared/settings.js";
 import type { BrowserState, ItemId, ItemLocation, RuntimeState, Space, SpaceId, TabItem } from "../shared/types";
 import { createActionButton, createElement, createFavicon, dispatch } from "./dom.js";
-import { installDragAndDrop, markListDropZone, onDragStateChanged, setItemDraggedInOtherWindow } from "./dragDrop.js";
+import { dropItemSentFromOtherWindow, installDragAndDrop, markListDropZone, onDragStateChanged, setItemDraggedInOtherWindow } from "./dragDrop.js";
 import { morphChildren } from "./morph.js";
 import type { MorphOptions } from "./morph.js";
 import { renderFavoriteTile, renderItemRows, startRowRedraw } from "./rows.js";
@@ -672,6 +672,10 @@ function setUpSidebarResizer(): void {
  * Handles requests from the main process that only this page can carry out (inline editing).
  */
 function handleSidebarCommand(command: SidebarCommand): void {
+  if (command.kind === "dropItemFromOtherWindow") {
+    dropItemSentFromOtherWindow(command.itemId, { clientX: command.clientX, clientY: command.clientY });
+    return;
+  }
   if (command.kind === "beginRename") {
     renamingItemId = command.itemId;
   }

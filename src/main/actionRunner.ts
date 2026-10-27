@@ -22,6 +22,7 @@ import {
   previewSidebarWidthWhileDragging,
   reportOpenEditor,
   setItemDrag,
+  handOverDrop,
   scheduleRuntimePush,
   sendSidebarCommand,
   setSidebarPeek,
@@ -185,6 +186,10 @@ export function runActionFromWindow(action: BrowserAction, windowId: WindowId | 
   }
   if (windowId !== null && action.type === "endItemDrag") {
     setItemDrag(windowId, null);
+    return;
+  }
+  if (windowId !== null && action.type === "dropItemInOtherWindow") {
+    handOverDrop(windowId, action.itemId, action.screenX, action.screenY);
     return;
   }
   if (windowId !== null && action.type === "setSidebarPeek") {
@@ -437,6 +442,7 @@ export function runAction(action: BrowserAction): void {
     case "reportOpenEditor":
     case "beginItemDrag":
     case "endItemDrag":
+    case "dropItemInOtherWindow":
       // Only a window's sidebar reports editors and drags (runActionFromWindow handles them with the window's id).
       return;
     case "takeItemFromOtherWindow":

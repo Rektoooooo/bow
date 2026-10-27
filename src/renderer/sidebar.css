@@ -741,6 +741,20 @@ button:disabled {
   opacity: 0.4;
 }
 
+/* The copy of a dragged item that follows the pointer (dragDrop.ts): lifted a little, never in the way of the pointer. */
+.drag-ghost {
+  position: fixed;
+  z-index: 1000;
+  margin: 0;
+  pointer-events: none;
+  opacity: 0.96;
+  /* Solid: the selected row's tint over the frame's colour, so the rows it passes do not show through. */
+  background: linear-gradient(var(--row-selected), var(--row-selected)), var(--frame-2);
+  border-radius: var(--row-radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28), 0 1px 3px rgba(0, 0, 0, 0.2);
+  transform: scale(1.03);
+}
+
 .row-icon-slot {
   position: relative;
   flex: none;

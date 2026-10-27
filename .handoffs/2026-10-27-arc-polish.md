@@ -83,6 +83,18 @@ approved fixes Peek (3), tab tooltip (6) and sidebar width (7). The user was awa
   gone; a saved choice of them shows Glass. The Finder and a Dock without the app running show the bundled light
   Glass: a real dark-mode app icon needs an asset catalog (Icon Composer), not done. Drawn in code by us instead of
   generated in ChatGPT, as the user offered: vectors stay sharp at every size and stay our own design.
+- Tab dragging rewritten (the user, three times: "I can't grab it even"). We never reproduced it: no tool here can
+  post a real macOS drag, and every synthetic test passed. So the sidebar no longer uses the system's drag and drop
+  for its items: `dragDrop.ts` follows the pointer (press, 4 pt, pointer capture, a solid copy of the item under the
+  pointer, the same drop lines and rules, a long list scrolls near its edges, the click after a drag is swallowed).
+  A release outside the window sends `dropItemInOtherWindow` with the screen point; main's `handOverDrop` finds the
+  main window there, focuses it and sends its sidebar `dropItemFromOtherWindow` with the point in that window, which
+  drops and takes the item in. Links dragged in from outside still use drag events. check-app and check-windows now
+  drag with Playwright's mouse (real pointer events); check-windows puts the windows side by side first.
+- Library › Spaces is Arc's column view (a column per Space, painted like its frame, pinned items with folders
+  indented, a pencil, a "…", a round +); the column widens for it (`computeLibraryWidth`, the overlay reports its
+  section). The Peek's buttons are dark grey circles with a padded column (a near miss no longer closes the Peek).
+  The back-to-pinned arrow sits left of a tab's icon.
 
 ## How it was measured (keep doing it this way)
 

@@ -63,6 +63,11 @@ function isBoolean(value: unknown): boolean {
   return typeof value === "boolean";
 }
 
+/** A point of the screen: any finite number within a few screens of the origin. */
+function isScreenCoordinate(value: unknown): boolean {
+  return typeof value === "number" && Number.isFinite(value) && Math.abs(value) < 1_000_000;
+}
+
 /**
  * True when the value is one of the "Archive tabs after" choices (a number of milliseconds, or null for never).
  * Anything else is refused, so a bad message cannot set a 0 ms threshold and archive everything.
@@ -319,6 +324,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   beginItemDrag: { itemId: isText },
   endItemDrag: {},
   takeItemFromOtherWindow: { itemId: isText },
+  dropItemInOtherWindow: { itemId: isText, screenX: isScreenCoordinate, screenY: isScreenCoordinate },
 };
 
 /**

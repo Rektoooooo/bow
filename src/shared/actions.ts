@@ -37,6 +37,7 @@ export type MenuRequest =
  * Example: the tab menu's "Rename…" sends { kind: "beginRename", itemId }.
  */
 export type SidebarCommand =
+  | { kind: "dropItemFromOtherWindow"; itemId: ItemId; clientX: number; clientY: number }
   | { kind: "beginRename"; itemId: ItemId }
   | { kind: "beginSpaceRename"; spaceId: SpaceId }
   | { kind: "beginSpaceIconEdit"; spaceId: SpaceId };
@@ -139,7 +140,9 @@ export type BrowserAction =
   | { type: "beginItemDrag"; itemId: ItemId }
   | { type: "endItemDrag" }
   /** An item dragged from another window was dropped here: a tab or split comes along (windows.ts). */
-  | { type: "takeItemFromOtherWindow"; itemId: ItemId };
+  | { type: "takeItemFromOtherWindow"; itemId: ItemId }
+  /** A drag was let go outside its window, at a point of the screen: main hands it to the main window there. */
+  | { type: "dropItemInOtherWindow"; itemId: ItemId; screenX: number; screenY: number };
 
 /** Every action type, for checking an incoming `type` string. */
 export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
@@ -236,4 +239,5 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "beginItemDrag",
   "endItemDrag",
   "takeItemFromOtherWindow",
+  "dropItemInOtherWindow",
 ];

@@ -169,28 +169,40 @@ const clickMenuItem = (app, label) =>
   }, label);
 
 /**
- * Drags a sidebar item out of one window's sidebar and drops it on a target in another's, with the HTML drag events
- * the user's drag fires (Playwright's own drag hangs in Electron). The target page knows the item only from main.
+ * Puts the two tagged windows side by side, so a drag can be let go over the other one (let go over its own window,
+ * it drops there).
+ */
+async function placeSideBySide(app) {
+  await app.evaluate(async ({ BrowserWindow, screen }) => {
+    const area = screen.getPrimaryDisplay().workArea;
+    const half = Math.floor(area.width / 2);
+    for (const window of BrowserWindow.getAllWindows()) {
+      const tag = await window.webContents.executeJavaScript("window.name").catch(() => "");
+      if (tag === "first") window.setBounds({ x: area.x, y: area.y, width: half, height: area.height });
+      if (tag === "second") window.setBounds({ x: area.x + half, y: area.y, width: half, height: area.height });
+    }
+  });
+}
+
+/**
+ * Drags a sidebar item out of one window's sidebar with the mouse and lets go over a target in another window's (the
+ * sidebar moves items with pointer events, so Playwright's mouse is a real drag). The release point is the target's
+ * place on the screen, seen from the first window: outside it, so main hands the drop to the window there.
  */
 async function dragAcrossWindows(fromSidebar, itemId, toSidebar, targetSelector, verticalFraction = 0.5) {
-  await fromSidebar.evaluate((id) => {
-    const source = document.querySelector(`[draggable="true"][data-item-id="${id}"]`);
-    window.crossWindowDrag = { source: source, dataTransfer: new DataTransfer() };
-    source.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer: window.crossWindowDrag.dataTransfer }));
-  }, itemId);
+  const source = await fromSidebar.locator(`[draggable="true"][data-item-id="${itemId}"]`).boundingBox();
+  const start = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
+  await fromSidebar.mouse.move(start.x, start.y);
+  await fromSidebar.mouse.down();
+  await fromSidebar.mouse.move(start.x + 6, start.y + 6, { steps: 2 });
   const isAccepted = await toSidebar.waitForFunction(() => document.body.classList.contains("is-dragging"), null, { timeout: 3000 }).then(() => true, () => false);
-  await toSidebar.evaluate(({ selector, fraction }) => {
-    const target = document.querySelector(selector);
-    const rectangle = target.getBoundingClientRect();
-    const point = { clientX: rectangle.left + rectangle.width / 2, clientY: rectangle.top + rectangle.height * fraction };
-    const dataTransfer = new DataTransfer();
-    target.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer, ...point }));
-    target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer, ...point }));
+  const targetOnScreen = await toSidebar.evaluate(({ selector, fraction }) => {
+    const rectangle = document.querySelector(selector).getBoundingClientRect();
+    return { x: window.screenX + rectangle.left + rectangle.width / 2, y: window.screenY + rectangle.top + rectangle.height * fraction };
   }, { selector: targetSelector, fraction: verticalFraction });
-  await fromSidebar.evaluate(() => {
-    const drag = window.crossWindowDrag;
-    drag.source.dispatchEvent(new DragEvent("dragend", { bubbles: true, cancelable: true, dataTransfer: drag.dataTransfer }));
-  });
+  const fromOrigin = await fromSidebar.evaluate(() => ({ x: window.screenX, y: window.screenY }));
+  await fromSidebar.mouse.move(targetOnScreen.x - fromOrigin.x, targetOnScreen.y - fromOrigin.y, { steps: 3 });
+  await fromSidebar.mouse.up();
   await toSidebar.waitForTimeout(500);
   return isAccepted;
 }
@@ -348,6 +360,7 @@ await waitForWindows(app, (list) => findWindow(list, "first")?.pageUrls.includes
 // Dragging an item from one window's sidebar into another's, like Arc: it lands where it is dropped, and a tab comes
 // along (selected there, its page moved over; the window it came from shows another of its tabs).
 const spaceOf = (state, spaceId) => state.spaces.find((candidate) => candidate.id === spaceId);
+await placeSideBySide(app);
 await dispatch(secondSidebar, { type: "switchSpace", spaceId: "space-work" });
 await dispatch(firstSidebar, { type: "selectTab", tabId: "tab-gamma" });
 await waitForWindows(app, (list) => findWindow(list, "first")?.pageUrls.includes(urlOf("gamma")));
