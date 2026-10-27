@@ -189,15 +189,16 @@ interface VideoReading extends VideoSize {
 }
 
 /**
- * Runs one of the scripts above in the page's isolated world. User gesture is set, because browsers only allow
- * play() after one. Resolves to null when the page is gone or the script failed.
+ * Runs one of the scripts above in the page's isolated world. Resolves to null when the page is gone or the script
+ * failed. Only a press on play / pause counts as the user's gesture (browsers only allow play() after one): a
+ * gesture is the page's, not just our world's, and would let the page's own scripts open windows meanwhile.
  */
-async function runScript(contents: WebContents, script: string): Promise<unknown> {
+async function runScript(contents: WebContents, script: string, isUserGesture: boolean = false): Promise<unknown> {
   if (contents.isDestroyed()) {
     return null;
   }
   try {
-    return await contents.executeJavaScriptInIsolatedWorld(PIP_SCRIPT_WORLD_ID, [{ code: script }], true);
+    return await contents.executeJavaScriptInIsolatedWorld(PIP_SCRIPT_WORLD_ID, [{ code: script }], isUserGesture);
   } catch {
     return null;
   }
@@ -518,7 +519,7 @@ async function runCommand(pip: OpenPictureInPicture, command: PictureInPictureCo
       setMuted(pip.tabId, !tab.isMuted);
     }
   } else {
-    await runScript(pip.pageView.webContents, TOGGLE_SCRIPT);
+    await runScript(pip.pageView.webContents, TOGGLE_SCRIPT, true);
   }
   await sendStatus(pip);
 }
