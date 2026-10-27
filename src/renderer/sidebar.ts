@@ -16,6 +16,7 @@
  * survive, new rows grow in and removed rows shrink away. Clicks are handled by sidebarEvents.ts and dragDrop.ts
  * from data attributes, never by handlers on the rows.
  */
+import { getHexLuminance } from "../shared/faviconColor.js";
 import type { SidebarCommand } from "../shared/actions.js";
 import { SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_WIDTH_PX } from "../shared/settings.js";
 import type { BrowserState, ItemId, ItemLocation, RuntimeState, Space, SpaceId, TabItem } from "../shared/types";
@@ -417,16 +418,6 @@ const NEAR_BLACK_TOOLBAR_COLOR = "#424242";
 const NEAR_BLACK_TOOLBAR_COLOR_ACTIVE = "#3a3a3a";
 
 /**
- * Returns a "#rrggbb" color's perceived brightness, 0 (black) to 1 (white).
- */
-function getLuminance(hex: string): number {
-  const red = parseInt(hex.slice(1, 3), 16) / 255;
-  const green = parseInt(hex.slice(3, 5), 16) / 255;
-  const blue = parseInt(hex.slice(5, 7), 16) / 255;
-  return 0.299 * red + 0.587 * green + 0.114 * blue;
-}
-
-/**
  * Tints the card's toolbar with the selected page's color, like Arc, with text and icons that stay readable on it.
  * Without a known color the card takes the theme's default. Dark Spaces keep Arc's grey bar whatever the page's
  * color (the user's Arc on apple.com, 2026-10-27: grey over a page whose top we had sampled as white).
@@ -446,10 +437,10 @@ function applyToolbarTint(selectedTabId: ItemId | null): void {
   card.style.setProperty("--page-top-color", color);
   const nearBlackColor = currentRuntime.isWindowActive ? NEAR_BLACK_TOOLBAR_COLOR_ACTIVE : NEAR_BLACK_TOOLBAR_COLOR;
   const isDarkSpace = document.documentElement.dataset.appearance === "dark";
-  const isNearBlack = getLuminance(color) < NEAR_BLACK_LUMINANCE;
+  const isNearBlack = getHexLuminance(color) < NEAR_BLACK_LUMINANCE;
   const shownColor = isDarkSpace || isNearBlack ? nearBlackColor : color;
   card.style.setProperty("--card-bg", shownColor);
-  card.dataset.toolbarTone = getLuminance(shownColor) > LIGHT_TOOLBAR_LUMINANCE ? "light" : "dark";
+  card.dataset.toolbarTone = getHexLuminance(shownColor) > LIGHT_TOOLBAR_LUMINANCE ? "light" : "dark";
 }
 
 /**

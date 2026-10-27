@@ -4,7 +4,7 @@
  *   parts, transparent corners must not count, and a black-and-white icon must give no colour at all.
  */
 import { describe, expect, it } from "vitest";
-import { getFaviconAddress, pickAccentColor } from "../src/shared/faviconColor";
+import { getFaviconAddress, getHexLuminance, pickAccentColor } from "../src/shared/faviconColor";
 
 /** A BGRA bitmap (premultiplied, like macOS's) from a list of [red, green, blue, alpha] pixels. */
 function makePixels(colors: [number, number, number, number][]): Uint8Array {
@@ -55,6 +55,14 @@ describe("a favicon's colour", () => {
 
   it("is none only for an icon with nothing visible", () => {
     expect(pickAccentColor(makePixels(repeat([0, 0, 0, 0], 8)), 8, 1)).toBeNull();
+  });
+});
+
+describe("a colour's brightness", () => {
+  it("runs from 0 for black to 1 for white, green counting most", () => {
+    expect(getHexLuminance("#000000")).toBe(0);
+    expect(getHexLuminance("#ffffff")).toBeCloseTo(1);
+    expect(getHexLuminance("#00ff00")).toBeGreaterThan(getHexLuminance("#ff0000"));
   });
 });
 

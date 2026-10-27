@@ -14,7 +14,7 @@
  * Rule: no event listeners here (morph.ts keeps elements across redraws, so a listener would remember stale data).
  * The one exception is the rename field, which morphing never replaces while it has the focus.
  */
-import { getFaviconAddress } from "../shared/faviconColor.js";
+import { getFaviconAddress, getHexLuminance } from "../shared/faviconColor.js";
 import type { BrowserState, FolderItem, ItemId, ItemLocation, LiveFolderSource, LiveFolderStatus, RuntimeState, SidebarItem, SplitItem, TabItem } from "../shared/types";
 import { createActionButton, createElement, createFavicon, dispatch, getDisplayHost } from "./dom.js";
 import { createIcon } from "./icons.js";
@@ -520,6 +520,27 @@ export function renderItemRows(itemIds: ItemId[], location: ItemLocation, depth:
 }
 
 /**
+ * A logo colour that would vanish on this appearance's tiles is left out (the tile then uses the sidebar's own ink):
+ * a white logo (GitHub, X in dark mode) on a light Space, a black one on a dark Space (the user asked to check light
+ * mode for white on white, 2026-10-27). Our thresholds.
+ */
+const VANISHING_ON_LIGHT_LUMINANCE = 0.85;
+const VANISHING_ON_DARK_LUMINANCE = 0.15;
+
+/**
+ * The logo colour to draw a Favorite with, or undefined when it would vanish on this appearance's tiles.
+ */
+function pickVisibleAccent(color: string | undefined): string | undefined {
+  if (color === undefined) {
+    return undefined;
+  }
+  const luminance = getHexLuminance(color);
+  const isLightAppearance = document.documentElement.dataset.appearance === "light";
+  const vanishes = isLightAppearance ? luminance > VANISHING_ON_LIGHT_LUMINANCE : luminance < VANISHING_ON_DARK_LUMINANCE;
+  return vanishes ? undefined : color;
+}
+
+/**
  * The bouncing bars under the logo of a Favorite whose page plays sound in the background, in the site's colour when
  * it is known (white otherwise). Keyed, so redraws keep the same element and its bars keep moving.
  */
@@ -553,7 +574,7 @@ export function renderFavoriteTile(tab: TabItem, location: ItemLocation, index: 
   tile.classList.toggle("is-loaded", context.runtime.tabs[tab.id] !== undefined);
   // Arc borders the selected Favorite in its icon's colour (main/faviconAccents.ts finds it).
   const iconAddress = getFaviconAddress(tab.faviconUrl, tab.url);
-  const iconColor = iconAddress === null ? undefined : context.runtime.faviconAccents[iconAddress];
+  const iconColor = pickVisibleAccent(iconAddress === null ? undefined : context.runtime.faviconAccents[iconAddress]);
   const accent = isSelected ? iconColor : undefined;
   tile.classList.toggle("has-accent", accent !== undefined);
   if (accent !== undefined) {

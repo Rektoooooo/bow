@@ -163,9 +163,10 @@ export const TAB_TOOLTIP_DELAY_MS = 600;
  * Arc's Library lives in the sidebar column (the user's recording, 2026-10-27, frames f0177–f0243): the column widens
  * to a rail of sections (112 pt, then a 1 pt line) and a list beside it, and the page card moves to x = 417 pt. In
  * our terms (the card starts CARD_GAP_PX after the sidebar's width) that is a 410 pt column, the same at any sidebar
- * width (the user's sidebar was 254).
+ * width (the user's sidebar was 254). Ours is wider, 560 pt: at 410 Settings and Extensions wrapped into narrow
+ * columns (the user, 2026-10-27).
  */
-export const LIBRARY_COLUMN_WIDTH_PX = 410;
+export const LIBRARY_COLUMN_WIDTH_PX = 560;
 export const LIBRARY_RAIL_WIDTH_PX = 112;
 
 /*

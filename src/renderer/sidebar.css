@@ -49,7 +49,7 @@
   --row-gap: 5px;
   --row-radius: 10px;
   --peek-inset: 5px; /* the peeking sidebar's distance from the window edges (Arc, the user's recording) */
-  --library-width: 410px; /* = LIBRARY_COLUMN_WIDTH_PX */
+  --library-width: 560px; /* = LIBRARY_COLUMN_WIDTH_PX */
   --peek-radius: 12px;
 
   /* Motion, close to Arc's: quick and soft. */

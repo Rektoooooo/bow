@@ -63,6 +63,16 @@ export function getFaviconAddress(faviconUrl: string | null, pageUrl: string): s
 }
 
 /**
+ * A "#rrggbb" colour's perceived brightness, 0 (black) to 1 (white).
+ */
+export function getHexLuminance(hex: string): number {
+  const red = parseInt(hex.slice(1, 3), 16) / CHANNEL_MAX;
+  const green = parseInt(hex.slice(3, 5), 16) / CHANNEL_MAX;
+  const blue = parseInt(hex.slice(5, 7), 16) / CHANNEL_MAX;
+  return 0.299 * red + 0.587 * green + 0.114 * blue;
+}
+
+/**
  * Two hex digits for a channel.
  */
 function toHexChannel(channel: number): string {

@@ -19,7 +19,7 @@ const SIDEBAR_WIDTH = 242;
 const CARD_GAP = 7;
 const CARD_INSET = 10;
 const LAYOUT_MOTION_MS = 260;
-const LIBRARY_COLUMN_WIDTH = 410;
+const LIBRARY_COLUMN_WIDTH = 560; // = LIBRARY_COLUMN_WIDTH_PX
 
 const results = [];
 function check(name, ok, detail = "") {

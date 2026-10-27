@@ -122,17 +122,18 @@ await dispatch({ type: "openLibrary" });
 await overlay.waitForSelector(".library .library-line", { timeout: 5000 });
 const archiveLines = await overlay.locator(".library .library-line").count();
 check("the Library lists the archived tab", archiveLines === 1, String(archiveLines));
-// Like Arc's, the Library takes the sidebar column (410 pt wide); the sidebar page widens its column to match.
+// Like Arc's, the Library takes the sidebar column (560 pt wide, wider than Arc's 410); the sidebar page widens its
+// column to match.
 const libraryPlacement = await app.evaluate(({ BrowserWindow }) => {
   const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
   const overlayView = win.contentView.children.find((child) => child.webContents?.getURL().endsWith("/overlay/overlay.html"));
   return overlayView === undefined ? null : overlayView.getBounds();
 });
-// The column glides open (260 ms) after the runtime push; the card then starts after it (410 + the 7 pt gap).
-await sidebar.waitForFunction(() => document.body.classList.contains("library-open") && Math.round(document.getElementById("card").getBoundingClientRect().x) === 417, null, { timeout: 3000 }).catch(() => undefined);
+// The column glides open (260 ms) after the runtime push; the card then starts after it (560 + the 7 pt gap).
+await sidebar.waitForFunction(() => document.body.classList.contains("library-open") && Math.round(document.getElementById("card").getBoundingClientRect().x) === 567, null, { timeout: 3000 }).catch(() => undefined);
 const sidebarColumn = await sidebar.evaluate(() => (document.body.classList.contains("library-open") ? Math.round(document.getElementById("card").getBoundingClientRect().x) - 7 : 0));
 const railSections = await overlay.$$eval(".library-rail .library-tab", (tabs) => tabs.map((tab) => tab.dataset.section).join(","));
-check("the Library takes the sidebar column, with Arc's rail of sections", libraryPlacement?.x === 0 && libraryPlacement?.width === 410 && sidebarColumn === 410 && railSections.startsWith("media,downloads,spaces,boosts,archive"), `${JSON.stringify(libraryPlacement)} column=${sidebarColumn} ${railSections}`);
+check("the Library takes the sidebar column, with Arc's rail of sections", libraryPlacement?.x === 0 && libraryPlacement?.width === 560 && sidebarColumn === 560 && railSections.startsWith("media,downloads,spaces,boosts,archive"), `${JSON.stringify(libraryPlacement)} column=${sidebarColumn} ${railSections}`);
 await overlay.click(".library .library-line");
 await sidebar.waitForTimeout(500);
 state = await getState();
@@ -678,6 +679,18 @@ const boostTitles = await overlay.$$eval(".library-line .library-line-title", (t
 check("Library › Boosts lists the sites with a Boost", boostTitles.includes("example.com"), boostTitles.join(","));
 await overlay.click(".library-tab[data-section='settings']");
 await overlay.waitForTimeout(200);
+// Flipping a switch far down in Settings redraws the section with fresh data; the list stays where it was scrolled.
+const settingsScroll = await overlay.$eval(".library-settings", (list) => {
+  list.scrollTop = list.scrollHeight;
+  return list.scrollTop;
+});
+// A plain DOM click: Playwright's click would scroll the switch into view first.
+await overlay.$eval(".setting-switch[aria-label='Show full URLs']", (toggle) => toggle.click());
+await sidebar.waitForTimeout(500);
+const scrollAfterSwitch = await overlay.$eval(".library-settings", (list) => list.scrollTop);
+check("flipping a switch in Settings keeps the list where it was scrolled", settingsScroll > 0 && Math.abs(scrollAfterSwitch - settingsScroll) <= 1 && (await getState()).settings.showsFullUrls === true, `${settingsScroll} → ${scrollAfterSwitch}`);
+await overlay.$eval(".setting-switch[aria-label='Show full URLs']", (toggle) => toggle.click());
+await sidebar.waitForTimeout(300);
 // Search engine: chosen in Settings, it searches what you type in the Command Bar.
 await overlay.selectOption(".library-select[aria-label='Search engine']", "google");
 await sidebar.waitForTimeout(300);

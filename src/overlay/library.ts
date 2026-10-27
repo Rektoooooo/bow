@@ -692,6 +692,30 @@ function renderRoutingSettings(data: LibraryData): HTMLElement {
   return section;
 }
 
+/** The parts of a Library section that scroll (overlay.css overflow-y: auto). */
+const SCROLLING_PARTS = ".library-settings, .library-list, .media-grid";
+
+/**
+ * How far each scrolling part of the section is scrolled, in page order.
+ */
+function readScrollPositions(body: HTMLElement): number[] {
+  const positions: number[] = [];
+  for (const part of body.querySelectorAll<HTMLElement>(SCROLLING_PARTS)) {
+    positions.push(part.scrollTop);
+  }
+  return positions;
+}
+
+/**
+ * Scrolls the redrawn section's parts back to where the old ones were.
+ */
+function restoreScrollPositions(body: HTMLElement, positions: number[]): void {
+  const parts = body.querySelectorAll<HTMLElement>(SCROLLING_PARTS);
+  parts.forEach((part, index) => {
+    part.scrollTop = positions[index] ?? 0;
+  });
+}
+
 /**
  * Draws the selected section into the panel body.
  */
@@ -701,6 +725,10 @@ function renderBody(data: LibraryData): void {
   if (body === null || tabs === null) {
     return;
   }
+  // A redraw of the same section (fresh data after a switch was flipped) keeps its lists where they were scrolled;
+  // without this, every change in Settings jumped back to the top (the user, 2026-10-27).
+  const isRedraw = body.dataset.section === section;
+  const scrollPositions = isRedraw ? readScrollPositions(body) : [];
   for (const button of tabs.querySelectorAll<HTMLButtonElement>("button")) {
     button.classList.toggle("is-active", button.dataset.section === section);
   }
@@ -728,6 +756,8 @@ function renderBody(data: LibraryData): void {
   if (section === "settings") {
     renderSettingsSection(body, data);
   }
+  body.dataset.section = section;
+  restoreScrollPositions(body, scrollPositions);
 }
 
 /**
