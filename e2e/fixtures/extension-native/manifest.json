@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "Native Echo",
+  "version": "1.0.0",
+  "description": "Test extension for e2e/check-extensions.mjs: talks to a native messaging host (a made-up echo host the check installs). The key fixes its id: dpnkcidamnfhaoahbjlbmphnnnbdmfff.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAw5CJ8kWNkdyJlnvVxJMrW+CNx/QaZ7MHJX3nLRvHK06P6ZG/Q8jrBr2dx40cLdsFQPCHdfeRFfqLazQ52Q4L2NRZG+DwY/mK2YcFk6Ui47nZwj6X/WzWKgC7q0XLF9C4KmzUWxgAofkiMWaKtT3eFj9yZsIc5egqesx7tVsEkRJMOqqo47nlIOKRmZuDfS6jdJ8F0zA/4bjWcOyVN4Qo+fr1VKaxdpVqUrSQjHFwiQWqMg2sv8NE2nrxqmysVA7Wrv7G0bs6U7vXg0ngFliBQPuSU9C3AFgcrbY44rc+kMVRQWm+54NzdsKHqvwBupFpFj3TqcM1u3jC/D8vI8Hh5wIDAQAB",
+  "background": { "service_worker": "background.js" },
+  "permissions": ["nativeMessaging"]
+}

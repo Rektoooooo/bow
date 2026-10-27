@@ -116,6 +116,9 @@ in Arc). Running it twice adds nothing twice.
   [electron-chrome-extensions](https://github.com/samuelmaddock/electron-browser-shell) library (MIT) adds the
   browser parts: the puzzle button in the toolbar opens an extension's popup, `chrome.tabs` knows the selected tab,
   extensions can open tabs, and their items appear in the page's right-click menu.
+- Password managers' desktop links work (native messaging, e.g. Apple Passwords, 1Password, Bitwarden): hosts
+  registered for Chrome are found directly, and those registered only for Arc, Brave, Edge, Vivaldi or Chromium are
+  linked in at startup.
 - Some extensions need Chrome features Electron does not have (side panels, tab capture); those load but only
   partly work.
 

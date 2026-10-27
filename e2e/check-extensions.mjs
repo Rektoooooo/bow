@@ -150,6 +150,55 @@ await dispatch(sidebar, { type: "removeExtension", profileId: "profile-default",
 state = await waitFor(() => getState(sidebar), (value) => (value.extensions ?? []).length === 0);
 check("Remove takes it out of the profile", (state.extensions ?? []).length === 0);
 check("and out of the session", (await waitFor(() => loadedNames(app), (names) => names.length === 0)).length === 0);
+// Native messaging (how password managers such as Apple Passwords or 1Password talk to their app): a made-up echo host
+// in the profile's NativeMessagingHosts folder, and a test extension with a fixed id that pings it and sends back the
+// answer. The host logs what arrives, so its log shows the round trip.
+const NATIVE_EXTENSION_ID = "dpnkcidamnfhaoahbjlbmphnnnbdmfff";
+const hostsDir = path.join(userDataDir, "NativeMessagingHosts");
+fs.mkdirSync(hostsDir, { recursive: true });
+const hostScript = path.join(hostsDir, "echo-host.js");
+const hostLog = path.join(hostsDir, "echo-log.txt");
+fs.writeFileSync(
+  hostScript,
+  `#!${process.execPath}
+// Chrome's native messaging: each message is a 4-byte little-endian length, then that much JSON.
+const fs = require("node:fs");
+let buffer = Buffer.alloc(0);
+process.stdin.on("data", (chunk) => {
+  buffer = Buffer.concat([buffer, chunk]);
+  while (buffer.length >= 4 && buffer.length >= 4 + buffer.readUInt32LE(0)) {
+    const length = buffer.readUInt32LE(0);
+    const message = JSON.parse(buffer.subarray(4, 4 + length).toString("utf8"));
+    buffer = buffer.subarray(4 + length);
+    fs.appendFileSync(${JSON.stringify(hostLog)}, JSON.stringify(message) + "\\n");
+    const reply = Buffer.from(JSON.stringify({ pong: true }));
+    const header = Buffer.alloc(4);
+    header.writeUInt32LE(reply.length);
+    process.stdout.write(Buffer.concat([header, reply]));
+  }
+});
+`,
+);
+fs.chmodSync(hostScript, 0o755);
+fs.writeFileSync(
+  path.join(hostsDir, "com.sidebar_browser.test_echo.json"),
+  JSON.stringify({ name: "com.sidebar_browser.test_echo", description: "Test echo host", path: hostScript, type: "stdio", allowed_origins: [`chrome-extension://${NATIVE_EXTENSION_ID}/`] }),
+);
+await app.evaluate(({ dialog }, folder) => {
+  dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [folder] });
+}, path.join(appDir, "e2e", "fixtures", "extension-native"));
+await dispatch(sidebar, { type: "loadUnpackedExtension" });
+const hostLines = await waitFor(
+  () => (fs.existsSync(hostLog) ? fs.readFileSync(hostLog, "utf8").trim().split("\n") : []),
+  (lines) => lines.length >= 2,
+  20000,
+);
+check(
+  "an extension reaches a native messaging host and gets its answer (password-manager bridges)",
+  hostLines[0]?.includes("hello from the extension") && hostLines[1]?.includes('"pong":true'),
+  hostLines.join(" | "),
+);
+
 // A Chrome Web Store extension page gets "Add Extension" in the toolbar (shown from the address alone; not clicked,
 // which would download from the Web Store).
 await dispatch(sidebar, { type: "openTab", typedText: "https://chromewebstore.google.com/detail/made-up-name/abcdefghijklmnopabcdefghijklmnop" });

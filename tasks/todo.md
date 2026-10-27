@@ -133,8 +133,10 @@ Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 Ã
 - [x] Live folders: GitHub pull requests / review requests / assigned issues (read with the profile's GitHub sign-in,
       HTML first, hidden window for script-drawn lists; verified on a real public GitHub list), RSS/Atom/JSON feeds
       from the page on screen; Arc import keeps Arc's GitHub live folder live
-- Not doing (documented): Arc Max (user's choice), sync/sharing/accounts (user's choice), AppleScript and
-  password-manager bridges (need native code), auto-updates (needs published releases: ask first)
+- [x] Password-manager bridges: native messaging works (round trip checked in e2e); hosts of Arc, Brave, Edge,
+      Vivaldi and Chromium are linked in at startup
+- Not doing (documented): Arc Max (user's choice), sync/sharing/accounts (user's choice), AppleScript (needs
+  native Cocoa scripting code), auto-updates (needs published releases: ask first)
 
 ### 3.4 Verification
 - [x] e2e/arc-compare.mjs (side-by-side with the reference; positions match within about a point)
@@ -158,7 +160,10 @@ Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 Ã
 ## Later
 - [ ] Ghidra pass when RAM allows (Command Bar ranking, Peek triggers, sync merge, Easel captures)
 - [x] Easels, Notes, tab hover previews, built-in ad blocking, screen sharing (macOS's sharing picker)
-- [ ] Multiple main windows (âŒ˜N opens a second window, like Arc)
+- [ ] Multiple main windows (âŒ˜N opens a second window, like Arc). Deferred on evidence: every StorableWindows
+      snapshot in the user's Arc backup (Marchâ€“October 2026) holds 0 or 1 window. Sketch when it is needed: keep
+      activeSpaceId/selectedTabIdBySpace as the focused window's, park the other windows' in a `windows` list, project
+      the state per window for its sidebar, move the overlay/Peek/status views to the focused window.
 - [ ] Sign and notarize the app (needs a Developer ID) so it runs on other Macs
 - [ ] Adding a Web Store extension to a second profile re-downloads into the folder the first profile has loaded;
       reuse the existing copy instead (rare)

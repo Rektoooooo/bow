@@ -57,6 +57,7 @@ import { startHandoff } from "./handoff";
 import { noticeVisitedPage, startLiveFolderRefreshing } from "./liveFolderRefresher";
 import { getProfileSession, onProfileSessionCreated, restrictWebPermissions, useChromeUserAgent } from "./profiles";
 import { retakeCapture } from "./liveCaptures";
+import { linkNativeMessagingHosts, listOtherBrowserHostFolders } from "./nativeMessagingHosts";
 import { moveTabsToArchive, setNoteTitle, updateTabFavicon, updateTabPage } from "./state";
 import { getStateFilePath } from "./store";
 import { loadWindowBounds, rememberWindowBounds } from "./windowState";
@@ -264,6 +265,22 @@ function startAutoArchiveTimers(): void {
   setInterval(pruneOldArchiveEntries, ARCHIVE_PRUNE_INTERVAL_MS);
 }
 
+/** Where the extension library looks for native messaging host manifests besides Chrome's folders. */
+const NATIVE_MESSAGING_HOSTS_FOLDER_NAME = "NativeMessagingHosts";
+
+/**
+ * Links the native messaging hosts of other Chromium browsers into ours (nativeMessagingHosts.ts). A failure only
+ * means fewer hosts; it never stops the start.
+ */
+function linkHostsOfOtherBrowsers(): void {
+  try {
+    const ourFolder = path.join(app.getPath("userData"), NATIVE_MESSAGING_HOSTS_FOLDER_NAME);
+    linkNativeMessagingHosts(listOtherBrowserHostFolders(app.getPath("home")), ourFolder);
+  } catch (error) {
+    console.warn("Could not link the native messaging hosts of other browsers:", error);
+  }
+}
+
 /**
  * Keeps Web Store extensions current: a first check shortly after startup, then every few hours, like Chrome.
  */
@@ -339,6 +356,8 @@ async function handleAppReady(): Promise<void> {
   registerSymbolIpc();
   setCommandActionRegistry(createCommandActionRegistry({ commands: appMenuCommands, runAction: runAction, getState: getState }));
   installAppMenu(appMenuCommands);
+  // Hosts that password managers registered for other Chromium browsers (Arc, Brave, …) are found by extensions here.
+  linkHostsOfOtherBrowsers();
   // Extensions load before the first page, so their content scripts reach the pages restored at startup.
   initializeExtensionHost(tabViewEvents);
   await prepareExtensions();
