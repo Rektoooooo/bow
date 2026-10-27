@@ -1231,6 +1231,19 @@ button:disabled {
   transition: padding var(--motion-layout) var(--motion-layout-ease);
 }
 
+/*
+  The frame around the card moves the window like a title bar, as in Arc (only the toolbar and the sidebar's top
+  strip did, so grabbing the window's top edge did nothing). The card takes its own clicks again; its toolbar drags
+  as before. Since Electron 44 app-region is inherited, so everything inside the card is no-drag unless it says so.
+*/
+.main-column {
+  -webkit-app-region: drag;
+}
+
+.card {
+  -webkit-app-region: no-drag;
+}
+
 body.sidebar-hidden .main-column {
   padding-left: var(--card-inset);
 }

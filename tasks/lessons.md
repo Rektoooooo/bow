@@ -15,6 +15,10 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   reworded before a push. Write "three of the user's titles", never the titles.
 
 ## Testing
+- Window dragging cannot be driven from a test (Playwright's mouse never reaches the native window, and posting real
+  mouse events needs a permission we do not have). Check drag regions with `ELECTRON_DEBUG_DRAGGABLE_REGIONS=1`
+  (Electron 44.3+): it paints the regions main hit-tests on the page, and a window capture shows them. Since
+  Electron 44 `-webkit-app-region` is inherited, so a no-drag container makes everything inside it no-drag.
 - Playwright's `dragAndDrop` hangs inside Electron on macOS (it starts a real OS drag). Simulate HTML drag events in
   the page instead (`simulateDrag` in `e2e/check-app.mjs`).
 - Vitest picks up test files in agent worktrees under `.claude/`; `vitest.config.ts` excludes them.
