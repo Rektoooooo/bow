@@ -1,7 +1,7 @@
 # CLAUDE.md — Bow (formerly Sidebar Browser)
 
 An Arc-style desktop browser in Electron + TypeScript, built after studying Arc 1.170.0 with REA.
-Public repo: https://github.com/Rektoooooo/sidebar-browser
+Public repo: https://github.com/Rektoooooo/bow
 
 ## Start here
 
@@ -27,6 +27,8 @@ npm run e2e          # build + drive the real app: check-app, check-overlay, che
 node e2e/window-shot.mjs   # README screenshots from sample data → docs/screenshot-*.png
 node e2e/arc-compare.mjs   # side-by-side crops with the user's Arc screenshots (reference/, local only) → e2e/output
 npm run package      # release/Bow-darwin-arm64/Bow.app (ad-hoc signed, git-ignored)
+npm run release      # release/Bow-<version>-arm64.dmg: Developer ID signed, hardened runtime, notarized + stapled
+                     # (needs the keychain's Developer ID certificate and the notarytool profile "bow-notary")
 node e2e/check-package.mjs # checks that packaged app (Info.plist, menu, links from other apps)
 tools/make-icon.sh   # redraws build/icon.icns from tools/make-icon.cjs (our own icon design)
 ```
@@ -121,7 +123,7 @@ The owner must be able to explain every line to a reviewer:
 
 ## Git and GitHub
 
-- `main` tracks `origin` = `https://github.com/Rektoooooo/sidebar-browser.git` (public).
+- `main` tracks `origin` = `https://github.com/Rektoooooo/bow.git` (public).
 - Commits in this repo use the repo-local author `Rektoooooo <95218813+Rektoooooo@users.noreply.github.com>`
   (already set in `.git/config`). Do not commit with the machine's global identity, which is a work address.
 - Run `gh auth status` first. On the Arc account (below) the only gh account is Rektoooooo, so
@@ -129,7 +131,7 @@ The owner must be able to explain every line to a reviewer:
   must stay active: do not `gh auth switch`; use the personal token per command:
 
   ```bash
-  GH_TOKEN="$(gh auth token --user Rektoooooo)" gh repo view Rektoooooo/sidebar-browser
+  GH_TOKEN="$(gh auth token --user Rektoooooo)" gh repo view Rektoooooo/bow
   GH_TOKEN="$(gh auth token --user Rektoooooo)" git -c credential.helper= \
     -c 'credential.helper=!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; }; f' push
   ```

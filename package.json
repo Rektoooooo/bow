@@ -2,7 +2,17 @@
   "name": "sidebar-browser",
   "productName": "Bow",
   "version": "0.1.0",
-  "description": "A desktop browser with a vertical sidebar, Spaces and auto-archive of unused tabs.",
+  "description": "An open-source browser in the spirit of Arc: tabs in a vertical sidebar, Spaces, Peek, Split View and auto-archive.",
+  "license": "MIT",
+  "author": "Rektoooooo",
+  "homepage": "https://github.com/Rektoooooo/bow#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rektoooooo/bow.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Rektoooooo/bow/issues"
+  },
   "private": true,
   "main": "dist/node/main/main.js",
   "scripts": {
@@ -10,7 +20,8 @@
     "start": "npm run build && electron .",
     "test": "vitest run",
     "e2e": "npm run build && node e2e/check-app.mjs && node e2e/check-overlay.mjs && node e2e/check-extensions.mjs && node e2e/permission-check.mjs && node e2e/check-motion.mjs && node e2e/check-live-folders.mjs && node e2e/check-performance.mjs && node e2e/check-windows.mjs",
-    "package": "tools/package-mac.sh"
+    "package": "tools/package-mac.sh",
+    "release": "tools/release-mac.sh"
   },
   "devDependencies": {
     "@electron/packager": "20.3.0",
