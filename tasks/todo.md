@@ -250,6 +250,19 @@ repo: the user stores them in their own keychain); Arc Max and sync/sharing stay
       measure when the order changed, the toolbar tint restyles the card alone → about 8 ms per redraw
 - [ ] Hands-on runs of the packaged app; all suites green; docs + teardown page current
 
+## Review (2026-10-28, an unattended night: open source, releases, auto-update, speed, polish)
+- **Works and verified:** open-source setup and repo rename; `npm run release` up to Apple's notarization (signing,
+  hardened runtime, DMG checked by hand; notarization waits for the user's credentials); auto-update (a real signed
+  0.1.0 → 0.1.1 update by hand; check-package and check-windows cover the rest); sleeping tabs incl. calls
+  (check-tab-sleep 7); Firefox import (unit tests on a real SQLite file; the user's own Firefox folder was not read);
+  saves and pushes batched, startup symbol cache and deferred Dock icon (measured); toast, Peek menu navigation,
+  overlay scroll knob, Library polish, peek toolbar fix. Last full run: `npm test` 376, check-app 47, check-overlay
+  88, check-extensions 35, permission-check, check-motion 9, check-live-folders 21, check-performance 7,
+  check-windows 52, check-tab-sleep 7, check-package 19.
+- **Not verified:** notarization itself (no credentials yet); the move to Applications answered with Move (only the
+  offer was seen, from a mounted disk image); website notifications on a real site.
+- **Open:** see `.handoffs/2026-10-28-night.md` › Decisions for the user and Next.
+
 ## Review (2026-10-27, polish tour and Arc fixes 3–7 from the live comparison, 3.7)
 - **Works and verified:** background-window icon fading, toolbar strengths, planet, tab title weight, New Tab pitch,
   floating peek panel (`7211ac4`); Arc's tab tooltip (`fa4360b`); Arc import sets the sidebar width (`f85eebe`, also
