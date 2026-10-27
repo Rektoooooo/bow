@@ -13,7 +13,7 @@
  *   a main window gets the focus → floating panels close → focusWindow(state, id)
  *   a main window closes → its pages leave it → closeWindow(state, id) (not while quitting) → quit after the last
  */
-import { app, BrowserWindow } from "electron";
+import { app, autoUpdater, BrowserWindow } from "electron";
 import type { Rectangle } from "electron";
 import * as path from "node:path";
 import type { WindowId } from "../shared/types";
@@ -160,6 +160,11 @@ function createMainWindow(windowId: WindowId, bounds: Rectangle | null): Browser
  */
 export function restoreMainWindows(): void {
   app.on("before-quit", () => {
+    isQuitting = true;
+  });
+  // "Restart to Update" closes the windows before app.quit(), so before-quit would come too late: every window but
+  // the last would be closed for good instead of opening again in the new version.
+  autoUpdater.on("before-quit-for-update", () => {
     isQuitting = true;
   });
   const state = getState();

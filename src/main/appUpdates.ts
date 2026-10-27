@@ -18,9 +18,27 @@
  *   startup from the disk image → offerMoveToApplications() → Electron moves Bow and starts it again
  */
 import { app, autoUpdater, dialog } from "electron";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { APP_UPDATE_FEED_BASE_URL, APP_UPDATE_FIRST_CHECK_MS, APP_UPDATE_INTERVAL_MS } from "../shared/settings";
 import { isRunningFromDiskImage } from "./appLocation";
 import { getWindow, setUpdateReadyVersion } from "./browserCore";
+
+/** The Info.plist key tools/package-mac.sh writes into release builds; only those update themselves. */
+const RELEASE_BUILD_KEY = "<key>BowUpdatesFromGitHub</key>";
+
+/**
+ * True when this app was built for a release (signed with a Developer ID by tools/release-mac.sh). Info.plist is the
+ * XML file the packager wrote, next to the Resources folder.
+ */
+function isReleaseBuild(): boolean {
+  const infoPlistPath = path.join(process.resourcesPath, "..", "Info.plist");
+  try {
+    return fs.readFileSync(infoPlistPath, "utf8").includes(RELEASE_BUILD_KEY);
+  } catch {
+    return false;
+  }
+}
 
 /** Where updates come from, or why this run never updates. */
 type UpdateSource = { kind: "feed"; url: string } | { kind: "off"; reason: string };
@@ -40,16 +58,22 @@ let readyVersion: string | null = null;
 /** True while a check runs: a second check meanwhile would download the update twice (Squirrel starts a new one). */
 let isChecking = false;
 
+/** Ends a check that never got an answer (no network reply, no event), so later checks are not blocked forever. */
+let checkTimeout: NodeJS.Timeout | null = null;
+
+/** A check gets this long to say whether there is an update. Our choice: the feed is one small file. */
+const CHECK_TIMEOUT_MS = 60 * 1000;
+
 /** True while a download runs after a check found an update. */
 let isDownloading = false;
 
-/** Answers a check the user asked for once it has an outcome, or null when nobody waits for one. */
-let answerWaitingUser: ((outcome: CheckOutcome) => void) | null = null;
+/** The user's checks waiting for an outcome (a second "Check for Updates…" joins the first). */
+let waitingAnswers: ((outcome: CheckOutcome) => void)[] = [];
 
 /**
- * Picks the feed. Builds made from source (npm start) and the tests' throwaway profiles never check: the first is
- * not signed for updates, the second must not reach GitHub. --update-feed overrides both checks for the package
- * check's local feed.
+ * Picks the feed. Builds made from source (npm start), copies packaged on this Mac (npm run package, signed ad hoc)
+ * and the tests' throwaway profiles never check: the first two cannot accept a Developer ID update, the last must
+ * not reach GitHub. --update-feed overrides all three for the package check's local feed.
  */
 function chooseUpdateSource(): UpdateSource {
   const feedOverride = app.commandLine.getSwitchValue("update-feed");
@@ -62,17 +86,27 @@ function chooseUpdateSource(): UpdateSource {
   if (app.commandLine.hasSwitch("user-data-dir")) {
     return { kind: "off", reason: "Updates are off while Bow runs with its own data folder (--user-data-dir)." };
   }
+  if (!isReleaseBuild()) {
+    return { kind: "off", reason: "This copy of Bow was built on this Mac (npm run package). Only the downloaded app updates itself." };
+  }
   // One feed per processor type, so an Intel build can be added later without changing installed apps.
   return { kind: "feed", url: `${APP_UPDATE_FEED_BASE_URL}/update-darwin-${process.arch}.json` };
 }
 
 /**
- * Tells the user waiting for a check (if any) what it found.
+ * A check has its outcome: it is no longer running, and everyone waiting for it hears what it found.
  */
-function answerUser(outcome: CheckOutcome): void {
-  const answer = answerWaitingUser;
-  answerWaitingUser = null;
-  answer?.(outcome);
+function finishCheck(outcome: CheckOutcome): void {
+  isChecking = false;
+  if (checkTimeout !== null) {
+    clearTimeout(checkTimeout);
+    checkTimeout = null;
+  }
+  const answers = waitingAnswers;
+  waitingAnswers = [];
+  for (const answer of answers) {
+    answer(outcome);
+  }
 }
 
 /**
@@ -80,26 +114,24 @@ function answerUser(outcome: CheckOutcome): void {
  */
 function listenToUpdater(onReadyToInstall: () => void): void {
   autoUpdater.on("update-available", () => {
-    isChecking = false;
     isDownloading = true;
-    answerUser({ kind: "downloading" });
+    finishCheck({ kind: "downloading" });
   });
   autoUpdater.on("update-not-available", () => {
-    isChecking = false;
-    answerUser({ kind: "newest" });
+    finishCheck({ kind: "newest" });
   });
-  // The feed's "name" is the bare version number (tools/release-mac.sh writes it so).
+  // The feed's "name" is the bare version number (tools/release-mac.sh writes it so); a feed without one still works.
   autoUpdater.on("update-downloaded", (_event, _releaseNotes, releaseName) => {
     isDownloading = false;
-    readyVersion = releaseName;
-    setUpdateReadyVersion(releaseName);
+    const version = releaseName.trim() === "" ? "(new version)" : releaseName;
+    readyVersion = version;
+    setUpdateReadyVersion(version);
     onReadyToInstall();
   });
   autoUpdater.on("error", (error) => {
-    isChecking = false;
     isDownloading = false;
     console.warn("Update check failed:", error.message);
-    answerUser({ kind: "failed", message: error.message });
+    finishCheck({ kind: "failed", message: error.message });
   });
 }
 
@@ -112,6 +144,10 @@ function checkInBackground(): void {
     return;
   }
   isChecking = true;
+  checkTimeout = setTimeout(() => {
+    checkTimeout = null;
+    finishCheck({ kind: "failed", message: "The update feed did not answer. Check your connection and try again." });
+  }, CHECK_TIMEOUT_MS);
   autoUpdater.checkForUpdates();
 }
 
@@ -185,12 +221,27 @@ async function showOutcome(outcome: CheckOutcome): Promise<void> {
 }
 
 /**
+ * True when the folder holding Bow.app can be written to: an app kept on an external drive (also under /Volumes) is
+ * installed there on purpose, while a disk image and macOS's translocated copy are read-only.
+ */
+function isAppFolderWritable(): boolean {
+  // process.execPath is …/Bow.app/Contents/MacOS/Bow.
+  const appBundlePath = path.resolve(process.execPath, "..", "..", "..");
+  try {
+    fs.accessSync(path.dirname(appBundlePath), fs.constants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Bow opened from its disk image (or macOS's read-only copy of it): offers to move it to Applications, where it keeps
  * working after the image is ejected and can update itself. A sheet on the window, so the browser is usable behind
  * it. Electron's move replaces an older Bow there, or switches to it when that one is running.
  */
 export async function offerMoveToApplications(): Promise<void> {
-  if (!app.isPackaged || !isRunningFromDiskImage(process.execPath)) {
+  if (!app.isPackaged || !isRunningFromDiskImage(process.execPath) || isAppFolderWritable()) {
     return;
   }
   console.log(`Bow runs from ${process.execPath}; offering to move it to Applications.`);
@@ -231,7 +282,7 @@ export async function checkForUpdatesNow(): Promise<void> {
     return;
   }
   const outcome = new Promise<CheckOutcome>((resolve) => {
-    answerWaitingUser = resolve;
+    waitingAnswers.push(resolve);
   });
   checkInBackground();
   await showOutcome(await outcome);

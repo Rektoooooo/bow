@@ -526,9 +526,26 @@ check(
   JSON.stringify(windows.map((window) => window.pageX)),
 );
 
+// "Restart to Update" (Electron's quitAndInstall) closes every window before it quits: they must all come back.
+const exitedForUpdate = new Promise((resolve) => app.process().once("exit", () => resolve(true)));
+const updateRunLog = mainLog.join("");
+await app.evaluate(({ autoUpdater, BrowserWindow }) => {
+  autoUpdater.emit("before-quit-for-update");
+  const mainWindows = BrowserWindow.getAllWindows().filter((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  for (const window of mainWindows) {
+    window.close();
+  }
+}).catch(() => undefined);
+await Promise.race([exitedForUpdate, new Promise((resolve) => setTimeout(() => resolve(false), 10000))]);
+await new Promise((resolve) => setTimeout(resolve, 1500));
+({ app, mainLog } = await launch());
+sidebars = await waitForSidebars(app, 2).catch(() => app.windows().filter(isSidebarPage));
+await new Promise((resolve) => setTimeout(resolve, 1000));
+check("Restart to Update brings every window back (it closes them before quitting)", app.windows().filter(isSidebarPage).length === 2, `${app.windows().filter(isSidebarPage).length} sidebars`);
+
 // Closing every window ends the app; the last one is kept for the next start.
 const exited = new Promise((resolve) => app.process().once("exit", () => resolve(true)));
-const secondRunLog = mainLog.join("");
+const secondRunLog = updateRunLog + mainLog.join("");
 await app.evaluate(({ BrowserWindow }) => {
   const mainWindows = BrowserWindow.getAllWindows().filter((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
   mainWindows[0]?.close();

@@ -27,13 +27,19 @@ dmg_path="release/Bow-$version-$architecture.dmg"
 zip_name="Bow-$version-$architecture.zip"
 feed_path="release/update-darwin-$architecture.json"
 work_folder="$(mktemp -d)"
+# The temporary zip and disk folder go away however the script ends.
+trap 'rm -rf "$work_folder"' EXIT
 
 # Sends a file to Apple's notary service, waits for the answer and stops the release when Apple refuses it (the log
 # says which file inside was the problem).
 notarize() {
   local file_path="$1"
   local answer
-  answer="$(xcrun notarytool submit "$file_path" --keychain-profile "$notary_profile" --wait --output-format plist)"
+  if ! answer="$(xcrun notarytool submit "$file_path" --keychain-profile "$notary_profile" --wait --output-format plist)"; then
+    echo "notarytool could not submit $(basename "$file_path"):"
+    echo "$answer"
+    exit 1
+  fi
   local submission_status="$(plutil -extract status raw -o - - <<< "$answer")"
   local submission_id="$(plutil -extract id raw -o - - <<< "$answer")"
   echo "Notarization of $(basename "$file_path"): $submission_status ($submission_id)"
@@ -103,6 +109,5 @@ xcrun stapler staple "$dmg_path"
 
 spctl --assess --type execute --verbose=2 "$app_path"
 spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg_path"
-rm -rf "$work_folder"
 echo "Built $dmg_path, release/$zip_name and $feed_path"
 shasum -a 256 "$dmg_path" "release/$zip_name"

@@ -3,7 +3,8 @@
 # the Info.plist entries that let macOS use it as the default browser (build/extend-info.plist). The app is signed
 # ad hoc, which is enough to run it on this Mac. With BOW_SIGN_IDENTITY set (tools/release-mac.sh does that) it is
 # signed with that certificate instead, with the hardened runtime and Chromium's entitlements for each helper
-# (@electron/osx-sign's defaults: JIT, camera, microphone, location), as notarization needs. Of node_modules only the
+# (@electron/osx-sign's defaults: JIT, camera, microphone, location), as notarization needs, and marked as a build
+# that updates itself (BowUpdatesFromGitHub in Info.plist). Of node_modules only the
 # runtime dependencies go in: electron-chrome-extensions and its debug → ms (everything else in package.json is a dev
 # tool).
 # The bundle id keeps the app's first name (Sidebar Browser): macOS ties the default browser and website permissions
@@ -21,7 +22,16 @@ cached_zip="$(find "$HOME/Library/Caches/electron" -name "electron-v${electron_v
 zip_options=()
 [[ -n "$cached_zip" ]] && zip_options=(--electron-zip-dir="$(dirname "$cached_zip")")
 sign_options=()
-[[ -n "$BOW_SIGN_IDENTITY" ]] && sign_options=(--osx-sign.identity="$BOW_SIGN_IDENTITY")
+extend_info="build/extend-info.plist"
+if [[ -n "$BOW_SIGN_IDENTITY" ]]; then
+  sign_options=(--osx-sign.identity="$BOW_SIGN_IDENTITY")
+  # Only a release build updates itself from GitHub (src/main/appUpdates.ts reads this key): an ad-hoc build would
+  # download every release and have each one refused, because it accepts only its own signature.
+  release_info_folder="$(mktemp -d)"
+  extend_info="$release_info_folder/extend-info.plist"
+  cp build/extend-info.plist "$extend_info"
+  plutil -insert BowUpdatesFromGitHub -bool YES "$extend_info"
+fi
 npx electron-packager . "Bow" "${zip_options[@]}" "${sign_options[@]}" \
   --platform=darwin \
   --arch="$architecture" \
@@ -29,7 +39,7 @@ npx electron-packager . "Bow" "${zip_options[@]}" "${sign_options[@]}" \
   --overwrite \
   --icon=build/icon.icns \
   --app-bundle-id=io.github.rektoooooo.sidebar-browser \
-  --extend-info=build/extend-info.plist \
+  --extend-info="$extend_info" \
   --ignore='^/(src|tests|e2e|docs|reference|tools|tasks|build|release|\.handoffs|\.claude|\.github)(/|$)' \
   --ignore='^/node_modules/(?!(electron-chrome-extensions|debug|ms)(/|$))' \
   --ignore='^/(tsconfig[^/]*\.json|vitest\.config\.ts|README\.md|CLAUDE\.md|\.nvmrc|\.gitignore)$'

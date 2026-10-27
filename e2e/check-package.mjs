@@ -39,6 +39,13 @@ check("Info.plist names the app", infoPlist.CFBundleName === "Bow", infoPlist.CF
 check("the bundle id stays the same after the rename", infoPlist.CFBundleIdentifier === "io.github.rektoooooo.sidebar-browser", infoPlist.CFBundleIdentifier);
 const usageTexts = [infoPlist.NSCameraUsageDescription, infoPlist.NSMicrophoneUsageDescription, infoPlist.NSLocationWhenInUseUsageDescription];
 check("Info.plist explains camera, microphone and location use", usageTexts.every((text) => typeof text === "string" && text.startsWith("Websites you allow")), usageTexts.join(" | "));
+// Only a release build (signed with a Developer ID by tools/release-mac.sh) updates itself from GitHub; an ad-hoc build
+// would download every release and have each one refused.
+// codesign prints the signature's details on stderr.
+const codesignOutput = execFileSync("sh", ["-c", 'codesign --display --verbose=2 "$1" 2>&1', "sh", bundlePath]).toString();
+const isDeveloperIdBuild = codesignOutput.includes("Authority=Developer ID Application");
+const isMarkedForUpdates = infoPlist.BowUpdatesFromGitHub === true;
+check("only a Developer ID build is marked to update itself from GitHub", isMarkedForUpdates === isDeveloperIdBuild, `Developer ID ${isDeveloperIdBuild}, marked ${isMarkedForUpdates}`);
 check("the app icon is ours", fs.readFileSync(path.join(bundlePath, "Contents", "Resources", infoPlist.CFBundleIconFile)).equals(fs.readFileSync(path.join(appDir, "build", "icon.icns"))));
 
 // The update feed: this app's own version is the newest, so the check must find nothing to download.
