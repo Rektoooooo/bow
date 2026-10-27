@@ -37,7 +37,7 @@ export interface RowContext {
 }
 
 /** Bars in a Favorite's equaliser (sound playing in the background). Our choice. */
-const EQUALIZER_BAR_COUNT = 3;
+const EQUALIZER_BAR_COUNT = 4;
 
 /**
  * Indent per folder level, in pixels. Measured on the user's Arc: a child row, its highlight included, starts about
@@ -520,13 +520,16 @@ export function renderItemRows(itemIds: ItemId[], location: ItemLocation, depth:
 }
 
 /**
- * The three bars under a Favorite whose page plays sound in the background. Keyed, so redraws keep the same element
- * and its bars keep moving instead of starting over.
+ * The bouncing bars in the corner of a Favorite whose page plays sound in the background, in the site's colour when
+ * it is known (white otherwise). Keyed, so redraws keep the same element and its bars keep moving.
  */
-function createEqualizer(): HTMLElement {
+function createEqualizer(accent: string | undefined): HTMLElement {
   const equalizer = createElement("span", "tile-equalizer");
   equalizer.dataset.key = "equalizer";
   equalizer.setAttribute("aria-label", "Playing sound");
+  if (accent !== undefined) {
+    equalizer.style.setProperty("--equalizer-color", accent);
+  }
   for (let barIndex = 0; barIndex < EQUALIZER_BAR_COUNT; barIndex += 1) {
     equalizer.append(createElement("span", "tile-equalizer-bar"));
   }
@@ -550,7 +553,8 @@ export function renderFavoriteTile(tab: TabItem, location: ItemLocation, index: 
   tile.classList.toggle("is-loaded", context.runtime.tabs[tab.id] !== undefined);
   // Arc borders the selected Favorite in its icon's colour (main/faviconAccents.ts finds it).
   const iconAddress = getFaviconAddress(tab.faviconUrl, tab.url);
-  const accent = isSelected && iconAddress !== null ? context.runtime.faviconAccents[iconAddress] : undefined;
+  const iconColor = iconAddress === null ? undefined : context.runtime.faviconAccents[iconAddress];
+  const accent = isSelected ? iconColor : undefined;
   tile.classList.toggle("has-accent", accent !== undefined);
   if (accent !== undefined) {
     tile.style.setProperty("--tile-accent", accent);
@@ -564,7 +568,7 @@ export function renderFavoriteTile(tab: TabItem, location: ItemLocation, index: 
   const isPlayingElsewhere = context.runtime.tabs[tab.id]?.isAudible === true && !isSelected;
   const isUnread = tab.isUnread === true && !isSelected;
   if (isPlayingElsewhere) {
-    tile.append(createEqualizer());
+    tile.append(createEqualizer(iconColor));
   } else if (isUnread) {
     tile.append(createElement("span", "tile-unread-dot"));
   }
