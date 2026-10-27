@@ -76,7 +76,6 @@ import {
   restoreArchivedTab,
   selectTab,
   setArchiveAfter,
-  setSoundEffects,
   setAdBlock,
   setAdBlockForSite,
   setAppIcon,
@@ -412,8 +411,6 @@ export function runAction(action: BrowserAction): void {
       applyChange((state) => setAppIcon(state, action.variantId));
       applyAppIcon(action.variantId).catch((error) => console.error("Changing the app icon failed:", error));
       return;
-    case "setSoundEffects":
-      return applyChange((state) => setSoundEffects(state, action.isOn));
     case "importFromBrowser":
       importFromBrowser(action.sourceId).catch((error) => console.error("Import from browser failed:", error));
       return;

@@ -678,9 +678,6 @@ const boostTitles = await overlay.$$eval(".library-line .library-line-title", (t
 check("Library › Boosts lists the sites with a Boost", boostTitles.includes("example.com"), boostTitles.join(","));
 await overlay.click(".library-tab[data-section='settings']");
 await overlay.waitForTimeout(200);
-await overlay.click(".setting-switch[aria-label='Sound effects']");
-await sidebar.waitForTimeout(300);
-check("Library › Settings turns sound effects off", (await getState()).settings.areSoundEffectsOn === false);
 await overlay.press("body", "Escape");
 await sidebar.waitForTimeout(300);
 await app.evaluate(({ clipboard }, text) => clipboard.writeText(text), clipboardTextBefore);
@@ -803,6 +800,9 @@ const tabBeforeSwitch = selectedTab(state)?.id;
 await commandBar("newTab", "example.com/switcher");
 await waitForSelectedUrl("example.com/switcher");
 await sidebar.waitForTimeout(1500);
+// The switcher highlights the card under the pointer: the overlay's last pointer place (the Capture drag above) must
+// not lie where the first card appears.
+await overlay.mouse.move(1, 1);
 await findMenuItemByLabel("Recent Tab");
 await overlay.waitForSelector(".switcher:not([hidden]) .switcher-card", { timeout: 5000 }).catch(() => undefined);
 const switcherCards = await overlay.$$eval(".switcher-card", (cards) => cards.map((card) => ({ highlighted: card.classList.contains("is-highlighted"), picture: card.querySelector("img") !== null })));

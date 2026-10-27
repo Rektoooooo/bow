@@ -164,7 +164,6 @@ export interface LibraryData {
   downloads: DownloadRecord[];
   media: MediaLine[];
   archiveAfterMs: number | null;
-  areSoundEffectsOn: boolean;
   appIcon: string;
   areTitlesTidy: boolean;
   showsFullUrls: boolean;

@@ -129,8 +129,9 @@ Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 �
       well-known sites) · [x] Tidy titles (our own rules)
 - [x] Capture (Control Center) · [x] Library Media · [x] Library Spaces/Boosts · [x] Notes · [x] Easels (text, pen,
       pictures, live captures taken again from their page; no sharing: server feature) · [x] Boost colors/fonts/JS
-- [x] Sound effects (our own synthesized) · [x] Alternate app icons (Dock while running; Finder icon needs a Dock
-      tile plug-in Electron cannot ship) · [x] Ad & tracker blocking (own engine, EasyList/EasyPrivacy downloaded)
+- Sound effects: removed on purpose (the user, 2026-10-27: "no one does that") · [x] Alternate app icons (Dock
+      while running; Finder icon needs a Dock tile plug-in Electron cannot ship) · [x] Ad & tracker blocking (own
+      engine, EasyList/EasyPrivacy downloaded)
 - [x] Translate page (Google Translate, labelled) · [x] Handoff (unverified: needs signing and a second device)
 - [x] Import from Chrome/Brave/Edge/Vivaldi/Safari (bookmarks + history; no passwords) · [x] First-run welcome
 - [x] Developer Mode (shot 5)

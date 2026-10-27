@@ -29,7 +29,6 @@ import { installSidebarEvents } from "./sidebarEvents.js";
 import { createIcon, installSymbols } from "./icons.js";
 import { applySpaceTheme, onSystemAppearanceChange } from "./theme.js";
 import { createNavigationButtons, renderToolbar } from "./toolbar.js";
-import { playSound } from "./sounds.js";
 import { installFolderListHover } from "./folderListHover.js";
 import { installTabTooltipHover } from "./tabTooltipHover.js";
 import { showNoteEditor } from "./noteEditor.js";
@@ -679,12 +678,6 @@ function setUpSidebarResizer(): void {
  * Handles requests from the main process that only this page can carry out (inline editing).
  */
 function handleSidebarCommand(command: SidebarCommand): void {
-  if (command.kind === "playSound") {
-    if (currentState?.settings.areSoundEffectsOn !== false) {
-      playSound(command.sound);
-    }
-    return;
-  }
   if (command.kind === "beginRename") {
     renamingItemId = command.itemId;
   }
@@ -711,50 +704,12 @@ function openSpaceIconPicker(spaceId: SpaceId): void {
 }
 
 /**
- * Counts the split views in a state.
- */
-function countSplits(state: BrowserState): number {
-  return Object.values(state.items).filter((item) => item.kind === "split").length;
-}
-
-/**
- * Plays Arc-like sounds for what just changed: a Space switch, Today cleared, a tab closed (archived by hand), a new
- * split view. Off when the user turned sound effects off.
- */
-function playSoundForChange(previous: BrowserState, next: BrowserState): void {
-  if (next.settings.areSoundEffectsOn === false) {
-    return;
-  }
-  if (previous.activeSpaceId !== next.activeSpaceId) {
-    playSound("switchSpace");
-    return;
-  }
-  const newestArchived = next.archive[0];
-  const isArchiveGrown = next.archive.length > previous.archive.length && newestArchived !== previous.archive[0];
-  if (isArchiveGrown && newestArchived?.reason === "clear-button") {
-    playSound("clearToday");
-    return;
-  }
-  if (isArchiveGrown && newestArchived?.reason === "manual") {
-    playSound("closeTab");
-    return;
-  }
-  if (countSplits(next) > countSplits(previous)) {
-    playSound("split");
-  }
-}
-
-/**
  * Entry point: subscribes to state and runtime pushes, wires page-wide events, and draws the first state.
  */
 async function startSidebar(): Promise<void> {
   window.browserApi.onStateChanged((state) => {
-    const previousState = currentState;
     currentState = state;
     renderAll();
-    if (previousState !== null) {
-      playSoundForChange(previousState, state);
-    }
   });
   window.browserApi.onRuntimeChanged((runtime) => {
     currentRuntime = runtime;

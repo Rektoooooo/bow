@@ -35,11 +35,7 @@ export type MenuRequest =
  * Requests from the main process to the sidebar page, for things only the page can do (inline editing).
  * Example: the tab menu's "Rename…" sends { kind: "beginRename", itemId }.
  */
-/** The short sounds the sidebar page can play (renderer/sounds.ts). */
-export type SoundName = "closeTab" | "clearToday" | "switchSpace" | "split" | "capture";
-
 export type SidebarCommand =
-  | { kind: "playSound"; sound: SoundName }
   | { kind: "beginRename"; itemId: ItemId }
   | { kind: "beginSpaceRename"; spaceId: SpaceId }
   | { kind: "beginSpaceIconEdit"; spaceId: SpaceId };
@@ -112,7 +108,6 @@ export type BrowserAction =
   | { type: "openDeveloperTool"; tool: DeveloperTool }
   | { type: "runSiteCommand"; command: ToolbarSiteCommand }
   | { type: "importFromBrowser"; sourceId: string }
-  | { type: "setSoundEffects"; isOn: boolean }
   | { type: "setAdBlock"; isOn: boolean }
   | { type: "setAdBlockForSite"; site: string; isOn: boolean }
   | { type: "setAppIcon"; variantId: string }
@@ -212,7 +207,6 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "openDeveloperTool",
   "runSiteCommand",
   "importFromBrowser",
-  "setSoundEffects",
   "setAdBlock",
   "setAdBlockForSite",
   "setAppIcon",

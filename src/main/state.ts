@@ -789,16 +789,6 @@ export function setArchiveAfter(state: BrowserState, archiveAfterMs: number | nu
 }
 
 /**
- * Turns the sound effects on or off.
- */
-export function setSoundEffects(state: BrowserState, isOn: boolean): BrowserState {
-  if ((state.settings.areSoundEffectsOn ?? true) === isOn) {
-    return state;
-  }
-  return { ...state, settings: { ...state.settings, areSoundEffectsOn: isOn } };
-}
-
-/**
  * Remembers that the first-start tour was finished or skipped.
  */
 export function finishWelcome(state: BrowserState): BrowserState {

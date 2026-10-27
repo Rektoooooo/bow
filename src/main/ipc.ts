@@ -291,7 +291,6 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   openDeveloperTool: { tool: isDeveloperTool },
   runSiteCommand: { command: isToolbarSiteCommand },
   importFromBrowser: { sourceId: isImportSource },
-  setSoundEffects: { isOn: isBoolean },
   setAdBlock: { isOn: isBoolean },
   setAdBlockForSite: { site: isSite, isOn: isBoolean },
   setAppIcon: { variantId: isAppIconVariant },

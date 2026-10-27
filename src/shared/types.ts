@@ -167,8 +167,6 @@ export interface BrowserSettings {
    * missing means SIDEBAR_WIDTH_PX.
    */
   sidebarWidth?: number;
-  /** Short sounds on some actions (renderer/sounds.ts). Optional: missing means on, like Arc. */
-  areSoundEffectsOn?: boolean;
   /** Blocks ads and trackers (main/adBlock.ts). Optional: missing means off until the user turns it on. */
   isAdBlockOn?: boolean;
   /** The app icon variant shown in the Dock (shared/appIconDrawing.ts). Optional: missing means "classic". */

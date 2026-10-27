@@ -225,7 +225,6 @@ function buildLibraryData(state: BrowserState): LibraryData {
       thumbnailUrl: record.thumbnailUrl,
     })),
     archiveAfterMs: state.settings.archiveAfterMs,
-    areSoundEffectsOn: state.settings.areSoundEffectsOn !== false,
     appIcon: state.settings.appIcon ?? "classic",
     areTitlesTidy: state.settings.areTitlesTidy !== false,
     showsFullUrls: state.settings.showsFullUrls === true,
@@ -813,9 +812,6 @@ async function capturePage(contents: WebContents, region?: Rectangle): Promise<v
   await copyPngToClipboard(image.toPNG());
   saveCapture(image, contents.getTitle(), contents.getURL(), Date.now(), source);
   refreshOpenPanel();
-  if (getState().settings.areSoundEffectsOn !== false) {
-    sendSidebarCommand({ kind: "playSound", sound: "capture" });
-  }
 }
 
 /**

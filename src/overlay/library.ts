@@ -599,11 +599,6 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
   ]);
   const browsing = createSettingGroup("Browsing", [
     createSettingRow("Block ads and trackers", describeAdBlockStatus(data.adBlock), createSwitch(data.adBlock.isOn, "Block ads and trackers", (isOn) => dispatch({ type: "setAdBlock", isOn: isOn }))),
-    createSettingRow(
-      "Sound effects",
-      "Short, quiet sounds when you close a tab, clear Today, switch Spaces, split or capture.",
-      createSwitch(data.areSoundEffectsOn, "Sound effects", (isOn) => dispatch({ type: "setSoundEffects", isOn: isOn })),
-    ),
   ]);
   const appearance = createSettingGroup("Appearance", [
     createSettingRow(

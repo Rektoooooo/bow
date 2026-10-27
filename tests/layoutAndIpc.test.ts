@@ -102,7 +102,6 @@ describe("parseAction", () => {
     expect(parseAction({ type: "openBoostEditor" })).not.toBeNull();
     expect(parseAction({ type: "openBoostEditor", site: "example.com" })).not.toBeNull();
     expect(parseAction({ type: "openBoostEditor", site: "<script>" })).toBeNull();
-    expect(parseAction({ type: "setSoundEffects", isOn: "yes" })).toBeNull();
     expect(parseAction({ type: "setAppIcon", variantId: "mint" })).not.toBeNull();
     expect(parseAction({ type: "setAppIcon", variantId: "../evil" })).toBeNull();
     expect(parseAction({ type: "setAdBlockForSite", site: "example.com", isOn: false })).not.toBeNull();
