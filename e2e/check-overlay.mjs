@@ -732,6 +732,26 @@ check("Library › Settings picks the search engine, and the Command Bar searche
 await overlay.press(".command-input", "Escape");
 await dispatch({ type: "setSearchEngine", engineId: "duckduckgo" });
 await sidebar.waitForTimeout(300);
+// Copy URL (⇧⌘C) confirms with a toast at the bottom center of the card, like Arc's, which then goes away.
+await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items.flatMap((menu) => menu.submenu?.items ?? []).find((item) => item.label === "Copy URL").click());
+await sidebar.waitForTimeout(400);
+const copied = await app.evaluate(async ({ BrowserWindow, clipboard }) => {
+  const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  const bubble = win.contentView.children.find((child) => child.webContents?.getURL().endsWith("/status/status.html"));
+  // Awaited: the main process's clipboard may answer with a promise.
+  return { text: await clipboard.readText(), bounds: bubble?.getBounds() ?? null, windowWidth: win.getContentSize()[0] };
+});
+const toastPage = app.windows().find((candidate) => candidate.url().endsWith("/status/status.html"));
+const toastText = (await toastPage?.textContent("#status").catch(() => "")) ?? "";
+const copiedState = await getState();
+const copiedTabUrl = copiedState.items[copiedState.selectedTabIdBySpace[copiedState.activeSpaceId]]?.url;
+check("Copy URL copies the address and says so in a toast at the card's bottom", copied.text === copiedTabUrl && toastText.includes("Copied link") && copied.bounds !== null, `${copied.text} / ${toastText} / ${JSON.stringify(copied.bounds)}`);
+await sidebar.waitForTimeout(2200);
+const toastGone = await app.evaluate(({ BrowserWindow }) => {
+  const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  return !win.contentView.children.some((child) => child.webContents?.getURL().endsWith("/status/status.html"));
+});
+check("and the toast goes away by itself", toastGone);
 await app.evaluate(({ clipboard }, text) => clipboard.writeText(text), clipboardTextBefore);
 
 // Live captures, like Arc's Easels: the capture remembers where it came from; put on an easel it is live, and its

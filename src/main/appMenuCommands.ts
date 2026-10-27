@@ -21,6 +21,7 @@ import { copyTabUrl, toggleDevTools, zoomPage } from "./pageCommands";
 import { closePeek, getPeekContents, isPeekOpen, openPeekAsTab } from "./peek";
 import { buildImportMenu, showMenuRequest } from "./menus";
 import { menuHost } from "./actionRunner";
+import { showToast } from "./statusBubble";
 import {
   clearTodayTabs,
   createFolder,
@@ -73,6 +74,7 @@ export const appMenuCommands: AppMenuCommands = {
     const tab = selectedTabId === null ? undefined : findTab(getState(), selectedTabId);
     if (tab !== undefined) {
       copyTabUrl(tab, format);
+      showToast(format === "markdown" ? "Copied link as Markdown" : "Copied link").catch(() => undefined);
     }
   },
   duplicateSelected: () => {

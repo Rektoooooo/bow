@@ -3,12 +3,16 @@
  *   While the pointer is over a link, browsers show where it goes in a small bubble at the bottom of the page. The page
  *   is a native view, so the bubble is one more small transparent view above it. A view catches the pointer, so when
  *   the pointer is near the bubble's corner it moves to the other corner (like Chrome's), and links under it stay usable.
+ *   The same view shows short confirmations ("Copied link"), like Arc's toast, centered at the card's bottom: one more
+ *   renderer process for those would cost about 70 MB (measured 2026-10-27).
  *
  * Data source:
- *   "update-target-url" from the tabs' pages (tabViews.ts), the card's position and the pointer position.
+ *   "update-target-url" from the tabs' pages (tabViews.ts), the card's position and the pointer position; commands
+ *   that confirm what they did (appMenuCommands.ts, overlayController.ts).
  *
  * Data flow:
  *   pointer over a link → main.ts → showLinkStatus(tabId, url) → bubble shown in the focused window; "" → hidden
+ *   Copy URL → showToast("Copied link") → shown for TOAST_SHOWN_MS, then it fades and leaves
  */
 import { screen, WebContentsView } from "electron";
 import type { BrowserWindow } from "electron";
@@ -27,6 +31,18 @@ const BUBBLE_MARGIN_PX = 6;
 
 /** Longest address shown; the rest ends in "…". */
 const MAX_SHOWN_LENGTH = 300;
+
+/** A confirmation's size and distance from the card's bottom. Our choice. */
+const TOAST_WIDTH_PX = 260;
+const TOAST_HEIGHT_PX = 40;
+const TOAST_MARGIN_PX = 14;
+
+/** How long a confirmation stays, and how long it takes to fade (= toast-out in status.css). Our choice. */
+const TOAST_SHOWN_MS = 1600;
+const TOAST_FADE_MS = 160;
+
+/** Ends the confirmation on screen, or null when none is. */
+let toastTimer: NodeJS.Timeout | null = null;
 
 let bubbleView: WebContentsView | null = null;
 let isBubbleShown = false;
@@ -77,6 +93,10 @@ function computeBubbleBounds(): Bounds | null {
  * Takes the bubble out of the window it is in.
  */
 function hideBubble(): void {
+  if (toastTimer !== null) {
+    clearTimeout(toastTimer);
+    toastTimer = null;
+  }
   if (bubbleView !== null && bubbleWindow !== null && !bubbleWindow.isDestroyed()) {
     bubbleWindow.contentView.removeChildView(bubbleView);
   }
@@ -115,6 +135,10 @@ export async function showLinkStatus(tabId: ItemId, url: string): Promise<void> 
   if (bounds === null || bubbleView === null) {
     return;
   }
+  if (toastTimer !== null) {
+    clearTimeout(toastTimer);
+    toastTimer = null;
+  }
   const withoutScheme = url.replace(/^https?:\/\//, "");
   const shownText = withoutScheme.length > MAX_SHOWN_LENGTH ? `${withoutScheme.slice(0, MAX_SHOWN_LENGTH)}…` : withoutScheme;
   // JSON.stringify makes the address a safe string literal inside the script.
@@ -124,4 +148,35 @@ export async function showLinkStatus(tabId: ItemId, url: string): Promise<void> 
   window.contentView.addChildView(bubbleView);
   bubbleWindow = window;
   isBubbleShown = true;
+}
+
+/**
+ * Confirms a command with a short message at the bottom center of the focused window's card, like Arc's toast. It
+ * fades away after TOAST_SHOWN_MS; a link hovered meanwhile takes the view back.
+ */
+export async function showToast(message: string): Promise<void> {
+  const window = getWindow();
+  if (window === null || bubbleView === null) {
+    return;
+  }
+  await bubbleReady;
+  const contentSize = window.getContentSize();
+  const card = computeCardBounds(contentSize[0] ?? 0, contentSize[1] ?? 0, getLayoutOptions());
+  const width = Math.min(TOAST_WIDTH_PX, card.width);
+  const bounds = { x: Math.round(card.x + (card.width - width) / 2), y: card.y + card.height - TOAST_HEIGHT_PX - TOAST_MARGIN_PX, width: width, height: TOAST_HEIGHT_PX };
+  bubbleView.webContents.executeJavaScript(`window.showToast(${JSON.stringify(message)})`).catch(() => undefined);
+  bubbleView.setBounds(bounds);
+  window.contentView.addChildView(bubbleView);
+  bubbleWindow = window;
+  isBubbleShown = true;
+  if (toastTimer !== null) {
+    clearTimeout(toastTimer);
+  }
+  toastTimer = setTimeout(() => {
+    bubbleView?.webContents.executeJavaScript("window.fadeToast()").catch(() => undefined);
+    toastTimer = setTimeout(() => {
+      toastTimer = null;
+      hideBubble();
+    }, TOAST_FADE_MS);
+  }, TOAST_SHOWN_MS);
 }

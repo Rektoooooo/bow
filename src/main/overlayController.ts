@@ -66,6 +66,7 @@ import { getSelectedTabId, openTab, selectTab } from "./state";
 import { readTabSleepAfter } from "./tabSleep";
 import { loadUrlInTab, openLinkInNewTab, setMuted } from "./tabActions";
 import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
+import { showToast } from "./statusBubble";
 import { findProfileIdOfItem, findTab, getActiveSpace } from "./tree";
 import { getPermissionOrigin, getSitePermissions } from "./sitePermissions";
 import { looksLikeWebAddress, normalizeTypedInput } from "./urls";
@@ -885,6 +886,7 @@ function handleSiteCommand(command: SiteCommand): void {
   if (command === "copyLink") {
     clipboard.writeText(site.url);
     closeOverlay();
+    showToast("Copied link").catch(() => undefined);
     return;
   }
   if (command === "share") {
