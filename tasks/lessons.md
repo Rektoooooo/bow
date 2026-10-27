@@ -11,6 +11,9 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 - Push in its own command, only after reading the suite's summary. Never chain `git push` after a command that
   merely prints the results: on 2026-10-27 a grep of an e2e log (3 FAIL lines, exit 1) and the push ran in one call,
   and a red run went to GitHub. Read the summary, then push.
+- The same for the personal-data grep: run it alone, read it, then push. On 2026-10-28 the grep printed two hits (the
+  signing team's id and company name in a handoff's runbook) in the same call as the push, and they went public.
+  Team ids, certificate names and Apple IDs never go into the repo, not even in docs: write placeholders.
 - Comments count as personal data too: a comment that named the user's tab titles as measurement samples had to be
   reworded before a push. Write "three of the user's titles", never the titles.
 
