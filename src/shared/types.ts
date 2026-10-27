@@ -357,6 +357,11 @@ export interface RuntimeState {
    * is still open (one editor at a time writes the file).
    */
   editorTabIdsHere: ItemId[];
+  /**
+   * The sidebar item being dragged in another main window right now, or null: this window's sidebar accepts it as a
+   * drop (main carries the id, because a drag's data stays in the page it started in).
+   */
+  itemDraggedInOtherWindow: ItemId | null;
 }
 
 /** What the sidebar's small media player shows. */

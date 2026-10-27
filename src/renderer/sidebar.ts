@@ -20,7 +20,7 @@ import type { SidebarCommand } from "../shared/actions.js";
 import { SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_WIDTH_PX } from "../shared/settings.js";
 import type { BrowserState, ItemId, ItemLocation, RuntimeState, Space, SpaceId, TabItem } from "../shared/types";
 import { createActionButton, createElement, createFavicon, dispatch } from "./dom.js";
-import { installDragAndDrop, markListDropZone, onDragStateChanged } from "./dragDrop.js";
+import { installDragAndDrop, markListDropZone, onDragStateChanged, setItemDraggedInOtherWindow } from "./dragDrop.js";
 import { morphChildren } from "./morph.js";
 import type { MorphOptions } from "./morph.js";
 import { renderFavoriteTile, renderItemRows, startRowRedraw } from "./rows.js";
@@ -54,6 +54,7 @@ let currentRuntime: RuntimeState = {
   liveFolders: {},
   tabIdsInOtherWindows: [],
   editorTabIdsHere: [],
+  itemDraggedInOtherWindow: null,
 };
 
 /** The Note or Easel tab whose editor this page last told main it has open, or null. */
@@ -490,6 +491,8 @@ function renderAll(): void {
   const context = createRowContext(state);
   document.body.classList.toggle("sidebar-hidden", !state.settings.isSidebarVisible);
   document.body.classList.toggle("sidebar-peeking", currentRuntime.isSidebarPeeking);
+  // An item dragged in another window shows this sidebar's drop places too (the Favorites end zone).
+  document.body.classList.toggle("is-dragging", currentRuntime.itemDraggedInOtherWindow !== null);
   applySidebarWidth(draggedSidebarWidth ?? state.settings.sidebarWidth ?? SIDEBAR_WIDTH_PX);
   applySpaceTheme(space.theme);
   // A Space switch replaces the whole list: it slides in instead of every row growing in one by one.
@@ -735,6 +738,7 @@ async function startSidebar(): Promise<void> {
   });
   window.browserApi.onRuntimeChanged((runtime) => {
     currentRuntime = runtime;
+    setItemDraggedInOtherWindow(runtime.itemDraggedInOtherWindow);
     renderAll();
   });
   window.browserApi.onSidebarCommand(handleSidebarCommand);

@@ -3,6 +3,8 @@
  *   Arc's sidebar is arranged by dragging: a tab dragged into Pinned is pinned, into the Favorites row becomes a
  *   Favorite, onto a folder goes inside it, onto a Space button moves it to that Space. This file turns HTML drag and
  *   drop on the sidebar into one "moveItem" action. Links dragged in from a page or another app open as a new tab.
+ *   Items can also be dragged into another main window's sidebar: a drag's data stays in the page it started in, so
+ *   main tells the other windows which item is being dragged (RuntimeState.itemDraggedInOtherWindow).
  *
  * Data source:
  *   Drag events, and the drop information each element carries as data attributes (set with markDropTarget() and
@@ -10,8 +12,9 @@
  *   redraws (morph.ts), so a position read when the drop happens is always the current one.
  *
  * Data flow:
- *   dragstart on [draggable][data-item-id] → dragover on a [data-drop] element (line or highlight) → drop
- *   → dispatch moveItem / moveItemToSpace / openTab
+ *   dragstart on [draggable][data-item-id] → dispatch beginItemDrag → dragover on a [data-drop] element (line or
+ *   highlight) → drop → dispatch moveItem / moveItemToSpace / openTab (+ takeItemFromOtherWindow for an item dragged
+ *   from another window) → dragend → dispatch endItemDrag
  */
 import type { ItemId, ItemLocation } from "../shared/types";
 import { dispatch } from "./dom.js";
@@ -27,6 +30,23 @@ const DROP_CLASSES = ["drop-before", "drop-after", "drop-into"];
 
 /** The item being dragged right now. dataTransfer cannot be read during dragover, so it is kept here. */
 let draggedItemId: ItemId | null = null;
+
+/** The item another window's sidebar is dragging right now, as main reported it, or null. */
+let itemFromOtherWindow: ItemId | null = null;
+
+/**
+ * Hears from main which item another window is dragging (null when none), so a drop here can take it.
+ */
+export function setItemDraggedInOtherWindow(itemId: ItemId | null): void {
+  itemFromOtherWindow = itemId;
+}
+
+/**
+ * The item a drop here would move: this page's own drag, or another window's.
+ */
+function findDraggedItemId(): ItemId | null {
+  return draggedItemId ?? itemFromOtherWindow;
+}
 
 /** Listeners told when a drag starts and ends (sidebar.ts holds redraws during a drag). */
 const dragStateListeners: ((isDragging: boolean) => void)[] = [];
@@ -127,7 +147,7 @@ export function markListDropZone(element: HTMLElement, location: ItemLocation, p
  */
 function carriesExternalLink(event: DragEvent): boolean {
   const types = event.dataTransfer === null ? [] : Array.from(event.dataTransfer.types);
-  return draggedItemId === null && types.includes("text/uri-list");
+  return findDraggedItemId() === null && types.includes("text/uri-list");
 }
 
 /**
@@ -184,7 +204,8 @@ function acceptsDrag(event: DragEvent, target: HTMLElement): boolean {
   if (carriesExternalLink(event)) {
     return true;
   }
-  return draggedItemId !== null && draggedItemId !== target.dataset.itemId;
+  const itemId = findDraggedItemId();
+  return itemId !== null && itemId !== target.dataset.itemId;
 }
 
 /**
@@ -231,6 +252,18 @@ function dropItem(event: DragEvent, target: HTMLElement, itemId: ItemId): void {
 }
 
 /**
+ * Drops an item dragged in another window: it moves like any drop, and then a tab or split comes along into this
+ * window with its page (except on a Space button, which only moves it to that Space).
+ */
+function dropItemFromOtherWindow(event: DragEvent, target: HTMLElement, itemId: ItemId): void {
+  dropItem(event, target, itemId);
+  itemFromOtherWindow = null;
+  if (target.dataset.drop !== "space") {
+    dispatch({ type: "takeItemFromOtherWindow", itemId: itemId });
+  }
+}
+
+/**
  * Handles every drag and drop inside `root` with a few listeners on the root itself.
  */
 export function installDragAndDrop(root: HTMLElement): void {
@@ -245,8 +278,12 @@ export function installDragAndDrop(root: HTMLElement): void {
     draggedItemId = itemId;
     source.classList.add("is-dragging");
     notifyDragState(true);
+    dispatch({ type: "beginItemDrag", itemId: itemId });
   });
   root.addEventListener("dragend", (event) => {
+    if (draggedItemId !== null) {
+      dispatch({ type: "endItemDrag" });
+    }
     draggedItemId = null;
     const source = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-item-id]") : null;
     source?.classList.remove("is-dragging");
@@ -274,6 +311,10 @@ export function installDragAndDrop(root: HTMLElement): void {
     clearAllDropClasses();
     if (carriesExternalLink(event)) {
       openDroppedLink(event);
+      return;
+    }
+    if (draggedItemId === null && itemFromOtherWindow !== null && itemFromOtherWindow !== target.dataset.itemId) {
+      dropItemFromOtherWindow(event, target, itemFromOtherWindow);
       return;
     }
     if (draggedItemId === null || draggedItemId === target.dataset.itemId) {

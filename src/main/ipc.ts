@@ -310,6 +310,9 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   showHiddenLiveFolderItems: { folderId: isText },
   moveTabToThisWindow: {},
   reportOpenEditor: { tabId: isText, isOpen: isBoolean },
+  beginItemDrag: { itemId: isText },
+  endItemDrag: {},
+  takeItemFromOtherWindow: { itemId: isText },
 };
 
 /**

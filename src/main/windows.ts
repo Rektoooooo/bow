@@ -18,7 +18,7 @@
  * Same rules as state.ts: never change the state passed in, return the same object when nothing changes.
  */
 import type { BrowserState, ItemId, ParkedWindow, SidebarItem, Space, SpaceId, WindowId, WindowSidebar } from "../shared/types";
-import { repairSelections } from "./state";
+import { repairSelections, selectTab } from "./state";
 
 /**
  * The ids of the folders the focused window shows open.
@@ -245,6 +245,43 @@ export function repairOtherWindows(state: BrowserState): BrowserState {
     return state;
   }
   return { ...state, otherWindows: repairedWindows };
+}
+
+/**
+ * A parked window stops showing some tabs: where it selected one, it selects its most recently used other tab in that
+ * Space instead (repairSelections). The same record when it showed none of them.
+ */
+function letGoOfTabs(state: BrowserState, parked: ParkedWindow, tabIds: Set<ItemId>): ParkedWindow {
+  const asFocused = { ...state, selectedTabIdBySpace: parked.selectedTabIdBySpace };
+  const repaired = repairSelections(asFocused, tabIds);
+  if (repaired === asFocused) {
+    return parked;
+  }
+  return { ...parked, selectedTabIdBySpace: repaired.selectedTabIdBySpace };
+}
+
+/**
+ * A tab or split view dragged from another window's sidebar and dropped into the focused window's comes along, like
+ * a tab dragged to another browser window: the focused window selects it (a split shows all its panes), and the
+ * windows that selected it let go, so its page moves over. A folder only moves (same state).
+ * Example: A shows tab T; T dropped into B's Today → B selects T, A selects its most recent other tab
+ */
+export function takeItemIntoFocusedWindow(state: BrowserState, itemId: ItemId, now: number): BrowserState {
+  const item = state.items[itemId];
+  let tabIds: ItemId[] = [];
+  if (item?.kind === "tab") {
+    tabIds = [itemId];
+  }
+  if (item?.kind === "split") {
+    tabIds = item.childIds;
+  }
+  const firstTabId = tabIds[0];
+  if (firstTabId === undefined) {
+    return state;
+  }
+  const takenTabIds = new Set(tabIds);
+  const otherWindows = state.otherWindows.map((parked) => letGoOfTabs(state, parked, takenTabIds));
+  return selectTab({ ...state, otherWindows: otherWindows }, firstTabId, now);
 }
 
 /**

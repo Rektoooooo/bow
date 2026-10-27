@@ -76,6 +76,9 @@ in Arc). Running it twice adds nothing twice.
 - A page is on screen in one window at a time. Selecting a tab another window shows says "Open in another window",
   with **Move to This Window**. Notes and Easels too: one window edits them at a time, and moving one over keeps the
   last keystrokes.
+- Drag a tab, folder or split from one window's sidebar into another's (Favorites, Pinned, Today, a folder, next to
+  a split, or a Space button). A tab or split comes along: the other window selects it and its page moves over; the
+  window it came from shows another of its tabs. On a Space button it only moves to that Space.
 - Menus, shortcuts, the Command Bar, the Library, Peek and the other panels act in the window in front. ⇧⌘W closes a
   window; the app quits with the last one. Every window (place, size, Space, selection) opens again at the next
   start; links from Little Windows go to the main window you used last.

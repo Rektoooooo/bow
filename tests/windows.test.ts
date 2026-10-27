@@ -6,7 +6,17 @@
 import { describe, expect, it } from "vitest";
 import { deleteSpace, switchSpace } from "../src/main/spaces";
 import { closeTab, createFolder, createInitialState, deleteItem, getSelectedTabId, selectTab, setPinnedSectionOpen, setSidebarVisible, setSidebarWidth, toggleFolder } from "../src/main/state";
-import { closeWindow, collectSelectedTabIdsOfAllWindows, focusWindow, listWindowIds, openWindow, projectStateForWindow, repairOtherWindows } from "../src/main/windows";
+import {
+  closeWindow,
+  collectSelectedTabIdsOfAllWindows,
+  focusWindow,
+  listWindowIds,
+  openWindow,
+  projectStateForWindow,
+  repairOtherWindows,
+  takeItemIntoFocusedWindow,
+} from "../src/main/windows";
+import { splitTabs } from "../src/main/split";
 import { FIRST_WINDOW_ID, HOUR_MS } from "../src/shared/settings";
 import { ONE_PM, openTabs, PERSONAL_SPACE_ID, WORK_SPACE_ID } from "./builders";
 
@@ -219,5 +229,35 @@ describe("each window's own sidebar, Pinned sections and folders (Arc's Storable
     const repaired = repairOtherWindows(deleted);
 
     expect(repaired.otherWindows[0]).toMatchObject({ collapsedPinnedSpaceIds: [], openFolderIds: [] });
+  });
+});
+
+describe("an item dragged from another window", () => {
+  it("is selected in the focused window, and the window that showed it lets go", () => {
+    const { state, tabIds } = buildTwoWindows();
+
+    const taken = takeItemIntoFocusedWindow(state, tabIds[1] as string, TWO_PM);
+
+    expect(getSelectedTabId(taken)).toBe(tabIds[1]);
+    expect(taken.otherWindows[0]?.selectedTabIdBySpace[PERSONAL_SPACE_ID]).toBe(tabIds[0]);
+  });
+
+  it("brings a split view along with all its panes", () => {
+    const built = openTabs(["https://a.example", "https://b.example", "https://c.example"]);
+    const withSplit = splitTabs(built.state, built.tabIds[1] as string, built.tabIds[2] as string, ONE_PM);
+    const splitId = Object.values(withSplit.items).find((item) => item.kind === "split")?.id as string;
+    const twoWindows = openWindow(withSplit, SECOND_WINDOW_ID);
+
+    const taken = takeItemIntoFocusedWindow(twoWindows, splitId, TWO_PM);
+
+    expect([built.tabIds[1], built.tabIds[2]]).toContain(getSelectedTabId(taken));
+    expect(taken.otherWindows[0]?.selectedTabIdBySpace[PERSONAL_SPACE_ID]).toBe(built.tabIds[0]);
+  });
+
+  it("leaves a folder where it was dropped", () => {
+    const withFolder = createFolder(createInitialState(), "Folder", ONE_PM);
+    const folderId = Object.values(withFolder.items).find((item) => item.kind === "folder")?.id as string;
+
+    expect(takeItemIntoFocusedWindow(withFolder, folderId, TWO_PM)).toBe(withFolder);
   });
 });

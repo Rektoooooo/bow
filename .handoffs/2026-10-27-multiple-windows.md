@@ -50,6 +50,16 @@ differs from it); every snapshot fits "the sidebar of the last window closed", a
   reads the newest file. `check-windows` types into a note and moves it at once; with the flush and the hand-over
   disabled that check fails ("First window" without the last words).
 
+- **Piece 3 (drag between windows):** an HTML drag's data stays in the page it started in, so the sidebar tells main
+  when a drag starts and ends (`beginItemDrag` / `endItemDrag`, never focusing a window) and main gives the other
+  windows the item in `RuntimeState.itemDraggedInOtherWindow`; their `dragDrop.ts` accepts it like its own (and
+  shows the Favorites end zone). The drop sends the usual `moveItem` / `moveItemToSpace` from the target window, then
+  `takeItemFromOtherWindow` (not on a Space button): `windows.ts takeItemIntoFocusedWindow` selects a dropped tab or
+  split there, and every window that selected it lets go (its most recently used other tab), so the page moves
+  over. Our choice where Arc could not be checked: the source window lets go instead of showing the placeholder.
+  Verified with simulated drag events in two pages (Playwright's real drag hangs in Electron); a real OS drag between
+  two windows was not exercised.
+
 ## How it is built
 
 - **Saved shape v3** (`src/shared/types.ts`): `focusedWindowId` and `otherWindows: WindowSelection[]` (id, Space,
@@ -88,12 +98,12 @@ differs from it); every snapshot fits "the sidebar of the last window closed", a
   This Window, a let-go page returning, actions and the Command Bar in the window they came from, a menu acting on
   the focused window only, Close Window, restart restoring both windows (place, Space, selection, focus), quitting
   with the last window and the next start opening that one, and an old one-rectangle `window-state.json` placing
-  the first window (30 checks). `E2E_DEBUG=1` streams the main process's output. `check-package` (packaged app, not
+  the first window; since 3.6 also per-window sidebars, Pinned sections and folders, Notes/Easels hand-over and
+  drags between windows (50 checks). `E2E_DEBUG=1` streams the main process's output. `check-package` (packaged app, not
   part of `npm run e2e`) is green too (12).
 
 ## Known limits (our choices or not done)
 
 - Extensions: a tab belongs to the window it was first shown in for `chrome.tabs` / `chrome.windows` (the library
   cannot move a tab between windows without its removeTab, which would close our tab).
-- Dragging a tab from one window's sidebar to another's is not supported (each sidebar's drag lives in its page).
 - A window with nothing selected shows the empty card; Arc's exact new-window state was not observed.

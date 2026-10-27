@@ -131,7 +131,12 @@ export type BrowserAction =
   /** "Move to This Window": the window takes the pages it selected that another window shows. */
   | { type: "moveTabToThisWindow" }
   /** The sidebar page opened or closed a Note or Easel editor (sent after its last save; see tabViews.ts). */
-  | { type: "reportOpenEditor"; tabId: ItemId; isOpen: boolean };
+  | { type: "reportOpenEditor"; tabId: ItemId; isOpen: boolean }
+  /** A sidebar item started or stopped being dragged in this window: other windows' sidebars accept it as a drop. */
+  | { type: "beginItemDrag"; itemId: ItemId }
+  | { type: "endItemDrag" }
+  /** An item dragged from another window was dropped here: a tab or split comes along (windows.ts). */
+  | { type: "takeItemFromOtherWindow"; itemId: ItemId };
 
 /** Every action type, for checking an incoming `type` string. */
 export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
@@ -220,4 +225,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "showHiddenLiveFolderItems",
   "moveTabToThisWindow",
   "reportOpenEditor",
+  "beginItemDrag",
+  "endItemDrag",
+  "takeItemFromOtherWindow",
 ];

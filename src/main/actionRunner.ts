@@ -21,6 +21,7 @@ import {
   moveShownElsewhereTabsHere,
   previewSidebarWidthWhileDragging,
   reportOpenEditor,
+  setItemDrag,
   scheduleRuntimePush,
   sendSidebarCommand,
   setSidebarPeek,
@@ -89,6 +90,7 @@ import {
   switchSpace,
   switchSpaceByOffset,
 } from "./spaces";
+import { takeItemIntoFocusedWindow } from "./windows";
 import { closeTabByUser, navigateFocusedPage, openLinkInNewTab, resetTabToHome, setMuted } from "./tabActions";
 import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
 import { createId } from "./tree";
@@ -156,9 +158,18 @@ const POINTER_ACTION_TYPES: BrowserAction["type"][] = ["setSidebarPeek", "showTa
  */
 export function runActionFromWindow(action: BrowserAction, windowId: WindowId | null): void {
   const isFromBackgroundWindow = windowId !== null && windowId !== getState().focusedWindowId;
-  // Every window's sidebar reports its editors as they open and close, in the background too.
+  // Every window's sidebar reports its editors and drags as they start and end, in the background too (a drag ends
+  // in its own window after the drop landed in another).
   if (windowId !== null && action.type === "reportOpenEditor") {
     reportOpenEditor(windowId, action.tabId, action.isOpen);
+    return;
+  }
+  if (windowId !== null && action.type === "beginItemDrag") {
+    setItemDrag(windowId, action.itemId);
+    return;
+  }
+  if (windowId !== null && action.type === "endItemDrag") {
+    setItemDrag(windowId, null);
     return;
   }
   if (windowId !== null && action.type === "setSidebarPeek") {
@@ -398,7 +409,11 @@ export function runAction(action: BrowserAction): void {
     case "moveTabToThisWindow":
       return moveShownElsewhereTabsHere();
     case "reportOpenEditor":
-      // Only a window's sidebar reports editors (runActionFromWindow handles it with the window's id).
+    case "beginItemDrag":
+    case "endItemDrag":
+      // Only a window's sidebar reports editors and drags (runActionFromWindow handles them with the window's id).
       return;
+    case "takeItemFromOtherWindow":
+      return applyChange((state) => takeItemIntoFocusedWindow(state, action.itemId, now));
   }
 }

@@ -75,6 +75,9 @@ const peekingWindowIds = new Set<WindowId>();
 /** True while the Command Bar is open to make a new tab (RuntimeState.isNewTabPending). */
 let isNewTabPending = false;
 
+/** The sidebar item being dragged and the window it is dragged from, or null (RuntimeState.itemDraggedInOtherWindow). */
+let itemDrag: { itemId: ItemId; windowId: WindowId } | null = null;
+
 /** How each live folder's last refresh went (RuntimeState.liveFolders); liveFolderRefresher.ts sets them. */
 const liveFolderStatuses = new Map<ItemId, LiveFolderStatus>();
 
@@ -272,6 +275,19 @@ export function setSidebarPeek(windowId: WindowId, isPeeking: boolean): void {
 }
 
 /**
+ * A drag of a sidebar item started in a window (itemId) or ended there (null): the other windows' sidebars hear of
+ * it, so they accept the item as a drop.
+ */
+export function setItemDrag(windowId: WindowId, itemId: ItemId | null): void {
+  if (itemId !== null) {
+    itemDrag = { itemId: itemId, windowId: windowId };
+  } else if (itemDrag?.windowId === windowId) {
+    itemDrag = null;
+  }
+  scheduleRuntimePush();
+}
+
+/**
  * A window's sidebar page opened or closed a Note or Easel editor: a window waiting for that editor may draw it now.
  */
 export function reportOpenEditor(windowId: WindowId, tabId: ItemId, isOpen: boolean): void {
@@ -393,6 +409,7 @@ export function collectRuntimeState(windowId: WindowId = currentState.focusedWin
     liveFolders: getLiveFolderStatuses(),
     tabIdsInOtherWindows: getTabIdsShownElsewhere(windowId),
     editorTabIdsHere: getEditorTabIdsHere(windowId),
+    itemDraggedInOtherWindow: itemDrag !== null && itemDrag.windowId !== windowId ? itemDrag.itemId : null,
   };
 }
 

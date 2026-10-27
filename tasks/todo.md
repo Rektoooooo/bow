@@ -164,7 +164,7 @@ differs from it), and new windows start from it.
       their own); `newWindowSidebar` = the last closed window's; sidebar peek and glide per window; migrate v3 → v4
 - [x] Piece 2: Notes and Easels in two windows get the same "Open in another window" card as pages (Arc's notes are
       tab content too), so one editor at a time saves the file
-- [ ] Piece 3: drag an item from one window's sidebar into another's (Favorites, Pinned, Today, folders, splits,
+- [x] Piece 3: drag an item from one window's sidebar into another's (Favorites, Pinned, Today, folders, splits,
       Space switcher): main carries the dragged item id between windows; a dropped tab is selected there and its
       page moves along
 
@@ -175,6 +175,15 @@ differs from it), and new windows start from it.
       per selection; unchanged rows now come as placeholders morph.ts keeps as they are, move animations only
       measure when the order changed, the toolbar tint restyles the card alone → about 8 ms per redraw
 - [ ] Hands-on runs of the packaged app; all suites green; docs + teardown page current
+
+## Review (2026-10-27, multiple windows closer to Arc, 3.6)
+- **Works and verified:** per-window sidebar (⌘S, width, peek), Pinned sections and folders; new windows from the
+  last closed window's sidebar; Notes and Easels one window at a time with a lossless hand-over; dragging tabs,
+  folders and splits between windows' sidebars. Suites: `npm test` 310, `check-app` 47, `check-overlay` 68,
+  `check-extensions` 20, `permission-check`, `check-motion` 6, `check-live-folders` 21, `check-performance` 4,
+  `check-windows` 50.
+- **Not verified:** a real OS drag between two windows (Playwright's drag hangs in Electron; simulated drag events
+  in both pages are checked instead).
 
 ## Review (2026-10-27, multiple main windows)
 - **Works and verified:** ⌘N, a Space and selection per window, "Open in another window" + Move to This Window, a

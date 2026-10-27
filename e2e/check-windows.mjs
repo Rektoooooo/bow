@@ -36,6 +36,9 @@ const now = Date.now();
 const tab = (id, name) => ({ kind: "tab", id, url: urlOf(name), title: name, customTitle: null, faviconUrl: null, homeUrl: null, lastActiveAt: now, isMuted: false });
 const space = (id, name, todayIds, pinnedIds = []) => ({ id, name, icon: "✦", theme: { colors: ["#000000"], appearance: "dark", grain: 0 }, profileId: "profile-default", pinnedIds, todayIds, isPinnedOpen: true });
 const folder = { kind: "folder", id: "folder-reading", title: "Reading", childIds: [], isOpen: true };
+const splitPair = { kind: "split", id: "split-pair", childIds: ["tab-left", "tab-right"], orientation: "horizontal" };
+const spareTabNames = ["gamma", "delta", "epsilon", "zeta", "left", "right"];
+const spareTabs = Object.fromEntries(spareTabNames.map((name) => [`tab-${name}`, tab(`tab-${name}`, name)]));
 
 /** Same values as shared/settings.ts: where the page card starts with the sidebar shown, and with it hidden. */
 const SIDEBAR_WIDTH = 242;
@@ -45,9 +48,12 @@ fs.writeFileSync(
   path.join(userDataDir, "browser-state.json"),
   JSON.stringify({
     version: 3,
-    items: { "tab-alpha": tab("tab-alpha", "alpha"), "tab-beta": tab("tab-beta", "beta"), "tab-work": tab("tab-work", "work"), "folder-reading": folder },
+    items: { "tab-alpha": tab("tab-alpha", "alpha"), "tab-beta": tab("tab-beta", "beta"), "tab-work": tab("tab-work", "work"), "folder-reading": folder, "split-pair": splitPair, ...spareTabs },
     profiles: [{ id: "profile-default", name: "Default", favoriteIds: [] }],
-    spaces: [space("space-main", "Main", ["tab-alpha", "tab-beta"], ["folder-reading"]), space("space-work", "Work", ["tab-work"])],
+    spaces: [
+      space("space-main", "Main", ["tab-alpha", "tab-beta", "tab-gamma", "tab-delta", "tab-epsilon", "tab-zeta"], ["folder-reading"]),
+      space("space-work", "Work", ["tab-work", "split-pair"]),
+    ],
     activeSpaceId: "space-main",
     selectedTabIdBySpace: { "space-main": "tab-alpha", "space-work": "tab-work" },
     focusedWindowId: "window-1",
@@ -162,6 +168,33 @@ const clickMenuItem = (app, label) =>
     return item !== null;
   }, label);
 
+/**
+ * Drags a sidebar item out of one window's sidebar and drops it on a target in another's, with the HTML drag events
+ * the user's drag fires (Playwright's own drag hangs in Electron). The target page knows the item only from main.
+ */
+async function dragAcrossWindows(fromSidebar, itemId, toSidebar, targetSelector, verticalFraction = 0.5) {
+  await fromSidebar.evaluate((id) => {
+    const source = document.querySelector(`[draggable="true"][data-item-id="${id}"]`);
+    window.crossWindowDrag = { source: source, dataTransfer: new DataTransfer() };
+    source.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer: window.crossWindowDrag.dataTransfer }));
+  }, itemId);
+  const isAccepted = await toSidebar.waitForFunction(() => document.body.classList.contains("is-dragging"), null, { timeout: 3000 }).then(() => true, () => false);
+  await toSidebar.evaluate(({ selector, fraction }) => {
+    const target = document.querySelector(selector);
+    const rectangle = target.getBoundingClientRect();
+    const point = { clientX: rectangle.left + rectangle.width / 2, clientY: rectangle.top + rectangle.height * fraction };
+    const dataTransfer = new DataTransfer();
+    target.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer, ...point }));
+    target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer, ...point }));
+  }, { selector: targetSelector, fraction: verticalFraction });
+  await fromSidebar.evaluate(() => {
+    const drag = window.crossWindowDrag;
+    drag.source.dispatchEvent(new DragEvent("dragend", { bubbles: true, cancelable: true, dataTransfer: drag.dataTransfer }));
+  });
+  await toSidebar.waitForTimeout(500);
+  return isAccepted;
+}
+
 /** Whether the "Open in another window" card shows in a sidebar page. */
 const showsElsewhereCard = (sidebar) => sidebar.evaluate(() => document.getElementById("elsewhere-card")?.hidden === false);
 
@@ -194,7 +227,7 @@ let firstState = await getState(firstSidebar);
 let secondState = await getState(secondSidebar);
 check(
   "both windows show the same Spaces and tabs",
-  JSON.stringify(firstState.spaces) === JSON.stringify(secondState.spaces) && Object.keys(secondState.items).length === 4,
+  JSON.stringify(firstState.spaces) === JSON.stringify(secondState.spaces) && Object.keys(secondState.items).length === 11,
 );
 check("the new window starts on the same Space with nothing selected", secondState.activeSpaceId === "space-main" && selectedTabId(secondState) === null && selectedTabId(firstState) === "tab-alpha");
 check("the new window has the focus", secondState.focusedWindowId !== "window-1" && firstState.otherWindows.length === 1);
@@ -281,6 +314,62 @@ await dispatch(firstSidebar, { type: "selectTab", tabId: easelTabId });
 await firstSidebar.waitForTimeout(600);
 check("an Easel too: one window draws it, the other says \"Open in another window\"", (await showsElsewhereCard(firstSidebar)) && (await editorCount(firstSidebar, ".easel-editor")) === 0 && (await editorCount(secondSidebar, ".easel-editor")) === 1);
 await dispatch(firstSidebar, { type: "selectTab", tabId: "tab-alpha" });
+await dispatch(secondSidebar, { type: "selectTab", tabId: "tab-beta" });
+await waitForWindows(app, (list) => findWindow(list, "first")?.pageUrls.includes(urlOf("alpha")) && findWindow(list, "second")?.pageUrls.includes(urlOf("beta")));
+
+// Dragging an item from one window's sidebar into another's, like Arc: it lands where it is dropped, and a tab comes
+// along (selected there, its page moved over; the window it came from shows another of its tabs).
+const spaceOf = (state, spaceId) => state.spaces.find((candidate) => candidate.id === spaceId);
+await dispatch(secondSidebar, { type: "switchSpace", spaceId: "space-work" });
+await dispatch(firstSidebar, { type: "selectTab", tabId: "tab-gamma" });
+await waitForWindows(app, (list) => findWindow(list, "first")?.pageUrls.includes(urlOf("gamma")));
+const isDragAccepted = await dragAcrossWindows(firstSidebar, "tab-gamma", secondSidebar, ".today-list .list-end-zone");
+windows = await waitForWindows(app, (list) => findWindow(list, "second")?.pageUrls.includes(urlOf("gamma")));
+firstState = await getState(firstSidebar);
+secondState = await getState(secondSidebar);
+check("a drag in one window shows the other window's drop places", isDragAccepted);
+check(
+  "a tab dropped into another window's Today moves there, is selected, and its page comes along",
+  spaceOf(secondState, "space-work").todayIds.at(-1) === "tab-gamma" && selectedTabId(secondState) === "tab-gamma" && findWindow(windows, "second").pageUrls.join() === urlOf("gamma"),
+  JSON.stringify(windows.map((window) => window.pageUrls)),
+);
+check(
+  "and the window it came from shows another of its tabs",
+  selectedTabId(firstState) !== "tab-gamma" && findWindow(windows, "first").pageUrls.length === 1 && !findWindow(windows, "first").pageUrls.includes(urlOf("gamma")),
+  `${selectedTabId(firstState)} ${JSON.stringify(findWindow(windows, "first").pageUrls)}`,
+);
+await dragAcrossWindows(firstSidebar, "tab-delta", secondSidebar, ".favorites-end-zone");
+secondState = await getState(secondSidebar);
+check("onto another window's Favorites", secondState.profiles[0].favoriteIds.includes("tab-delta") && selectedTabId(secondState) === "tab-delta");
+await dispatch(secondSidebar, { type: "switchSpace", spaceId: "space-main" });
+await secondSidebar.waitForTimeout(300);
+await dragAcrossWindows(firstSidebar, "tab-epsilon", secondSidebar, '[data-drop="item"][data-item-id="folder-reading"]');
+secondState = await getState(secondSidebar);
+check("into a folder in another window", secondState.items["folder-reading"].childIds.includes("tab-epsilon") && selectedTabId(secondState) === "tab-epsilon");
+await dispatch(secondSidebar, { type: "switchSpace", spaceId: "space-work" });
+await secondSidebar.waitForTimeout(300);
+await dragAcrossWindows(firstSidebar, "tab-zeta", secondSidebar, '[data-drop="item"][data-item-id="split-pair"]', 0.2);
+secondState = await getState(secondSidebar);
+const workToday = spaceOf(secondState, "space-work").todayIds;
+check("next to a split view in another window", workToday.indexOf("tab-zeta") === workToday.indexOf("split-pair") - 1 && selectedTabId(secondState) === "tab-zeta", workToday.join());
+await dispatch(firstSidebar, { type: "switchSpace", spaceId: "space-work" });
+await firstSidebar.waitForTimeout(300);
+await dragAcrossWindows(firstSidebar, "split-pair", secondSidebar, ".today-list .list-end-zone");
+windows = await waitForWindows(app, (list) => findWindow(list, "second")?.pageUrls.length === 2);
+check("a split view dragged into another window comes along with both pages", findWindow(windows, "second").pageUrls.sort().join() === [urlOf("left"), urlOf("right")].sort().join(), JSON.stringify(windows.map((window) => window.pageUrls)));
+await dispatch(firstSidebar, { type: "switchSpace", spaceId: "space-main" });
+await firstSidebar.waitForTimeout(300);
+const selectionBeforeSpaceDrop = selectedTabId(await getState(secondSidebar));
+await dragAcrossWindows(firstSidebar, easelTabId, secondSidebar, '[data-drop="space"][data-space-id="space-work"]');
+firstState = await getState(firstSidebar);
+secondState = await getState(secondSidebar);
+check(
+  "on another window's Space button it only moves to that Space",
+  spaceOf(secondState, "space-work").todayIds.includes(easelTabId) && selectedTabId(secondState) === selectionBeforeSpaceDrop,
+  `${selectedTabId(secondState)} vs ${selectionBeforeSpaceDrop}`,
+);
+await dispatch(firstSidebar, { type: "selectTab", tabId: "tab-alpha" });
+await dispatch(secondSidebar, { type: "switchSpace", spaceId: "space-main" });
 await dispatch(secondSidebar, { type: "selectTab", tabId: "tab-beta" });
 await waitForWindows(app, (list) => findWindow(list, "first")?.pageUrls.includes(urlOf("alpha")) && findWindow(list, "second")?.pageUrls.includes(urlOf("beta")));
 
