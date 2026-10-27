@@ -60,6 +60,7 @@ let currentRuntime: RuntimeState = {
   extensionsBeingAdded: [],
   isWindowActive: true,
   isLibraryOpen: false,
+  faviconAccents: {},
 };
 
 /** The Note or Easel tab whose editor this page last told main it has open, or null. */
@@ -438,9 +439,11 @@ function applyToolbarTint(selectedTabId: ItemId | null): void {
   const color = selectedTabId === null ? null : currentRuntime.tabs[selectedTabId]?.toolbarColor ?? null;
   if (color === null || !/^#[0-9a-f]{6}$/.test(color)) {
     card.style.removeProperty("--card-bg");
+    card.style.removeProperty("--page-top-color");
     card.dataset.toolbarTone = document.documentElement.dataset.appearance === "light" ? "light" : "dark";
     return;
   }
+  card.style.setProperty("--page-top-color", color);
   const nearBlackColor = currentRuntime.isWindowActive ? NEAR_BLACK_TOOLBAR_COLOR_ACTIVE : NEAR_BLACK_TOOLBAR_COLOR;
   const shownColor = getLuminance(color) < NEAR_BLACK_LUMINANCE ? nearBlackColor : color;
   card.style.setProperty("--card-bg", shownColor);

@@ -23,6 +23,7 @@ import { IPC_CHANNELS } from "../shared/ipcChannels";
 import { SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_WIDTH_PX } from "../shared/settings";
 import type { BrowserState, ExtensionBeingAdded, ItemId, LiveFolderStatus, RuntimeState, WindowId } from "../shared/types";
 import { getActiveDownloadCount } from "./downloads";
+import { getFaviconAccents } from "./faviconAccents";
 import { findMediaInfo, handleShownTabsChanged } from "./media";
 import type { CardLayoutOptions } from "./layout";
 import { raiseOverlayIfShown } from "./overlay";
@@ -439,6 +440,7 @@ export function collectRuntimeState(windowId: WindowId = currentState.focusedWin
     extensionsBeingAdded: extensionsBeingAdded,
     isWindowActive: getMainWindow(windowId)?.isFocused() ?? false,
     isLibraryOpen: libraryWindowId === windowId,
+    faviconAccents: getFaviconAccents(),
   };
 }
 
@@ -498,9 +500,28 @@ export function scheduleRuntimePush(): void {
   runtimePushTimer = setTimeout(() => {
     runtimePushTimer = null;
     for (const { windowId, window } of listMainWindows()) {
+      updateWindowButtons(windowId, window);
       window.webContents.send(IPC_CHANNELS.runtimeChanged, collectRuntimeState(windowId));
     }
   }, RUNTIME_PUSH_DELAY_MS);
+}
+
+/** Whether each window shows its traffic lights now, so they are only touched when that changes. */
+const windowButtonsShown = new WeakMap<BrowserWindow, boolean>();
+
+/**
+ * Arc hides the traffic lights while the sidebar is hidden (its toolbar then starts at the window's left edge, with
+ * the sidebar button first) and shows them with the sidebar, when it peeks in, and with the Library's column (the
+ * user's recording, 2026-10-27).
+ */
+function updateWindowButtons(windowId: WindowId, window: BrowserWindow): void {
+  const isSidebarVisible = getStateForWindow(windowId).settings.isSidebarVisible;
+  const isShown = isSidebarVisible || peekingWindowIds.has(windowId) || libraryWindowId === windowId;
+  if (windowButtonsShown.get(window) === isShown || process.platform !== "darwin") {
+    return;
+  }
+  windowButtonsShown.set(window, isShown);
+  window.setWindowButtonVisibility(isShown);
 }
 
 /**

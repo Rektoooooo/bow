@@ -215,6 +215,13 @@ tooltip, 7 sidebar width, then AppleScript.
       Done: Arc's width reaches the page card (card at 254, measured live), ours stops 7 pt earlier, so the first
       import sets 247 (`readArcSidebarWidth`); a later run leaves the width alone
 - [ ] Sidebar scrollbar: thin overlay scrollbar while scrolling → check ours
+- [x] ⌘S like Arc's (the user's recording, 2026-10-27): the traffic lights hide with the sidebar, the card's toolbar
+      starts at the window's edge with the sidebar button and moves rigidly with the card, which slides over the
+      sidebar (no longer squeezed); the sidebar's own buttons go at once
+- [x] The page meets the toolbar square: the card shows the page's own top colour under the page view's rounded corners
+- [x] The selected Favorite: Arc's 2 pt border in the icon's colour and a tinted fill (main/faviconAccents.ts)
+- [ ] Dragging tabs in the sidebar does not work for the user with a real mouse (e2e only simulates drag events);
+      needs a look with real input
 - New window: the purple window in the first recording was most likely incognito (⇧⌘N; the user is not sure), so
   Arc's ⌘N window and its "open in another window" placeholder are still unobserved; no change planned
 - [ ] AppleScript dictionary (the user runs Raycast, which talks to Arc through AppleScript; ours has none yet).

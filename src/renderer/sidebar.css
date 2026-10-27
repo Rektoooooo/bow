@@ -217,8 +217,23 @@ body.sidebar-hidden {
   grid-template-columns: 0 minmax(0, 1fr);
 }
 
+/*
+  ⌘S, like Arc's (the user's recording, 2026-10-27): the sidebar keeps its width and stays where it is while the card
+  slides over it (hiding) or off it (showing); it only goes once the card has covered it. Squeezing it with its column
+  made the rows reflow on the way.
+*/
 body.sidebar-hidden .sidebar {
   visibility: hidden;
+  transition: visibility 0s linear var(--motion-layout);
+}
+
+/* Its own buttons go at once, with the traffic lights: the card's toolbar shows the sidebar button from the start. */
+body.sidebar-hidden .header-buttons {
+  visibility: hidden;
+}
+
+body.sidebar-hidden.sidebar-peeking .header-buttons {
+  visibility: visible;
 }
 
 /*
@@ -228,6 +243,7 @@ body.sidebar-hidden .sidebar {
 */
 body.sidebar-hidden.sidebar-peeking .sidebar {
   visibility: visible;
+  transition: none;
   position: absolute;
   top: var(--peek-inset);
   bottom: var(--peek-inset);
@@ -334,6 +350,7 @@ button:disabled {
   position: relative;
   display: flex;
   flex-direction: column;
+  width: var(--sidebar-width);
   min-height: 0;
   min-width: 0;
   padding: 0 0 0 7px;
@@ -455,6 +472,25 @@ button:disabled {
 .favorite-tile.is-selected {
   background: var(--tile-selected);
   box-shadow: var(--row-shadow);
+}
+
+/*
+  Arc's selected Favorite (the user's screenshots, 2026-10-27): a 2 pt border in the site's colour and a light fill
+  tinted with it. 22 % of the colour over 44 % white reproduces both shots (YouTube 148/122/122, Spotify 110/136/118
+  on a frame of 25) within two levels. Light Spaces keep their white tile under the tint.
+*/
+.favorite-tile.is-selected.has-accent {
+  --tile-tint: color-mix(in srgb, var(--tile-accent) 22%, transparent);
+  background:
+    linear-gradient(var(--tile-tint), var(--tile-tint)),
+    rgba(255, 255, 255, 0.44);
+  box-shadow: inset 0 0 0 2px var(--tile-accent);
+}
+
+:root[data-appearance="light"] .favorite-tile.is-selected.has-accent {
+  background:
+    linear-gradient(var(--tile-tint), var(--tile-tint)),
+    var(--tile-selected);
 }
 
 .tile-audio-dot {
@@ -1223,7 +1259,10 @@ button:disabled {
 
 /* ---------- Main column: the page card (toolbar on top, the web page below) ---------- */
 
+/* Above the sidebar (and the frame's grain), so the card slides over the sidebar when ⌘S hides it. */
 .main-column {
+  position: relative;
+  z-index: 1;
   display: grid;
   min-width: 0;
   min-height: 0;
@@ -1276,15 +1315,6 @@ body.sidebar-hidden.library-open .main-column {
   color: var(--toolbar-ink);
   -webkit-app-region: drag;
   transition: padding var(--motion-layout) var(--motion-layout-ease);
-}
-
-/* With the sidebar hidden, the toolbar starts right of the traffic lights. */
-body.sidebar-hidden .toolbar {
-  padding-left: 72px;
-}
-
-body.sidebar-hidden.library-open .toolbar {
-  padding-left: 7px;
 }
 
 /* Loading glow: a soft line moving along the toolbar's bottom edge while the page loads. */
@@ -1484,12 +1514,17 @@ body.sidebar-hidden.library-open .toolbar {
 }
 
 /* The card's page area: covered by the tab's web view whenever a tab is open. */
+/*
+  Under the page: the page's own top colour when it is known. Electron rounds all four corners of the page's view, so
+  its top corners leave a notch under the toolbar; in the page's colour the notch is invisible and the page meets the
+  toolbar square, like Arc's.
+*/
 .card-slot {
   flex: 1;
   min-height: 0;
   display: grid;
   place-items: center;
-  background: var(--card-empty);
+  background: var(--page-top-color, var(--card-empty));
 }
 
 .empty-card {
