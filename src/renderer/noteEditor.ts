@@ -61,6 +61,9 @@ const FORMAT_BUTTONS: { icon: IconName | null; label: string; text: string; comm
 let openNoteId: string | null = null;
 let saveTimer: number | null = null;
 
+/** The save waiting for its delay. It runs at once when the editor closes: another window may open the note next. */
+let pendingSave: (() => void) | null = null;
+
 /**
  * Copies a node into a clean document fragment: allowed tags with allowed attributes, everything else unwrapped.
  */
@@ -114,12 +117,25 @@ function scheduleSave(noteId: string, body: HTMLElement): void {
   if (saveTimer !== null) {
     window.clearTimeout(saveTimer);
   }
-  saveTimer = window.setTimeout(() => {
-    saveTimer = null;
+  pendingSave = () => {
     const holder = document.createElement("div");
     holder.appendChild(cleanHtml(body.innerHTML));
     window.browserApi.saveNote(noteId, holder.innerHTML, readTitle(body)).catch(() => undefined);
-  }, SAVE_DELAY_MS);
+  };
+  saveTimer = window.setTimeout(runPendingSave, SAVE_DELAY_MS);
+}
+
+/**
+ * Saves now what is waiting to be saved, if anything.
+ */
+function runPendingSave(): void {
+  if (saveTimer !== null) {
+    window.clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  const save = pendingSave;
+  pendingSave = null;
+  save?.();
 }
 
 /**
@@ -243,6 +259,8 @@ export function showNoteEditor(slot: HTMLElement, noteId: string | null): void {
     return;
   }
   openNoteId = noteId;
+  // The closing editor's last change is saved before anything else happens (sidebar.ts then reports it closed).
+  runPendingSave();
   slot.querySelector(".note-editor")?.remove();
   if (noteId !== null) {
     slot.append(buildEditor(noteId));

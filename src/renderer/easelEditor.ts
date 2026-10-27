@@ -71,6 +71,9 @@ interface OpenBoard {
 
 let openBoard: OpenBoard | null = null;
 let saveTimer: number | null = null;
+
+/** The save waiting for its delay. It runs at once when the editor closes: another window may open the easel next. */
+let pendingSave: (() => void) | null = null;
 let elementCounter = 0;
 
 /**
@@ -88,10 +91,23 @@ function scheduleSave(current: OpenBoard): void {
   if (saveTimer !== null) {
     window.clearTimeout(saveTimer);
   }
-  saveTimer = window.setTimeout(() => {
-    saveTimer = null;
+  pendingSave = () => {
     window.browserApi.saveEasel(current.easelId, JSON.stringify(current.board)).catch(() => undefined);
-  }, SAVE_DELAY_MS);
+  };
+  saveTimer = window.setTimeout(runPendingSave, SAVE_DELAY_MS);
+}
+
+/**
+ * Saves now what is waiting to be saved, if anything.
+ */
+function runPendingSave(): void {
+  if (saveTimer !== null) {
+    window.clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  const save = pendingSave;
+  pendingSave = null;
+  save?.();
 }
 
 /**
@@ -634,6 +650,8 @@ export function showEaselEditor(slot: HTMLElement, easelId: string | null): void
     return;
   }
   openBoard = null;
+  // The closing editor's last change is saved before anything else happens (sidebar.ts then reports it closed).
+  runPendingSave();
   slot.querySelector(".easel-editor")?.remove();
   if (easelId !== null) {
     slot.append(buildEditor(easelId));

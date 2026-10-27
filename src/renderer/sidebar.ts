@@ -53,7 +53,11 @@ let currentRuntime: RuntimeState = {
   isNewTabPending: false,
   liveFolders: {},
   tabIdsInOtherWindows: [],
+  editorTabIdsHere: [],
 };
+
+/** The Note or Easel tab whose editor this page last told main it has open, or null. */
+let reportedEditorTabId: ItemId | null = null;
 
 /** The sidebar item, Space name or Space icon being edited inline, or null. */
 let renamingItemId: ItemId | null = null;
@@ -512,10 +516,31 @@ function renderAll(): void {
   updateEmptyCard(selectedTabId);
   const cardSlot = document.getElementById("card-slot");
   if (cardSlot !== null) {
-    showNoteEditor(cardSlot, noteId);
-    showEaselEditor(cardSlot, easelId);
+    showEditors(cardSlot, selectedTabId, noteId, easelId);
   }
   updateDocumentTitle(state, selectedTabId);
+}
+
+/**
+ * Draws the selected Note's or Easel's editor when main says this window may (one window at a time has it, like a
+ * page), and tells main which editor is open. A closing editor saves first, so the report reaches main after the save.
+ */
+function showEditors(cardSlot: HTMLElement, selectedTabId: ItemId | null, noteId: string | null, easelId: string | null): void {
+  const mayDrawEditor = selectedTabId !== null && currentRuntime.editorTabIdsHere.includes(selectedTabId);
+  showNoteEditor(cardSlot, mayDrawEditor ? noteId : null);
+  showEaselEditor(cardSlot, mayDrawEditor ? easelId : null);
+  const hasEditor = mayDrawEditor && (noteId !== null || easelId !== null);
+  const openEditorTabId = hasEditor ? selectedTabId : null;
+  if (openEditorTabId === reportedEditorTabId) {
+    return;
+  }
+  if (reportedEditorTabId !== null) {
+    dispatch({ type: "reportOpenEditor", tabId: reportedEditorTabId, isOpen: false });
+  }
+  if (openEditorTabId !== null) {
+    dispatch({ type: "reportOpenEditor", tabId: openEditorTabId, isOpen: true });
+  }
+  reportedEditorTabId = openEditorTabId;
 }
 
 /**

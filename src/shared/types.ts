@@ -352,6 +352,11 @@ export interface RuntimeState {
    * card says "Open in another window" instead.
    */
   tabIdsInOtherWindows: ItemId[];
+  /**
+   * The Note and Easel tabs this window may draw an editor for: it has them on screen and no other window's editor
+   * is still open (one editor at a time writes the file).
+   */
+  editorTabIdsHere: ItemId[];
 }
 
 /** What the sidebar's small media player shows. */

@@ -5,6 +5,9 @@
  *   selected tab, or every pane of its split view, and the pages report what they do (navigation, titles, icons,
  *   loading, sound). A view has one parent, so a page is on screen in one window at a time: it stays with the window
  *   that shows it, and another window selecting it gets "Open in another window" instead (until it is moved there).
+ *   Notes and Easels follow the same rule (Arc's notes are tabs too), so only one editor at a time writes the file:
+ *   their editor is drawn by the sidebar page, which tells us when it opened or closed one, and a window may draw an
+ *   editor only once no other window has it open (its last save came first).
  *
  * Data source:
  *   BrowserState as each window shows it (browserCore.ts), Electron's BrowserWindow / WebContentsView APIs, and
@@ -96,6 +99,12 @@ const shownElsewhereByWindow = new Map<WindowId, ItemId[]>();
 
 /** Tabs asked to move to a window ("Move to This Window"); the next sync puts them there. */
 const requestedMoves = new Map<ItemId, WindowId>();
+
+/** The Note and Easel tabs whose editor each window's sidebar page has open right now, as it reported. */
+const openEditorsByWindow = new Map<WindowId, Set<ItemId>>();
+
+/** The Note and Easel tabs each window may draw an editor for (it has them, and no other window's editor is open). */
+const editorsHereByWindow = new Map<WindowId, ItemId[]>();
 
 /** Where each shown view was last sent (it may still be gliding there), so an unchanged layout sends nothing. */
 const targetBounds = new WeakMap<WebContentsView, Rectangle>();
@@ -221,6 +230,39 @@ export function findWindowShowingTab(tabId: ItemId): WindowId | null {
  */
 export function getTabIdsShownElsewhere(windowId: WindowId): ItemId[] {
   return shownElsewhereByWindow.get(windowId) ?? [];
+}
+
+/**
+ * Returns the Note and Easel tabs a window may draw an editor for.
+ */
+export function getEditorTabIdsHere(windowId: WindowId): ItemId[] {
+  return editorsHereByWindow.get(windowId) ?? [];
+}
+
+/**
+ * A window's sidebar page opened or closed a Note or Easel editor. It reports a closing only after its last save, so
+ * the next window to draw that editor reads the newest text.
+ */
+export function setEditorOpen(windowId: WindowId, tabId: ItemId, isOpen: boolean): void {
+  const openEditors = openEditorsByWindow.get(windowId) ?? new Set<ItemId>();
+  if (isOpen) {
+    openEditors.add(tabId);
+  } else {
+    openEditors.delete(tabId);
+  }
+  openEditorsByWindow.set(windowId, openEditors);
+}
+
+/**
+ * True when another window than this one has the tab's editor open.
+ */
+function isEditorOpenElsewhere(tabId: ItemId, windowId: WindowId): boolean {
+  for (const [otherWindowId, openEditors] of openEditorsByWindow) {
+    if (otherWindowId !== windowId && openEditors.has(tabId)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -476,10 +518,13 @@ export function forgetWindow(windowId: WindowId): void {
   }
   shownByWindow.delete(windowId);
   shownElsewhereByWindow.delete(windowId);
+  openEditorsByWindow.delete(windowId);
+  editorsHereByWindow.delete(windowId);
 }
 
 /**
- * Returns the tabs that should be on screen: the selected tab, or every tab of its split view in pane order.
+ * Returns the tabs that should be on screen: the selected tab, or every tab of its split view in pane order. Notes
+ * and Easels are among them; they get an editor instead of a page view (isEditorTab).
  */
 export function computeVisibleTabIds(state: BrowserState): ItemId[] {
   const selectedTabId = getSelectedTabId(state);
@@ -488,12 +533,16 @@ export function computeVisibleTabIds(state: BrowserState): ItemId[] {
   }
   const splitId = findSplitOfTab(state, selectedTabId);
   const split = splitId === null ? undefined : state.items[splitId];
-  const shownIds = split !== undefined && split.kind === "split" ? split.childIds : [selectedTabId];
-  // Notes and easels have no web page: the sidebar page draws their editor in the card (shared/notes.ts, easels.ts).
-  return shownIds.filter((tabId) => {
-    const url = findTab(state, tabId)?.url ?? "";
-    return !isNoteUrl(url) && !isEaselUrl(url);
-  });
+  return split !== undefined && split.kind === "split" ? split.childIds : [selectedTabId];
+}
+
+/**
+ * True for Notes and Easels: they have no web page; the sidebar page draws their editor in the card
+ * (shared/notes.ts, easels.ts).
+ */
+function isEditorTab(state: BrowserState, tabId: ItemId): boolean {
+  const url = findTab(state, tabId)?.url ?? "";
+  return isNoteUrl(url) || isEaselUrl(url);
 }
 
 /**
@@ -507,7 +556,8 @@ export function layoutShownTabViews(target: WindowTarget, isAnimated: boolean = 
   const card = computeCardBounds(contentWidth, contentHeight, target.layoutOptions);
 
   const state = target.state;
-  const shownTabIds = getShownTabIdsInWindow(target.windowId);
+  // Notes and Easels have no view: the pages share the card among themselves.
+  const shownTabIds = getShownTabIdsInWindow(target.windowId).filter((tabId) => tabViews.has(tabId));
   const selectedTabId = getSelectedTabId(state);
   const splitId = selectedTabId === null ? null : findSplitOfTab(state, selectedTabId);
   const split = splitId === null ? undefined : state.items[splitId];
@@ -591,7 +641,8 @@ function assignTabsToWindows(targets: WindowTarget[], wantedByWindow: Map<Window
  */
 function showTabsInWindow(target: WindowTarget, tabIds: ItemId[], events: TabViewEvents): void {
   const shown = shownByWindow.get(target.windowId) ?? { window: target.window, tabIds: [] };
-  for (const tabId of tabIds) {
+  const pageTabIds = tabIds.filter((tabId) => !isEditorTab(target.state, tabId));
+  for (const tabId of pageTabIds) {
     const tab = findTab(target.state, tabId) as TabItem;
     const view = tabViews.get(tabId) ?? createTabView(target.state, tab, events);
     target.window.contentView.addChildView(view);
@@ -638,8 +689,12 @@ export function syncTabViews(targets: WindowTarget[], events: TabViewEvents): Se
     const wanted = wantedByWindow.get(target.windowId) ?? [];
     const ownTabIds = wanted.filter((tabId) => owners.get(tabId) === target.windowId);
     const elsewhereTabIds = wanted.filter((tabId) => owners.get(tabId) !== target.windowId);
+    const ownEditorTabIds = ownTabIds.filter((tabId) => isEditorTab(target.state, tabId));
+    // An editor another window still has open waits until that window closed it (after its last save).
+    const drawableEditorTabIds = ownEditorTabIds.filter((tabId) => !isEditorOpenElsewhere(tabId, target.windowId));
     newShownByWindow.set(target.windowId, ownTabIds);
     shownElsewhereByWindow.set(target.windowId, elsewhereTabIds);
+    editorsHereByWindow.set(target.windowId, drawableEditorTabIds);
   }
 
   // Release first: every view leaving a window goes before any window takes one.

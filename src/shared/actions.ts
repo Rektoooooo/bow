@@ -129,7 +129,9 @@ export type BrowserAction =
   | { type: "openLiveFolderSource"; folderId: ItemId }
   | { type: "showHiddenLiveFolderItems"; folderId: ItemId }
   /** "Move to This Window": the window takes the pages it selected that another window shows. */
-  | { type: "moveTabToThisWindow" };
+  | { type: "moveTabToThisWindow" }
+  /** The sidebar page opened or closed a Note or Easel editor (sent after its last save; see tabViews.ts). */
+  | { type: "reportOpenEditor"; tabId: ItemId; isOpen: boolean };
 
 /** Every action type, for checking an incoming `type` string. */
 export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
@@ -217,4 +219,5 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "openLiveFolderSource",
   "showHiddenLiveFolderItems",
   "moveTabToThisWindow",
+  "reportOpenEditor",
 ];

@@ -41,6 +41,15 @@ differs from it); every snapshot fits "the sidebar of the last window closed", a
   (our choice). `getLayoutOptions(windowId)` and the sidebar peek read each window's own sidebar. `migrate.ts`
   v3 → v4 copies the shared values into every parked window.
 
+- **Piece 2 (Notes and Easels):** chosen: the same "Open in another window" card as pages, since Arc's notes are
+  tab content too and a tab is in one window at a time (the alternative, two live editors synced through main, could
+  still lose keystrokes typed in both). `tabViews.ts` now owns editor tabs per window like page views (no view, no
+  pane); a window may draw an editor only when no other window's sidebar reports it open
+  (`RuntimeState.editorTabIdsHere`). The sidebar page reports open and closed editors (`reportOpenEditor`); a closing
+  editor saves its pending change first, and the report follows on the same IPC channel, so the next window always
+  reads the newest file. `check-windows` types into a note and moves it at once; with the flush and the hand-over
+  disabled that check fails ("First window" without the last words).
+
 ## How it is built
 
 - **Saved shape v3** (`src/shared/types.ts`): `focusedWindowId` and `otherWindows: WindowSelection[]` (id, Space,
@@ -84,7 +93,6 @@ differs from it); every snapshot fits "the sidebar of the last window closed", a
 
 ## Known limits (our choices or not done)
 
-- Notes and Easels have no page view, so two windows can show the same note's editor at once; the last save wins.
 - Extensions: a tab belongs to the window it was first shown in for `chrome.tabs` / `chrome.windows` (the library
   cannot move a tab between windows without its removeTab, which would close our tab).
 - Dragging a tab from one window's sidebar to another's is not supported (each sidebar's drag lives in its page).

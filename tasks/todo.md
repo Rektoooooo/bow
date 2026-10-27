@@ -162,7 +162,7 @@ differs from it), and new windows start from it.
 - [x] Piece 1: saved shape v4: per window sidebar shown/hidden (⌘S), width, collapsed Pinned sections and open
       folders (the focused window's stay in settings / Space.isPinnedOpen / FolderItem.isOpen, parked windows keep
       their own); `newWindowSidebar` = the last closed window's; sidebar peek and glide per window; migrate v3 → v4
-- [ ] Piece 2: Notes and Easels in two windows get the same "Open in another window" card as pages (Arc's notes are
+- [x] Piece 2: Notes and Easels in two windows get the same "Open in another window" card as pages (Arc's notes are
       tab content too), so one editor at a time saves the file
 - [ ] Piece 3: drag an item from one window's sidebar into another's (Favorites, Pinned, Today, folders, splits,
       Space switcher): main carries the dragged item id between windows; a dropped tab is selected there and its

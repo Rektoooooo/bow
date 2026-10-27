@@ -246,6 +246,44 @@ check(
   JSON.stringify(windows.map((window) => window.pageUrls)),
 );
 
+// Notes and Easels follow the same rule as pages (Arc's notes are tabs too): one editor at a time writes the file.
+const editorCount = (sidebar, selector) => sidebar.evaluate((wanted) => document.querySelectorAll(wanted).length, selector);
+await dispatch(firstSidebar, { type: "createNote" });
+await firstSidebar.waitForSelector(".note-body", { timeout: 5000 });
+await firstSidebar.waitForTimeout(300);
+const noteTabId = selectedTabId(await getState(firstSidebar));
+await firstSidebar.click(".note-body");
+await firstSidebar.keyboard.type("First window");
+await firstSidebar.waitForTimeout(900);
+await dispatch(secondSidebar, { type: "selectTab", tabId: noteTabId });
+await secondSidebar.waitForTimeout(600);
+check(
+  "a Note open in one window says \"Open in another window\" in the other, with no second editor",
+  (await showsElsewhereCard(secondSidebar)) && (await editorCount(secondSidebar, ".note-editor")) === 0 && (await editorCount(firstSidebar, ".note-editor")) === 1,
+);
+// Typed just before the move, so the save is still waiting: the first window saves it before letting go.
+await firstSidebar.click(".note-body");
+await firstSidebar.keyboard.press("End");
+await firstSidebar.keyboard.type(" and more");
+await secondSidebar.click("#move-here-button");
+await secondSidebar.waitForSelector(".note-body", { timeout: 5000 });
+await secondSidebar.waitForTimeout(300);
+const movedNoteText = await secondSidebar.evaluate(() => document.querySelector(".note-body")?.innerText ?? "");
+check(
+  "Move to This Window takes the Note over with its last keystrokes",
+  movedNoteText.includes("First window and more") && (await editorCount(firstSidebar, ".note-editor")) === 0 && (await showsElsewhereCard(firstSidebar)),
+  movedNoteText.replace(/\n/g, " / "),
+);
+await dispatch(secondSidebar, { type: "createEasel" });
+await secondSidebar.waitForSelector(".easel-viewport", { timeout: 5000 });
+const easelTabId = selectedTabId(await getState(secondSidebar));
+await dispatch(firstSidebar, { type: "selectTab", tabId: easelTabId });
+await firstSidebar.waitForTimeout(600);
+check("an Easel too: one window draws it, the other says \"Open in another window\"", (await showsElsewhereCard(firstSidebar)) && (await editorCount(firstSidebar, ".easel-editor")) === 0 && (await editorCount(secondSidebar, ".easel-editor")) === 1);
+await dispatch(firstSidebar, { type: "selectTab", tabId: "tab-alpha" });
+await dispatch(secondSidebar, { type: "selectTab", tabId: "tab-beta" });
+await waitForWindows(app, (list) => findWindow(list, "first")?.pageUrls.includes(urlOf("alpha")) && findWindow(list, "second")?.pageUrls.includes(urlOf("beta")));
+
 // Actions from a window's sidebar act there, and the overlay goes to that window.
 await dispatch(firstSidebar, { type: "openCommandBar", mode: "newTab" });
 windows = await waitForWindows(app, (list) => findWindow(list, "first")?.hasOverlay === true);

@@ -20,6 +20,7 @@ import {
   getWindow,
   moveShownElsewhereTabsHere,
   previewSidebarWidthWhileDragging,
+  reportOpenEditor,
   scheduleRuntimePush,
   sendSidebarCommand,
   setSidebarPeek,
@@ -155,6 +156,11 @@ const POINTER_ACTION_TYPES: BrowserAction["type"][] = ["setSidebarPeek", "showTa
  */
 export function runActionFromWindow(action: BrowserAction, windowId: WindowId | null): void {
   const isFromBackgroundWindow = windowId !== null && windowId !== getState().focusedWindowId;
+  // Every window's sidebar reports its editors as they open and close, in the background too.
+  if (windowId !== null && action.type === "reportOpenEditor") {
+    reportOpenEditor(windowId, action.tabId, action.isOpen);
+    return;
+  }
   if (windowId !== null && action.type === "setSidebarPeek") {
     setSidebarPeek(windowId, action.isPeeking);
     return;
@@ -391,5 +397,8 @@ export function runAction(action: BrowserAction): void {
       return;
     case "moveTabToThisWindow":
       return moveShownElsewhereTabsHere();
+    case "reportOpenEditor":
+      // Only a window's sidebar reports editors (runActionFromWindow handles it with the window's id).
+      return;
   }
 }

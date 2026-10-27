@@ -34,10 +34,12 @@ import {
   collectTabRuntime,
   findWindowShowingTab,
   forgetWindow,
+  getEditorTabIdsHere,
   getShownTabIds,
   getTabIdsShownElsewhere,
   layoutShownTabViews,
   requestTabsMoveToWindow,
+  setEditorOpen,
   syncTabViews,
 } from "./tabViews";
 import type { TabViewEvents, WindowTarget } from "./tabViews";
@@ -270,6 +272,15 @@ export function setSidebarPeek(windowId: WindowId, isPeeking: boolean): void {
 }
 
 /**
+ * A window's sidebar page opened or closed a Note or Easel editor: a window waiting for that editor may draw it now.
+ */
+export function reportOpenEditor(windowId: WindowId, tabId: ItemId, isOpen: boolean): void {
+  setEditorOpen(windowId, tabId, isOpen);
+  syncViews();
+  scheduleRuntimePush();
+}
+
+/**
  * "Move to This Window": the focused window takes the pages it selected that another window shows. That window then
  * says "Open in another window" while it still selects them.
  */
@@ -381,6 +392,7 @@ export function collectRuntimeState(windowId: WindowId = currentState.focusedWin
     isNewTabPending: isNewTabPending && isFocused,
     liveFolders: getLiveFolderStatuses(),
     tabIdsInOtherWindows: getTabIdsShownElsewhere(windowId),
+    editorTabIdsHere: getEditorTabIdsHere(windowId),
   };
 }
 

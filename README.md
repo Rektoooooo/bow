@@ -74,7 +74,8 @@ in Arc). Running it twice adds nothing twice.
   window starts with the sidebar of the last window you closed (Arc's rule), and the folders of the window it came
   from.
 - A page is on screen in one window at a time. Selecting a tab another window shows says "Open in another window",
-  with **Move to This Window**.
+  with **Move to This Window**. Notes and Easels too: one window edits them at a time, and moving one over keeps the
+  last keystrokes.
 - Menus, shortcuts, the Command Bar, the Library, Peek and the other panels act in the window in front. ⇧⌘W closes a
   window; the app quits with the last one. Every window (place, size, Space, selection) opens again at the next
   start; links from Little Windows go to the main window you used last.
