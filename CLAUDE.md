@@ -78,7 +78,8 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   extensions are synthetic (`e2e/fixtures/`), never copied from a real profile. Web Store installs and updates are
   our own (`crx.ts` verifies CRX3 signatures, `webStoreInstall.ts` unpacks with `/usr/bin/unzip`, refuses symlinks
   and non-Chrome versions, writes the key so the id stays the Web Store id); copies live in
-  `<userData>/Extensions/<id>/<version>/` and are deleted only one by one when nothing uses them.
+  `<userData>/Extensions/<id>/<version>/`, are shared by every profile that adds the extension (never downloaded
+  again into a folder a session has loaded), and are deleted only one by one when nothing uses them.
 - **Security:** web pages stay sandboxed and get no preload, except in a profile that has extensions: there the
   extension library's preload runs in an isolated world (page scripts see nothing new); website permissions are
   installed per session in `profiles.ts`: `fullscreen` and `clipboard-sanitized-write` are allowed, camera,

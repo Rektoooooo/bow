@@ -362,6 +362,17 @@ export interface RuntimeState {
    * drop (main carries the id, because a drag's data stays in the page it started in).
    */
   itemDraggedInOtherWindow: ItemId | null;
+  /**
+   * Web Store extensions downloading right now, once per profile that asked for each: that profile's toolbar says
+   * "Adding…" on the extension's Web Store page until the download is done.
+   */
+  extensionsBeingAdded: ExtensionBeingAdded[];
+}
+
+/** A profile waiting for a Web Store extension's download (RuntimeState.extensionsBeingAdded). */
+export interface ExtensionBeingAdded {
+  profileId: ProfileId;
+  extensionId: string;
 }
 
 /** What the sidebar's small media player shows. */

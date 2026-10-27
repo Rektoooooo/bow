@@ -21,7 +21,7 @@ import type { BrowserWindow, WebContents } from "electron";
 import type { SidebarCommand } from "../shared/actions";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
 import { SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_WIDTH_PX } from "../shared/settings";
-import type { BrowserState, ItemId, LiveFolderStatus, RuntimeState, WindowId } from "../shared/types";
+import type { BrowserState, ExtensionBeingAdded, ItemId, LiveFolderStatus, RuntimeState, WindowId } from "../shared/types";
 import { getActiveDownloadCount } from "./downloads";
 import { findMediaInfo, handleShownTabsChanged } from "./media";
 import type { CardLayoutOptions } from "./layout";
@@ -80,6 +80,9 @@ let itemDrag: { itemId: ItemId; windowId: WindowId } | null = null;
 
 /** How each live folder's last refresh went (RuntimeState.liveFolders); liveFolderRefresher.ts sets them. */
 const liveFolderStatuses = new Map<ItemId, LiveFolderStatus>();
+
+/** Web Store extensions downloading and the profiles waiting for each (RuntimeState.extensionsBeingAdded). */
+let extensionsBeingAdded: ExtensionBeingAdded[] = [];
 
 /** The sidebar width while its edge is being dragged in the focused window; null otherwise (the saved width applies). */
 let previewSidebarWidth: number | null = null;
@@ -410,6 +413,7 @@ export function collectRuntimeState(windowId: WindowId = currentState.focusedWin
     tabIdsInOtherWindows: getTabIdsShownElsewhere(windowId),
     editorTabIdsHere: getEditorTabIdsHere(windowId),
     itemDraggedInOtherWindow: itemDrag !== null && itemDrag.windowId !== windowId ? itemDrag.itemId : null,
+    extensionsBeingAdded: extensionsBeingAdded,
   };
 }
 
@@ -429,6 +433,22 @@ export function setLiveFolderStatus(folderId: ItemId, status: LiveFolderStatus |
   } else {
     liveFolderStatuses.set(folderId, status);
   }
+  scheduleRuntimePush();
+}
+
+/**
+ * The Web Store extensions downloading right now, once per profile waiting for each.
+ */
+export function getExtensionsBeingAdded(): ExtensionBeingAdded[] {
+  return extensionsBeingAdded;
+}
+
+/**
+ * Records which profiles wait for which Web Store downloads (extensionsController.ts) and tells the sidebars, whose
+ * toolbars say "Adding…" until the list drops them.
+ */
+export function setExtensionsBeingAdded(entries: ExtensionBeingAdded[]): void {
+  extensionsBeingAdded = entries;
   scheduleRuntimePush();
 }
 

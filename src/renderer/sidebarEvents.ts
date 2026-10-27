@@ -98,15 +98,14 @@ function dispatchExtensionsMenu(button: HTMLElement): void {
 }
 
 /**
- * "Add Extension" on a Chrome Web Store page: shows that it is working, then asks the main process to install.
+ * "Add Extension" on a Chrome Web Store page asks the main process to install. The pill then says "Adding…" from
+ * the runtime facts main sends (toolbar.ts), not from a change made here, which the next redraw would undo.
  */
 function dispatchAddExtension(button: HTMLElement): void {
   const extensionId = button.dataset.extensionId ?? "";
   if (extensionId === "" || button.hasAttribute("disabled")) {
     return;
   }
-  button.setAttribute("disabled", "");
-  button.querySelector(".toolbar-pill-text")?.replaceChildren("Adding…");
   dispatch({ type: "installWebStoreExtension", extensionId: extensionId });
 }
 

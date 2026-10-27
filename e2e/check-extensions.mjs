@@ -2,10 +2,16 @@
 // Load Unpacked adds it to the profile, its content script marks pages, the toolbar's extensions menu opens its popup
 // (which sees the selected tab through chrome.tabs), turning it off unloads it, it is loaded before the window after
 // a relaunch, and Remove takes it out. A profile without extensions keeps pages free of preload scripts.
+// Chrome Web Store: a made-up extension signed with a key made here is served by a stand-in for Google's update server
+// (net.fetch is replaced in the main process and pages get a stand-in, so nothing reaches the real Web Store).
+// The toolbar says Adding… for the whole download, a second profile shares the first profile's copy, and copies are
+// deleted one by one.
 // usage: npm run e2e   (or: npm run build && node e2e/check-extensions.mjs)
 // Uses a throwaway --user-data-dir folder, so your real browser state is never touched.
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
+import { execFileSync } from "node:child_process";
+import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -56,8 +62,8 @@ async function launch() {
 
 const getState = (sidebar) => sidebar.evaluate(() => window.browserApi.getState());
 const dispatch = (sidebar, action) => sidebar.evaluate((value) => window.browserApi.dispatch(value), action);
-const loadedNames = (app) =>
-  app.evaluate(({ session }, partition) => session.fromPartition(partition).extensions.getAllExtensions().map((extension) => extension.name), PROFILE_PARTITION);
+const loadedNames = (app, partition = PROFILE_PARTITION) =>
+  app.evaluate(({ session }, name) => session.fromPartition(name).extensions.getAllExtensions().map((extension) => extension.name), partition);
 const preloadCount = (app) => app.evaluate(({ session }, partition) => session.fromPartition(partition).getPreloadScripts().length, PROFILE_PARTITION);
 // The fixture's content script sets data-fixture-marker="on" on the shown page.
 const pageMarker = (app) =>
@@ -199,11 +205,164 @@ check(
   hostLines.join(" | "),
 );
 
-// A Chrome Web Store extension page gets "Add Extension" in the toolbar (shown from the address alone; not clicked,
-// which would download from the Web Store).
-await dispatch(sidebar, { type: "openTab", typedText: "https://chromewebstore.google.com/detail/made-up-name/abcdefghijklmnopabcdefghijklmnop" });
-const addPill = await sidebar.waitForSelector(".toolbar-pill", { timeout: 5000 }).catch(() => null);
-check("a Web Store extension page offers Add Extension in the toolbar", (await addPill?.textContent())?.includes("Add Extension"));
+// ---------- Chrome Web Store: Add Extension, from a stand-in for Google's update server ----------
+// A CRX3 file the way the Web Store builds one (as in tests/crx.test.ts): header data naming the id, the developer's
+// signature over it and the zip, then the zip.
+function encodeVarint(value) {
+  const bytes = [];
+  let remaining = value;
+  while (remaining >= 128) {
+    bytes.push((remaining % 128) | 0x80);
+    remaining = Math.floor(remaining / 128);
+  }
+  bytes.push(remaining);
+  return Buffer.from(bytes);
+}
+const encodeField = (fieldNumber, bytes) => Buffer.concat([encodeVarint(fieldNumber * 8 + 2), encodeVarint(bytes.length), bytes]);
+function uint32(value) {
+  const bytes = Buffer.alloc(4);
+  bytes.writeUInt32LE(value);
+  return bytes;
+}
+const idBytes = (extensionId) => Buffer.from(Array.from(extensionId, (letter) => (letter.charCodeAt(0) - 97).toString(16)).join(""), "hex");
+function buildCrx(archive, publicKeyDer, privateKey, extensionId) {
+  const signedHeaderData = encodeField(1, idBytes(extensionId));
+  const signedData = Buffer.concat([Buffer.from("CRX3 SignedData\0", "latin1"), uint32(signedHeaderData.length), signedHeaderData, archive]);
+  const proof = encodeField(2, Buffer.concat([encodeField(1, publicKeyDer), encodeField(2, crypto.sign("sha256", signedData, privateKey))]));
+  const header = Buffer.concat([proof, encodeField(10000, signedHeaderData)]);
+  return Buffer.concat([Buffer.from("Cr24", "latin1"), uint32(3), uint32(header.length), header, archive]);
+}
+
+const STORE_EXTENSION_NAME = "Fixture Store Extension";
+const STORE_EXTENSION_VERSION = "1.0.0";
+const { extensionIdFromPublicKey } = createRequire(import.meta.url)(path.join(appDir, "dist", "node", "main", "crx.js"));
+const storeKeys = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
+const storePublicKeyDer = storeKeys.publicKey.export({ type: "spki", format: "der" });
+const storeExtensionId = extensionIdFromPublicKey(storePublicKeyDer);
+const storeSourceDir = path.join(outDir, "store-extension");
+fs.rmSync(storeSourceDir, { recursive: true, force: true });
+fs.mkdirSync(storeSourceDir, { recursive: true });
+fs.writeFileSync(path.join(storeSourceDir, "manifest.json"), JSON.stringify({ manifest_version: 3, name: STORE_EXTENSION_NAME, version: STORE_EXTENSION_VERSION }));
+const storeZipPath = path.join(outDir, "store-extension.zip");
+fs.rmSync(storeZipPath, { force: true });
+execFileSync("/usr/bin/zip", ["-q", "-r", "-X", storeZipPath, "."], { cwd: storeSourceDir });
+const storeCrx = buildCrx(fs.readFileSync(storeZipPath), storePublicKeyDer, storeKeys.privateKey, storeExtensionId);
+fs.rmSync(storeSourceDir, { recursive: true, force: true });
+fs.rmSync(storeZipPath, { force: true });
+
+// The stand-in: Google's update address answers "no update" to update checks and the CRX to downloads, which wait
+// until the check releases them (holdStoreDownloads / releaseStoreDownloads). Every other address is fetched as usual.
+// Error dialogs are recorded instead of shown, so a failed install cannot leave a modal hanging.
+await app.evaluate(({ net, dialog }, crxBase64) => {
+  const originalFetch = net.fetch;
+  const crx = Buffer.from(crxBase64, "base64");
+  globalThis.storeDownloadCount = 0;
+  globalThis.errorBoxes = [];
+  dialog.showErrorBox = (title, message) => globalThis.errorBoxes.push(`${title}: ${message}`);
+  globalThis.holdStoreDownloads = () => {
+    globalThis.storeDownloadsReleased = new Promise((resolve) => {
+      globalThis.releaseStoreDownloads = resolve;
+    });
+  };
+  globalThis.holdStoreDownloads();
+  net.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input.url;
+    if (!url.startsWith("https://clients2.google.com/service/update2/crx")) {
+      return originalFetch.call(net, input, init);
+    }
+    if (url.includes("response=updatecheck")) {
+      return new Response('<?xml version="1.0"?><gupdate protocol="2.0"></gupdate>');
+    }
+    globalThis.storeDownloadCount = globalThis.storeDownloadCount + 1;
+    await globalThis.storeDownloadsReleased;
+    return new Response(crx);
+  };
+}, storeCrx.toString("base64"));
+// The Web Store's own page is a stand-in too: the real one sends a made-up id elsewhere (Google's consent page), and the
+// toolbar needs only the address. From here on every https page in a profile session gets the stand-in; sessions made
+// later (a new profile below) get it the moment they are created.
+await app.evaluate(({ app: electronApp, session }, partition) => {
+  const standInPage = "<!doctype html><title>Web Store stand-in</title>";
+  const serveStandIn = (profileSession) => profileSession.protocol.handle("https", () => new Response(standInPage, { headers: { "content-type": "text/html" } }));
+  serveStandIn(session.fromPartition(partition));
+  electronApp.on("session-created", serveStandIn);
+}, PROFILE_PARTITION);
+const storeDownloadCount = () => app.evaluate(() => globalThis.storeDownloadCount);
+const releaseStoreDownloads = () => app.evaluate(() => globalThis.releaseStoreDownloads());
+const findStoreExtension = (value, profileId) => (value.extensions ?? []).find((extension) => extension.id === storeExtensionId && extension.profileId === profileId);
+const activeProfileId = (value) => value.spaces.find((space) => space.id === value.activeSpaceId)?.profileId;
+const readAddPill = () =>
+  sidebar.evaluate(() => {
+    const pill = document.querySelector(".toolbar-pill");
+    return pill === null ? null : { text: pill.textContent, isDisabled: pill.disabled };
+  });
+const clickAddPill = () => sidebar.locator(".toolbar-pill").click();
+
+// A Web Store extension page gets "Add Extension" in the toolbar; clicking it says "Adding…" for the whole download,
+// even when the sidebar redraws meanwhile (it used to reset on the next redraw).
+await dispatch(sidebar, { type: "openTab", typedText: `https://chromewebstore.google.com/detail/fixture-store-extension/${storeExtensionId}` });
+let addPill = await waitFor(readAddPill, (value) => value?.text === "Add Extension");
+check("a Web Store extension page offers Add Extension in the toolbar", addPill?.text === "Add Extension", JSON.stringify(addPill));
+await clickAddPill();
+addPill = await waitFor(readAddPill, (value) => value?.text === "Adding…", 5000);
+check("clicking it says Adding… while it downloads", addPill?.text === "Adding…" && addPill.isDisabled && (await storeDownloadCount()) === 1, JSON.stringify(addPill));
+state = await getState(sidebar);
+await dispatch(sidebar, { type: "setPinnedSectionOpen", spaceId: state.activeSpaceId, isOpen: false });
+await dispatch(sidebar, { type: "setPinnedSectionOpen", spaceId: state.activeSpaceId, isOpen: true });
+await sidebar.waitForTimeout(500);
+addPill = await readAddPill();
+check("and keeps saying it when the sidebar redraws during the download", addPill?.text === "Adding…" && addPill.isDisabled, JSON.stringify(addPill));
+await releaseStoreDownloads();
+state = await waitFor(() => getState(sidebar), (value) => findStoreExtension(value, "profile-default") !== undefined);
+const firstCopy = findStoreExtension(state, "profile-default");
+const expectedCopyFolder = path.join(userDataDir, "Extensions", storeExtensionId, STORE_EXTENSION_VERSION);
+check("the verified download is unpacked into the Extensions folder and added to the profile", firstCopy?.source === "webstore" && firstCopy.path === expectedCopyFolder, JSON.stringify(firstCopy));
+check("and loaded into its session", (await waitFor(() => loadedNames(app), (names) => names.includes(STORE_EXTENSION_NAME))).includes(STORE_EXTENSION_NAME));
+check("then the toolbar stops offering it", (await waitFor(readAddPill, (value) => value === null, 5000)) === null);
+
+// A second profile adds it too: it shares the first profile's copy instead of downloading into the folder the first
+// profile's session has loaded (it used to download again and replace those files). A file left in the folder shows it.
+const leftoverPath = path.join(expectedCopyFolder, "left-by-the-check.txt");
+fs.writeFileSync(leftoverPath, "The first profile's copy was not replaced.");
+await dispatch(sidebar, { type: "createProfileForSpace", spaceId: state.activeSpaceId });
+state = await waitFor(() => getState(sidebar), (value) => activeProfileId(value) !== "profile-default");
+const secondProfileId = activeProfileId(state);
+await waitFor(readAddPill, (value) => value?.text === "Add Extension");
+await clickAddPill();
+state = await waitFor(() => getState(sidebar), (value) => findStoreExtension(value, secondProfileId) !== undefined, 10000);
+const secondCopy = findStoreExtension(state, secondProfileId);
+check("adding it in a second profile shares the first profile's copy, with no second download", secondCopy?.path === expectedCopyFolder && (await storeDownloadCount()) === 1, `${await storeDownloadCount()} downloads, ${JSON.stringify(secondCopy)}`);
+check("and leaves the files the first profile has loaded alone", fs.existsSync(leftoverPath));
+const secondPartition = `persist:${secondProfileId}`;
+check("it is loaded into the second profile's session", (await waitFor(() => loadedNames(app, secondPartition), (names) => names.includes(STORE_EXTENSION_NAME))).includes(STORE_EXTENSION_NAME));
+check("and still into the first profile's", (await loadedNames(app)).includes(STORE_EXTENSION_NAME));
+
+// Copies are deleted one by one, only when no profile uses them.
+await dispatch(sidebar, { type: "removeExtension", profileId: "profile-default", extensionId: storeExtensionId });
+await waitFor(() => loadedNames(app), (names) => !names.includes(STORE_EXTENSION_NAME));
+await sidebar.waitForTimeout(1000);
+check("removing it from one profile keeps the copy the other profile uses", fs.existsSync(expectedCopyFolder));
+await dispatch(sidebar, { type: "removeExtension", profileId: secondProfileId, extensionId: storeExtensionId });
+check("removing it from the last profile deletes the copy", await waitFor(() => !fs.existsSync(expectedCopyFolder), (isGone) => isGone, 10000));
+
+// Both profiles ask while one download runs: the second waits for that download instead of starting its own (or
+// being ignored, as before), and both get the one copy it makes.
+await app.evaluate(() => globalThis.holdStoreDownloads());
+await waitFor(readAddPill, (value) => value?.text === "Add Extension");
+await clickAddPill();
+await waitFor(readAddPill, (value) => value?.text === "Adding…", 5000);
+await dispatch(sidebar, { type: "setSpaceProfile", spaceId: state.activeSpaceId, profileId: "profile-default" });
+addPill = await waitFor(readAddPill, (value) => value?.text === "Add Extension");
+check("a profile that is not waiting for the running download is offered Add Extension", addPill?.text === "Add Extension", JSON.stringify(addPill));
+await clickAddPill();
+addPill = await waitFor(readAddPill, (value) => value?.text === "Adding…", 5000);
+check("asking while another profile's download runs says Adding… without a second download", addPill?.text === "Adding…" && (await storeDownloadCount()) === 2, `${await storeDownloadCount()} downloads`);
+await releaseStoreDownloads();
+state = await waitFor(() => getState(sidebar), (value) => findStoreExtension(value, "profile-default") !== undefined && findStoreExtension(value, secondProfileId) !== undefined, 10000);
+const sharedPaths = [findStoreExtension(state, "profile-default")?.path, findStoreExtension(state, secondProfileId)?.path];
+check("when it finishes, both profiles get the one copy", sharedPaths.every((folder) => folder === expectedCopyFolder) && (await storeDownloadCount()) === 2, JSON.stringify(sharedPaths));
+const errorBoxes = await app.evaluate(() => globalThis.errorBoxes);
+check("no Add Extension error dialogs", errorBoxes.length === 0, errorBoxes.join(" | "));
 check("no page errors in the sidebar (second run)", pageErrors.length === 0, pageErrors.join(" | "));
 await app.close();
 fs.rmSync(userDataDir, { recursive: true, force: true });

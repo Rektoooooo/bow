@@ -248,6 +248,8 @@ repo: the user stores them in their own keychain); Arc Max and sync/sharing stay
       user's Arc backup holds 0 or 1 window; the user asked for it.)
 - [x] Multiple windows follow-ups: see 3.6
 - [ ] Sign and notarize the app (needs a Developer ID) so it runs on other Macs
-- [ ] Adding a Web Store extension to a second profile re-downloads into the folder the first profile has loaded;
-      reuse the existing copy instead (rare)
-- [ ] Toolbar "Adding…" state resets on any redraw during the download (cosmetic; one download only)
+- [x] Adding a Web Store extension to a second profile re-downloads into the folder the first profile has loaded;
+      reuse the existing copy instead (rare). Fixed 2026-10-27: a second profile shares the copy
+      (`findExtensionCopy`); one that asks while the download runs waits for it and gets the same copy.
+- [x] Toolbar "Adding…" state resets on any redraw during the download (cosmetic; one download only). Fixed
+      2026-10-27: main sends it as a runtime fact (`RuntimeState.extensionsBeingAdded`), per profile.

@@ -50,6 +50,11 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 
 - A saved-shape version bump also breaks `e2e/check-app.mjs`, which asserts the upgraded file's version: grep
   `e2e/` for `version ===` with every bump (missed twice on 2026-10-27).
+- A check that needs a real site's address must not load the real site: the Web Store sends a made-up extension id
+  to Google's consent page within a second, so the toolbar pill vanished and looked like a bug. Network emulation
+  "offline" does not stop page navigations; `session.protocol.handle("https", …)` serving a stand-in page does
+  (plus `app.on("session-created")` for profiles made during the check). Main's `net.fetch` can be replaced from
+  `app.evaluate` (checked 2026-10-27), which is how check-extensions serves its CRX.
 
 ## Matching Arc from screenshots
 - Screen captures: Claude Desktop runs our commands through its own "Claude Code" app (com.anthropic.claude-code,

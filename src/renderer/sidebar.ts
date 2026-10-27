@@ -55,6 +55,7 @@ let currentRuntime: RuntimeState = {
   tabIdsInOtherWindows: [],
   editorTabIdsHere: [],
   itemDraggedInOtherWindow: null,
+  extensionsBeingAdded: [],
 };
 
 /** The Note or Easel tab whose editor this page last told main it has open, or null. */

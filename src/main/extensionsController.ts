@@ -14,7 +14,8 @@
  * Data flow:
  *   Library "Load Unpacked…" → loadUnpackedExtension() → loadExtensionNow() (learns the id) → addExtension
  *   Import from Arc → importArcExtensions() → copy each folder → addExtension → extensionHost.ts loads the enabled ones
- *   toolbar "Add Extension" → installFromWebStore(id) → download → unpackCrx() → addExtension
+ *   toolbar "Add Extension" → installFromWebStore(id) → another profile's copy? share it : download → unpackCrx() →
+ *   addExtension for every profile that asked meanwhile (RuntimeState.extensionsBeingAdded shows "Adding…")
  *   timer / "Check for Updates" → updateExtensionsFromWebStore() → newer version? → unpackCrx() → updateExtensionFolder
  */
 import { app, dialog, net } from "electron";
@@ -22,9 +23,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { InstalledExtension } from "../shared/types";
 import { findArcExtensions } from "./arcExtensionsImport";
-import { applyChange, getState, getWindow } from "./browserCore";
+import { applyChange, getExtensionsBeingAdded, getState, getWindow, setExtensionsBeingAdded } from "./browserCore";
 import { loadExtensionNow } from "./extensionHost";
-import { addExtension, findExtension, removeExtension, setExtensionEnabled, updateExtensionFolder } from "./extensionList";
+import { addExtension, findExtension, findExtensionCopy, removeExtension, setExtensionEnabled, updateExtensionFolder } from "./extensionList";
 import { readExtensionManifestInfo } from "./extensionManifest";
 import { whenExtensionsSettled } from "./extensionHost";
 import {
@@ -151,9 +152,6 @@ export function importArcExtensions(arcFolder: string): ArcExtensionsImportRepor
   return report;
 }
 
-/** Extensions being added from the Web Store right now, so a second click does not download twice. */
-const installingExtensionIds = new Set<string>();
-
 /**
  * Where our copies of extensions live: <data folder>/Extensions.
  */
@@ -181,7 +179,8 @@ async function downloadExtensionFile(url: string): Promise<Buffer> {
 
 /**
  * Adds a Chrome Web Store extension to the active Space's profile (toolbar "Add Extension" on its Web Store page).
- * Already added there: it is turned on.
+ * Already added there: it is turned on. Another profile has it: that copy is shared. Otherwise it is downloaded; a
+ * profile that asks while the download runs waits for it and gets the same copy.
  */
 export async function installFromWebStore(extensionId: string): Promise<void> {
   const profileId = getActiveSpace(getState()).profileId;
@@ -190,29 +189,53 @@ export async function installFromWebStore(extensionId: string): Promise<void> {
     openLibrary("extensions");
     return;
   }
-  if (installingExtensionIds.has(extensionId)) {
+  // Downloading again would replace the files under the other profile's loaded extension (unpackCrx empties the folder).
+  const copy = findExtensionCopy(getState(), extensionId);
+  if (copy !== undefined && readExtensionManifestInfo(copy.path) !== null) {
+    const extension: InstalledExtension = { ...copy, profileId: profileId, isEnabled: true, source: "webstore" };
+    applyChange((state) => addExtension(state, extension));
+    openLibrary("extensions");
     return;
   }
-  installingExtensionIds.add(extensionId);
+  const beingAdded = getExtensionsBeingAdded();
+  const isWaiting = beingAdded.some((entry) => entry.extensionId === extensionId && entry.profileId === profileId);
+  if (isWaiting) {
+    return;
+  }
+  const isDownloading = beingAdded.some((entry) => entry.extensionId === extensionId);
+  setExtensionsBeingAdded([...beingAdded, { profileId: profileId, extensionId: extensionId }]);
+  if (!isDownloading) {
+    await downloadForWaitingProfiles(extensionId);
+  }
+}
+
+/**
+ * Downloads, verifies and unpacks a Web Store extension, then adds it to every profile that asked for it meanwhile.
+ */
+async function downloadForWaitingProfiles(extensionId: string): Promise<void> {
   try {
     const crx = await downloadExtensionFile(buildDownloadUrl(extensionId, process.versions.chrome));
     const unpacked = await unpackCrx(crx, extensionId, getExtensionsFolder());
-    const extension: InstalledExtension = {
-      id: extensionId,
-      profileId: profileId,
-      name: unpacked.name,
-      version: unpacked.version,
-      path: unpacked.folder,
-      isEnabled: true,
-      source: "webstore",
-    };
-    applyChange((state) => addExtension(state, extension));
+    const waiting = getExtensionsBeingAdded().filter((entry) => entry.extensionId === extensionId);
+    const additions = waiting.map(
+      (entry): InstalledExtension => ({
+        id: extensionId,
+        profileId: entry.profileId,
+        name: unpacked.name,
+        version: unpacked.version,
+        path: unpacked.folder,
+        isEnabled: true,
+        source: "webstore",
+      }),
+    );
+    applyChange((state) => additions.reduce((next, extension) => addExtension(next, extension), state));
     openLibrary("extensions");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     dialog.showErrorBox("Add Extension", `The extension could not be added: ${message}`);
   } finally {
-    installingExtensionIds.delete(extensionId);
+    const stillBeingAdded = getExtensionsBeingAdded().filter((entry) => entry.extensionId !== extensionId);
+    setExtensionsBeingAdded(stillBeingAdded);
   }
 }
 

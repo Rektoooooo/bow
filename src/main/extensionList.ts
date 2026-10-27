@@ -30,6 +30,16 @@ export function findExtension(state: BrowserState, profileId: ProfileId, extensi
 }
 
 /**
+ * Our copy of a Web Store extension that some profile already has (added from the Web Store or imported from Arc),
+ * so another profile that adds it shares that folder instead of downloading it again into the folder a session has
+ * loaded. Profiles share one copy anyway once an update moves them all (updateExtensionFolder). Unpacked extensions are
+ * the user's own folders and never shared. Undefined when no profile has a copy.
+ */
+export function findExtensionCopy(state: BrowserState, extensionId: string): InstalledExtension | undefined {
+  return (state.extensions ?? []).find((extension) => extension.id === extensionId && extension.source !== "unpacked");
+}
+
+/**
  * Adds an extension to its profile, or replaces the one with the same id there (a newer version, another folder).
  * Returns the same state when the profile does not exist or already holds the most extensions allowed.
  */

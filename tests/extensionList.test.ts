@@ -1,7 +1,7 @@
 /**
  * WHY this file exists:
  *   The extension list decides what each profile's session loads; these tests pin down adding, replacing, turning
- *   off and removing, and that one profile's extensions never leak into another.
+ *   off and removing, that one profile's extensions never leak into another, and which copy a second profile shares.
  */
 import { describe, expect, it } from "vitest";
 import { DEFAULT_PROFILE_ID } from "../src/shared/settings";
@@ -9,6 +9,7 @@ import type { BrowserState, InstalledExtension } from "../src/shared/types";
 import {
   addExtension,
   findExtension,
+  findExtensionCopy,
   getProfileExtensions,
   MAX_EXTENSIONS_PER_PROFILE,
   removeExtension,
@@ -69,6 +70,17 @@ describe("extension list", () => {
       "Renamed 2.0 /extensions/aaaa/2.0",
     ]);
     expect(updateExtensionFolder(state, "bbbb", "X", "9.0", "/x")).toBe(state);
+  });
+
+  it("finds the Web Store or Arc copy another profile has, so a second profile shares it, never an unpacked folder", () => {
+    const unpackedOnly = addExtension(stateWithTwoProfiles(), makeExtension("aaaa", { profileId: WORK_PROFILE_ID }));
+    const withStoreCopy = addExtension(unpackedOnly, makeExtension("aaaa", { source: "webstore", path: "/extensions/aaaa/1.0" }));
+    const withArcCopy = addExtension(stateWithTwoProfiles(), makeExtension("bbbb", { profileId: WORK_PROFILE_ID, source: "arc", path: "/extensions/bbbb/2.0" }));
+
+    expect(findExtensionCopy(unpackedOnly, "aaaa")).toBeUndefined();
+    expect(findExtensionCopy(withStoreCopy, "aaaa")?.path).toBe("/extensions/aaaa/1.0");
+    expect(findExtensionCopy(withArcCopy, "bbbb")?.path).toBe("/extensions/bbbb/2.0");
+    expect(findExtensionCopy(withArcCopy, "aaaa")).toBeUndefined();
   });
 
   it("turns extensions off and on, and removes them", () => {
