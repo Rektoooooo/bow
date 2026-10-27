@@ -96,8 +96,10 @@ check("a downloaded update shows the sidebar's restart notice", noticeText.inclu
 const menuAfterDownload = await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items[0].submenu.items.map((item) => item.label));
 check("and the app menu offers the restart", menuAfterDownload.includes("Restart to Update to Bow 9.9.9"), menuAfterDownload.slice(0, 3).join(", "));
 
-// The hidden window that draws the Dock icon (a data: page, in dark mode right at startup) is not one of the app's.
-const windowCount = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((window) => !window.webContents.getURL().startsWith("data:")).length);
+// Little Windows only: the hidden window that draws the Dock icon comes and goes shortly after start (with no
+// address yet while it loads), so counting every window was a race.
+const windowCount = () =>
+  app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((window) => window.webContents.getURL().includes("/little/little.html")).length);
 const windowsBefore = await windowCount();
 await app.evaluate(({ app }) => app.emit("open-url", { preventDefault() {} }, "javascript:alert(1)"));
 await new Promise((resolve) => setTimeout(resolve, 500));
