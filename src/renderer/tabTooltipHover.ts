@@ -10,7 +10,8 @@
  *
  * Data flow:
  *   pointer rests on a row for TAB_TOOLTIP_DELAY_MS → action showTabTooltip(title, hint, frame) → overlayController.ts
- *   pointer moves on, leaves, presses, scrolls or a drag starts → action hideTabTooltip
+ *   pointer moves on, leaves or scrolls → action hideTabTooltip; a press → fadeHoverPanel, then hideTabTooltip once
+ *   the press ends or a drag has started
  */
 import {
   TAB_TOOLTIP_DELAY_MS,
@@ -111,6 +112,10 @@ function showTooltip(row: HTMLElement, pointerX: number, pointerY: number): void
  * The pointer moved over the sidebar: hide a tooltip it moved away from, and start waiting for it to rest on a row.
  */
 function handlePointerMove(event: PointerEvent): void {
+  // While a button is held (a press, maybe a drag starting) the tooltip's view must stay put; see fadeTooltip.
+  if (event.buttons !== 0) {
+    return;
+  }
   if (shownAt !== null) {
     const drift = Math.hypot(event.clientX - shownAt.x, event.clientY - shownAt.y);
     if (drift <= MOVE_TOLERANCE_PX) {
@@ -119,7 +124,7 @@ function handlePointerMove(event: PointerEvent): void {
   }
   hideTooltip();
   const row = (event.target as Element | null)?.closest<HTMLElement>('[data-row="tab"]') ?? null;
-  if (row === null || event.buttons !== 0) {
+  if (row === null) {
     return;
   }
   const pointerX = event.clientX;
@@ -133,12 +138,28 @@ function handlePointerMove(event: PointerEvent): void {
 }
 
 /**
+ * A press: the tooltip fades at once, but its view stays in the window until the press ends or a drag has started
+ * (main's fadeHoverPanel). Taking a view out of the window in the middle of a press may stop a tab drag from starting.
+ */
+function fadeTooltip(): void {
+  if (restTimer !== null) {
+    window.clearTimeout(restTimer);
+    restTimer = null;
+  }
+  if (shownAt !== null) {
+    dispatch({ type: "fadeHoverPanel" });
+  }
+}
+
+/**
  * Watches the pointer over the sidebar's tab rows.
  */
 export function installTabTooltipHover(root: HTMLElement): void {
   root.addEventListener("pointermove", handlePointerMove);
   root.addEventListener("pointerleave", hideTooltip);
-  root.addEventListener("pointerdown", hideTooltip);
+  root.addEventListener("pointerdown", fadeTooltip);
+  root.addEventListener("pointerup", hideTooltip);
   root.addEventListener("dragstart", hideTooltip);
+  root.addEventListener("dragend", hideTooltip);
   root.addEventListener("wheel", hideTooltip, { passive: true });
 }

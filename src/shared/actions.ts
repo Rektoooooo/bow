@@ -121,6 +121,7 @@ export type BrowserAction =
   | { type: "showFolderList"; folderId: ItemId; anchor: { x: number; y: number; width: number; height: number } }
   | { type: "hideFolderList" }
   | { type: "folderListPointer"; isInside: boolean }
+  | { type: "fadeHoverPanel" }
   | { type: "setTidyTitles"; isOn: boolean }
   | { type: "setShowFullUrls"; isOn: boolean }
   | { type: "createNote" }
@@ -220,6 +221,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "showFolderList",
   "hideFolderList",
   "folderListPointer",
+  "fadeHoverPanel",
   "setTidyTitles",
   "setShowFullUrls",
   "createNote",

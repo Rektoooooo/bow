@@ -1,8 +1,9 @@
 /**
  * WHY this file exists:
  *   Arc borders the selected Favorite in the site's own colour (red for YouTube, green for Spotify; the user's
- *   screenshots, 2026-10-27). This picks that colour from a favicon's pixels, and names the address a page's icon comes
- *   from, so the main process (which decodes the icon) and the sidebar (which draws it) mean the same icon.
+ *   screenshots, 2026-10-27). The user's rule: the colour that appears most in the logo, for every Favorite. This
+ *   picks it from a favicon's pixels, and names the address a page's icon comes from, so the main process (which
+ *   decodes the icon) and the sidebar (which draws it) mean the same icon.
  *
  * Data source:
  *   A favicon's raw pixels as macOS hands them out (BGRA, colours premultiplied by alpha), already scaled down.
@@ -15,16 +16,17 @@
 /** Pixels more transparent than this are left out (the icon's soft edge and empty corners). */
 const MIN_ALPHA = 128;
 
-/** Pixels greyer or darker than these are left out: black and white parts of a logo are not its colour. */
-const MIN_SATURATION = 0.3;
-const MIN_VALUE = 0.25;
+/** Colours are counted in groups of 16 levels per channel, so antialiasing does not split one colour. Our choice. */
+const LEVELS_PER_GROUP = 16;
+const GROUPS_PER_CHANNEL = 16;
 
-/** Hues are grouped in 12 buckets of 30°; the heaviest bucket is the icon's colour. Our choice. */
-const HUE_BUCKET_COUNT = 12;
-const FULL_TURN_DEGREES = 360;
-
-/** At least this share of the visible pixels must be coloured, or the icon counts as black and white. Our choice. */
-const MIN_COLORED_SHARE = 0.05;
+/**
+ * A near-black most common colour is usually the icon's square, not its logo (X: a thin white X on black, 5 % of
+ * the visible pixels). Then the most common colour that is not near-black counts instead, when it covers at least
+ * this share. Our choice, set by X's icon.
+ */
+const NEAR_BLACK_LUMINANCE = 0.12;
+const LOGO_SHARE = 0.04;
 
 /** Bytes per pixel and the place of each channel in BGRA. */
 const BYTES_PER_PIXEL = 4;
@@ -35,8 +37,8 @@ const ALPHA_OFFSET = 3;
 
 const CHANNEL_MAX = 255;
 
-interface HueBucket {
-  weight: number;
+interface ColorGroup {
+  count: number;
   red: number;
   green: number;
   blue: number;
@@ -61,25 +63,6 @@ export function getFaviconAddress(faviconUrl: string | null, pageUrl: string): s
 }
 
 /**
- * The hue (degrees) of an RGB colour, or null for a grey.
- */
-function computeHue(red: number, green: number, blue: number): number | null {
-  const highest = Math.max(red, green, blue);
-  const lowest = Math.min(red, green, blue);
-  const chroma = highest - lowest;
-  if (chroma === 0) {
-    return null;
-  }
-  if (highest === red) {
-    return (((green - blue) / chroma + 6) % 6) * 60;
-  }
-  if (highest === green) {
-    return ((blue - red) / chroma + 2) * 60;
-  }
-  return ((red - green) / chroma + 4) * 60;
-}
-
-/**
  * Two hex digits for a channel.
  */
 function toHexChannel(channel: number): string {
@@ -88,49 +71,56 @@ function toHexChannel(channel: number): string {
 }
 
 /**
- * The colour of a favicon: the average of its most common hue among its coloured pixels, or null for an icon that is
- * black, white or grey (no colour to show).
- * Example: a red square with a white triangle → about "#ff0000"
+ * The perceived brightness (0…1) of a group's average colour.
  */
-export function pickAccentColor(pixels: Uint8Array, width: number, height: number): string | null {
-  const buckets: HueBucket[] = Array.from({ length: HUE_BUCKET_COUNT }, () => ({ weight: 0, red: 0, green: 0, blue: 0 }));
-  let visibleCount = 0;
-  let coloredCount = 0;
-  const pixelCount = Math.min(width * height, Math.floor(pixels.length / BYTES_PER_PIXEL));
+function computeLuminance(group: ColorGroup): number {
+  return (0.299 * group.red + 0.587 * group.green + 0.114 * group.blue) / group.count / CHANNEL_MAX;
+}
+
+/**
+ * Counts the visible pixels by colour group (premultiplied BGRA in, real colours counted).
+ */
+function countColorGroups(pixels: Uint8Array, pixelCount: number): Map<number, ColorGroup> {
+  const groups = new Map<number, ColorGroup>();
   for (let index = 0; index < pixelCount; index += 1) {
     const offset = index * BYTES_PER_PIXEL;
     const alpha = pixels[offset + ALPHA_OFFSET] ?? 0;
     if (alpha < MIN_ALPHA) {
       continue;
     }
-    visibleCount += 1;
-    // Premultiplied: undo the alpha so a half-transparent edge pixel has its real colour.
+    // Premultiplied: undo the alpha so a half-transparent edge pixel counts with its real colour.
     const red = Math.min(CHANNEL_MAX, ((pixels[offset + RED_OFFSET] ?? 0) * CHANNEL_MAX) / alpha);
     const green = Math.min(CHANNEL_MAX, ((pixels[offset + GREEN_OFFSET] ?? 0) * CHANNEL_MAX) / alpha);
     const blue = Math.min(CHANNEL_MAX, ((pixels[offset + BLUE_OFFSET] ?? 0) * CHANNEL_MAX) / alpha);
-    const highest = Math.max(red, green, blue);
-    const saturation = highest === 0 ? 0 : (highest - Math.min(red, green, blue)) / highest;
-    const value = highest / CHANNEL_MAX;
-    const hue = computeHue(red, green, blue);
-    if (hue === null || saturation < MIN_SATURATION || value < MIN_VALUE) {
-      continue;
-    }
-    coloredCount += 1;
-    const bucket = buckets[Math.floor(hue / (FULL_TURN_DEGREES / HUE_BUCKET_COUNT)) % HUE_BUCKET_COUNT] as HueBucket;
-    const weight = saturation * value;
-    bucket.weight += weight;
-    bucket.red += red * weight;
-    bucket.green += green * weight;
-    bucket.blue += blue * weight;
+    const key = (Math.floor(red / LEVELS_PER_GROUP) * GROUPS_PER_CHANNEL + Math.floor(green / LEVELS_PER_GROUP)) * GROUPS_PER_CHANNEL + Math.floor(blue / LEVELS_PER_GROUP);
+    const group = groups.get(key) ?? { count: 0, red: 0, green: 0, blue: 0 };
+    group.count += 1;
+    group.red += red;
+    group.green += green;
+    group.blue += blue;
+    groups.set(key, group);
   }
-  if (visibleCount === 0 || coloredCount / visibleCount < MIN_COLORED_SHARE) {
+  return groups;
+}
+
+/**
+ * A favicon's colour, the way the user asked for it: the colour that appears most in the logo (the average of its
+ * group). A near-black square behind a logo gives way to the logo's colour when that covers at least LOGO_SHARE.
+ * Null only for an icon with no visible pixels.
+ * Examples: YouTube (red with a white triangle) → red; X (white X on black) → white; an all-black logo → black
+ */
+export function pickAccentColor(pixels: Uint8Array, width: number, height: number): string | null {
+  const pixelCount = Math.min(width * height, Math.floor(pixels.length / BYTES_PER_PIXEL));
+  const groups = countColorGroups(pixels, pixelCount);
+  const largestFirst = [...groups.values()].sort((first, second) => second.count - first.count);
+  const visibleCount = largestFirst.reduce((sum, group) => sum + group.count, 0);
+  const mostCommon = largestFirst[0];
+  if (mostCommon === undefined) {
     return null;
   }
-  let heaviest = buckets[0] as HueBucket;
-  for (const bucket of buckets) {
-    if (bucket.weight > heaviest.weight) {
-      heaviest = bucket;
-    }
-  }
-  return `#${toHexChannel(heaviest.red / heaviest.weight)}${toHexChannel(heaviest.green / heaviest.weight)}${toHexChannel(heaviest.blue / heaviest.weight)}`;
+  const logo = largestFirst.find((group) => computeLuminance(group) >= NEAR_BLACK_LUMINANCE);
+  const isBlackSquare = computeLuminance(mostCommon) < NEAR_BLACK_LUMINANCE;
+  const isLogoLarge = logo !== undefined && logo.count / visibleCount >= LOGO_SHARE;
+  const chosen = isBlackSquare && isLogoLarge && logo !== undefined ? logo : mostCommon;
+  return `#${toHexChannel(chosen.red / chosen.count)}${toHexChannel(chosen.green / chosen.count)}${toHexChannel(chosen.blue / chosen.count)}`;
 }

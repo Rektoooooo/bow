@@ -499,6 +499,18 @@ export function hideFolderList(): void {
 }
 
 /**
+ * A press in the sidebar while a tooltip or a folder list shows: the panel fades away but its view stays until the
+ * press ends or a drag has started (hideTabTooltip / hideFolderList then). Taking a view out of the window in the
+ * middle of a press is the likeliest reason a real tab drag never started for the user (not confirmed: tests cannot
+ * make a real drag).
+ */
+export function fadeHoverPanel(): void {
+  if (shownPanel?.kind === "tabTooltip" || shownPanel?.kind === "folderList") {
+    sendToOverlay(OVERLAY_CHANNELS.closing);
+  }
+}
+
+/**
  * Hides the tab tooltip (nothing else).
  */
 export function hideTabTooltip(): void {

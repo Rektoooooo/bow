@@ -10,7 +10,7 @@
  * Data flow:
  *   pointer rests on a closed folder for FOLDER_LIST_DELAY_MS → action showFolderList(folderId, row box)
  *   pointer leaves that row → action folderListPointer(false); comes back → showFolderList again
- *   the row is pressed, dragged or scrolled → action hideFolderList
+ *   the row is pressed → fadeHoverPanel; the press ends, a drag starts or the list scrolls → action hideFolderList
  */
 import { FOLDER_LIST_DELAY_MS } from "../shared/settings.js";
 import { dispatch } from "./dom.js";
@@ -82,7 +82,18 @@ function handlePointerMove(event: PointerEvent): void {
 }
 
 /**
- * A press, a drag or a scroll ends the list: the folder is being opened or moved.
+ * A press fades the list at once but leaves its view in the window until the press ends or a drag has started
+ * (taking a view out mid-press may stop a drag from starting).
+ */
+function fadeList(): void {
+  cancelPendingList();
+  if (shownFolderId !== null) {
+    dispatch({ type: "fadeHoverPanel" });
+  }
+}
+
+/**
+ * The end of a press, a drag or a scroll ends the list: the folder is being opened or moved.
  */
 function endList(): void {
   cancelPendingList();
@@ -103,7 +114,9 @@ export function installFolderListHover(root: HTMLElement): void {
     cancelPendingList();
     reportPointerLeftRow();
   });
-  root.addEventListener("pointerdown", endList);
+  root.addEventListener("pointerdown", fadeList);
+  root.addEventListener("pointerup", endList);
   root.addEventListener("dragstart", endList);
+  root.addEventListener("dragend", endList);
   root.addEventListener("wheel", endList, { passive: true });
 }

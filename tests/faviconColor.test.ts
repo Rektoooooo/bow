@@ -42,10 +42,19 @@ describe("a favicon's colour", () => {
     expect(pickAccentColor(pixels, 4, 1)).toBe("#ff0000");
   });
 
-  it("is none for a black and white icon", () => {
-    const pixels = makePixels([...repeat([0, 0, 0, 255], 8), ...repeat([255, 255, 255, 255], 8)]);
+  it("is the logo's colour when the most common one is a black square behind it (X: 5 % white)", () => {
+    const pixels = makePixels([...repeat([0, 0, 0, 255], 90), ...repeat([8, 8, 8, 255], 4), ...repeat([255, 255, 255, 255], 6)]);
 
-    expect(pickAccentColor(pixels, 16, 1)).toBeNull();
+    expect(pickAccentColor(pixels, 100, 1)).toBe("#ffffff");
+  });
+
+  it("is black for an all-black logo, and white for an all-white one: every icon gets a colour", () => {
+    expect(pickAccentColor(makePixels(repeat([0, 0, 0, 255], 8)), 8, 1)).toBe("#000000");
+    expect(pickAccentColor(makePixels([...repeat([255, 255, 255, 255], 8), ...repeat([0, 0, 0, 0], 8)]), 16, 1)).toBe("#ffffff");
+  });
+
+  it("is none only for an icon with nothing visible", () => {
+    expect(pickAccentColor(makePixels(repeat([0, 0, 0, 0], 8)), 8, 1)).toBeNull();
   });
 });
 

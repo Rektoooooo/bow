@@ -300,6 +300,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   showFolderList: { folderId: isText, anchor: isAnchor },
   hideFolderList: {},
   folderListPointer: { isInside: isBoolean },
+  fadeHoverPanel: {},
   setTidyTitles: { isOn: isBoolean },
   setShowFullUrls: { isOn: isBoolean },
   createNote: {},
