@@ -215,6 +215,18 @@ const peekEntry = views.find((view) => view.url.includes("iana.org"));
 state = await getState();
 check("a link from a pinned tab to another site opens in a Peek", peekEntry !== undefined, JSON.stringify(views.map((view) => view.url)));
 check("…and the pinned tab stays on its page", state.items[pinnedSourceId]?.url.startsWith("https://example.com/peek-source"), state.items[pinnedSourceId]?.url);
+// Arc's layout: the page sits under the Peek's own 44 pt toolbar row (which hangs from the window's top edge and
+// shows the address), 80 % as wide as the page card; the round buttons are stacked right of it.
+const peekLayout = await app.evaluate(({ BrowserWindow }) => {
+  const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  const peekView = win.contentView.children.find((child) => child.webContents?.getURL().includes("iana.org"));
+  return { peek: peekView?.getBounds() ?? null, contentWidth: win.getContentSize()[0] };
+});
+const peekHost = await overlay.$eval(".peek-toolbar .peek-host", (element) => element.textContent).catch(() => "");
+const buttonsBox = await overlay.$eval(".peek-buttons", (element) => element.getBoundingClientRect().toJSON()).catch(() => null);
+const peekBox = peekLayout.peek;
+const isArcLayout = peekBox !== null && peekBox.y === 44 && peekHost.includes("iana.org") && buttonsBox !== null && buttonsBox.x > peekBox.x + peekBox.width && buttonsBox.height > buttonsBox.width;
+check("the Peek has Arc's layout: its own toolbar row with the address on top, buttons stacked at its right", isArcLayout, `${JSON.stringify(peekBox)} host=${peekHost} buttons=${JSON.stringify(buttonsBox)}`);
 await overlay.click(".peek-button[aria-label^='Open as Tab']");
 await sidebar.waitForTimeout(800);
 state = await getState();

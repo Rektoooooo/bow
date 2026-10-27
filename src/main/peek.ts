@@ -11,9 +11,10 @@
  *   link in a Pinned tab → main.ts onWillNavigate → openPeek(url, sourceTabId) → page view on top of the overlay
  *   "Open as Tab" → adoptTabView() + openTab({ id }) → the same page becomes a Today tab, nothing reloads
  */
-import { WebContentsView } from "electron";
+import { nativeTheme, WebContentsView } from "electron";
 import type { BrowserWindow, WebContents } from "electron";
 import { DEFAULT_PROFILE_ID } from "../shared/settings";
+import { computeFramePalette } from "../shared/themePalette";
 import type { ItemId } from "../shared/types";
 import { addAfterSyncHook, applyChange, getLayoutOptions, getState, getWindow } from "./browserCore";
 import { computeCardBounds } from "./layout";
@@ -25,17 +26,20 @@ import { getSelectedTabId, openTab, updateTabPage } from "./state";
 import { adoptTabView, glideView } from "./tabViews";
 import { LAYOUT_MOTION_MS } from "../shared/settings";
 import type { TabViewEvents } from "./tabViews";
-import { createId, findProfileIdOfItem } from "./tree";
+import { createId, findProfileIdOfItem, getActiveSpace } from "./tree";
 
-/** Space above the Peek for its header (host and buttons), drawn by the overlay. Must match overlay.css. */
-const PEEK_HEADER_SPACE_PX = 52;
+/*
+ * Arc's Peek, measured in the user's recording (2026-10-27): the card hangs from the window's top edge, its own
+ * toolbar row (back, forward, reload, address) 44 pt tall in the window frame's color, the page below it ending 12 pt
+ * above the window's bottom; it is 80 % as wide as the page card (10 % free on each side), centered on it. The
+ * overlay draws the toolbar row and must use the same height (overlay.css --peek-toolbar-height).
+ */
+const PEEK_TOOLBAR_HEIGHT_PX = 44;
+const PEEK_BOTTOM_SPACE_PX = 12;
+const PEEK_SIDE_MARGIN_RATIO = 0.1;
 
-/** Space below the Peek, and the share of the card's width left free on each side. Our choice, close to Arc. */
-const PEEK_BOTTOM_SPACE_PX = 20;
-const PEEK_SIDE_MARGIN_RATIO = 0.07;
-
-/** Corner radius of the Peek card. */
-const PEEK_RADIUS_PX = 12;
+/** Corner radius of the Peek's page (its bottom corners show; the top ones sit under the toolbar row). */
+const PEEK_RADIUS_PX = 10;
 
 /** A Peek grows from this share of its size when it opens and shrinks back to it when it closes. Our choice. */
 const PEEK_START_SCALE = 0.94;
@@ -78,29 +82,36 @@ export function isPeekOpen(): boolean {
 }
 
 /**
- * Where the Peek card goes in a window: centered over the page card, leaving room for its header above.
+ * The page card of a window (what the Peek is centered on and what dims behind it).
+ */
+function computeWindowCard(window: BrowserWindow): Bounds {
+  const contentSize = window.getContentSize();
+  return computeCardBounds(contentSize[0] ?? 0, contentSize[1] ?? 0, getLayoutOptions());
+}
+
+/**
+ * Where the Peek's page goes in a window: below its toolbar row, centered on the page card.
  */
 function computePeekBounds(window: BrowserWindow | null): Bounds | null {
   if (window === null || window.isDestroyed()) {
     return null;
   }
-  const contentSize = window.getContentSize();
-  const contentWidth = contentSize[0] ?? 0;
-  const contentHeight = contentSize[1] ?? 0;
-  const card = computeCardBounds(contentWidth, contentHeight, getLayoutOptions());
+  const contentHeight = window.getContentSize()[1] ?? 0;
+  const card = computeWindowCard(window);
   const sideMargin = Math.round(card.width * PEEK_SIDE_MARGIN_RATIO);
   return {
     x: card.x + sideMargin,
-    y: card.y + PEEK_HEADER_SPACE_PX,
+    y: PEEK_TOOLBAR_HEIGHT_PX,
     width: Math.max(card.width - 2 * sideMargin, 0),
-    height: Math.max(card.height - PEEK_HEADER_SPACE_PX - PEEK_BOTTOM_SPACE_PX, 0),
+    height: Math.max(contentHeight - PEEK_TOOLBAR_HEIGHT_PX - PEEK_BOTTOM_SPACE_PX, 0),
   };
 }
 
 /**
- * Draws the overlay part of the Peek (dimmed page, shadow, header with buttons) under the Peek's page view.
+ * Draws the overlay part of the Peek (its toolbar row, the dimmed page card, the buttons) under the Peek's page view,
+ * and gives the page the keyboard unless the Peek is only being redrawn.
  */
-function showPeekFrame(contents: WebContents): void {
+function showPeekFrame(contents: WebContents, takesKeyboard: boolean = true): void {
   const window = peekWindow;
   const frame = computePeekBounds(window);
   if (window === null || frame === null || peekView === null) {
@@ -108,12 +119,26 @@ function showPeekFrame(contents: WebContents): void {
   }
   const contentSize = window.getContentSize();
   const fullWindow = { x: 0, y: 0, width: contentSize[0] ?? 0, height: contentSize[1] ?? 0 };
-  const panel = { kind: "peek" as const, frame: frame, url: contents.getURL(), title: contents.getTitle() };
+  const theme = getActiveSpace(getState()).theme;
+  const palette = computeFramePalette(theme, nativeTheme.shouldUseDarkColors, window.isFocused());
+  const history = contents.navigationHistory;
+  const panel = {
+    kind: "peek" as const,
+    frame: frame,
+    card: computeWindowCard(window),
+    url: contents.getURL(),
+    chromeColor: palette.colors[0],
+    canGoBack: history.canGoBack(),
+    canGoForward: history.canGoForward(),
+  };
   const view = peekView;
-  showOverlay(window, fullWindow, { panel: panel, isDark: true, library: null, site: null }).then(() => {
+  showOverlay(window, fullWindow, { panel: panel, isDark: palette.isDark, library: null, site: null }, takesKeyboard).then(() => {
     // The overlay was just put on top; the page view must sit above it.
-    if (peekView === view) {
-      window.contentView.addChildView(view);
+    if (peekView !== view) {
+      return;
+    }
+    window.contentView.addChildView(view);
+    if (takesKeyboard) {
       view.webContents.focus();
     }
   });
@@ -129,6 +154,17 @@ function raisePeek(): void {
   }
   raiseOverlayIfShown(window);
   window.contentView.addChildView(peekView);
+}
+
+/**
+ * Redraws the Peek's frame after its window gained or lost the focus: its toolbar row has the frame's color, which is
+ * darker in the active window.
+ */
+export function refreshPeekFrame(window: BrowserWindow): void {
+  if (peekView === null || peekWindow !== window) {
+    return;
+  }
+  showPeekFrame(peekView.webContents, false);
 }
 
 /**
@@ -178,6 +214,8 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
   });
   contents.on("page-title-updated", () => showPeekFrame(contents));
   contents.on("did-navigate", () => showPeekFrame(contents));
+  // Back and forward follow in-page navigations too (pages that change their address without loading).
+  contents.on("did-navigate-in-page", () => showPeekFrame(contents));
   // Links inside a Peek that open new windows become ordinary tabs.
   contents.setWindowOpenHandler((details) => {
     tabViewEvents?.onOpenInNewTab(peekSourceTabId ?? "", details.url, details.disposition === "background-tab" ? "background" : "foreground");
@@ -237,6 +275,25 @@ export function closePeekIn(window: BrowserWindow): void {
 export function closePeek(): void {
   removePeek(false);
   peekSourceTabId = null;
+}
+
+/**
+ * Back, forward or reload in the Peek's own toolbar row.
+ */
+export function navigatePeek(command: "back" | "forward" | "reload"): void {
+  if (peekView === null) {
+    return;
+  }
+  const contents = peekView.webContents;
+  if (command === "back") {
+    contents.navigationHistory.goBack();
+  }
+  if (command === "forward") {
+    contents.navigationHistory.goForward();
+  }
+  if (command === "reload") {
+    contents.reload();
+  }
 }
 
 /**

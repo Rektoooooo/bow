@@ -37,7 +37,7 @@ import { getSiteKey } from "./urls";
 import { DEFAULT_PROFILE_ID, SIDEBAR_WIDTH_PX } from "../shared/settings";
 import type { Bounds } from "./layout";
 import { getOverlayContents, hideOverlay, sendToOverlay, setOverlayBounds, showOverlay } from "./overlay";
-import { closePeek, isPeekOpen, openPeekAsTab, openPeekInSplit } from "./peek";
+import { closePeek, isPeekOpen, navigatePeek, openPeekAsTab, openPeekInSplit } from "./peek";
 import { toggleDevTools, translatePage, zoomPage } from "./pageCommands";
 import { splitTabs } from "./split";
 import { getSelectedTabId, openTab, selectTab } from "./state";
@@ -1029,6 +1029,9 @@ export function registerOverlayIpc(): void {
     }
     if (command === "close") {
       closePeek();
+    }
+    if (command === "back" || command === "forward" || command === "reload") {
+      navigatePeek(command);
     }
   });
   ipcMain.handle(OVERLAY_CHANNELS.openUrl, (event, url: unknown) => {

@@ -45,7 +45,12 @@ export type OverlayPanel =
   | { kind: "theme"; spaceId: string; spaceName: string; spaceIcon: string; theme: SpaceTheme; sidebarWidth: number; presets: { label: string; colors: string[]; appearance: ThemeAppearance }[] }
   /** Arc's icon picker for a Space, pointing at the Space's button (anchor, in window coordinates). */
   | { kind: "spaceIcon"; spaceId: string; icon: string; anchor: OverlayRect }
-  | { kind: "peek"; frame: { x: number; y: number; width: number; height: number }; url: string; title: string }
+  /**
+   * Arc's Peek: `frame` is where the page view sits; the overlay draws the card's toolbar row above it (from the
+   * window's top edge, in `chromeColor`, the window frame's color), dims the page card (`card`) behind it and stacks
+   * the buttons right of it.
+   */
+  | { kind: "peek"; frame: OverlayRect; card: OverlayRect; url: string; chromeColor: string; canGoBack: boolean; canGoForward: boolean }
   | { kind: "permission"; requestId: string; host: string; kinds: SitePermissionKind[]; appName: string | null }
   | { kind: "capture"; frame: { x: number; y: number; width: number; height: number } }
   | { kind: "switcher"; tabs: SwitcherTab[]; index: number }
@@ -72,7 +77,7 @@ export interface OverlayRect {
 }
 
 /** The Peek header's buttons. */
-export type PeekCommand = "openAsTab" | "split" | "close";
+export type PeekCommand = "openAsTab" | "split" | "close" | "back" | "forward" | "reload";
 
 /** One line in the Command Bar, as the overlay draws it. */
 export interface CommandBarLine {

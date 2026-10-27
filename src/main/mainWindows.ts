@@ -20,7 +20,7 @@ import type { WindowId } from "../shared/types";
 import { applyChange, attachWindow, detachWindow, getMainWindow, getState, getWindow, listMainWindows, relayoutWindow, scheduleRuntimePush } from "./browserCore";
 import { closeOverlay, openCommandBar, relayoutOverlay } from "./overlayController";
 import { leaveWindow as overlayLeaveWindow } from "./overlay";
-import { closePeekIn, relayoutPeek } from "./peek";
+import { closePeekIn, refreshPeekFrame, relayoutPeek } from "./peek";
 import { leaveWindow as statusBubbleLeaveWindow } from "./statusBubble";
 import { createId } from "./tree";
 import { closeWindow, focusWindow, listWindowIds, openWindow } from "./windows";
@@ -132,6 +132,8 @@ function createMainWindow(windowId: WindowId, bounds: Rectangle | null): Browser
   // Arc draws an active window darker than an inactive one: the sidebar hears of every change (also to another app).
   window.on("focus", () => scheduleRuntimePush());
   window.on("blur", () => scheduleRuntimePush());
+  window.on("focus", () => refreshPeekFrame(window));
+  window.on("blur", () => refreshPeekFrame(window));
   window.on("close", () => handleWindowClose(windowId, window));
   // Little Windows cannot live without a main window; closing the last one ends the app.
   window.on("closed", () => {

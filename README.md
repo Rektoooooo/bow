@@ -100,8 +100,9 @@ in Arc). Running it twice adds nothing twice.
 ![The Command Bar: typing "wiki" offers the open Wikipedia Favorite first, and Tab to search Wikipedia](docs/screenshot-command-bar.png)
 
 **Pages**
-- **Peek**: a link from a Pinned tab or Favorite to another site, or any Shift-clicked link, opens in a floating
-  card. ⌘O makes it a tab without reloading, Split puts it next to the page, Esc closes it.
+- **Peek**: a link from a Pinned tab or Favorite to another site, or any Shift-clicked link, opens in a card that
+  hangs from the window's top edge with its own back / forward / reload row, the page behind dimmed, like Arc's.
+  ⌘O (or the round ↗ button) makes it a tab without reloading, Split puts it next to the page, Esc closes it.
 - **Split View**: two to four tabs side by side or stacked, one row in the sidebar.
 - **Little Window**: links from other apps (and ⌥⌘N) open in a small window; "Open in Space" moves the page into the
   sidebar. A Little Window left alone for 6 hours goes to the Archive.

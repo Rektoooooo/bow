@@ -187,9 +187,12 @@ tooltip, 7 sidebar width, then AppleScript.
       light on screen. Not measured yet: icon, faint, dot, line, field tokens, light themes, the floating peek panel.
 - [ ] Library lives in the sidebar column: a vertical icon rail (Media, Downloads, Easels, Spaces, Boosts, Archived
       Tabs) with the list beside it; Spaces spread over the window in columns → ours is a floating panel
-- [ ] Peek: a card almost the whole page card wide, over the toolbar, with its own toolbar row (back, forward,
+- [x] Peek: a card almost the whole page card wide, over the toolbar, with its own toolbar row (back, forward,
       reload, address) inside; close / expand / split stacked vertically outside its right edge; page dimmed behind →
-      ours is a smaller card with a header above it
+      ours was a smaller card with a header above it. Done, measured on frame f0491: the card hangs from the window's
+      top edge, toolbar row 44 pt in the frame's color, 80 % of the page card wide, 12 pt above the bottom; only the
+      page card dims (black 55 %); round black buttons 34 pt, 42 pt apart, 12 pt right of the card. Not possible: the
+      page's top corners stay rounded under the row (Electron gives a view one radius for all corners)
 - [x] Theme editor and icon picker are popovers above the sidebar's bottom bar (compared side by side with the
       recording on the real screen: place, size, colors within a few levels; Arc's pad mapping is unknown, ours is
       documented in shared/themePad.ts) (theme: auto/light/dark, grainy colour
