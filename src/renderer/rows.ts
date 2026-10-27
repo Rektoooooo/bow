@@ -520,7 +520,7 @@ export function renderItemRows(itemIds: ItemId[], location: ItemLocation, depth:
 }
 
 /**
- * The bouncing bars in the corner of a Favorite whose page plays sound in the background, in the site's colour when
+ * The bouncing bars under the logo of a Favorite whose page plays sound in the background, in the site's colour when
  * it is known (white otherwise). Keyed, so redraws keep the same element and its bars keep moving.
  */
 function createEqualizer(accent: string | undefined): HTMLElement {

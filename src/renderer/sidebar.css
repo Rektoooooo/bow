@@ -516,36 +516,22 @@ button:disabled {
 }
 
 /*
-  Sound playing in a Favorite you are not on: four rounded bars bouncing unevenly in a small glass capsule in the
-  tile's corner, in the site's colour (our design; the user chose an equaliser, and asked for a clearer one than three
-  plain lines). Each bar has its own rhythm so they never move in step.
+  Sound playing in a Favorite you are not on: four rounded bars bouncing unevenly under the logo, where the unread dot
+  sits, in the site's colour (our design; the user chose an equaliser, asked for a clearer one than three plain lines,
+  and then for no background behind it). Each bar has its own rhythm so they never move in step.
 */
 .tile-equalizer {
   position: absolute;
-  right: 3px;
-  bottom: 3px;
+  bottom: 4px;
   display: flex;
   align-items: flex-end;
   gap: 1.5px;
-  height: 14px;
-  padding: 3px 4px;
-  border-radius: 7px;
-  /* Glass, like Apple's Liquid Glass (the user's wish): the tile and logo show through blurred, with a light rim, a
-     soft highlight on top and a faint shadow under it. */
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06));
-  backdrop-filter: blur(4px) saturate(160%);
-  box-shadow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.45),
-    inset 0 0 0 0.5px rgba(255, 255, 255, 0.18),
-    0 1px 3px rgba(0, 0, 0, 0.35);
+  height: 8px;
 }
 
+/* A white logo's bars on a light tile: a hairline of shadow keeps them visible. */
 :root[data-appearance="light"] .tile-equalizer {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.45));
-  box-shadow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.9),
-    inset 0 0 0 0.5px rgba(0, 0, 0, 0.08),
-    0 1px 3px rgba(0, 0, 0, 0.15);
+  filter: drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.45));
 }
 
 .tile-equalizer-bar {
