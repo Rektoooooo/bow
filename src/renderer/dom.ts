@@ -10,6 +10,7 @@
  */
 import type { BrowserAction } from "../shared/actions.js";
 import type { BrowserApi } from "../shared/types";
+import { getFaviconAddress } from "../shared/faviconColor.js";
 import { createIcon } from "./icons.js";
 import type { IconName } from "./icons.js";
 
@@ -117,20 +118,6 @@ export function getDisplayHost(url: string): string {
 }
 
 /**
- * Returns the conventional icon address of a web page's site ("https://host/favicon.ico"), or null for other URLs.
- * Used for tabs that have not loaded yet, so they still show their site's icon.
- */
-function guessFaviconUrl(url: string): string | null {
-  try {
-    const parsedUrl = new URL(url);
-    const isWebPage = parsedUrl.protocol === "https:" || parsedUrl.protocol === "http:";
-    return isWebPage ? `${parsedUrl.origin}/favicon.ico` : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Builds a site icon: the page's favicon, the site's /favicon.ico when the page has not reported one, or the first
  * letter of its host when neither loads.
  */
@@ -138,7 +125,7 @@ export function createFavicon(faviconUrl: string | null, url: string, className:
   const wrapper = createElement("span", className);
   const host = getDisplayHost(url);
   const initial = host === "" ? FALLBACK_SITE_INITIAL : host.charAt(0).toUpperCase();
-  const iconUrl = faviconUrl ?? guessFaviconUrl(url);
+  const iconUrl = getFaviconAddress(faviconUrl, url);
   wrapper.dataset.initial = initial;
 
   if (iconUrl === null || failedIconUrls.has(iconUrl)) {

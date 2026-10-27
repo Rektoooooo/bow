@@ -367,6 +367,8 @@ export interface RuntimeState {
    * and the overlay draws the Library over it.
    */
   isLibraryOpen: boolean;
+  /** The colour of each Favorite's icon, by icon address (shared/faviconColor.ts): the selected tile's border. */
+  faviconAccents: Record<string, string>;
   /**
    * The sidebar item being dragged in another main window right now, or null: this window's sidebar accepts it as a
    * drop (main carries the id, because a drag's data stays in the page it started in).

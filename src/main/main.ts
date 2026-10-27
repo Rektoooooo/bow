@@ -34,6 +34,7 @@ import {
   getStateForWindow,
   getWindow,
   initializeState,
+  onStateChanged,
   scheduleRuntimePush,
   setTabViewEvents,
   syncViews,
@@ -45,6 +46,7 @@ import { getExtensionMenuItems, initializeExtensionHost, prepareExtensions } fro
 import { initializePermissionPrompts } from "./permissionPrompts";
 import { registerSymbolIpc } from "./symbols";
 import { loadToolbarColors } from "./toolbarTint";
+import { initializeFaviconAccents, refreshFaviconAccents } from "./faviconAccents";
 import { updateExtensionsFromWebStore } from "./extensionsController";
 import { isRecordableUrl } from "./history";
 import { addVisit, loadHistory, saveHistoryNow, setVisitTitle } from "./historyStore";
@@ -247,6 +249,10 @@ async function handleAppReady(): Promise<void> {
   initializeState(getStateFilePath(), Date.now());
   loadHistory();
   loadToolbarColors(path.join(app.getPath("userData"), TOOLBAR_COLORS_FILE_NAME), scheduleRuntimePush);
+  // The selected Favorite's border takes its icon's colour, like Arc's.
+  initializeFaviconAccents(scheduleRuntimePush);
+  onStateChanged(refreshFaviconAccents);
+  refreshFaviconAccents(getState());
   loadCaptures(app.getPath("userData"));
   initializeNotesStore(app.getPath("userData"));
   initializeEaselsStore(app.getPath("userData"));

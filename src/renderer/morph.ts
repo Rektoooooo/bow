@@ -91,19 +91,33 @@ function hasSameKeyOrder(keyedCurrent: Map<string, Element>, freshChildren: Node
 }
 
 /**
+ * Copies the inline style. Our pages' Content-Security-Policy (style-src 'self') ignores a style attribute written
+ * with setAttribute, so it goes through the CSSOM, which the policy allows (a kept tile lost its colour without this).
+ */
+function syncInlineStyle(kept: Element, fresh: Element): void {
+  if (!(kept instanceof HTMLElement) || !(fresh instanceof HTMLElement)) {
+    return;
+  }
+  if (kept.style.cssText !== fresh.style.cssText) {
+    kept.style.cssText = fresh.style.cssText;
+  }
+}
+
+/**
  * Copies attributes from the new element to the kept one: changed values are set, missing ones removed.
  */
 function syncAttributes(kept: Element, fresh: Element): void {
   for (const attribute of Array.from(fresh.attributes)) {
-    if (kept.getAttribute(attribute.name) !== attribute.value) {
+    if (attribute.name !== "style" && kept.getAttribute(attribute.name) !== attribute.value) {
       kept.setAttribute(attribute.name, attribute.value);
     }
   }
   for (const attribute of Array.from(kept.attributes)) {
-    if (!fresh.hasAttribute(attribute.name)) {
+    if (attribute.name !== "style" && !fresh.hasAttribute(attribute.name)) {
       kept.removeAttribute(attribute.name);
     }
   }
+  syncInlineStyle(kept, fresh);
 }
 
 /**

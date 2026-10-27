@@ -14,6 +14,7 @@
  * Rule: no event listeners here (morph.ts keeps elements across redraws, so a listener would remember stale data).
  * The one exception is the rename field, which morphing never replaces while it has the focus.
  */
+import { getFaviconAddress } from "../shared/faviconColor.js";
 import type { BrowserState, FolderItem, ItemId, ItemLocation, LiveFolderSource, LiveFolderStatus, RuntimeState, SidebarItem, SplitItem, TabItem } from "../shared/types";
 import { createActionButton, createElement, createFavicon, dispatch, getDisplayHost } from "./dom.js";
 import { createIcon } from "./icons.js";
@@ -527,8 +528,18 @@ export function renderFavoriteTile(tab: TabItem, location: ItemLocation, index: 
   tile.setAttribute("role", "button");
   tile.setAttribute("aria-label", getTabDisplayName(tab));
   tile.tabIndex = 0;
-  tile.classList.toggle("is-selected", tab.id === context.selectedTabId);
+  const isSelected = tab.id === context.selectedTabId;
+  tile.classList.toggle("is-selected", isSelected);
   tile.classList.toggle("is-loaded", context.runtime.tabs[tab.id] !== undefined);
+  // Arc borders the selected Favorite in its icon's colour (main/faviconAccents.ts finds it).
+  const iconAddress = getFaviconAddress(tab.faviconUrl, tab.url);
+  const accent = isSelected && iconAddress !== null ? context.runtime.faviconAccents[iconAddress] : undefined;
+  tile.classList.toggle("has-accent", accent !== undefined);
+  if (accent !== undefined) {
+    tile.style.setProperty("--tile-accent", accent);
+  } else {
+    tile.style.removeProperty("--tile-accent");
+  }
   tile.append(isNoteUrl(tab.url) ? createIcon("note", "icon note-icon") : createFavicon(tab.faviconUrl, tab.url, "favicon favicon-large"));
 
   const isAudible = context.runtime.tabs[tab.id]?.isAudible === true;
