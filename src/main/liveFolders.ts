@@ -18,7 +18,7 @@
 import { LIVE_FOLDER_ITEM_LIMIT } from "../shared/settings";
 import type { BrowserState, FolderItem, ItemId, LiveFolderSource, ProfileId, SidebarItem, TabItem } from "../shared/types";
 import { repairSelections } from "./state";
-import { createId, deleteItems, findProfileIdOfItem } from "./tree";
+import { collectTabIds, createId, deleteItems, findProfileIdOfItem } from "./tree";
 
 /** One item a source lists: its address and title. */
 export interface LiveFolderEntry {
@@ -163,7 +163,8 @@ export function applyLiveFolderEntries(state: BrowserState, folderId: ItemId, en
       newChildIds.push(childId);
       continue;
     }
-    removedIds.push(childId);
+    // Whatever else got in (an import, an older version) leaves whole: a container takes its tabs along.
+    removedIds.push(childId, ...collectTabIds(state, childId));
   }
   if (isSameOrder(newChildIds, folder.childIds)) {
     return state;

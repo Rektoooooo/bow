@@ -50,6 +50,12 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   sRGB arithmetic says. Calibrate alphas against the reference pixels, not by computing them.
 - `View.setBounds(…, { animate })` reports the end place at once and cannot be verified without screen recording;
   step the bounds ourselves when motion must be provable.
+- Check the traffic lights before calibrating colors: grey lights mean the window was inactive. All five of the
+  user's shots are inactive, so every token is matched to an inactive Arc; what Arc changes when active is unknown
+  until there is an active shot. Ask for one before tuning "too dim" / "too bright" differences.
+- Compare every state a shot shows, not only the resting one: with the Command Bar or Control Center open, Arc's
+  frame stays #313131 (no dimming). I had a 30 % backdrop under both for a whole session; measuring the frame pixel
+  of shots 3 and 4 found it.
 
 ## Dependencies
 - Check a package's license **per version** and diff a just-published release against the previous one before

@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { createFolder, createInitialState, deleteItem, moveItem, selectTab } from "../src/main/state";
+import { splitTabs } from "../src/main/split";
 import { applyLiveFolderEntries, listLiveFolders, showHiddenLiveFolderItems } from "../src/main/liveFolders";
 import type { LiveFolderEntry } from "../src/main/liveFolders";
 import { LIVE_FOLDER_ITEM_LIMIT } from "../src/shared/settings";
@@ -132,6 +133,49 @@ describe("live folders", () => {
     const { state, folderId } = withLiveFolder(built.state);
     const todayTabId = getTodayIds(state)[0] as ItemId;
     expect(moveItem(state, todayTabId, { kind: "folder", folderId: folderId }, 0, LATER)).toBe(state);
+  });
+
+  it("never get a split: splitting one of their tabs puts the split where the other tab is", () => {
+    const built = openTabs(["https://other.example/"]);
+    const { state, folderId } = withLiveFolder(built.state);
+    const filled = applyLiveFolderEntries(state, folderId, [POST_A, POST_B], ONE_PM, false);
+    const tabA = getFolder(filled, folderId).childIds[0] as ItemId;
+    const todayTabId = getTodayIds(filled)[0] as ItemId;
+
+    const splitState = splitTabs(filled, tabA, todayTabId, LATER);
+    const splitId = getTodayIds(splitState)[0] as ItemId;
+    expect(splitState.items[splitId]?.kind).toBe("split");
+    expect(getFolder(splitState, folderId).childIds).not.toContain(tabA);
+
+    // Two refreshes later the post is not added again (its tab is open in the split) and nothing is left over.
+    const refreshedOnce = applyLiveFolderEntries(splitState, folderId, [POST_A, POST_B], LATER, true);
+    const refreshedTwice = applyLiveFolderEntries(refreshedOnce, folderId, [POST_A, POST_B], LATER, true);
+    const tabsOfPostA = Object.values(refreshedTwice.items).filter((item) => item.kind === "tab" && (item.homeUrl ?? item.url) === POST_A.url);
+    expect(tabsOfPostA.length).toBe(1);
+    expect(getChildTabs(refreshedTwice, folderId).map((tab) => tab.title)).toEqual(["Post B"]);
+  });
+
+  it("do not split two of their own tabs", () => {
+    const { state, folderId } = withLiveFolder();
+    const filled = applyLiveFolderEntries(state, folderId, [POST_A, POST_B], ONE_PM, false);
+    const [tabA, tabB] = getFolder(filled, folderId).childIds as [ItemId, ItemId];
+    expect(splitTabs(filled, tabA, tabB, LATER)).toBe(filled);
+  });
+
+  it("drop a split that got inside some other way, with its tabs, leaving nothing behind", () => {
+    const { state, folderId } = withLiveFolder();
+    const filled = applyLiveFolderEntries(state, folderId, [POST_A, POST_B], ONE_PM, false);
+    const [tabA, tabB] = getFolder(filled, folderId).childIds as [ItemId, ItemId];
+    const split = { kind: "split" as const, id: "split-inside", childIds: [tabA, tabB], orientation: "horizontal" as const };
+    const folder = getFolder(filled, folderId);
+    const withSplitInside: BrowserState = { ...filled, items: { ...filled.items, [split.id]: split, [folderId]: { ...folder, childIds: [split.id] } } };
+
+    const refreshed = applyLiveFolderEntries(withSplitInside, folderId, [POST_C], LATER, true);
+
+    expect(refreshed.items["split-inside"]).toBeUndefined();
+    expect(refreshed.items[tabA]).toBeUndefined();
+    expect(refreshed.items[tabB]).toBeUndefined();
+    expect(getChildTabs(refreshed, folderId).map((tab) => tab.title)).toEqual(["Post C"]);
   });
 
   it("leave without filling the Archive when deleted", () => {

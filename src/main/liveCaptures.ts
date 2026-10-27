@@ -74,8 +74,8 @@ export async function describeCaptureSource(contents: WebContents, region?: Rect
 
 /**
  * Loads the page in a hidden window like the one it was captured in and captures the same region. Returns a PNG
- * data: URL, or null when the page could not load. The window never shows, cannot open others, makes no sound and is
- * destroyed before this returns.
+ * data: URL, or null when the page could not load. The window never shows, cannot open others or leave the page's
+ * site, makes no sound and is destroyed before this returns.
  */
 async function retakeNow(source: CaptureSource, profileSession: Session): Promise<string | null> {
   const hiddenWindow = new BrowserWindow({
@@ -88,6 +88,17 @@ async function retakeNow(source: CaptureSource, profileSession: Session): Promis
   const contents = hiddenWindow.webContents;
   contents.setAudioMuted(true);
   contents.setWindowOpenHandler(() => ({ action: "deny" }));
+  // The page stays on its own site: a redirect elsewhere (a sign-in page) gives no new picture, and the easel keeps
+  // the one it has, rather than showing the other site.
+  const siteOrigin = new URL(source.url).origin;
+  const keepOnSite = (event: Electron.Event, targetUrl: string): void => {
+    const isSameSite = URL.canParse(targetUrl) && new URL(targetUrl).origin === siteOrigin;
+    if (!isSameSite) {
+      event.preventDefault();
+    }
+  };
+  contents.on("will-navigate", keepOnSite);
+  contents.on("will-redirect", keepOnSite);
   try {
     // Both settle to a word, so the one that loses the race can never fail later with nobody listening.
     const loaded = contents.loadURL(source.url).then(

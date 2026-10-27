@@ -684,12 +684,12 @@ export function deleteItem(state: BrowserState, itemId: ItemId, now: number): Br
   }
 
   const tabIds = collectTabIds(state, itemId);
+  const containerIds = collectContainerIds(state, itemId);
   if (item.kind === "folder" && item.live !== undefined) {
     // A live folder's tabs came from its source, not from the user: they leave without filling the Archive.
-    const stateWithoutFolder = deleteItems(removeFromLocation(state, itemId), [itemId, ...tabIds]);
+    const stateWithoutFolder = deleteItems(removeFromLocation(state, itemId), [...containerIds, ...tabIds]);
     return repairSelections(stateWithoutFolder);
   }
-  const containerIds = collectContainerIds(state, itemId);
   const archivedState = moveTabsToArchive(state, tabIds, now, "manual");
   const stateWithoutItem = removeFromLocation(archivedState, itemId);
   return deleteItems(stateWithoutItem, containerIds);

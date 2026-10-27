@@ -26,36 +26,57 @@ function canJoinSplit(state: BrowserState, tabId: ItemId): boolean {
 }
 
 /**
+ * True when a tab sits directly in a live folder, whose source decides what it holds (liveFolders.ts).
+ */
+function isInLiveFolder(state: BrowserState, tabId: ItemId): boolean {
+  const location = findLocation(state, tabId);
+  if (location === null || location.kind !== "folder") {
+    return false;
+  }
+  const folder = state.items[location.folderId];
+  return folder !== undefined && folder.kind === "folder" && folder.live !== undefined;
+}
+
+/**
  * Shows a second tab next to the first. If the first tab is already in a split view, the second joins that split.
  * Otherwise a new split view takes the first tab's place in the sidebar. The first tab is selected.
+ * A split never goes into a live folder: when the first tab sits in one, the split takes the second tab's place
+ * instead (and two tabs of live folders do not split).
  * Example: Today [A, B, C], splitTabs(A, C) → Today [split(A, C), B]
  */
 export function splitTabs(state: BrowserState, firstTabId: ItemId, secondTabId: ItemId, now: number): BrowserState {
   if (firstTabId === secondTabId || !canJoinSplit(state, firstTabId) || !canJoinSplit(state, secondTabId)) {
     return state;
   }
+  const isFirstInLiveFolder = isInLiveFolder(state, firstTabId);
+  if (isFirstInLiveFolder && isInLiveFolder(state, secondTabId)) {
+    return state;
+  }
+  // The anchor keeps its place and the split takes it; the joining tab leaves its own place.
+  const anchorTabId = isFirstInLiveFolder ? secondTabId : firstTabId;
+  const joiningTabId = isFirstInLiveFolder ? firstTabId : secondTabId;
 
-  const existingSplitId = findSplitOfTab(state, firstTabId);
+  const existingSplitId = findSplitOfTab(state, anchorTabId);
   if (existingSplitId !== null) {
-    const grownState = addTabToSplit(state, existingSplitId, secondTabId, now);
+    const grownState = addTabToSplit(state, existingSplitId, joiningTabId, now);
     return selectTab(grownState, firstTabId, now);
   }
 
-  const firstLocation = findLocation(state, firstTabId);
-  if (firstLocation === null) {
+  const anchorLocation = findLocation(state, anchorTabId);
+  if (anchorLocation === null) {
     return state;
   }
   const split: SplitItem = { kind: "split", id: createId("split", now), childIds: [firstTabId, secondTabId], orientation: "horizontal" };
 
-  // Take the second tab out first, then swap the first tab's id for the split's id in its list.
-  const stateWithoutSecond = dissolveSmallSplits(removeFromLocation(state, secondTabId));
-  const currentFirstLocation = findLocation(stateWithoutSecond, firstTabId) ?? firstLocation;
-  const siblingIds = getIdsAt(stateWithoutSecond, currentFirstLocation);
-  const swappedIds = siblingIds.map((id) => (id === firstTabId ? split.id : id));
-  const stateWithSplitItem: BrowserState = { ...stateWithoutSecond, items: { ...stateWithoutSecond.items, [split.id]: split } };
-  const stateWithSplit = setIdsAt(stateWithSplitItem, currentFirstLocation, swappedIds);
-  // The second tab may come from another section (Today into a Pinned split): give it that section's home-URL rule.
-  const stateWithHomeUrls = applyHomeUrlRule(stateWithSplit, secondTabId, now);
+  // Take the joining tab out first, then swap the anchor's id for the split's id in its list.
+  const stateWithoutJoining = dissolveSmallSplits(removeFromLocation(state, joiningTabId));
+  const currentAnchorLocation = findLocation(stateWithoutJoining, anchorTabId) ?? anchorLocation;
+  const siblingIds = getIdsAt(stateWithoutJoining, currentAnchorLocation);
+  const swappedIds = siblingIds.map((id) => (id === anchorTabId ? split.id : id));
+  const stateWithSplitItem: BrowserState = { ...stateWithoutJoining, items: { ...stateWithoutJoining.items, [split.id]: split } };
+  const stateWithSplit = setIdsAt(stateWithSplitItem, currentAnchorLocation, swappedIds);
+  // The joining tab may come from another section (Today into a Pinned split): give it that section's home-URL rule.
+  const stateWithHomeUrls = applyHomeUrlRule(stateWithSplit, joiningTabId, now);
   return selectTab(stateWithHomeUrls, firstTabId, now);
 }
 
