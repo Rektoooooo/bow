@@ -26,6 +26,8 @@ import { getActiveDownloadCount } from "./downloads";
 import { getFaviconAccents } from "./faviconAccents";
 import { findMediaInfo, handleShownTabsChanged } from "./media";
 import type { CardLayoutOptions } from "./layout";
+import { computeLibraryWidth } from "./layout";
+import type { LibrarySection } from "../shared/overlay";
 import { raiseOverlayIfShown } from "./overlay";
 import { getSelectedTabId } from "./state";
 import { findTab } from "./tree";
@@ -75,6 +77,9 @@ const peekingWindowIds = new Set<WindowId>();
 
 /** The window whose sidebar column shows the Library (the overlay is in one window at a time), or null. */
 let libraryWindowId: WindowId | null = null;
+
+/** The section the Library shows (its width depends on it). */
+let librarySection: LibrarySection = "archive";
 
 /** True while the Command Bar is open to make a new tab (RuntimeState.isNewTabPending). */
 let isNewTabPending = false;
@@ -229,7 +234,37 @@ export function getLayoutOptions(windowId: WindowId = currentState.focusedWindow
     sidebarWidth: sidebarWidth,
     isDeveloperToolbar: isDeveloperToolbar,
     isLibraryOpen: libraryWindowId === windowId,
+    libraryWidth: getLibraryWidth(windowId),
   };
+}
+
+/**
+ * How wide a window's Library column is now (layout.ts computeLibraryWidth: Spaces widens it).
+ */
+export function getLibraryWidth(windowId: WindowId = currentState.focusedWindowId): number {
+  const contentWidth = getMainWindow(windowId)?.getContentSize()[0] ?? 0;
+  return computeLibraryWidth(librarySection, currentState.spaces.length, contentWidth);
+}
+
+/**
+ * The Library showed another section: Spaces widens its column (the page glides aside), the others narrow it again.
+ */
+export function setLibrarySection(section: LibrarySection): void {
+  if (section === librarySection) {
+    return;
+  }
+  librarySection = section;
+  if (libraryWindowId !== null) {
+    relayoutWindow(libraryWindowId, true);
+    scheduleRuntimePush();
+  }
+}
+
+/**
+ * True when a window's sidebar column shows the Library.
+ */
+export function isLibraryOpenIn(windowId: WindowId): boolean {
+  return libraryWindowId === windowId;
 }
 
 /**
@@ -444,6 +479,7 @@ export function collectRuntimeState(windowId: WindowId = currentState.focusedWin
     extensionsBeingAdded: extensionsBeingAdded,
     isWindowActive: getMainWindow(windowId)?.isFocused() ?? false,
     isLibraryOpen: libraryWindowId === windowId,
+    libraryWidth: getLibraryWidth(windowId),
     faviconAccents: getFaviconAccents(),
   };
 }

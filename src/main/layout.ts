@@ -10,7 +10,21 @@
  * Data flow:
  *   tabViews.ts → computeCardBounds() → computePaneBounds() → WebContentsView.setBounds()
  */
-import { CARD_GAP_PX, CARD_INSET_PX, DEVELOPER_TOOLBAR_HEIGHT_PX, LIBRARY_COLUMN_WIDTH_PX, SIDEBAR_WIDTH_PX, SPLIT_GAP_PX, TOOLBAR_HEIGHT_PX } from "../shared/settings";
+import {
+  CARD_GAP_PX,
+  CARD_INSET_PX,
+  DEVELOPER_TOOLBAR_HEIGHT_PX,
+  LIBRARY_ADD_SPACE_ROOM_PX,
+  LIBRARY_COLUMN_WIDTH_PX,
+  LIBRARY_MIN_PAGE_WIDTH_PX,
+  LIBRARY_RAIL_WIDTH_PX,
+  LIBRARY_SPACE_COLUMN_GAP_PX,
+  LIBRARY_SPACE_COLUMN_WIDTH_PX,
+  SIDEBAR_WIDTH_PX,
+  SPLIT_GAP_PX,
+  TOOLBAR_HEIGHT_PX,
+} from "../shared/settings";
+import type { LibrarySection } from "../shared/overlay";
 import type { SplitOrientation } from "../shared/types";
 
 /** A rectangle in window content coordinates, in pixels. */
@@ -31,8 +45,10 @@ export interface CardLayoutOptions {
   sidebarWidth?: number;
   /** The selected page's site is in Developer Mode: its toolbar is taller. */
   isDeveloperToolbar?: boolean;
-  /** The Library is open in the sidebar column (Arc's): the column is LIBRARY_COLUMN_WIDTH_PX wide, sidebar or not. */
+  /** The Library is open in the sidebar column (Arc's), sidebar or not. */
   isLibraryOpen?: boolean;
+  /** How wide the Library's column is while open (computeLibraryWidth); LIBRARY_COLUMN_WIDTH_PX when not given. */
+  libraryWidth?: number;
 }
 
 /**
@@ -44,7 +60,8 @@ export interface CardLayoutOptions {
 export function computeCardBounds(contentWidth: number, contentHeight: number, options: CardLayoutOptions): Bounds {
   const sidebarWidth = options.sidebarWidth ?? SIDEBAR_WIDTH_PX;
   const sidebarLeft = options.isSidebarVisible ? sidebarWidth + CARD_GAP_PX : CARD_INSET_PX;
-  const left = options.isLibraryOpen === true ? LIBRARY_COLUMN_WIDTH_PX + CARD_GAP_PX : sidebarLeft;
+  const libraryWidth = options.libraryWidth ?? LIBRARY_COLUMN_WIDTH_PX;
+  const left = options.isLibraryOpen === true ? libraryWidth + CARD_GAP_PX : sidebarLeft;
   const toolbarHeight = options.isDeveloperToolbar === true ? DEVELOPER_TOOLBAR_HEIGHT_PX : TOOLBAR_HEIGHT_PX;
   const top = options.isToolbarVisible ? CARD_INSET_PX + toolbarHeight : CARD_INSET_PX;
   const width = contentWidth - left - CARD_INSET_PX;
@@ -53,6 +70,21 @@ export function computeCardBounds(contentWidth: number, contentHeight: number, o
   const isPeekSliding = !options.isSidebarVisible && options.isSidebarPeeking === true && options.isLibraryOpen !== true;
   const peekOffset = isPeekSliding ? sidebarWidth : 0;
   return { x: left + peekOffset, y: top, width: Math.max(width, 0), height: Math.max(height, 0) };
+}
+
+/**
+ * How wide the Library's column is: LIBRARY_COLUMN_WIDTH_PX, except in Spaces, which holds a column per Space and
+ * the + after them, as far as the page keeps LIBRARY_MIN_PAGE_WIDTH_PX beside it (more Spaces scroll sideways).
+ * Example: Spaces with 3 Spaces in a 1440 pt window → 112 + 12 + 3 × 202 + 56 = 786
+ */
+export function computeLibraryWidth(section: LibrarySection, spaceCount: number, contentWidth: number): number {
+  if (section !== "spaces") {
+    return LIBRARY_COLUMN_WIDTH_PX;
+  }
+  const columnsWidth = LIBRARY_SPACE_COLUMN_GAP_PX + spaceCount * (LIBRARY_SPACE_COLUMN_WIDTH_PX + LIBRARY_SPACE_COLUMN_GAP_PX);
+  const wantedWidth = LIBRARY_RAIL_WIDTH_PX + columnsWidth + LIBRARY_ADD_SPACE_ROOM_PX;
+  const widestWidth = contentWidth - CARD_GAP_PX - CARD_INSET_PX - LIBRARY_MIN_PAGE_WIDTH_PX;
+  return Math.max(LIBRARY_COLUMN_WIDTH_PX, Math.min(wantedWidth, widestWidth));
 }
 
 /**

@@ -12,7 +12,8 @@
  * Data flow:
  *   "overlay:show" (library) → renderLibrary() → a section → click Restore → dispatch restoreArchivedTab → close
  */
-import type { ExtensionLine, HistoryLine, LibraryBoost, LibraryData, LibrarySection, LibrarySpace, MediaLine } from "../shared/overlay";
+import type { ExtensionLine, HistoryLine, LibraryBoost, LibraryData, LibrarySection, LibrarySpace, LibrarySpaceItem, MediaLine } from "../shared/overlay";
+import { computeFramePalette } from "../shared/themePalette.js";
 import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS } from "../shared/settings.js";
 import { APP_ICON_VARIANTS, buildAppIconSvg } from "../shared/appIconDrawing.js";
 import { isSearchEngineId, SEARCH_ENGINE_IDS, SEARCH_ENGINES } from "../shared/searchEngines.js";
@@ -342,40 +343,87 @@ function renderMediaSection(body: HTMLElement, data: LibraryData): void {
   body.replaceChildren(grid);
 }
 
+/** macOS dark mode, for Spaces whose theme follows the system. */
+const DARK_MODE_QUERY = "(prefers-color-scheme: dark)";
+
+/** A row's left padding in a Space's column, and how much more each folder level indents. Our choice. */
+const SPACE_ITEM_PADDING_PX = 10;
+const SPACE_ITEM_INDENT_PX = 16;
+
 /**
- * One Space: its color and icon, its name and what it holds, Switch, Edit Theme and the Space's own menu.
+ * One row of a Space's column: a folder (bold) or a tab, indented by how deep it sits. A tab opens on click (in its
+ * Space, so the page beside the Library shows it).
  */
-function createSpaceLine(space: LibrarySpace): HTMLElement {
-  const line = createElement("div", "library-line space-line");
-  line.classList.toggle("is-active", space.isActive);
-  const swatch = createSpaceIcon(space.icon, "space-swatch");
-  if (space.color !== null && /^#[0-9a-fA-F]{6}$/.test(space.color)) {
-    swatch.style.background = space.color;
+function createSpaceItemRow(item: LibrarySpaceItem): HTMLElement {
+  const row = document.createElement("button");
+  row.type = "button";
+  row.className = `space-item is-${item.kind}`;
+  row.style.paddingLeft = `${SPACE_ITEM_PADDING_PX + item.depth * SPACE_ITEM_INDENT_PX}px`;
+  const icon = item.kind === "folder" ? createIcon("folder", "icon space-item-icon") : createFavicon(item.faviconUrl, item.url);
+  row.append(icon, createElement("span", "space-item-title", item.title === "" ? item.url : item.title));
+  row.title = item.title;
+  if (item.kind === "tab") {
+    row.addEventListener("click", () => dispatch({ type: "selectTab", tabId: item.id }));
+  } else {
+    row.disabled = true;
   }
-  const text = createElement("span", "library-line-text");
-  text.append(createElement("span", "library-line-title", space.isActive ? `${space.name} · open now` : space.name));
-  const profile = space.profileName === "" ? "" : ` · profile ${space.profileName}`;
-  text.append(createElement("span", "library-line-meta", `${space.pinnedCount} pinned · ${space.todayCount} today${profile}`));
-  const switchButton = createTextButton("Switch", "library-chip", () => {
-    dispatch({ type: "switchSpace", spaceId: space.id });
-    window.overlayApi.close();
-  });
-  switchButton.disabled = space.isActive;
-  const themeButton = createTextButton("Edit Theme…", "library-chip", () => dispatch({ type: "openThemeEditor", spaceId: space.id }));
-  const menuButton = createIconButton("more", "Rename, profile, delete…", "library-line-icon-button", () =>
-    dispatch({ type: "showMenu", request: { menu: "space", spaceId: space.id } }),
-  );
-  line.append(swatch, text, switchButton, themeButton, menuButton);
-  return line;
+  return row;
 }
 
 /**
- * Builds the Spaces section: every Space with what it holds, like Arc's Library.
+ * One Space as a column, like Arc's Library › Spaces: painted like the Space's frame, its name (click to switch to
+ * it), its profile, a pencil to edit its theme, its pinned folders and tabs, and a "…" menu.
+ */
+function createSpaceColumn(space: LibrarySpace): HTMLElement {
+  const column = createElement("section", "space-column");
+  column.classList.toggle("is-active", space.isActive);
+  const palette = computeFramePalette(space.theme, window.matchMedia(DARK_MODE_QUERY).matches, true);
+  const [firstColor, middleColor, lastColor] = palette.colors;
+  column.style.background = `linear-gradient(165deg, ${firstColor}, ${middleColor} 55%, ${lastColor})`;
+  column.classList.toggle("is-dark", palette.isDark);
+
+  const header = createElement("header", "space-column-header");
+  const title = document.createElement("button");
+  title.type = "button";
+  title.className = "space-column-title";
+  title.title = space.isActive ? `${space.name} (open now)` : `Switch to ${space.name}`;
+  title.append(createSpaceIcon(space.icon, "space-column-icon"), createElement("span", "space-column-name", space.name));
+  title.addEventListener("click", () => dispatch({ type: "switchSpace", spaceId: space.id }));
+  header.append(title);
+  if (space.profileName !== "") {
+    const profile = createElement("span", "space-column-profile");
+    profile.append(createIcon("person", "icon space-column-profile-icon"), createElement("span", "", space.profileName));
+    header.append(profile);
+  }
+  header.append(createIconButton("pencil", "Edit Theme…", "space-column-button", () => dispatch({ type: "openThemeEditor", spaceId: space.id })));
+
+  const items = createElement("div", "space-column-items");
+  if (space.items.length === 0) {
+    items.append(createElement("p", "space-column-empty", "Nothing pinned yet"));
+  }
+  items.append(...space.items.map((item) => createSpaceItemRow(item)));
+
+  const footer = createElement("footer", "space-column-footer");
+  footer.append(
+    createElement("span", "space-column-count", `${space.todayCount} today`),
+    createIconButton("more", "Rename, profile, delete…", "space-column-button", () => dispatch({ type: "showMenu", request: { menu: "space", spaceId: space.id } })),
+  );
+  column.append(header, items, footer);
+  return column;
+}
+
+/**
+ * Builds the Spaces section like Arc's: every Space as a column of what it has pinned, and a round + for a new Space.
+ * The Library's column widens to hold them (main: computeLibraryWidth).
  */
 function renderSpacesSection(body: HTMLElement, data: LibraryData): void {
-  const list = createElement("div", "library-list");
-  list.append(...data.spaces.map((space) => createSpaceLine(space)));
-  body.replaceChildren(list);
+  const columns = createElement("div", "space-columns");
+  columns.append(...data.spaces.map((space) => createSpaceColumn(space)));
+  const addButton = createIconButton("plus", "New Space", "space-add", () =>
+    dispatch({ type: "createSpace", name: "New Space", icon: "✦", theme: data.newSpaceTheme }),
+  );
+  columns.append(addButton);
+  body.replaceChildren(columns);
 }
 
 /**
@@ -783,6 +831,8 @@ export function renderLibrary(host: HTMLElement, data: LibraryData, requestedSec
     button.append(createIcon(choice.icon), createElement("span", "library-tab-label", choice.label));
     button.addEventListener("click", () => {
       section = choice.id;
+      // Spaces widens the Library's column, the other sections narrow it again (main lays the page out).
+      window.overlayApi.setLibrarySection(choice.id).catch(() => undefined);
       if (library !== null) {
         renderBody(library);
       }

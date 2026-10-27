@@ -14,14 +14,25 @@
  */
 import { app, clipboard, ipcMain, Menu, nativeTheme, net, ShareMenu } from "electron";
 import type { IpcMainInvokeEvent, MenuItemConstructorOptions, Rectangle, WebContents } from "electron";
-import { OVERLAY_CHANNELS } from "../shared/overlay";
-import type { CommandBarLine, CommandBarMode, LibraryData, LibrarySection, OverlayPanel, OverlayRect, SiteCommand, SiteInfo, SwitcherTab } from "../shared/overlay";
+import { LIBRARY_SECTIONS, OVERLAY_CHANNELS } from "../shared/overlay";
+import type { CommandBarLine, CommandBarMode, LibraryData, LibrarySection, LibrarySpaceItem, OverlayPanel, OverlayRect, SiteCommand, SiteInfo, SwitcherTab } from "../shared/overlay";
 import { getSnapshot } from "./tabSnapshots";
 import { copyPngToClipboard, listCaptures, runCaptureCommand, saveCapture } from "./captures";
 import { describeCaptureSource } from "./liveCaptures";
 import type { CaptureCommand } from "./captures";
-import type { BrowserState, ItemId, SitePermissionKind } from "../shared/types";
-import { applyChange, getLayoutOptions, getRecentTabIds, getState, getWindow, sendSidebarCommand, setLibraryWindow, setNewTabPending } from "./browserCore";
+import type { BrowserState, ItemId, SitePermissionKind, SpaceTheme } from "../shared/types";
+import {
+  applyChange,
+  getLayoutOptions,
+  getLibraryWidth,
+  getRecentTabIds,
+  getState,
+  getWindow,
+  sendSidebarCommand,
+  setLibrarySection,
+  setLibraryWindow,
+  setNewTabPending,
+} from "./browserCore";
 import { rankCommandBarResults } from "./commandBar";
 import type { CommandBarResult } from "./commandBar";
 import type { CommandActionRegistry } from "./commandBarActions";
@@ -43,7 +54,6 @@ import {
   FOLDER_LIST_ROW_HEIGHT_PX,
   FOLDER_LIST_SEARCH_HEIGHT_PX,
   FOLDER_LIST_WIDTH_PX,
-  LIBRARY_COLUMN_WIDTH_PX,
   SIDEBAR_WIDTH_PX,
 } from "../shared/settings";
 import { buildFolderList } from "./folderList";
@@ -162,7 +172,7 @@ function computeOverlayBounds(panel: OverlayPanel): Bounds | null {
   const contentHeight = contentSize[1] ?? 0;
   if (panel.kind === "library") {
     // Arc's Library takes the sidebar column, which widens for it (layout.ts); the page stays usable beside it.
-    return { x: 0, y: 0, width: LIBRARY_COLUMN_WIDTH_PX, height: contentHeight };
+    return { x: 0, y: 0, width: getLibraryWidth(), height: contentHeight };
   }
   if (panel.kind === "folderList") {
     return panel.frame;
@@ -192,6 +202,37 @@ function computeOverlayBounds(panel: OverlayPanel): Bounds | null {
   };
 }
 
+/** Most rows a Space's column in Library › Spaces lists, and how deep it follows folders. Our choice. */
+const LIBRARY_SPACE_ITEMS_LIMIT = 80;
+const LIBRARY_SPACE_DEPTH_LIMIT = 3;
+
+/**
+ * A Space's pinned folders and tabs for its column in Library › Spaces: each folder followed by what it holds, a split
+ * view's tabs in its place. Adds to `items` and returns it.
+ */
+function listSpaceItems(state: BrowserState, itemIds: ItemId[], depth: number, items: LibrarySpaceItem[]): LibrarySpaceItem[] {
+  if (depth > LIBRARY_SPACE_DEPTH_LIMIT) {
+    return items;
+  }
+  for (const itemId of itemIds) {
+    const item = state.items[itemId];
+    if (item === undefined || items.length >= LIBRARY_SPACE_ITEMS_LIMIT) {
+      continue;
+    }
+    if (item.kind === "tab") {
+      items.push({ id: item.id, kind: "tab", title: item.customTitle ?? item.title, url: item.url, faviconUrl: item.faviconUrl, depth: depth });
+    }
+    if (item.kind === "folder") {
+      items.push({ id: item.id, kind: "folder", title: item.title, url: "", faviconUrl: null, depth: depth });
+      listSpaceItems(state, item.childIds, depth + 1, items);
+    }
+    if (item.kind === "split") {
+      listSpaceItems(state, item.childIds, depth, items);
+    }
+  }
+  return items;
+}
+
 /**
  * Collects what the Library shows.
  */
@@ -205,11 +246,12 @@ function buildLibraryData(state: BrowserState): LibraryData {
       id: space.id,
       name: space.name,
       icon: space.icon,
-      color: space.theme.colors[0] ?? null,
+      theme: space.theme,
       pinnedCount: space.pinnedIds.length,
       todayCount: space.todayIds.length,
       profileName: state.profiles.find((profile) => profile.id === space.profileId)?.name ?? "",
       isActive: space.id === state.activeSpaceId,
+      items: listSpaceItems(state, space.pinnedIds, 0, []),
     })),
     boosts: (state.boosts ?? []).map((boost) => ({ site: boost.site, isEnabled: boost.isEnabled, zapCount: boost.zappedSelectors.length, hasCss: boost.css.trim() !== "" })),
     history: historyLines,
@@ -241,7 +283,16 @@ function buildLibraryData(state: BrowserState): LibraryData {
       iconUrl: getExtensionIconUrl(extension),
       loadError: extension.isEnabled ? getExtensionLoadError(extension.profileId, extension.id) : null,
     })),
+    newSpaceTheme: pickNewSpaceTheme(state),
   };
+}
+
+/**
+ * The theme a new Space gets: the next preset in turn, like the sidebar's + menu (menus.ts).
+ */
+function pickNewSpaceTheme(state: BrowserState): SpaceTheme {
+  const nextPreset = THEME_PRESETS[state.spaces.length % THEME_PRESETS.length] ?? THEME_PRESETS[0];
+  return { colors: nextPreset?.colors ?? ["#d9d4e9"], appearance: nextPreset?.appearance ?? "auto", grain: 0 };
 }
 
 /**
@@ -332,7 +383,10 @@ function openPanel(panel: OverlayPanel): void {
   const replacedPanel = shownPanel;
   shownPanel = panel;
   setNewTabPending(panel.kind === "commandBar" && panel.mode === "newTab");
-  // The Library takes the focused window's sidebar column; any other panel gives it back.
+  // The Library takes the focused window's sidebar column (as wide as its section needs); any other panel gives it back.
+  if (panel.kind === "library") {
+    setLibrarySection(panel.section);
+  }
   setLibraryWindow(panel.kind === "library" ? state.focusedWindowId : null);
   if (panel.kind !== "folderList") {
     stopWatchingFolderListPointer();
@@ -1124,6 +1178,14 @@ export function registerOverlayIpc(): void {
     if (isFromOverlay(event) && isOverlayRect(anchor)) {
       showSiteMenu(anchor);
     }
+  });
+  ipcMain.handle(OVERLAY_CHANNELS.librarySection, (event, section: unknown) => {
+    const isSection = typeof section === "string" && (LIBRARY_SECTIONS as readonly string[]).includes(section);
+    if (!isFromOverlay(event) || !isSection || shownPanel?.kind !== "library") {
+      return;
+    }
+    setLibrarySection(section as LibrarySection);
+    relayoutOverlay();
   });
   ipcMain.handle(OVERLAY_CHANNELS.peekCommand, (event, command: unknown) => {
     if (!isFromOverlay(event)) {

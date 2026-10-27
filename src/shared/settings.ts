@@ -170,6 +170,16 @@ export const LIBRARY_COLUMN_WIDTH_PX = 560;
 export const LIBRARY_RAIL_WIDTH_PX = 112;
 
 /*
+ * Library › Spaces lays every Space out as a column of its pinned items, with a round + after the last one, and the
+ * Library's column widens to hold them (Arc's, the user's screenshot 2026-10-27: about 160 pt columns 16 pt apart;
+ * ours are wider so titles fit). The page keeps at least LIBRARY_MIN_PAGE_WIDTH_PX; more Spaces scroll sideways.
+ */
+export const LIBRARY_SPACE_COLUMN_WIDTH_PX = 190;
+export const LIBRARY_SPACE_COLUMN_GAP_PX = 12;
+export const LIBRARY_ADD_SPACE_ROOM_PX = 56;
+export const LIBRARY_MIN_PAGE_WIDTH_PX = 360;
+
+/*
  * Arc's list of a closed folder's tabs (the user's recording, frame f0023): 245 pt wide, 4 pt right of the sidebar, a
  * 48 pt search row, 45 pt rows, at most 316 pt tall, centered on the folder's row but kept 18 pt from the window's
  * edges. It opens when the pointer rests on the folder and closes once the pointer has been away from the row and the

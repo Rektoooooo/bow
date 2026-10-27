@@ -364,10 +364,12 @@ export interface RuntimeState {
    */
   isWindowActive: boolean;
   /**
-   * True while this window's sidebar column shows the Library (Arc's): the column widens to LIBRARY_COLUMN_WIDTH_PX
-   * and the overlay draws the Library over it.
+   * True while this window's sidebar column shows the Library (Arc's): the column widens to libraryWidth and the
+   * overlay draws the Library over it.
    */
   isLibraryOpen: boolean;
+  /** The Library's column width in this window (layout.ts computeLibraryWidth: Spaces is wider). */
+  libraryWidth: number;
   /** The colour of each Favorite's icon, by icon address (shared/faviconColor.ts): the selected tile's border. */
   faviconAccents: Record<string, string>;
   /**

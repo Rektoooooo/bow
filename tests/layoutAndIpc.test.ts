@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { parseAction } from "../src/main/ipc";
-import { computeCardBounds, computePaneBounds } from "../src/main/layout";
+import { computeCardBounds, computeLibraryWidth, computePaneBounds } from "../src/main/layout";
 import { CARD_GAP_PX, CARD_INSET_PX, DEVELOPER_TOOLBAR_HEIGHT_PX, SIDEBAR_WIDTH_PX, SPLIT_GAP_PX, TOOLBAR_HEIGHT_PX } from "../src/shared/settings";
 
 describe("computeCardBounds", () => {
@@ -62,6 +62,18 @@ describe("computePaneBounds", () => {
 
     expect(panes[0]?.width).toBe(card.width);
     expect(panes[1]?.y).toBe(card.y + (panes[0]?.height ?? 0) + SPLIT_GAP_PX);
+  });
+});
+
+describe("the Library's column width", () => {
+  it("is the usual column in every section but Spaces", () => {
+    expect(computeLibraryWidth("settings", 3, 1440)).toBe(560);
+  });
+
+  it("holds a column per Space and the + in Spaces, as far as the page keeps 360 pt", () => {
+    expect(computeLibraryWidth("spaces", 3, 1440)).toBe(112 + 12 + 3 * 202 + 56);
+    expect(computeLibraryWidth("spaces", 8, 1440)).toBe(1440 - 7 - 10 - 360);
+    expect(computeLibraryWidth("spaces", 1, 1440)).toBe(560);
   });
 });
 

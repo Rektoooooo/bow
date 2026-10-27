@@ -17,7 +17,7 @@ import { app, BrowserWindow } from "electron";
 import type { Rectangle } from "electron";
 import * as path from "node:path";
 import type { WindowId } from "../shared/types";
-import { applyChange, attachWindow, detachWindow, getMainWindow, getState, getWindow, listMainWindows, relayoutWindow, scheduleRuntimePush } from "./browserCore";
+import { applyChange, attachWindow, detachWindow, getMainWindow, getState, getWindow, isLibraryOpenIn, listMainWindows, relayoutWindow, scheduleRuntimePush } from "./browserCore";
 import { closeOverlay, openCommandBar, relayoutOverlay } from "./overlayController";
 import { leaveWindow as overlayLeaveWindow } from "./overlay";
 import { closePeekIn, refreshPeekFrame, relayoutPeek } from "./peek";
@@ -126,6 +126,10 @@ function createMainWindow(windowId: WindowId, bounds: Rectangle | null): Browser
     relayoutOverlay();
     relayoutPeek();
     rememberWindowBounds(windowId, window);
+    // Library › Spaces is as wide as the window allows: the sidebar page's column follows.
+    if (isLibraryOpenIn(windowId)) {
+      scheduleRuntimePush();
+    }
   });
   window.on("move", () => rememberWindowBounds(windowId, window));
   window.on("focus", () => handleWindowFocus(windowId));

@@ -44,6 +44,7 @@ const CHANNELS: typeof OVERLAY_CHANNELS = {
   switcherCommit: "overlay:switcher-commit",
   chooseTab: "overlay:choose-tab",
   mediaCommand: "overlay:media-command",
+  librarySection: "overlay:library-section",
 };
 
 const DISPATCH_CHANNEL: (typeof IPC_CHANNELS)["dispatch"] = "browser:dispatch";
@@ -90,6 +91,7 @@ function createOverlayApi(): OverlayApi {
     captureRegion: (region) => ipcRenderer.invoke(CHANNELS.captureRegion, region),
     activateExtension: (extensionId, anchor) => ipcRenderer.invoke(CHANNELS.activateExtension, extensionId, anchor),
     showSiteMenu: (anchor) => ipcRenderer.invoke(CHANNELS.showSiteMenu, anchor),
+    setLibrarySection: (section) => ipcRenderer.invoke(CHANNELS.librarySection, section),
     getSymbols: () => ipcRenderer.invoke(SYMBOLS_CHANNEL),
   };
 }

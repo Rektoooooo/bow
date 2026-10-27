@@ -20,7 +20,9 @@ export type CommandBarResultKind = "navigate" | "search" | "tab" | "history" | "
 
 export type CommandBarMode = "newTab" | "editUrl" | "splitWith";
 
-export type LibrarySection = "archive" | "history" | "media" | "downloads" | "spaces" | "boosts" | "extensions" | "settings";
+export const LIBRARY_SECTIONS = ["archive", "history", "media", "downloads", "spaces", "boosts", "extensions", "settings"] as const;
+
+export type LibrarySection = (typeof LIBRARY_SECTIONS)[number];
 
 /** A screenshot or capture kept in the Library (captures.ts). */
 export interface MediaLine {
@@ -141,12 +143,25 @@ export interface LibrarySpace {
   id: string;
   name: string;
   icon: string;
-  /** The theme's first color, for a swatch. */
-  color: string | null;
+  /** The Space's theme: its column in Library › Spaces is painted like its frame. */
+  theme: SpaceTheme;
   pinnedCount: number;
   todayCount: number;
   profileName: string;
   isActive: boolean;
+  /** Its pinned folders and tabs in sidebar order, folders followed by what they hold (Arc's Spaces view). */
+  items: LibrarySpaceItem[];
+}
+
+/** One row of a Space's column in Library › Spaces. */
+export interface LibrarySpaceItem {
+  id: ItemId;
+  kind: "tab" | "folder";
+  title: string;
+  url: string;
+  faviconUrl: string | null;
+  /** 0 for the Space's own list, 1 inside a folder, and so on. */
+  depth: number;
 }
 
 /** A Boost as the Library lists it. */
@@ -172,6 +187,8 @@ export interface LibraryData {
   adBlock: { isOn: boolean; status: "off" | "loading" | "ready" | "failed"; filterCount: number };
   routingRules: RoutingRule[];
   extensions: ExtensionLine[];
+  /** The theme Library › Spaces' + gives a new Space (the next preset, like the sidebar's + menu). */
+  newSpaceTheme: SpaceTheme;
 }
 
 /** What the site controls show about the selected page. */
@@ -260,6 +277,8 @@ export interface OverlayApi {
   showSiteMenu(anchor: OverlayRect): Promise<void>;
   /** Library › Media: copy, show in Finder, save to Downloads or delete a picture. */
   mediaCommand(mediaId: string, command: MediaCommand): Promise<void>;
+  /** The Library shows another section (Spaces widens its column). */
+  setLibrarySection(section: LibrarySection): Promise<void>;
   /** The SF Symbols our icons use, rendered by macOS. */
   getSymbols(): Promise<Record<string, SymbolImage>>;
 }
@@ -288,4 +307,5 @@ export const OVERLAY_CHANNELS = {
   switcherCommit: "overlay:switcher-commit",
   chooseTab: "overlay:choose-tab",
   mediaCommand: "overlay:media-command",
+  librarySection: "overlay:library-section",
 } as const;

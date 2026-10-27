@@ -671,8 +671,13 @@ const mediaTiles = await overlay.$$eval(".media-tile img", (images) => images.le
 check("the capture shows in Library › Media with its thumbnail", mediaTiles === 1, String(mediaTiles));
 await overlay.click(".library-tab[data-section='spaces']");
 await overlay.waitForTimeout(200);
-const spaceLines = await overlay.$$eval(".space-line", (lines) => lines.length);
-check("Library › Spaces lists every Space", spaceLines === (await getState()).spaces.length, String(spaceLines));
+const spaceLines = await overlay.$$eval(".space-column", (columns) => columns.length);
+// Like Arc's, every Space is a column of what it has pinned, and the Library's column widens to hold them.
+const spacesWidth = await app.evaluate(({ BrowserWindow }) => {
+  const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  return win.contentView.children.find((child) => child.webContents?.getURL().endsWith("/overlay/overlay.html"))?.getBounds().width ?? 0;
+});
+check("Library › Spaces shows every Space as a column, in a wider Library", spaceLines === (await getState()).spaces.length && spacesWidth > 560, `${spaceLines} columns, ${spacesWidth} pt`);
 await overlay.click(".library-tab[data-section='boosts']");
 await overlay.waitForTimeout(200);
 const boostTitles = await overlay.$$eval(".library-line .library-line-title", (titles) => titles.map((title) => title.textContent));

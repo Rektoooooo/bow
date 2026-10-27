@@ -83,6 +83,8 @@ export const SYMBOL_NAMES = {
   moonStars: "moon.stars",
   chevronLeft: "chevron.left",
   minus: "minus",
+  // Library › Spaces: each Space's column has a pencil to edit it, like Arc's.
+  pencil: "pencil",
 } as const;
 
 /** An icon drawn from an SF Symbol. */

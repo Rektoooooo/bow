@@ -18,7 +18,7 @@
  */
 import { getHexLuminance } from "../shared/faviconColor.js";
 import type { SidebarCommand } from "../shared/actions.js";
-import { SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_WIDTH_PX } from "../shared/settings.js";
+import { LIBRARY_COLUMN_WIDTH_PX, SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_WIDTH_PX } from "../shared/settings.js";
 import type { BrowserState, ItemId, ItemLocation, RuntimeState, Space, SpaceId, TabItem } from "../shared/types";
 import { createActionButton, createElement, createFavicon, dispatch } from "./dom.js";
 import { installDragAndDrop, markListDropZone, onDragStateChanged, setItemDraggedInOtherWindow } from "./dragDrop.js";
@@ -60,6 +60,7 @@ let currentRuntime: RuntimeState = {
   extensionsBeingAdded: [],
   isWindowActive: true,
   isLibraryOpen: false,
+  libraryWidth: LIBRARY_COLUMN_WIDTH_PX,
   faviconAccents: {},
 };
 
@@ -488,6 +489,8 @@ function renderAll(): void {
   document.body.classList.toggle("sidebar-hidden", !state.settings.isSidebarVisible);
   document.body.classList.toggle("sidebar-peeking", currentRuntime.isSidebarPeeking);
   document.body.classList.toggle("library-open", currentRuntime.isLibraryOpen);
+  // Library › Spaces widens the column (main: computeLibraryWidth); sidebar.css glides it there.
+  document.body.style.setProperty("--library-width", `${currentRuntime.libraryWidth}px`);
   // An item dragged in another window shows this sidebar's drop places too (the Favorites end zone).
   document.body.classList.toggle("is-dragging", currentRuntime.itemDraggedInOtherWindow !== null);
   applySidebarWidth(draggedSidebarWidth ?? state.settings.sidebarWidth ?? SIDEBAR_WIDTH_PX);
