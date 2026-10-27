@@ -686,7 +686,7 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
   const importing = createSettingGroup("Import", [
     createSettingRow(
       "Bookmarks and history from another browser",
-      "Arc, Chrome, Brave, Edge, Vivaldi or Safari. Bookmarks arrive as a folder in this Space.",
+      "Arc, Chrome, Brave, Edge, Vivaldi, Firefox or Safari. Bookmarks arrive as a folder in this Space.",
       createTextButton("Import…", "library-chip", () => dispatch({ type: "showMenu", request: { menu: "import" } })),
     ),
   ]);

@@ -1,11 +1,12 @@
 /**
  * WHY this file exists:
- *   File › Import From Browser brings bookmarks and history from Chrome, Brave, Edge, Vivaldi, Chromium or Safari,
- *   like Arc's own importer. The readers (chromiumImport.ts, safariImport.ts) and the state change
- *   (bookmarkImport.ts) are separate; this file finds what can be imported, runs one import and reports it.
+ *   File › Import From Browser brings bookmarks and history from Chrome, Brave, Edge, Vivaldi, Chromium, Firefox or
+ *   Safari, like Arc's own importer. The readers (chromiumImport.ts, firefoxImport.ts, safariImport.ts) and the state
+ *   change (bookmarkImport.ts) are separate; this file finds what can be imported, runs one import and reports it.
  *
  * Data source:
- *   The browsers' profile folders under ~/Library/Application Support, and ~/Library/Safari (macOS only lets us read
+ *   The browsers' profile folders under ~/Library/Application Support (Firefox's listed in its profiles.ini), and
+ *   ~/Library/Safari (macOS only lets us read
  *   Safari's files with Full Disk Access).
  *
  * Data flow:
@@ -20,19 +21,22 @@ import { addImportedBookmarks, countBookmarks } from "./bookmarkImport";
 import type { ImportedBookmarkNode } from "./bookmarkImport";
 import { findChromiumProfiles, readChromiumBookmarks, readChromiumHistory } from "./chromiumImport";
 import type { ChromiumProfile } from "./chromiumImport";
+import { findFirefoxProfiles, readFirefoxBookmarks, readFirefoxHistory } from "./firefoxImport";
+import type { FirefoxProfile } from "./firefoxImport";
 import { importHistoryEntries } from "./historyStore";
 import { readSafariBookmarks, readSafariHistory } from "./safariImport";
 import { getActiveSpace } from "./tree";
 
 /** Something the user can import from, as the menus list it. */
 export interface ImportSource {
-  /** "safari", or "chromium:<browser>:<profile folder>". */
+  /** "safari", "chromium:<browser>:<profile folder>" or "firefox:<profile folder>". */
   id: string;
   label: string;
 }
 
 const SAFARI_SOURCE_ID = "safari";
 const CHROMIUM_SOURCE_PREFIX = "chromium:";
+const FIREFOX_SOURCE_PREFIX = "firefox:";
 
 /** Where macOS keeps Safari's files. */
 const SAFARI_FOLDER = path.join("Library", "Safari");
@@ -49,6 +53,12 @@ export function listImportSources(): ImportSource[] {
     id: `${CHROMIUM_SOURCE_PREFIX}${profile.browserId}:${profile.folderName}`,
     label: profile.displayName === profile.folderName ? profile.browserName : `${profile.browserName} — ${profile.displayName}`,
   }));
+  // One Firefox profile is just "Firefox"; several are told apart by their names.
+  const firefoxProfiles = findFirefoxProfiles(homeFolder);
+  for (const profile of firefoxProfiles) {
+    const label = firefoxProfiles.length === 1 ? "Firefox" : `Firefox — ${profile.displayName}`;
+    sources.push({ id: `${FIREFOX_SOURCE_PREFIX}${profile.folderName}`, label: label });
+  }
   if (fs.existsSync(path.join(homeFolder, SAFARI_FOLDER))) {
     sources.push({ id: SAFARI_SOURCE_ID, label: "Safari" });
   }
@@ -93,6 +103,15 @@ async function importChromiumProfile(profile: ChromiumProfile): Promise<void> {
   const bookmarkCount = addBookmarksToActiveSpace(`${profile.browserName} Bookmarks`, readChromiumBookmarks(profile));
   const historyCount = importHistoryEntries(await readChromiumHistory(profile));
   await showSummary(profile.browserName, bookmarkCount, historyCount);
+}
+
+/**
+ * Imports one Firefox profile.
+ */
+async function importFirefoxProfile(profile: FirefoxProfile): Promise<void> {
+  const bookmarkCount = addBookmarksToActiveSpace("Firefox Bookmarks", await readFirefoxBookmarks(profile));
+  const historyCount = importHistoryEntries(await readFirefoxHistory(profile));
+  await showSummary("Firefox", bookmarkCount, historyCount);
 }
 
 /**
@@ -146,6 +165,13 @@ async function importSafari(): Promise<void> {
 export async function importFromBrowser(sourceId: string): Promise<void> {
   if (sourceId === SAFARI_SOURCE_ID) {
     await importSafari();
+    return;
+  }
+  if (sourceId.startsWith(FIREFOX_SOURCE_PREFIX)) {
+    const firefoxProfile = findFirefoxProfiles(app.getPath("home")).find((candidate) => `${FIREFOX_SOURCE_PREFIX}${candidate.folderName}` === sourceId);
+    if (firefoxProfile !== undefined) {
+      await importFirefoxProfile(firefoxProfile);
+    }
     return;
   }
   const profile = findChromiumProfiles(app.getPath("home")).find((candidate) => `${CHROMIUM_SOURCE_PREFIX}${candidate.browserId}:${candidate.folderName}` === sourceId);

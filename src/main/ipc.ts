@@ -88,8 +88,11 @@ function isDeveloperTool(value: unknown): boolean {
   return value === "console" || value === "network" || value === "inspect";
 }
 
-/** An import source id from browserImportController.ts: "safari" or "chromium:<browser>:<profile folder>". */
-const IMPORT_SOURCE_PATTERN = /^(safari|chromium:[a-z]+:(Default|Profile \d+))$/;
+/**
+ * An import source id from browserImportController.ts: "safari", "chromium:<browser>:<profile folder>" or
+ * "firefox:<profile folder>" (Firefox names them like "abcd1234.default-release").
+ */
+const IMPORT_SOURCE_PATTERN = /^(safari|chromium:[a-z]+:(Default|Profile \d+)|firefox:[A-Za-z0-9][A-Za-z0-9._-]{0,99})$/;
 
 function isImportSource(value: unknown): boolean {
   return typeof value === "string" && IMPORT_SOURCE_PATTERN.test(value);

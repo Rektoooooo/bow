@@ -59,7 +59,7 @@ word for an arc.)
 **Coming from Arc?** **File › Import from Arc…** reads Arc's files on this Mac (read-only) and adds your Spaces,
 Favorites, pinned folders and tabs, Today tabs, Space themes, Arc's cached icons, your archive (newest 250), your
 browsing history and your Chrome Web Store extensions (copied, so they survive Arc; each keeps the on/off it had in
-Arc). Running it twice adds nothing twice. Chrome, Brave, Edge, Vivaldi and Safari can be imported too
+Arc). Running it twice adds nothing twice. Chrome, Brave, Edge, Vivaldi, Firefox and Safari can be imported too
 (Library › Settings).
 
 Bow keeps itself up to date: a few times a day it looks for a new release here on GitHub, downloads it in the
@@ -200,7 +200,7 @@ source never updates itself.
 **Library** (⇧⌘L): like Arc's, it takes the sidebar column (which widens for it) with a rail of sections: Media
 (screenshots and captures), Downloads, Spaces, Boosts, Archived Tabs (search, filter by reason, click to restore),
 History, Extensions and Settings (search engine: Google, DuckDuckGo, Bing, Brave Search or Kagi; ad blocking, app
-icon, import from Arc, Chrome, Brave, Edge, Vivaldi or Safari). The page stays usable beside it; ← or Esc closes it.
+icon, import from Arc, Chrome, Brave, Edge, Vivaldi, Firefox or Safari). The page stays usable beside it; ← or Esc closes it.
 
 **Also**: a short welcome tour on the first start, Handoff of the page you are reading to your other Apple devices,
 and alternate app icons for the Dock.
