@@ -92,7 +92,7 @@ export interface ArcImportReport {
   favoritesImported: number;
   /** Favorites skipped because a profile already had the most Favorites allowed. */
   favoritesDropped: number;
-  /** Folders (counted in foldersImported too) that Arc fills automatically from GitHub. They become plain folders. */
+  /** Folders (counted in foldersImported too) that Arc fills from GitHub. They become our GitHub live folders. */
   liveFolders: number;
   /** Items left out, by Arc's name for their kind, for example "easel" or "tabWithoutUrl". */
   skippedByKind: Record<string, number>;
@@ -456,8 +456,11 @@ function importFolder(context: ImportContext, arcItemId: string, arcItem: JsonOb
   }
 
   const listData = readObject(readObject(arcItem, "data"), "list");
-  const isLiveFolder = isJsonObject(listData) && isJsonObject(listData["automaticLiveFolderData"]);
-  if (isLiveFolder) {
+  const liveFolderData = isJsonObject(listData) ? listData["automaticLiveFolderData"] : undefined;
+  const dataSource = isJsonObject(liveFolderData) ? liveFolderData["dataSource"] : undefined;
+  // Arc's GitHub source ({"github": {}}) is your pull requests, read with your GitHub sign-in, like ours.
+  const isGitHubLiveFolder = isJsonObject(dataSource) && isJsonObject(dataSource["github"]);
+  if (isGitHubLiveFolder) {
     context.report.liveFolders += 1;
   }
 
@@ -470,6 +473,9 @@ function importFolder(context: ImportContext, arcItemId: string, arcItem: JsonOb
     childIds: childIds,
     isOpen: true,
   };
+  if (isGitHubLiveFolder) {
+    folder.live = { source: { kind: "github", list: "pullRequests" }, hiddenUrls: [] };
+  }
   context.items[folder.id] = folder;
   context.report.foldersImported += 1;
   return [folder.id];

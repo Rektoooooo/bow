@@ -43,7 +43,9 @@ function arcTab(id: string, url: string | null, options: { title?: string | null
 }
 
 function arcFolder(id: string, title: string | null, childrenIds: string[], isLive = false): ArcItemFixture {
-  const listData: Record<string, unknown> = isLive ? { automaticLiveFolderData: { github: {} } } : {};
+  // Arc's shape for its GitHub live folder (read from a real StorableSidebar.json; values made up).
+  const liveFolderData = { lastFetch: { timestamp: 800000000, status: { success: { _0: 800000000 } } }, hiddenItems: [], dataSource: { github: {} } };
+  const listData: Record<string, unknown> = isLive ? { automaticLiveFolderData: liveFolderData } : {};
   return { id: id, value: { id: id, title: title, childrenIds: childrenIds, data: { list: listData } } };
 }
 
@@ -292,6 +294,16 @@ describe("importing Pinned and Today items", () => {
     expect(split.childIds).toEqual(["arc-split-a", "arc-split-b"]);
     expect(split.orientation).toBe("vertical");
     expect(report.splitViewsImported).toBe(1);
+  });
+
+  it("makes Arc's GitHub live folder one of ours, and plain folders stay plain", () => {
+    const { state: imported } = importArcSidebar(buildTwoSpaceFile(), createInitialState(), ONE_PM);
+
+    const liveFolder = imported.items["arc-live"] as FolderItem;
+    expect(liveFolder.live).toEqual({ source: { kind: "github", list: "pullRequests" }, hiddenUrls: [] });
+    expect(liveFolder.childIds).toEqual(["arc-live-tab"]);
+    const plainFolder = imported.items["arc-outer"] as FolderItem;
+    expect(plainFolder.live).toBeUndefined();
   });
 
   it("counts live folders, unknown kinds and tabs without a URL", () => {

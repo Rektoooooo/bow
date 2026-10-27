@@ -14,8 +14,8 @@
  *   - When nothing changes, return the same state object, so main.ts can skip saving.
  *   - `now` is always a parameter; nothing here reads the clock.
  */
-import { ARCHIVE_LIMIT, DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_LIMIT, SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX } from "../shared/settings";
-import type { ArchiveReason, ArchivedTab, BrowserState, FolderItem, ItemId, ItemLocation, Space, SpaceId, TabItem } from "../shared/types";
+import { ARCHIVE_LIMIT, DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_LIMIT, LIVE_FOLDER_HIDDEN_LIMIT, SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX } from "../shared/settings";
+import type { ArchiveReason, ArchivedTab, BrowserState, FolderItem, ItemId, ItemLocation, LiveFolderData, Space, SpaceId, TabItem } from "../shared/types";
 import { createNoteUrl, NEW_NOTE_TITLE } from "../shared/notes";
 import { createEaselUrl, NEW_EASEL_TITLE } from "../shared/easels";
 import {
@@ -332,6 +332,7 @@ export function addToFavorites(state: BrowserState, tabId: ItemId): BrowserState
  *   - Favorites and split views hold only tabs.
  *   - Today holds tabs and split views (folders live in Pinned).
  *   - A folder cannot go inside itself.
+ *   - Nothing goes into a live folder: its source decides what it holds, and in which order.
  */
 function canPlace(state: BrowserState, itemId: ItemId, target: ItemLocation): boolean {
   const item = state.items[itemId];
@@ -345,7 +346,9 @@ function canPlace(state: BrowserState, itemId: ItemId, target: ItemLocation): bo
     return item.kind !== "folder";
   }
   if (target.kind === "folder") {
-    return !isSameOrDescendant(state, itemId, target.folderId);
+    const targetFolder = state.items[target.folderId];
+    const isLiveFolder = targetFolder !== undefined && targetFolder.kind === "folder" && targetFolder.live !== undefined;
+    return !isLiveFolder && !isSameOrDescendant(state, itemId, target.folderId);
   }
   return true;
 }
@@ -427,10 +430,14 @@ function updateHomeUrlForRoot(state: BrowserState, tabId: ItemId, root: ItemLoca
 }
 
 /**
- * Adds an empty, open folder at the bottom of the active Space's Pinned list.
+ * Adds an empty, open folder at the bottom of the active Space's Pinned list. With `live`, it is a live folder that
+ * liveFolders.ts fills from its source.
  */
-export function createFolder(state: BrowserState, title: string, now: number): BrowserState {
+export function createFolder(state: BrowserState, title: string, now: number, live?: LiveFolderData): BrowserState {
   const folder: FolderItem = { kind: "folder", id: createId("folder", now), title: title, childIds: [], isOpen: true };
+  if (live !== undefined) {
+    folder.live = live;
+  }
   const stateWithItem: BrowserState = { ...state, items: { ...state.items, [folder.id]: folder } };
   const pinnedLocation: ItemLocation = { kind: "pinned", spaceId: state.activeSpaceId };
   const pinnedIds = getIdsAt(stateWithItem, pinnedLocation);
@@ -643,7 +650,28 @@ export function resetPinnedTab(state: BrowserState, tabId: ItemId): BrowserState
 }
 
 /**
+ * A tab removed from a live folder stays removed: its address joins the folder's hidden list, so the next refresh
+ * does not bring it back. Tabs anywhere else are left alone.
+ */
+function hideFromLiveFolder(state: BrowserState, tab: TabItem): BrowserState {
+  const location = findLocation(state, tab.id);
+  if (location === null || location.kind !== "folder") {
+    return state;
+  }
+  const folder = state.items[location.folderId];
+  if (folder === undefined || folder.kind !== "folder" || folder.live === undefined) {
+    return state;
+  }
+  const address = tab.homeUrl ?? tab.url;
+  const otherHiddenUrls = folder.live.hiddenUrls.filter((hiddenUrl) => hiddenUrl !== address);
+  const hiddenUrls = [address, ...otherHiddenUrls].slice(0, LIVE_FOLDER_HIDDEN_LIMIT);
+  const changedFolder: FolderItem = { ...folder, live: { ...folder.live, hiddenUrls: hiddenUrls } };
+  return { ...state, items: { ...state.items, [folder.id]: changedFolder } };
+}
+
+/**
  * Removes an item for good: its tabs go to the archive ("manual") and any folders or split views inside are deleted.
+ * A live folder's tabs are deleted without archiving; a tab removed from a live folder is hidden from its source.
  */
 export function deleteItem(state: BrowserState, itemId: ItemId, now: number): BrowserState {
   const item = state.items[itemId];
@@ -651,10 +679,16 @@ export function deleteItem(state: BrowserState, itemId: ItemId, now: number): Br
     return state;
   }
   if (item.kind === "tab") {
-    return moveTabsToArchive(state, [itemId], now, "manual");
+    const stateWithHiddenUrl = hideFromLiveFolder(state, item);
+    return moveTabsToArchive(stateWithHiddenUrl, [itemId], now, "manual");
   }
 
   const tabIds = collectTabIds(state, itemId);
+  if (item.kind === "folder" && item.live !== undefined) {
+    // A live folder's tabs came from its source, not from the user: they leave without filling the Archive.
+    const stateWithoutFolder = deleteItems(removeFromLocation(state, itemId), [itemId, ...tabIds]);
+    return repairSelections(stateWithoutFolder);
+  }
   const containerIds = collectContainerIds(state, itemId);
   const archivedState = moveTabsToArchive(state, tabIds, now, "manual");
   const stateWithoutItem = removeFromLocation(archivedState, itemId);

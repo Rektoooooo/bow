@@ -54,6 +54,7 @@ import { initializePeek, openPeek, relayoutPeek } from "./peek";
 import { createOverlayView, getOverlayContents } from "./overlay";
 import { openWelcome, refreshOpenPanel, registerOverlayIpc, relayoutOverlay, setCommandActionRegistry } from "./overlayController";
 import { startHandoff } from "./handoff";
+import { noticeVisitedPage, startLiveFolderRefreshing } from "./liveFolderRefresher";
 import { onProfileSessionCreated, restrictWebPermissions, useChromeUserAgent } from "./profiles";
 import { moveTabsToArchive, setNoteTitle, updateTabFavicon, updateTabPage } from "./state";
 import { getStateFilePath } from "./store";
@@ -111,7 +112,10 @@ const tabViewEvents: TabViewEvents = {
     applyChange((state) => updateTabPage(state, tabId, url, title, isOnScreen));
     setVisitTitle(url, title);
   },
-  onNavigated: (url, title) => addVisit(url, title, Date.now()),
+  onNavigated: (url, title) => {
+    addVisit(url, title, Date.now());
+    noticeVisitedPage(url);
+  },
   onFaviconChanged: (tabId, faviconUrl) => applyChange((state) => updateTabFavicon(state, tabId, faviconUrl)),
   onRuntimeChanged: () => scheduleRuntimePush(),
   onOpenInNewTab: (tabId, url, disposition) => {
@@ -359,6 +363,7 @@ async function handleAppReady(): Promise<void> {
   pruneOldArchiveEntries();
   startAutoArchiveTimers();
   startExtensionUpdates();
+  startLiveFolderRefreshing();
   startHandoff();
   if (isFirstStart && getState().settings.hasSeenWelcome !== true) {
     // Once the sidebar has drawn, so the tour opens over a finished window.

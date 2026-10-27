@@ -98,6 +98,11 @@ function isAppIconVariant(value: unknown): boolean {
   return APP_ICON_VARIANTS.some((variant) => variant.id === value);
 }
 
+/** The GitHub lists a live folder can show (types.ts GitHubLiveList). */
+function isGitHubLiveList(value: unknown): boolean {
+  return value === "pullRequests" || value === "reviewRequests" || value === "assignedIssues";
+}
+
 function isToolbarSiteCommand(value: unknown): boolean {
   return value === "copyLink" || value === "capture" || value === "screenshot";
 }
@@ -293,6 +298,11 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   finishWelcome: {},
   setAsDefaultBrowser: {},
   translatePage: {},
+  createGitHubLiveFolder: { list: isGitHubLiveList },
+  createFeedLiveFolder: {},
+  refreshLiveFolder: { folderId: isText },
+  openLiveFolderSource: { folderId: isText },
+  showHiddenLiveFolderItems: { folderId: isText },
 };
 
 /**

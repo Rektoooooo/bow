@@ -84,7 +84,7 @@ Item kinds (`data` keys):
 | Kind | Payload | Notes |
 |---|---|---|
 | `tab` | `savedURL`, `savedTitle`, `timeLastActiveAt`, `savedMuteStatus` (`allowAudio` / `mute`), `activeTabBeforeCreationID`, `referrerID` | `savedTitle` is the page title; `savedURL` is the pinned "home" URL for Pinned and Favorite tabs. **(binary)** also `savedFavicon`, `liveItemID`, `tabType` |
-| `list` | `{}`; optional `customInfo.iconType`, `automaticLiveFolderData` | **A folder.** With `automaticLiveFolderData` it is a *live folder* filled from a data source (`{"github": {…}}`: pull requests), with `lastFetch` status and `hiddenItems` |
+| `list` | `{}`; optional `customInfo.iconType`, `automaticLiveFolderData` | **A folder.** With `automaticLiveFolderData` it is a *live folder* filled from a data source (`dataSource: {"github": {}}`: your pull requests), with `lastFetch` (`timestamp`, `status: {success}` or `{error: {refreshError: {github: {unexpectedPageStructure}}, isPersistent}}`) and `hiddenItems`; `customInfo.iconType` is `{icon: "github"}`. The error shows Arc reads github.com's page itself, signed in as you |
 | `itemContainer` | `containerType`: `{"spaceItems": {"_0": spaceId}}` or `{"topApps": {"_0": ProfileKey}}` | The roots: each Space has a pinned and an unpinned container, each profile has one Favorites ("top apps") container |
 | `splitView` **(binary)** | `layoutOrientation` (`horizontal` / `vertical`), `itemWidthFactors`, `focusItemID` | Children are ordinary tab items |
 | `easel`, `arcDocument`, `tabGroup`, `sharedObject`, `instantLinks`, `archiveContent`, `download`, `arcSearch`, `welcomeToArc` **(binary)** | — | Not in the user's data |

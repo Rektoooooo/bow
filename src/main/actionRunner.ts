@@ -32,6 +32,8 @@ import { hideTabPreview, openBoostEditor, openCommandBar, openLibrary, openSiteC
 import { setDeveloperMode } from "../shared/developerMode";
 import { openDeveloperTool, translatePage } from "./pageCommands";
 import { setAsDefaultBrowser } from "./defaultBrowser";
+import { createFeedLiveFolderFromPage, createGitHubLiveFolder, openLiveFolderSource, refreshLiveFolder } from "./liveFolderRefresher";
+import { showHiddenLiveFolderItems } from "./liveFolders";
 import { setSplitOrientation, separateTabFromSplit, splitTabs, unsplit } from "./split";
 import {
   addToFavorites,
@@ -331,6 +333,19 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => setSoundEffects(state, action.isOn));
     case "importFromBrowser":
       importFromBrowser(action.sourceId).catch((error) => console.error("Import from browser failed:", error));
+      return;
+    case "createGitHubLiveFolder":
+      return createGitHubLiveFolder(action.list);
+    case "createFeedLiveFolder":
+      createFeedLiveFolderFromPage().catch((error) => console.error("Making a feed live folder failed:", error));
+      return;
+    case "refreshLiveFolder":
+      return refreshLiveFolder(action.folderId);
+    case "openLiveFolderSource":
+      return openLiveFolderSource(action.folderId);
+    case "showHiddenLiveFolderItems":
+      applyChange((state) => showHiddenLiveFolderItems(state, action.folderId));
+      refreshLiveFolder(action.folderId);
       return;
   }
 }

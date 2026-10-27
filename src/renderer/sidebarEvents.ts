@@ -7,7 +7,8 @@
  * Data source:
  *   Data attributes set by rows.ts, sidebar.ts and toolbar.ts:
  *   - `data-action` on buttons ("close-tab", "switch-space", "navigate", …) with `data-item-id`, `data-space-id`, …
- *   - `data-row` on rows and tiles ("tab", "favorite", "folder", "split-pane", "space-title", "new-tab")
+ *   - `data-row` on rows and tiles ("tab", "favorite", "folder", "split-pane", "space-title", "new-tab",
+ *     "live-status" with `data-live-action`)
  *
  * Data flow:
  *   click / double-click / right-click / middle-click / Enter → find the element → dispatch(action), or tell
@@ -126,6 +127,21 @@ function runRowClick(row: HTMLElement): void {
       return dispatch({ type: "setPinnedSectionOpen", spaceId: data.spaceId ?? "", isOpen: data.pinnedOpen !== "true" });
     case "new-tab":
       return dispatch({ type: "openCommandBar", mode: "newTab" });
+    case "live-status":
+      return runLiveStatusClick(data.itemId ?? "", data.liveAction ?? "");
+  }
+}
+
+/**
+ * A live folder's status line: "Sign in to GitHub" opens the folder's list page (GitHub asks to sign in there),
+ * "Try again" refreshes. Other lines do nothing.
+ */
+function runLiveStatusClick(folderId: string, liveAction: string): void {
+  if (liveAction === "sign-in") {
+    dispatch({ type: "openLiveFolderSource", folderId: folderId });
+  }
+  if (liveAction === "retry") {
+    dispatch({ type: "refreshLiveFolder", folderId: folderId });
   }
 }
 

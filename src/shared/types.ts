@@ -59,6 +59,32 @@ export interface FolderItem {
   childIds: ItemId[];
   /** True when the folder is expanded in the sidebar. */
   isOpen: boolean;
+  /**
+   * Set when the folder is a live folder that fills itself (Arc's `automaticLiveFolderData`). Optional: plain folders
+   * have none, and files saved before live folders existed still load without an upgrade step.
+   */
+  live?: LiveFolderData;
+}
+
+/** The GitHub lists a live folder can show: the signed-in user's lists on github.com/pulls and github.com/issues. */
+export type GitHubLiveList = "pullRequests" | "reviewRequests" | "assignedIssues";
+
+/** Where a live folder's tabs come from. */
+export type LiveFolderSource = { kind: "github"; list: GitHubLiveList } | { kind: "feed"; url: string };
+
+/** What makes a folder live. Only what must survive a restart; how the last refresh went is a RuntimeState fact. */
+export interface LiveFolderData {
+  source: LiveFolderSource;
+  /** Addresses the user removed from the folder. Refreshes never bring them back (Arc's `hiddenItems`). */
+  hiddenUrls: string[];
+}
+
+/** How a live folder's last refresh went, for its status line in the sidebar. */
+export interface LiveFolderStatus {
+  /** "signedOut": GitHub asked to sign in. "failed": the source could not be read. */
+  state: "loading" | "ok" | "signedOut" | "failed";
+  /** When the last refresh finished, in milliseconds since 1970, or null while the first one runs. */
+  checkedAt: number | null;
 }
 
 /** Side-by-side or stacked panes. */
@@ -271,6 +297,8 @@ export interface RuntimeState {
   media: MediaInfo | null;
   /** True while the Command Bar is open to make a new tab: "New Tab" is highlighted instead of the tab, like Arc. */
   isNewTabPending: boolean;
+  /** How each live folder's last refresh went, by folder id. Folders not refreshed since the start are missing. */
+  liveFolders: Record<ItemId, LiveFolderStatus>;
 }
 
 /** What the sidebar's small media player shows. */

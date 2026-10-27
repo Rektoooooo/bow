@@ -69,6 +69,8 @@ export const SYMBOL_NAMES = {
   terminal: "apple.terminal",
   network: "network",
   scope: "scope",
+  person: "person.crop.circle",
+  warning: "exclamationmark.triangle",
 } as const;
 
 /** An icon drawn from an SF Symbol. */

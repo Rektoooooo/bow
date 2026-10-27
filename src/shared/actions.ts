@@ -10,7 +10,7 @@
  * Data flow:
  *   sidebar.ts → window.browserApi.dispatch(action) → preload → ipc.ts parseAction() → main.ts runAction()
  */
-import type { ItemId, ItemLocation, RoutingMatchType, SitePermissionKind, SpaceId, SpaceTheme, SplitOrientation } from "./types";
+import type { GitHubLiveList, ItemId, ItemLocation, RoutingMatchType, SitePermissionKind, SpaceId, SpaceTheme, SplitOrientation } from "./types";
 
 /** Toolbar and keyboard navigation commands for the page on screen. */
 export type NavigationCommand = "back" | "forward" | "reload" | "stop" | "hardReload" | "emptyCacheAndReload";
@@ -121,7 +121,12 @@ export type BrowserAction =
   | { type: "createEasel" }
   | { type: "finishWelcome" }
   | { type: "setAsDefaultBrowser" }
-  | { type: "translatePage" };
+  | { type: "translatePage" }
+  | { type: "createGitHubLiveFolder"; list: GitHubLiveList }
+  | { type: "createFeedLiveFolder" }
+  | { type: "refreshLiveFolder"; folderId: ItemId }
+  | { type: "openLiveFolderSource"; folderId: ItemId }
+  | { type: "showHiddenLiveFolderItems"; folderId: ItemId };
 
 /** Every action type, for checking an incoming `type` string. */
 export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
@@ -202,4 +207,9 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "finishWelcome",
   "setAsDefaultBrowser",
   "translatePage",
+  "createGitHubLiveFolder",
+  "createFeedLiveFolder",
+  "refreshLiveFolder",
+  "openLiveFolderSource",
+  "showHiddenLiveFolderItems",
 ];

@@ -50,6 +50,11 @@ in Arc). Running it twice adds nothing twice.
 - A small player for a tab playing sound in the background.
 - Rest the pointer on a tab to see a preview of its page; ⌃Tab shows the recently used tabs as cards with pictures.
 - Pinned tabs show tidy titles ("Inbox" rather than "(3) Inbox - Mail"), our own rules (Library › Settings).
+- **Live folders** (+ › New Live Folder) fill themselves, like Arc's: your open GitHub pull requests, review requests
+  or assigned issues (read from github.com with the Space's own GitHub sign-in: no token, private repositories
+  included), or the posts of the page's RSS/Atom feed. They refresh every 10 minutes; new items get a dot, items
+  you remove stay hidden (folder menu › Show Removed Items), the page you are reading never disappears. An Arc
+  import keeps Arc's GitHub live folder live.
 - The look is measured from Arc pixel by pixel (`node e2e/arc-compare.mjs` puts them side by side): Apple's SF
   Symbols, Arc's frame colors from a Space's theme and intensity, the toolbar inside the page card tinted with the
   page's own color, and motion that glides (the page moves with the sidebar).

@@ -128,6 +128,9 @@ Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 �
 - [x] Translate page (Google Translate, labelled) · [x] Handoff (unverified: needs signing and a second device)
 - [x] Import from Chrome/Brave/Edge/Vivaldi/Safari (bookmarks + history; no passwords) · [x] First-run welcome
 - [x] Developer Mode (shot 5)
+- [x] Live folders: GitHub pull requests / review requests / assigned issues (read with the profile's GitHub sign-in,
+      HTML first, hidden window for script-drawn lists; verified on a real public GitHub list), RSS/Atom/JSON feeds
+      from the page on screen; Arc import keeps Arc's GitHub live folder live
 - Not doing (documented): Arc Max (user's choice), sync/sharing/accounts (user's choice), AppleScript and
   password-manager bridges (need native code), auto-updates (needs published releases: ask first)
 

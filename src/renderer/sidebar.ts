@@ -45,7 +45,7 @@ const SWIPE_COOLDOWN_MS = 450;
 
 /** The newest state and runtime facts received. */
 let currentState: BrowserState | null = null;
-let currentRuntime: RuntimeState = { tabs: {}, activeDownloadCount: 0, isSidebarPeeking: false, media: null, isNewTabPending: false };
+let currentRuntime: RuntimeState = { tabs: {}, activeDownloadCount: 0, isSidebarPeeking: false, media: null, isNewTabPending: false, liveFolders: {} };
 
 /** The sidebar item, Space name or Space icon being edited inline, or null. */
 let renamingItemId: ItemId | null = null;

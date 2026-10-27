@@ -17,7 +17,7 @@ import type { BrowserWindow } from "electron";
 import type { SidebarCommand } from "../shared/actions";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
 import { SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_WIDTH_PX } from "../shared/settings";
-import type { BrowserState, ItemId, RuntimeState } from "../shared/types";
+import type { BrowserState, ItemId, LiveFolderStatus, RuntimeState } from "../shared/types";
 import { getActiveDownloadCount } from "./downloads";
 import { findMediaInfo, handleShownTabsChanged } from "./media";
 import type { CardLayoutOptions } from "./layout";
@@ -58,6 +58,9 @@ let isSidebarPeeking = false;
 
 /** True while the Command Bar is open to make a new tab (RuntimeState.isNewTabPending). */
 let isNewTabPending = false;
+
+/** How each live folder's last refresh went (RuntimeState.liveFolders); liveFolderRefresher.ts sets them. */
+const liveFolderStatuses = new Map<ItemId, LiveFolderStatus>();
 
 /** The sidebar width while its edge is being dragged; null otherwise (the saved width applies). */
 let previewSidebarWidth: number | null = null;
@@ -235,7 +238,27 @@ export function collectRuntimeState(): RuntimeState {
     isSidebarPeeking: isSidebarPeeking,
     media: findMediaInfo(tabs, getShownTabIds()),
     isNewTabPending: isNewTabPending,
+    liveFolders: getLiveFolderStatuses(),
   };
+}
+
+/**
+ * How every live folder's last refresh went, by folder id.
+ */
+export function getLiveFolderStatuses(): Record<ItemId, LiveFolderStatus> {
+  return Object.fromEntries(liveFolderStatuses);
+}
+
+/**
+ * Records how a live folder's refresh went (null forgets a deleted folder) and tells the sidebar.
+ */
+export function setLiveFolderStatus(folderId: ItemId, status: LiveFolderStatus | null): void {
+  if (status === null) {
+    liveFolderStatuses.delete(folderId);
+  } else {
+    liveFolderStatuses.set(folderId, status);
+  }
+  scheduleRuntimePush();
 }
 
 /**

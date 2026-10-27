@@ -451,6 +451,7 @@ const FEATURES = [
   ["org","Profiles per Space","","A Space can use its own profile, with separate logins, cookies and history.","One storage partition per profile: Electron session partitions, WKWebsiteDataStore, or Chromium profiles.","ARC_ProfilesUI","observe"],
   ["org","Favorites","","Icon grid at the top of the sidebar, shared by every Space, with unread badges such as a mail count.","A global item list. Read badge counts from a \"(3)\" title prefix or the favicon, then check against the badging provider.","Browser/Sidebar/AppTrayBadgingProvider, ARC_AppTray","observe"],
   ["org","Pinned tabs & folders","⌘D","A per-Space tree of pinned tabs and nested folders. A pinned tab remembers its home URL and can reset to it.","A tree of nodes that store both the home URL and the current URL. Model it on the schema in StorableSidebar.json.","ARC_StorableSidebar","static"],
+  ["org","Live folders","","Folders that fill themselves: your open GitHub pull requests, review requests or assigned issues, read with your GitHub sign-in. New items get a dot; ones you remove stay hidden; closed ones leave.","A folder with a data source, a refresh timer and a hidden-items list. Arc reads github.com as you: its stored error <code>unexpectedPageStructure</code> shows it scrapes the page, so read links by address shape, not markup.","StorableSidebar automaticLiveFolderData {dataSource, lastFetch, hiddenItems}","static"],
   ["org","Today tabs & auto-archive","⌘⇧K","Unpinned tabs move to the Archive after 1 hour, 6 hours, 12 hours, 24 hours, 7 days or 30 days without use, or never. Little Arc windows have their own setting, and each profile can have its own.","A last-active date per tab, refreshed on a timer, and a sweeper on a second timer. See the auto-archive teardown below.","ARC/Sources/Archive/ArchiveState+AutoArchive.swift","binary"],
   ["org","Archive","⌘⇧T","Auto-closed tabs go to a searchable archive instead of disappearing.","Store closed tabs with title, URL, Space and time, and search them from the Command Bar.","ARC_HomeButton archive.json","observe"],
   ["org","Tidy titles","","Pinned tabs show cleaner names for common sites such as Gmail, Figma and Notion.","Per-domain regex rules applied to document.title. Write your own rules.","web_content_behavior.json tidyTitles (24 domains)","static"],
@@ -506,7 +507,7 @@ const FEATURES = [
 const BUILT = {
   "Vertical sidebar":"built", "Inset web card":"built", "Split View":"built", "Space themes & grain":"built",
   "Glow loading indicator":"built", "Link status text":"built", "Crashed-tab page":"built", "Tab hover previews":"built",
-  "Spaces":"built", "Profiles per Space":"built", "Favorites":"built", "Pinned tabs & folders":"built",
+  "Spaces":"built", "Profiles per Space":"built", "Favorites":"built", "Pinned tabs & folders":"built", "Live folders":"built",
   "Today tabs & auto-archive":"built", "Archive":"built", "Sidebar restore":"built", "Tidy titles":"built",
   "Command Bar":"built", "URL autocomplete":"built", "Recent-tab switcher":"built", "Copy URL":"built", "Context menus":"built",
   "Little Arc":"built", "Peek":"built", "Auto picture-in-picture":"built", "Media controls":"built",

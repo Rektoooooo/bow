@@ -14,7 +14,7 @@
 import { app, clipboard, dialog, Menu } from "electron";
 import type { BrowserWindow, ContextMenuParams, MenuItem, MenuItemConstructorOptions, WebContents } from "electron";
 import type { BrowserAction, MenuRequest, SidebarCommand } from "../shared/actions";
-import type { BrowserState, ItemId, Space, TabItem } from "../shared/types";
+import type { BrowserState, FolderItem, ItemId, Space, TabItem } from "../shared/types";
 import { getSelectedTabId, listVisibleTabIds } from "./state";
 import { applyPreset, GRAIN_CHOICES, THEME_PRESETS } from "./themePresets";
 import { findLocation, findRootLocation, findSpace, findSplitOfTab, findTab } from "./tree";
@@ -158,9 +158,14 @@ function buildCloseItems(host: MenuHost, tab: TabItem): MenuItemConstructorOptio
   if (isToday) {
     return [{ label: "Close Tab", accelerator: "CommandOrControl+W", click: () => host.runAction({ type: "closeTab", tabId: tab.id }) }];
   }
+  const location = findLocation(state, tab.id);
+  const parentFolder = location !== null && location.kind === "folder" ? state.items[location.folderId] : undefined;
+  const isInLiveFolder = parentFolder !== undefined && parentFolder.kind === "folder" && parentFolder.live !== undefined;
+  // A live folder's item leaves for good (its source would bring it back): "Remove", not "Delete".
+  const deleteLabel = isInLiveFolder ? "Remove from Live Folder" : "Delete (Move to Archive)";
   return [
     { label: "Close Page", enabled: host.isTabLoaded(tab.id), click: () => host.runAction({ type: "closeTab", tabId: tab.id }) },
-    { label: "Delete (Move to Archive)", click: () => host.runAction({ type: "deleteItem", itemId: tab.id }) },
+    { label: deleteLabel, click: () => host.runAction({ type: "deleteItem", itemId: tab.id }) },
   ];
 }
 
@@ -188,15 +193,43 @@ function buildTabMenu(host: MenuHost, tab: TabItem): MenuItemConstructorOptions[
 }
 
 /**
- * The menu for a folder row.
+ * The menu for a folder row. A live folder adds "Refresh Now" and, once you removed items, "Show Removed Items";
+ * deleting it does not fill the Archive (its tabs came from its source).
  */
-function buildFolderMenu(host: MenuHost, folderId: ItemId, isOpen: boolean): MenuItemConstructorOptions[] {
-  return [
+function buildFolderMenu(host: MenuHost, folder: FolderItem): MenuItemConstructorOptions[] {
+  const folderId = folder.id;
+  const template: MenuItemConstructorOptions[] = [
     { label: "Rename…", click: () => host.sendSidebarCommand({ kind: "beginRename", itemId: folderId }) },
-    { label: isOpen ? "Collapse Folder" : "Expand Folder", click: () => host.runAction({ type: "toggleFolder", folderId: folderId }) },
+    { label: folder.isOpen ? "Collapse Folder" : "Expand Folder", click: () => host.runAction({ type: "toggleFolder", folderId: folderId }) },
     buildMoveToSpaceMenu(host, folderId),
+  ];
+  if (folder.live === undefined) {
+    template.push({ type: "separator" });
+    template.push({ label: "Delete Folder (Tabs Move to Archive)", click: () => host.runAction({ type: "deleteItem", itemId: folderId }) });
+    return template;
+  }
+  template.push({ type: "separator" });
+  template.push({ label: "Refresh Now", click: () => host.runAction({ type: "refreshLiveFolder", folderId: folderId }) });
+  template.push({
+    label: "Show Removed Items",
+    enabled: folder.live.hiddenUrls.length > 0,
+    click: () => host.runAction({ type: "showHiddenLiveFolderItems", folderId: folderId }),
+  });
+  template.push({ type: "separator" });
+  template.push({ label: "Delete Live Folder", click: () => host.runAction({ type: "deleteItem", itemId: folderId }) });
+  return template;
+}
+
+/**
+ * The + menu's "New Live Folder" submenu: one of the user's GitHub lists, or the feed of the page on screen.
+ */
+function buildLiveFolderMenu(host: MenuHost): MenuItemConstructorOptions[] {
+  return [
+    { label: "GitHub Pull Requests", click: () => host.runAction({ type: "createGitHubLiveFolder", list: "pullRequests" }) },
+    { label: "GitHub Review Requests", click: () => host.runAction({ type: "createGitHubLiveFolder", list: "reviewRequests" }) },
+    { label: "GitHub Issues Assigned to You", click: () => host.runAction({ type: "createGitHubLiveFolder", list: "assignedIssues" }) },
     { type: "separator" },
-    { label: "Delete Folder (Tabs Move to Archive)", click: () => host.runAction({ type: "deleteItem", itemId: folderId }) },
+    { label: "Feed from This Page", click: () => host.runAction({ type: "createFeedLiveFolder" }) },
   ];
 }
 
@@ -318,6 +351,7 @@ function buildPlusMenu(host: MenuHost): MenuItemConstructorOptions[] {
     { label: "New Note", click: () => host.runAction({ type: "createNote" }) },
     { label: "New Easel", click: () => host.runAction({ type: "createEasel" }) },
     { label: "New Folder", click: () => host.runAction({ type: "createFolder", title: "New Folder" }) },
+    { label: "New Live Folder", submenu: buildLiveFolderMenu(host) },
     {
       label: "New Space",
       click: () => host.runAction({ type: "createSpace", name: "New Space", icon: "✦", theme: newTheme }),
@@ -374,7 +408,7 @@ export function showMenuRequest(host: MenuHost, request: MenuRequest): void {
       popUp(host, buildTabMenu(host, item));
     }
     if (item?.kind === "folder") {
-      popUp(host, buildFolderMenu(host, item.id, item.isOpen));
+      popUp(host, buildFolderMenu(host, item));
     }
   }
 }

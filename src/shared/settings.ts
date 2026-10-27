@@ -113,3 +113,15 @@ export const EXTENSION_UPDATE_FIRST_CHECK_MS = 60 * 1000;
 
 /** Then extensions are checked for updates this often. Chrome's default interval is about 5 hours. */
 export const EXTENSION_UPDATE_INTERVAL_MS = 5 * 60 * 60 * 1000;
+
+/** Live folders refresh this often. Our choice; Arc does not document its interval. */
+export const LIVE_FOLDER_REFRESH_MS = 10 * 60 * 1000;
+
+/** The first refresh of every live folder runs this long after startup, so it never slows the start. Our choice. */
+export const LIVE_FOLDER_FIRST_REFRESH_MS = 15 * 1000;
+
+/** A live folder shows at most this many items, newest first. Our choice: a feed can list hundreds. */
+export const LIVE_FOLDER_ITEM_LIMIT = 30;
+
+/** A live folder remembers at most this many removed addresses (the newest). Our choice, keeps the saved file small. */
+export const LIVE_FOLDER_HIDDEN_LIMIT = 200;

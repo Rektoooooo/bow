@@ -14,7 +14,7 @@
  * Rule: no event listeners here (morph.ts keeps elements across redraws, so a listener would remember stale data).
  * The one exception is the rename field, which morphing never replaces while it has the focus.
  */
-import type { BrowserState, FolderItem, ItemId, ItemLocation, RuntimeState, SidebarItem, SplitItem, TabItem } from "../shared/types";
+import type { BrowserState, FolderItem, ItemId, ItemLocation, LiveFolderSource, LiveFolderStatus, RuntimeState, SidebarItem, SplitItem, TabItem } from "../shared/types";
 import { createActionButton, createElement, createFavicon, dispatch, getDisplayHost } from "./dom.js";
 import { createIcon } from "./icons.js";
 import { encodeLocation, markDraggable, markDropTarget } from "./dragDrop.js";
@@ -231,9 +231,92 @@ function folderContainsTab(state: BrowserState, folder: FolderItem, tabId: ItemI
   return false;
 }
 
+/** GitHub's address, for the icon of a GitHub live folder (the site's own icon, as any tab of it would show). */
+const GITHUB_SITE_URL = "https://github.com";
+
+/** What an empty live folder says, by source. */
+const EMPTY_LIVE_FOLDER_TEXTS = {
+  pullRequests: "No open pull requests",
+  reviewRequests: "No reviews requested",
+  assignedIssues: "No issues assigned to you",
+  feed: "No posts in this feed",
+} as const;
+
+/** What a live folder's status line says and what clicking it does ("" = nothing). */
+interface LiveStatusLine {
+  text: string;
+  action: "sign-in" | "retry" | "";
+  icon: "person" | "warning" | null;
+}
+
+/**
+ * The site whose icon a live folder shows: GitHub, or the feed's site.
+ */
+function getLiveSourceSiteUrl(source: LiveFolderSource): string {
+  return source.kind === "github" ? GITHUB_SITE_URL : source.url;
+}
+
+/**
+ * A live folder's status line: why it is empty, or what went wrong with its last refresh. Null when the folder shows
+ * its items and the last refresh went well (or a refresh of a filled folder is running).
+ */
+function describeLiveStatus(folder: FolderItem, source: LiveFolderSource, status: LiveFolderStatus | undefined): LiveStatusLine | null {
+  const isEmpty = folder.childIds.length === 0;
+  if (status === undefined || status.state === "loading") {
+    return isEmpty ? { text: "Loading…", action: "", icon: null } : null;
+  }
+  if (status.state === "signedOut") {
+    return { text: "Sign in to GitHub", action: "sign-in", icon: "person" };
+  }
+  if (status.state === "failed") {
+    return { text: "Couldn’t refresh. Try again", action: "retry", icon: "warning" };
+  }
+  if (!isEmpty) {
+    return null;
+  }
+  const emptyText = source.kind === "github" ? EMPTY_LIVE_FOLDER_TEXTS[source.list] : EMPTY_LIVE_FOLDER_TEXTS.feed;
+  return { text: emptyText, action: "", icon: null };
+}
+
+/**
+ * Builds a live folder's status line, one level inside the folder.
+ */
+function renderLiveStatusRow(folder: FolderItem, line: LiveStatusLine, depth: number): HTMLElement {
+  const row = createElement("div", "row live-status-row");
+  row.dataset.key = `live-status:${folder.id}`;
+  row.dataset.presence = "row";
+  row.dataset.row = "live-status";
+  row.dataset.itemId = folder.id;
+  row.dataset.liveAction = line.action;
+  row.classList.toggle("is-actionable", line.action !== "");
+  setIndent(row, depth);
+  const iconSlot = createElement("span", "row-icon-slot");
+  if (line.icon !== null) {
+    iconSlot.append(createIcon(line.icon));
+  }
+  row.append(iconSlot, createElement("span", "row-title", line.text));
+  return row;
+}
+
+/**
+ * The number of a live folder's items that arrived since you last looked (the selected one does not count).
+ */
+function countUnreadChildren(folder: FolderItem, context: RowContext): number {
+  let count = 0;
+  for (const childId of folder.childIds) {
+    const child = context.state.items[childId];
+    if (child !== undefined && child.kind === "tab" && child.isUnread === true && child.id !== context.selectedTabId) {
+      count = count + 1;
+    }
+  }
+  return count;
+}
+
 /**
  * Builds a folder row and, when it is open, its children one level deeper. A closed folder still shows the
- * selected tab beneath it, like Arc, so you never lose sight of the page you are on.
+ * selected tab beneath it, like Arc, so you never lose sight of the page you are on. A live folder shows its source's
+ * icon, how many items are new, and a status line when it is empty or its refresh failed; nothing can be dropped
+ * into it (its source decides what it holds).
  */
 export function renderFolderRows(folder: FolderItem, location: ItemLocation, index: number, depth: number, context: RowContext): HTMLElement[] {
   const row = createElement("div", "row folder-row");
@@ -246,8 +329,14 @@ export function renderFolderRows(folder: FolderItem, location: ItemLocation, ind
   row.classList.toggle("is-open", folder.isOpen);
   row.tabIndex = 0;
 
+  const live = folder.live;
+  row.classList.toggle("is-live", live !== undefined);
   const iconSlot = createElement("span", "row-icon-slot folder-icon");
-  iconSlot.append(createIcon(folder.isOpen ? "folderOpen" : "folderClosed"));
+  if (live === undefined) {
+    iconSlot.append(createIcon(folder.isOpen ? "folderOpen" : "folderClosed"));
+  } else {
+    iconSlot.append(createFavicon(null, getLiveSourceSiteUrl(live.source)));
+  }
   row.append(iconSlot);
 
   const title = createElement("span", "row-title");
@@ -257,14 +346,32 @@ export function renderFolderRows(folder: FolderItem, location: ItemLocation, ind
     title.textContent = folder.title;
   }
   row.append(title);
+  const unreadCount = live === undefined ? 0 : countUnreadChildren(folder, context);
+  if (unreadCount > 0) {
+    const badge = createElement("span", "live-unread-count", String(unreadCount));
+    badge.title = unreadCount === 1 ? "1 new item" : `${unreadCount} new items`;
+    row.append(badge);
+  }
 
   markDraggable(row, folder.id);
-  markDropTarget(row, location, index, folder.id);
+  markDropTarget(row, location, index, live === undefined ? folder.id : null);
 
   const rows: HTMLElement[] = [row];
   const childLocation: ItemLocation = { kind: "folder", folderId: folder.id };
-  if (folder.isOpen) {
+  if (folder.isOpen && live === undefined) {
     rows.push(...renderItemRows(folder.childIds, childLocation, depth + 1, context));
+    return rows;
+  }
+  if (folder.isOpen && live !== undefined) {
+    const childRows = renderItemRows(folder.childIds, childLocation, depth + 1, context);
+    for (const childRow of childRows) {
+      delete childRow.dataset.drop;
+    }
+    const statusLine = describeLiveStatus(folder, live.source, context.runtime.liveFolders[folder.id]);
+    if (statusLine !== null) {
+      childRows.push(renderLiveStatusRow(folder, statusLine, depth + 1));
+    }
+    rows.push(...childRows);
     return rows;
   }
 
