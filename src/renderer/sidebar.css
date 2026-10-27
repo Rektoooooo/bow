@@ -48,6 +48,8 @@
   --row-height: 35.33px; /* Arc's long lists: 40.33 pt per row with the 5 pt gap */
   --row-gap: 5px;
   --row-radius: 10px;
+  --peek-inset: 5px; /* the peeking sidebar's distance from the window edges (Arc, the user's recording) */
+  --peek-radius: 12px;
 
   /* Motion, close to Arc's: quick and soft. */
   --motion-fast: 120ms;
@@ -74,16 +76,22 @@
   converted to sRGB), black Space: in the background frame 53, selected row 73, Favorites tile 73, Space label 145,
   row text 217; active (their recording) frame 19, selected row 57, tile 37, label 115, row text 213, hovered row 29.
   Chromium blends in the display's color space, so these strengths are what reproduces Arc's pixels, not the plain
-  sRGB arithmetic. Tile hover and selected tile are scaled from the measured tile; icon, faint, dot, line and field
-  were calibrated earlier on Chromium's own snapshots and not measured again.
+  sRGB arithmetic. Tile hover and selected tile are scaled from the measured tile; faint, line and field were
+  calibrated earlier on Chromium's own snapshots and not measured again.
+  Icons fade in a background window while text does not (like AppKit controls): Arc's sidebar toggle, Archive and +
+  measure 25–30 % white in the background and 56–57 % active, the Space switcher's dots 9 % and 17 %, the current
+  Space's icon there 47 % and 94 %. The Space title's icon stays at 93 % in both (2026-10-27, test-window.png and the
+  user's recording).
 */
 :root[data-appearance="dark"] {
   color-scheme: dark;
   --ink: rgba(255, 255, 255, 0.79);
   --muted: rgba(255, 255, 255, 0.42);
-  --icon: rgba(255, 255, 255, 0.64);
+  --icon: rgba(255, 255, 255, 0.28);
+  --space-icon: rgba(255, 255, 255, 0.93);
+  --switcher-icon: rgba(255, 255, 255, 0.43);
   --faint: rgba(255, 255, 255, 0.22);
-  --dot: rgba(255, 255, 255, 0.18);
+  --dot: rgba(255, 255, 255, 0.08);
   --line: rgba(255, 255, 255, 0.14);
   --row-hover: rgba(255, 255, 255, 0.035);
   --row-selected: rgba(255, 255, 255, 0.085);
@@ -104,6 +112,9 @@
 :root[data-appearance="dark"][data-window="active"] {
   --ink: rgba(255, 255, 255, 0.795);
   --muted: rgba(255, 255, 255, 0.355);
+  --icon: rgba(255, 255, 255, 0.6);
+  --switcher-icon: rgba(255, 255, 255, 0.94);
+  --dot: rgba(255, 255, 255, 0.14);
   --row-hover: rgba(255, 255, 255, 0.035);
   --row-selected: rgba(255, 255, 255, 0.13);
   --tile: rgba(255, 255, 255, 0.06);
@@ -117,6 +128,8 @@
   --ink: rgba(0, 0, 0, 0.85);
   --muted: rgba(0, 0, 0, 0.45);
   --icon: rgba(0, 0, 0, 0.5);
+  --space-icon: rgba(0, 0, 0, 0.85);
+  --switcher-icon: rgba(0, 0, 0, 0.5);
   --faint: rgba(0, 0, 0, 0.25);
   --dot: rgba(0, 0, 0, 0.2);
   --line: rgba(0, 0, 0, 0.1);
@@ -141,11 +154,21 @@
   --card-bg: var(--card-bg-default);
 }
 
+/* Arc's dark toolbar (measured 2026-10-27): the address 73–75 % white in both window states; the buttons 65 %
+   in the active window (disabled back / forward 23 %) and all 25 % in a background one, disabled or not. */
 .card[data-toolbar-tone="dark"] {
-  --toolbar-ink: rgba(255, 255, 255, 0.92);
-  --toolbar-icon: rgba(255, 255, 255, 0.58);
+  --toolbar-ink: rgba(255, 255, 255, 0.74);
+  --toolbar-icon: rgba(255, 255, 255, 0.65);
   --toolbar-hover: rgba(255, 255, 255, 0.1);
   --hairline: rgba(255, 255, 255, 0.06);
+}
+
+:root[data-window="inactive"] .card[data-toolbar-tone="dark"] {
+  --toolbar-icon: rgba(255, 255, 255, 0.25);
+}
+
+:root[data-window="inactive"] .card[data-toolbar-tone="dark"] .toolbar-button:disabled {
+  opacity: 1;
 }
 
 .card[data-toolbar-tone="light"] {
@@ -197,23 +220,42 @@ body.sidebar-hidden .sidebar {
   visibility: hidden;
 }
 
-/* Hidden sidebar, pointer at the left edge: the sidebar shows over the card while main.ts slides the page aside. */
+/*
+  Hidden sidebar, pointer at the left edge: the sidebar shows over the card while main.ts slides the page aside. Like
+  Arc's, it is a floating panel (the user's recording): 5 pt from the window's top, left and bottom edges, 12 pt
+  corners and a light rim (72 on a frame of 16, active window).
+*/
 body.sidebar-hidden.sidebar-peeking .sidebar {
   visibility: visible;
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
+  top: var(--peek-inset);
+  bottom: var(--peek-inset);
+  left: var(--peek-inset);
   width: var(--sidebar-width);
   z-index: 2;
+  overflow: hidden;
+  /* The panel keeps the sidebar's width (main.ts slides the page by it), so the content gives up the inset on the
+     right instead of running under the rim. */
+  padding-right: var(--peek-inset);
+  border: 1px solid rgba(255, 255, 255, 0.23);
+  border-radius: var(--peek-radius);
   background: linear-gradient(165deg, var(--frame-1), var(--frame-2) 55%, var(--frame-3));
-  box-shadow: 8px 0 24px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
   animation: sidebar-slide-in var(--motion-layout) var(--motion-layout-ease);
+}
+
+:root[data-appearance="light"] body.sidebar-hidden.sidebar-peeking .sidebar {
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+/* The native traffic lights do not move with the panel, so its header stays level with them. */
+body.sidebar-hidden.sidebar-peeking .sidebar-header {
+  margin-top: calc(-1 * (var(--peek-inset) + 1px));
 }
 
 @keyframes sidebar-slide-in {
   from {
-    transform: translateX(calc(-1 * var(--sidebar-width)));
+    transform: translateX(calc(-1 * (var(--sidebar-width) + var(--peek-inset))));
   }
 }
 
@@ -574,6 +616,13 @@ button:disabled {
   font-weight: 600;
 }
 
+/* Arc's tab titles look lighter than Chromium's medium: on the real screen the ink (coverage) of three of the user's
+   titles is 168 / 435 / 159 px against our 183 / 470 / 173 at 500 and 172 / 444 / 163 at 450, with widths within
+   2 px. Folder titles (600) and New Tab already match. */
+.tab-row {
+  font-weight: 450;
+}
+
 .folder-icon {
   color: var(--ink);
 }
@@ -815,6 +864,12 @@ button:disabled {
   margin-bottom: var(--row-gap);
   padding-left: 8px;
   color: var(--muted);
+}
+
+/* Right after Pinned (Today empty, so no divider), New Tab keeps the rows' pitch like Arc's (shot 4: the last
+   pinned title at 916 pt, New Tab's at 957). */
+.pinned-list + .new-tab-row {
+  margin-top: var(--row-gap);
 }
 
 .new-tab-row .row-icon-slot {
@@ -1118,20 +1173,21 @@ button:disabled {
 }
 
 /*
-  A Space icon drawn as a symbol (renderer/spaceIcon.ts) instead of an emoji. Arc's planet measures about 14 pt in the
-  Space title, greyed like the Space's name, and 16 pt in the switcher (the user's recording).
+  A Space icon drawn as a symbol (renderer/spaceIcon.ts) instead of an emoji. Arc's planet measures about 17 × 11 pt
+  in the Space title, near-white even though the name is grey, and 15 × 10 pt in the switcher, where it fades with
+  the window (strengths at the top of this file; test-window.png and the user's recording).
 */
 .space-title-icon.is-symbol {
   display: grid;
   place-items: center;
-  color: var(--muted);
+  color: var(--space-icon);
 }
 
 .space-button.is-active .space-button-icon.is-symbol,
 .space-switcher:hover .space-button-icon.is-symbol {
   display: grid;
   place-items: center;
-  color: var(--icon);
+  color: var(--switcher-icon);
 }
 
 .space-icon-symbol {
@@ -1139,8 +1195,8 @@ button:disabled {
 }
 
 .space-icon-drawing {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
 }
 
 .space-button-icon .space-icon-drawing {

@@ -19,6 +19,7 @@ import type { SymbolIconName, SymbolImage } from "../shared/symbols";
 /**
  * One part of an icon we draw: an outline in the text color, filled with nothing, a soft wash of the text color
  * (the back of an open folder) or near-black (the inside of a folder; near-white in light mode, see sidebar.css).
+ * A "solid" part is filled in the text color and has no outline (the planet's sphere: its edges must stay exact).
  */
 interface OwnIconPart {
   path: string;
@@ -49,13 +50,17 @@ const OWN_ICONS = {
       { path: "M7.6 5.1H20.4C21 5.1 21.4 5.7 21.2 6.2L18.6 14.6C18.4 15.1 18 15.4 17.5 15.4H5.4C4.9 15.4 4.5 14.9 4.7 14.4Z", fill: "dark" },
     ],
   },
-  // A Space icon (shared/spaceIcons.ts): SF Symbols has no ringed planet, so we draw one (our own drawing).
+  // A Space icon (shared/spaceIcons.ts): SF Symbols has no ringed planet, so we draw one (our own drawing), in the
+  // proportions of the planet in the user's Arc (sphere about 12 pt, ring about 18 pt wide, falling 24° to the right). The sphere is two
+  // pieces with a 0.9 pt gap on each side of the ring's front half, so the ring reads as passing in front of it; the
+  // ring's back half is left out (hidden behind the sphere).
   planet: {
     width: 18,
     height: 18,
     parts: [
-      { path: "M4 9a5 5 0 1 0 10 0a5 5 0 1 0 -10 0Z", fill: "solid" },
-      { path: "M1.48 12.51A8.3 2.6 -25 1 1 16.52 5.49A8.3 2.6 -25 1 1 1.48 12.51Z", fill: "none" },
+      { path: "M3.21 7.42A6 6 0 1 1 14.05 12.25A6.95 1.75 24 0 1 3.21 7.42Z", fill: "solid" },
+      { path: "M10.49 14.81A6 6 0 0 1 3.68 11.78A10.25 5.05 24 0 0 10.49 14.81Z", fill: "solid" },
+      { path: "M15.74 9.5A8.6 3.4 24 1 1 4.12 4.32", fill: "none" },
     ],
   },
 } satisfies Record<string, OwnIcon>;
@@ -116,11 +121,14 @@ export function createIcon(name: IconName, className: string = "icon"): Element 
     const path = document.createElementNS(SVG_NAMESPACE, "path");
     path.setAttribute("d", part.path);
     path.setAttribute("class", `icon-part-${part.fill}`);
+    svg.append(path);
+    if (part.fill === "solid") {
+      continue;
+    }
     path.setAttribute("stroke", "currentColor");
     path.setAttribute("stroke-width", String(OWN_ICON_STROKE_WIDTH));
     path.setAttribute("stroke-linecap", "round");
     path.setAttribute("stroke-linejoin", "round");
-    svg.append(path);
   }
   return svg;
 }
