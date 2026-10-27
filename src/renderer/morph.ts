@@ -42,7 +42,7 @@ const placeholderBuilders = new WeakMap<Element, () => HTMLElement>();
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 /** Attributes that make an element clickable, draggable or a drop target (sidebarEvents.ts, dragDrop.ts). */
-const INTERACTIVE_ATTRIBUTES = ["data-key", "data-row", "data-action", "data-drop", "data-item-id", "draggable"];
+const INTERACTIVE_ATTRIBUTES = ["data-key", "data-row", "data-action", "data-drop", "data-item-id", "data-split-with", "draggable"];
 
 export interface MorphOptions {
   /** False for the first draw and for big changes (a Space switch), where rows should just appear. */

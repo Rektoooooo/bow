@@ -18,7 +18,7 @@ import { getFaviconAddress, getHexLuminance } from "../shared/faviconColor.js";
 import type { BrowserState, FolderItem, ItemId, ItemLocation, LiveFolderSource, LiveFolderStatus, RuntimeState, SidebarItem, SplitItem, TabItem } from "../shared/types";
 import { createActionButton, createElement, createFavicon, dispatch, getDisplayHost } from "./dom.js";
 import { createIcon } from "./icons.js";
-import { encodeLocation, markDraggable, markDropTarget } from "./dragDrop.js";
+import { encodeLocation, markDraggable, markDropTarget, markSplitTarget } from "./dragDrop.js";
 import { createKeepPlaceholder } from "./morph.js";
 import { isDeveloperModeOn } from "../shared/developerMode.js";
 import { tidyTitle } from "../shared/tidyTitles.js";
@@ -247,10 +247,8 @@ function buildTabRow(tab: TabItem, location: ItemLocation, index: number, depth:
     row.setAttribute("aria-current", "page");
   }
 
-  // A tab that left its home URL: a small "back" arrow just left of its icon (the user, 2026-10-27: not over the icon).
-  if (hasLeftHome(tab)) {
-    row.append(createActionButton("reset", "Back to pinned URL", "row-reset", "reset-tab", { itemId: tab.id }));
-  }
+  // A tab that left its home URL shows Arc's "/" before its title; "Back to Pinned URL" is in its right-click menu
+  // (the user did not want a back arrow on the row, 2026-10-27).
   row.append(createTabIconSlot(tab, runtimeInfo?.isLoading === true));
   // A site in Developer Mode: Arc outlines its tabs in dashed yellow and puts the host under the title (shot 5).
   const isDeveloper = isDeveloperModeOn(context.state, tab.url);
@@ -283,6 +281,7 @@ function buildTabRow(tab: TabItem, location: ItemLocation, index: number, depth:
   markDraggable(row, tab.id);
   if (!isLiveFolderList(location, context.state)) {
     markDropTarget(row, location, index, null);
+    markSplitTarget(row, tab.id);
   }
   return row;
 }
@@ -493,6 +492,10 @@ export function renderSplitRow(split: SplitItem, location: ItemLocation, index: 
 
   markDraggable(row, split.id);
   markDropTarget(row, location, index, null);
+  const firstTabId = split.childIds[0];
+  if (firstTabId !== undefined) {
+    markSplitTarget(row, firstTabId);
+  }
   return row;
 }
 

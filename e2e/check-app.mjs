@@ -201,7 +201,8 @@ check("clicking a folder collapses it", collapsedFolder?.isOpen === false);
 await dispatch(page, { type: "openTab", typedText: "example.net" });
 await page.waitForFunction(() => document.querySelectorAll(".today-list .tab-row").length === 2, null, { timeout: 10000 });
 state = await getState(page);
-await dispatch(page, { type: "splitTabs", firstTabId: todayTabs(state)[0].id, secondTabId: todayTabs(state)[1].id });
+// Like Arc: a tab dragged onto the middle of another tab goes side by side with it, as a split view.
+await simulateDrag(page, `[draggable="true"][data-item-id="${todayTabs(state)[1].id}"]`, `[draggable="true"][data-item-id="${todayTabs(state)[0].id}"]`, 0.5);
 await page.waitForSelector(".split-row", { timeout: 5000 });
 await page.waitForTimeout(500);
 const splitBounds = await tabViewBounds(app);

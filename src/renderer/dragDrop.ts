@@ -25,7 +25,10 @@ import { dispatch } from "./dom.js";
 /** The type name under which a dragged sidebar item's id travels. */
 const SIDEBAR_ITEM_TYPE = "application/x-sidebar-item";
 
-/** Part of a folder row (top and bottom) that still means "before" / "after" instead of "inside". */
+/**
+ * Part of a folder row (top and bottom) that still means "before" / "after" instead of "inside"; the same for a tab
+ * or split row, whose middle means "side by side" (Arc: a tab dropped on a tab makes a split view of the two).
+ */
 const FOLDER_EDGE_FRACTION = 0.25;
 
 /** How far the pointer moves with the button held before a press becomes a drag. Our choice, about macOS's own. */
@@ -54,6 +57,9 @@ let pointerDrag: PointerDrag | null = null;
 
 /** True right after a drag ended: the click the release fires must not open the item. */
 let isClickAfterDrag = false;
+
+/** The kind of row being dragged here ("tab", "folder", "split", "favorite"), or null: only tabs go side by side. */
+let draggedRowKind: string | null = null;
 
 /** CSS classes that show where a drop will land. */
 const DROP_CLASSES = ["drop-before", "drop-after", "drop-into"];
@@ -163,6 +169,14 @@ export function markDropTarget(element: HTMLElement, location: ItemLocation, ind
 }
 
 /**
+ * Lets a tab dropped on the middle of a tab or split row go side by side with it (Arc's): the drop makes a split view
+ * of the two, or adds a pane to the split. `tabId` is the tab that keeps its place (a split's first tab).
+ */
+export function markSplitTarget(element: HTMLElement, tabId: ItemId): void {
+  element.dataset.splitWith = tabId;
+}
+
+/**
  * Makes an element (an empty section, the space below a list, a section title) drop items at the start or end of a
  * list.
  */
@@ -204,7 +218,8 @@ function findDropZone(point: PagePoint, element: HTMLElement): "before" | "after
     return isLeftHalf ? "before" : "after";
   }
   const fraction = (point.clientY - rectangle.top) / rectangle.height;
-  if (element.dataset.intoFolderId !== undefined) {
+  const canGoSideBySide = element.dataset.splitWith !== undefined && (draggedRowKind === "tab" || draggedRowKind === null);
+  if (element.dataset.intoFolderId !== undefined || canGoSideBySide) {
     if (fraction < FOLDER_EDGE_FRACTION) {
       return "before";
     }
@@ -263,6 +278,11 @@ function dropItem(point: PagePoint, target: HTMLElement, itemId: ItemId): void {
   const intoFolderId = target.dataset.intoFolderId;
   if (zone === "into" && intoFolderId !== undefined) {
     dispatch({ type: "moveItem", itemId: itemId, target: { kind: "folder", folderId: intoFolderId }, index: -1 });
+    return;
+  }
+  const splitWithTabId = target.dataset.splitWith;
+  if (zone === "into" && splitWithTabId !== undefined) {
+    dispatch({ type: "splitTabs", firstTabId: splitWithTabId, secondTabId: itemId });
     return;
   }
   const targetIndex = Number(target.dataset.index ?? "0");
@@ -374,6 +394,7 @@ function beginDrag(drag: PointerDrag): void {
   }
   drag.ghost = createGhost(drag.source);
   draggedItemId = drag.itemId;
+  draggedRowKind = drag.source.dataset.row ?? null;
   drag.source.classList.add("is-dragging");
   notifyDragState(true);
   dispatch({ type: "beginItemDrag", itemId: drag.itemId });
@@ -387,6 +408,7 @@ function endDrag(drag: PointerDrag): void {
   drag.source.classList.remove("is-dragging");
   clearAllDropClasses();
   draggedItemId = null;
+  draggedRowKind = null;
   notifyDragState(false);
   dispatch({ type: "endItemDrag" });
 }

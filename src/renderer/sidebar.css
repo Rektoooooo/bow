@@ -841,36 +841,6 @@ button:disabled {
   }
 }
 
-/*
-  The "back to pinned URL" arrow sits just left of the favicon of a tab that left its home URL, faint until the
-  pointer is on it (the user, 2026-10-27: it covered the icon on hover). It eats into the row's gap, so the icon
-  and title stay where they are.
-*/
-.row-reset {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 16px;
-  height: 20px;
-  margin-right: -4px;
-  margin-left: -6px;
-  padding: 0;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--faint);
-}
-
-.row-reset .icon-symbol {
-  width: 11px;
-  height: 11px;
-}
-
-.row-reset:hover {
-  background: var(--row-hover, var(--row-selected));
-  color: var(--ink);
-}
-
 .row-title {
   flex: 1;
   min-width: 0;

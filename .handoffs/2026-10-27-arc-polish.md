@@ -94,7 +94,10 @@ approved fixes Peek (3), tab tooltip (6) and sidebar width (7). The user was awa
 - Library › Spaces is Arc's column view (a column per Space, painted like its frame, pinned items with folders
   indented, a pencil, a "…", a round +); the column widens for it (`computeLibraryWidth`, the overlay reports its
   section). The Peek's buttons are dark grey circles with a padded column (a near miss no longer closes the Peek).
-  The back-to-pinned arrow sits left of a tab's icon.
+  The back-to-pinned arrow is gone again (the user did not like it; "Back to Pinned URL" stays in the tab menu).
+- Arc's drop-to-split: a tab dropped on the middle half of a tab row makes a split view of the two (`splitTabs`,
+  the target keeps its place), on a split row it adds a pane; the top and bottom quarters still reorder, like a
+  folder row's. Only a dragged tab goes side by side (`draggedRowKind`). check-app makes its split with this drag.
 
 ## How it was measured (keep doing it this way)
 
