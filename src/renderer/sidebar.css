@@ -1408,14 +1408,25 @@ button:disabled {
 /* ---------- Main column: the page card (toolbar on top, the web page below) ---------- */
 
 /* Above the sidebar (and the frame's grain), so the card slides over the sidebar when ⌘S hides it. */
+/* Always the second column: while the sidebar peeks it floats outside the grid, and the card must not fall into the
+   sidebar's (then empty) first column. */
 .main-column {
+  grid-column: 2;
   position: relative;
   z-index: 1;
   display: grid;
   min-width: 0;
   min-height: 0;
   padding: var(--card-inset) var(--card-inset) var(--card-inset) var(--card-gap);
-  transition: padding var(--motion-layout) var(--motion-layout-ease);
+  transition:
+    padding var(--motion-layout) var(--motion-layout-ease),
+    transform var(--motion-layout) var(--motion-layout-ease);
+}
+
+/* The peeking sidebar slides the page aside by its width without resizing it (layout.ts computeCardBounds); the card
+   and its toolbar go along on the same curve. */
+body.sidebar-hidden.sidebar-peeking .main-column {
+  transform: translateX(var(--sidebar-width));
 }
 
 /*

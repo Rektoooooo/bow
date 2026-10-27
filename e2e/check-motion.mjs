@@ -111,6 +111,15 @@ await dispatch({ type: "setSidebarVisible", isVisible: false });
 await sidebar.waitForTimeout(LAYOUT_MOTION_MS + 200);
 const peeking = await sampleWhile(() => dispatch({ type: "setSidebarPeek", isPeeking: true }), LAYOUT_MOTION_MS + 250);
 check("the hidden sidebar peeking in slides the page aside smoothly", between(distinct(peeking.views), hiddenLeft, hiddenLeft + SIDEBAR_WIDTH).length >= 3 && peeking.views.at(-1) === hiddenLeft + SIDEBAR_WIDTH, `${distinct(peeking.views).join(" ")}`);
+// The card (and its toolbar) goes along at its full width: it used to fall into the hidden sidebar's empty grid
+// column and shrink to nothing, so the page had no toolbar while the sidebar peeked.
+const peekingCard = await sidebar.evaluate(() => {
+  const card = document.getElementById("card").getBoundingClientRect();
+  const toolbar = document.querySelector(".toolbar").getBoundingClientRect();
+  return { cardX: Math.round(card.x), cardWidth: Math.round(card.width), toolbarWidth: Math.round(toolbar.width), windowWidth: window.innerWidth };
+});
+const fullCardWidth = peekingCard.windowWidth - 2 * CARD_INSET;
+check("and the card with its toolbar slides with it, keeping its width", peekingCard.cardX === hiddenLeft + SIDEBAR_WIDTH && peekingCard.cardWidth === fullCardWidth && peekingCard.toolbarWidth === fullCardWidth, JSON.stringify(peekingCard));
 await dispatch({ type: "setSidebarPeek", isPeeking: false });
 await sidebar.waitForTimeout(LAYOUT_MOTION_MS + 200);
 await dispatch({ type: "setSidebarVisible", isVisible: true });
