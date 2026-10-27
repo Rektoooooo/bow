@@ -865,6 +865,45 @@ button:disabled {
 
 /* ---------- Live folders: new-item count and the status line (empty, sign in, try again) ---------- */
 
+/* The source's mark on the folder's dark front, like Arc's GitHub folder: centered on the closed folder's front
+   (9.5, 11.5 in its 19 pt drawing) or the open one's (13, 10.25 in 22 × 17), in the folder front's contrast color. */
+.live-folder-glyph {
+  position: absolute;
+  top: 8px;
+  left: 6px;
+  display: grid;
+  place-items: center;
+  width: 8px;
+  height: 8px;
+  overflow: hidden;
+  color: #fff;
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.folder-row.is-open .live-folder-glyph {
+  top: 8.25px;
+  left: 8.5px;
+  width: 7px;
+  height: 7px;
+}
+
+.live-folder-glyph img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+:root[data-appearance="light"] .live-folder-glyph {
+  color: #000;
+}
+
+:root[data-appearance="light"] .live-folder-glyph img {
+  filter: brightness(0);
+}
+
 .live-unread-count {
   flex: none;
   min-width: 18px;

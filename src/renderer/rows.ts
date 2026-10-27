@@ -324,10 +324,14 @@ interface LiveStatusLine {
 }
 
 /**
- * The site whose icon a live folder shows: GitHub, or the feed's site.
+ * The small mark inside a live folder's folder drawing, like Arc's (a GitHub folder shows GitHub's mark on the
+ * folder): GitHub's own icon as a one-color silhouette, or a feed symbol.
  */
-function getLiveSourceSiteUrl(source: LiveFolderSource): string {
-  return source.kind === "github" ? GITHUB_SITE_URL : source.url;
+function createLiveSourceGlyph(source: LiveFolderSource): Element {
+  if (source.kind === "github") {
+    return createFavicon(null, GITHUB_SITE_URL, "live-folder-glyph");
+  }
+  return createIcon("feed", "icon live-folder-glyph");
 }
 
 /**
@@ -406,10 +410,9 @@ export function renderFolderRows(folder: FolderItem, location: ItemLocation, ind
   const live = folder.live;
   row.classList.toggle("is-live", live !== undefined);
   const iconSlot = createElement("span", "row-icon-slot folder-icon");
-  if (live === undefined) {
-    iconSlot.append(createIcon(folder.isOpen ? "folderOpen" : "folderClosed"));
-  } else {
-    iconSlot.append(createFavicon(null, getLiveSourceSiteUrl(live.source)));
+  iconSlot.append(createIcon(folder.isOpen ? "folderOpen" : "folderClosed"));
+  if (live !== undefined) {
+    iconSlot.append(createLiveSourceGlyph(live.source));
   }
   row.append(iconSlot);
 

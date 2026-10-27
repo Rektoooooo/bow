@@ -71,6 +71,7 @@ export const SYMBOL_NAMES = {
   scope: "scope",
   person: "person.crop.circle",
   warning: "exclamationmark.triangle",
+  feed: "dot.radiowaves.up.forward",
 } as const;
 
 /** An icon drawn from an SF Symbol. */

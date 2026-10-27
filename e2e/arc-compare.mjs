@@ -78,7 +78,8 @@ const items = {
   "fav-youtube": tab("fav-youtube", "https://www.youtube.com/", "YouTube", "https://www.youtube.com/"),
   "fav-duckduckgo": tab("fav-duckduckgo", "https://duckduckgo.com/", "DuckDuckGo", "https://duckduckgo.com/"),
   "folder-reading": { kind: "folder", id: "folder-reading", title: "Reading List", childIds: Object.keys(readingChildren), isOpen: false },
-  "folder-projects": { kind: "folder", id: "folder-projects", title: "Projects", childIds: ["pin-electron"], isOpen: false },
+  // Like the user's second folder: a closed GitHub live folder (Arc draws GitHub's mark on it).
+  "folder-projects": { kind: "folder", id: "folder-projects", title: "Pull Requests", childIds: [], isOpen: false, live: { source: { kind: "github", list: "pullRequests" }, hiddenUrls: [] } },
   "pin-electron": tab("pin-electron", "https://www.electronjs.org/", "Electron", "https://www.electronjs.org/"),
   "today-search": tab("today-search", "https://duckduckgo.com/", "DuckDuckGo"),
   "today-mdn": tab("today-mdn", "https://developer.mozilla.org/", "MDN Web Docs"),
