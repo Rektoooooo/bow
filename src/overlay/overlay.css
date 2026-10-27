@@ -109,6 +109,13 @@ button:disabled {
   display: none;
 }
 
+/* Arc dims nothing behind the Command Bar or the Control Center: its frame stays #313131 in the user's shots 3 and
+   4 (ours went to #222 under the backdrop). The backdrop stays, see-through, to catch the click outside. */
+body[data-panel="commandBar"] .backdrop,
+body[data-panel="siteControls"] .backdrop {
+  background: transparent;
+}
+
 .panel {
   position: fixed;
   background: var(--panel);

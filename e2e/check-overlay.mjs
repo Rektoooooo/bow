@@ -107,6 +107,9 @@ await dispatch({ type: "setSidebarVisible", isVisible: true });
 
 await dispatch({ type: "openCommandBar", mode: "newTab" });
 await overlay.waitForSelector(".command-input");
+// Arc dims nothing behind the Command Bar (its frame stays #313131 in the user's shot 3).
+const commandBarBackdrop = await overlay.$eval(".backdrop", (backdrop) => getComputedStyle(backdrop).backgroundColor).catch(() => "no backdrop");
+check("the Command Bar leaves the window undimmed, like Arc", commandBarBackdrop === "rgba(0, 0, 0, 0)", commandBarBackdrop);
 await overlay.press(".command-input", "Escape");
 await sidebar.waitForTimeout(300);
 check("Escape closes the Command Bar", !(await overlayIsShown()));
