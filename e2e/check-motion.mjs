@@ -32,9 +32,9 @@ fs.writeFileSync(
   path.join(userDataDir, "browser-state.json"),
   JSON.stringify({
     version: 2,
-    items: { "tab-a": tab("tab-a", "about:blank", "Blank") },
+    items: { "tab-a": tab("tab-a", "about:blank", "Blank"), "tab-b": tab("tab-b", "about:blank", "Second") },
     profiles: [{ id: "profile-default", name: "Default", favoriteIds: [] }],
-    spaces: [{ id: "space-a", name: "Main", icon: "✦", theme: { colors: ["#000000"], appearance: "dark", grain: 0 }, profileId: "profile-default", pinnedIds: [], todayIds: ["tab-a"], isPinnedOpen: true }],
+    spaces: [{ id: "space-a", name: "Main", icon: "✦", theme: { colors: ["#000000"], appearance: "dark", grain: 0 }, profileId: "profile-default", pinnedIds: [], todayIds: ["tab-a", "tab-b"], isPinnedOpen: true }],
     activeSpaceId: "space-a",
     selectedTabIdBySpace: { "space-a": "tab-a" },
     archive: [],
@@ -114,6 +114,26 @@ await dispatch({ type: "setSidebarPeek", isPeeking: false });
 await sidebar.waitForTimeout(LAYOUT_MOTION_MS + 200);
 await dispatch({ type: "setSidebarVisible", isVisible: true });
 await sidebar.waitForTimeout(LAYOUT_MOTION_MS + 200);
+
+// A split: the page already on screen glides from the full card to its half.
+const widths = [];
+await app.evaluate(() => {
+  globalThis.widthSamples = [];
+});
+await app.evaluate(({ BrowserWindow }, duration) => {
+  const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  const view = win.contentView.children.find((child) => child.webContents && child.webContents !== win.webContents && !child.webContents.getURL().includes("overlay"));
+  const started = Date.now();
+  const timer = setInterval(() => {
+    globalThis.widthSamples.push(view.getBounds().width);
+    if (Date.now() - started > duration) clearInterval(timer);
+  }, 10);
+}, LAYOUT_MOTION_MS + 250);
+await dispatch({ type: "splitTabs", firstTabId: "tab-a", secondTabId: "tab-b" });
+await sidebar.waitForTimeout(LAYOUT_MOTION_MS + 350);
+widths.push(...(await app.evaluate(() => globalThis.widthSamples)));
+const distinctWidths = distinct(widths);
+check("making a split glides the page to its half", distinctWidths.length >= 4 && distinctWidths.at(-1) < distinctWidths[0], distinctWidths.join(" "));
 
 const resizing = await sampleWhile(
   () =>

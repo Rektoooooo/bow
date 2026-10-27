@@ -127,9 +127,9 @@ function stepGlides(): void {
 }
 
 /**
- * Starts a view gliding from where it is now (also mid-glide) to its new place.
+ * Starts a view gliding from where it is now (also mid-glide) to its new place (Peek uses it too).
  */
-function glideTo(view: WebContentsView, bounds: Rectangle): void {
+export function glideView(view: WebContentsView, bounds: Rectangle): void {
   glides.set(view, { from: view.getBounds(), to: bounds, startedAt: performance.now() });
   if (glideTimer === null) {
     glideTimer = setInterval(stepGlides, GLIDE_STEP_MS);
@@ -433,7 +433,7 @@ export function layoutShownTabViews(window: BrowserWindow, state: BrowserState, 
     targetBounds.set(view, bounds);
     // A view that was off screen (just added) appears in place; only views already showing glide.
     if (isAnimated && previousTarget !== undefined && previousTarget.width > 0) {
-      glideTo(view, bounds);
+      glideView(view, bounds);
     } else {
       placeAt(view, bounds);
     }
@@ -487,7 +487,8 @@ export function syncTabViews(window: BrowserWindow, state: BrowserState, layoutO
     captureSnapshotSoon(tabId, view.webContents);
   }
   shownTabIds = visibleTabIds;
-  layoutShownTabViews(window, state, layoutOptions);
+  // Pages that stay on screen (a split gaining or losing a pane) glide to their new place; new ones appear in place.
+  layoutShownTabViews(window, state, layoutOptions, true);
   return true;
 }
 

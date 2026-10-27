@@ -22,7 +22,8 @@ import { hideOverlay, raiseOverlayIfShown, showOverlay } from "./overlay";
 import { getProfileSession } from "./profiles";
 import { splitTabs } from "./split";
 import { getSelectedTabId, openTab, updateTabPage } from "./state";
-import { adoptTabView } from "./tabViews";
+import { adoptTabView, glideView } from "./tabViews";
+import { LAYOUT_MOTION_MS } from "../shared/settings";
 import type { TabViewEvents } from "./tabViews";
 import { createId, findProfileIdOfItem } from "./tree";
 
@@ -35,6 +36,21 @@ const PEEK_SIDE_MARGIN_RATIO = 0.07;
 
 /** Corner radius of the Peek card. */
 const PEEK_RADIUS_PX = 12;
+
+/** A Peek grows from this share of its size when it opens and shrinks back to it when it closes. Our choice. */
+const PEEK_START_SCALE = 0.94;
+
+/** A closing Peek's page goes once its shrink has finished: the glide's length plus one step's margin. */
+const PEEK_CLOSE_MS = LAYOUT_MOTION_MS + 40;
+
+/**
+ * The Peek's bounds scaled about their middle (the size it grows from and shrinks to).
+ */
+function scaleAboutCenter(bounds: Bounds, scale: number): Bounds {
+  const width = Math.round(bounds.width * scale);
+  const height = Math.round(bounds.height * scale);
+  return { x: bounds.x + Math.round((bounds.width - width) / 2), y: bounds.y + Math.round((bounds.height - height) / 2), width: width, height: height };
+}
 
 /** The open Peek, or null. */
 let peekView: WebContentsView | null = null;
@@ -142,7 +158,9 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
     webPreferences: { session: getProfileSession(profileId), sandbox: true, contextIsolation: true, nodeIntegration: false },
   });
   view.setBorderRadius(PEEK_RADIUS_PX);
-  view.setBounds(bounds);
+  // It grows into place, like Arc's Peek.
+  view.setBounds(scaleAboutCenter(bounds, PEEK_START_SCALE));
+  glideView(view, bounds);
   peekView = view;
   peekSourceTabId = sourceTabId ?? getSelectedTabId(state);
 
@@ -181,8 +199,12 @@ function removePeek(keepPage: boolean): WebContentsView | null {
     return null;
   }
   if (!keepPage) {
-    window?.contentView.removeChildView(view);
-    view.webContents.close();
+    // It shrinks away while its frame fades, then the page goes.
+    glideView(view, scaleAboutCenter(view.getBounds(), PEEK_START_SCALE));
+    setTimeout(() => {
+      window?.contentView.removeChildView(view);
+      view.webContents.close();
+    }, PEEK_CLOSE_MS);
     return null;
   }
   return view;

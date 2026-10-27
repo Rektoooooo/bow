@@ -160,6 +160,8 @@ body.is-closing .backdrop {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .peek-shadow,
+  .peek-header,
   .panel,
   .backdrop,
   body.is-closing .panel,
@@ -1556,6 +1558,24 @@ body[data-panel="theme"] .backdrop {
   border-radius: 12px;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.12);
   background: var(--panel);
+}
+
+/* The Peek's frame grows in with its page (peek.ts glides the page from 94 %) and fades out with it. */
+.peek-shadow,
+.peek-header {
+  animation: peek-in var(--motion-layout, 260ms) var(--motion-ease);
+}
+
+@keyframes peek-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+body.is-closing .peek-shadow,
+body.is-closing .peek-header {
+  animation: panel-out 120ms ease-in forwards;
 }
 
 .peek-header {

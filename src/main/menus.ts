@@ -20,6 +20,7 @@ import { applyPreset, GRAIN_CHOICES, THEME_PRESETS } from "./themePresets";
 import { findLocation, findRootLocation, findSpace, findSplitOfTab, findTab } from "./tree";
 import { SEARCH_URL_PREFIX } from "./urls";
 import { listImportSources } from "./browserImportController";
+import { addMenuIcons } from "./menuIcons";
 
 /** What the menus need from main.ts. */
 export interface MenuHost {
@@ -45,7 +46,7 @@ function popUp(host: MenuHost, template: (MenuItemConstructorOptions | MenuItem)
   if (window === null || template.length === 0) {
     return;
   }
-  Menu.buildFromTemplate(template).popup({ window: window });
+  Menu.buildFromTemplate(addMenuIcons(template)).popup({ window: window });
 }
 
 /**

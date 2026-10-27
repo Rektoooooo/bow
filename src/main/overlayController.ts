@@ -47,6 +47,7 @@ import { getPermissionOrigin, getSitePermissions } from "./sitePermissions";
 import { looksLikeWebAddress, normalizeTypedInput } from "./urls";
 import { isDeveloperModeOn } from "../shared/developerMode";
 import { listImportSources } from "./browserImportController";
+import { addMenuIcons } from "./menuIcons";
 import { describeAdBlock, getBlockedCount, isAdBlockActiveFor } from "./adBlock";
 
 /** DuckDuckGo's suggestion service; it is also the browser's search engine (urls.ts). */
@@ -916,7 +917,7 @@ function showSiteMenu(anchor: OverlayRect): void {
     { label: "Developer Tools", enabled: site.isLoaded, click: () => handleSiteCommand("devTools") },
   ];
   const position = roundRect(anchor);
-  Menu.buildFromTemplate(template).popup({ window: window, x: position.x, y: position.y + position.height });
+  Menu.buildFromTemplate(addMenuIcons(template)).popup({ window: window, x: position.x, y: position.y + position.height });
 }
 
 /** Longest text accepted from the overlay. */
