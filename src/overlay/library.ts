@@ -583,7 +583,8 @@ function createAppIconChoices(data: LibraryData): HTMLElement {
   const iconChoices = createElement("div", "app-icon-choices");
   for (const variant of APP_ICON_VARIANTS) {
     const choice = createTextButton("", "app-icon-choice", () => dispatch({ type: "setAppIcon", variantId: variant.id }));
-    choice.title = variant.label;
+    // Classic follows macOS: on the Graphite tile while macOS is in dark mode (main/appIcon.ts).
+    choice.title = variant.id === "classic" ? "Classic (dark tile in dark mode)" : variant.label;
     choice.setAttribute("aria-label", `${variant.label} app icon`);
     choice.classList.toggle("is-active", variant.id === data.appIcon);
     // The choice shows the icon itself (overlay.css crops the drawing's margin around the tile).

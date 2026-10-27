@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { APP_ICON_VARIANTS, buildAppIconSvg, findAppIconVariant } from "../src/shared/appIconDrawing";
 
 describe("app icon variants", () => {
-  it("draw the same bow in each variant's colors", () => {
+  it("draw the bow in each variant's colors, whatever its style", () => {
     for (const variant of APP_ICON_VARIANTS) {
       const svg = buildAppIconSvg(variant);
       expect(svg).toContain(variant.tile[0]);
@@ -15,8 +15,9 @@ describe("app icon variants", () => {
     }
   });
 
-  it("fall back to the classic icon for an unknown or missing choice", () => {
-    expect(findAppIconVariant("neon").id).toBe("classic");
+  it("fall back to the classic icon for an unknown, removed or missing choice", () => {
+    // Midnight was a variant until the bow icon (2026-10-27); a saved choice of it now shows Classic.
+    expect(findAppIconVariant("midnight").id).toBe("classic");
     expect(findAppIconVariant(undefined).id).toBe("classic");
   });
 });

@@ -74,7 +74,7 @@ import { initializeEaselsStore, readEasel, writeEasel } from "./easelsStore";
 import { initializeNotesStore, readNote, writeNote } from "./notesStore";
 import { createNoteUrl } from "../shared/notes";
 import { applyCosmeticFilters, initializeAdBlocking, installAdBlocker } from "./adBlock";
-import { applyAppIcon } from "./appIcon";
+import { applyAppIcon, followSystemAppearance } from "./appIcon";
 import { findRootLocation, findTab, getActiveSpace } from "./tree";
 import { isSameSite } from "./urls";
 import type { TabViewEvents } from "./tabViews";
@@ -315,6 +315,7 @@ async function handleAppReady(): Promise<void> {
   // Every window of the last session opens again, each with its own Space and selection (mainWindows.ts).
   restoreMainWindows();
   applyAppIcon(getState().settings.appIcon).catch((error) => console.warn("Could not show the chosen app icon:", error));
+  followSystemAppearance(() => getState().settings.appIcon);
   initializePeek(tabViewEvents);
   createOverlayView();
   createStatusBubble();

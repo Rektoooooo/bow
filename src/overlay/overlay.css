@@ -1344,6 +1344,7 @@ body.dark .tab-tooltip-hint {
 
 .app-icon-choices {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 

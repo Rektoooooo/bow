@@ -1,18 +1,22 @@
 /**
  * WHY this file exists:
  *   Arc lets you pick another app icon. Ours draws the chosen variant of our own icon (shared/appIconDrawing.ts) in
- *   a hidden window and gives it to the Dock while the app runs. The Finder keeps the bundled icon: changing that
- *   needs a Dock tile plug-in, which an Electron app cannot ship.
+ *   a hidden window and gives it to the Dock while the app runs. The Classic icon follows macOS's appearance: in dark
+ *   mode the Dock shows it on the dark Graphite tile (the user's wish, 2026-10-27). The Finder keeps the bundled
+ *   icon: changing that needs a Dock tile plug-in, which an Electron app cannot ship.
  *
  * Data source:
- *   BrowserState.settings.appIcon (the variant id).
+ *   BrowserState.settings.appIcon (the variant id) and whether macOS is in dark mode (nativeTheme).
  *
  * Data flow:
- *   startup / setting changed → applyAppIcon(variantId) → hidden offscreen window draws the SVG → capturePage
- *   → app.dock.setIcon(image)
+ *   startup / setting changed / macOS switches light and dark → applyAppIcon(variantId) → hidden offscreen window
+ *   draws the SVG → capturePage → app.dock.setIcon(image)
  */
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, nativeTheme } from "electron";
 import { APP_ICON_SIZE_PX, buildAppIconSvg, findAppIconVariant } from "../shared/appIconDrawing";
+
+/** The variant the Dock shows for Classic while macOS is in dark mode. */
+const DARK_MODE_VARIANT_ID = "graphite";
 
 /** Wait this long after loading the drawing before capturing it, so it has painted. Our choice. */
 const PAINT_WAIT_MS = 200;
@@ -49,7 +53,9 @@ async function drawAppIcon(variantId: string | undefined): Promise<Electron.Nati
  * startup; switching back to it after another one draws it again.
  */
 export async function applyAppIcon(variantId: string | undefined): Promise<void> {
-  const variant = findAppIconVariant(variantId);
+  const chosenVariant = findAppIconVariant(variantId);
+  const isDarkClassic = chosenVariant.id === "classic" && nativeTheme.shouldUseDarkColors;
+  const variant = isDarkClassic ? findAppIconVariant(DARK_MODE_VARIANT_ID) : chosenVariant;
   const isFirstTime = shownVariantId === null;
   if (variant.id === shownVariantId || app.dock === undefined) {
     return;
@@ -59,4 +65,13 @@ export async function applyAppIcon(variantId: string | undefined): Promise<void>
     return;
   }
   app.dock.setIcon(await drawAppIcon(variant.id));
+}
+
+/**
+ * Redraws the Dock icon when macOS switches between light and dark (Classic shows the dark tile in dark mode).
+ */
+export function followSystemAppearance(readVariantId: () => string | undefined): void {
+  nativeTheme.on("updated", () => {
+    applyAppIcon(readVariantId()).catch((error) => console.warn("Could not redraw the app icon:", error));
+  });
 }
