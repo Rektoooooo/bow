@@ -74,7 +74,7 @@ while (!sidebar) {
   if (!sidebar) await new Promise((resolve) => setTimeout(resolve, 200));
 }
 await sidebar.waitForSelector(".space-title");
-await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1440, 900));
+await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html")).setContentSize(1440, 900));
 // Give the page and the favicons time to load.
 await sidebar.waitForTimeout(6000);
 const dispatch = (action) => sidebar.evaluate((value) => window.browserApi.dispatch(value), action);

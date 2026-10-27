@@ -55,7 +55,7 @@ async function launch(dataDir) {
 // capturePage on the window does not include child web views, so save the tab's capture separately.
 async function windowShot(app, name) {
   const shots = await app.evaluate(async ({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows()[0];
+    const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
     const windowImage = await win.capturePage();
     const tabView = win.contentView.children.find((child) => child.webContents && child.webContents !== win.webContents);
     const out = { window: windowImage.toPNG().toString("base64"), tab: null };
@@ -77,7 +77,7 @@ const itemCount = (state) => Object.keys(state.items).length;
 // Only web pages: our own overlay and status bubble (file: pages) can be on screen too, e.g. with a site's
 // permission prompt (DuckDuckGo asks for the location on a "best pizza" search).
 const tabViewBounds = (app) => app.evaluate(({ BrowserWindow }) => {
-  const win = BrowserWindow.getAllWindows()[0];
+  const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
   return win.contentView.children
     .filter((child) => child.webContents && child.webContents !== win.webContents && !child.webContents.getURL().startsWith("file:"))
     .map((child) => child.getBounds());
