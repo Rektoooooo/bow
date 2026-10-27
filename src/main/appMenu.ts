@@ -62,7 +62,7 @@ export interface AppMenuCommands {
 }
 
 /** Where the Help menu points. */
-const PROJECT_URL = "https://github.com/Rektoooooo/sidebar-browser";
+const PROJECT_URL = "https://github.com/Rektoooooo/bow";
 
 /** ⌘1 … ⌘9 and ⌃1 … ⌃9. */
 const NUMBER_KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9];

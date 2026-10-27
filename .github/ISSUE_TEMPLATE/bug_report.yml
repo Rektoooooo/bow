@@ -1,0 +1,43 @@
+name: Bug report
+description: Something in Bow does not work the way it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Security problems go to [private reporting](https://github.com/Rektoooooo/bow/security/advisories/new), not here.
+        Please leave out anything personal (your bookmarks, history, sign-ins) from text and screenshots.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you see, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a new tab with ⌘T
+        2. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Bow version
+      description: Bow › About Bow, or the commit if you built it yourself.
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and Mac
+      placeholder: macOS 26.1, MacBook Air M2
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or anything else

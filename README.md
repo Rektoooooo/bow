@@ -1,43 +1,83 @@
-# Bow
+<p align="center">
+  <img src="build/icon-1024.png" alt="Bow's icon: a frosted white bow on a pink, violet and blue glass tile" width="180">
+</p>
 
-<img src="build/icon-1024.png" alt="Bow's icon: a gradient bow on a light tile" width="128">
+<h1 align="center">Bow</h1>
 
-An open-source browser in the spirit of Arc, built with Electron and TypeScript: tabs in a vertical sidebar, Spaces,
-Favorites, pinned folders, the page shown as an inset card, a Command Bar, Peek, Split View, Little Windows and
-auto-archive for tabs you stop using. It can import your Arc sidebar, archive and history.
+<p align="center">
+  <b>An open-source browser in the spirit of Arc, for macOS.</b><br>
+  Tabs in a vertical sidebar, Spaces, Favorites, Peek, Split View, Little Windows and tabs that tidy themselves away.
+</p>
 
-Arc is being shut down. Before it goes, we studied how it behaves (from its app bundle and the files it writes;
-see [docs/research](docs/research)) and rebuilt that behavior in our own code. No Arc code, icons or assets are used.
+<p align="center">
+  <a href="https://github.com/Rektoooooo/bow/releases/latest"><b>Download for Mac</b></a> ·
+  <a href="#what-works">Features</a> ·
+  <a href="#build-it-yourself">Build it yourself</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Rektoooooo/bow/releases/latest"><img src="https://img.shields.io/github/v/release/Rektoooooo/bow?label=release" alt="Latest release"></a>
+  <a href="https://github.com/Rektoooooo/bow/actions/workflows/ci.yml"><img src="https://github.com/Rektoooooo/bow/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/macOS-Apple%20silicon-black" alt="macOS on Apple silicon">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"></a>
+</p>
+
+![Bow in a dark Space: Favorites as tiles, a pinned folder, Today tabs and a Wikipedia page in the inset card](docs/screenshot-dark.png)
+
+## Why Bow
+
+Arc is being shut down. Bow keeps the way of browsing that made it special: the sidebar is your whole browser, every
+Space has its own colours and tabs, and tabs you stop using move to the archive by themselves. Bow is built with
+Electron and TypeScript, so every page runs on Chromium, and Chrome extensions work.
+
+Before Arc goes, we studied how it behaves (from its app bundle and the files it writes; see
+[docs/research](docs/research)) and rebuilt that behavior in our own code. No Arc code, icons or assets are used.
 Bow is not affiliated with or endorsed by The Browser Company; Arc is their product and trademark. (A bow is another
 word for an arc.)
 
-![Dark mode: Favorites tiles, a Space with a pinned folder, Today tabs, and a Wikipedia page in the inset card](docs/screenshot-dark.png)
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshot-command-bar.png" alt="The Command Bar: typing &quot;wiki&quot; offers the open Wikipedia Favorite first, and Tab to search Wikipedia"><br><sub><b>Command Bar</b> (⌘T): open tabs, history, search and browser actions in one list.</sub></td>
+    <td width="50%"><img src="docs/screenshot-split.png" alt="Split View: MDN and the Electron docs side by side, one row in the sidebar"><br><sub><b>Split View</b>: drop a tab on another tab to put them side by side.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshot-spaces.png" alt="Library › Spaces: a column for each Space with what it has pinned"><br><sub><b>Spaces</b>: each with its own theme, pinned tabs and profile.</sub></td>
+    <td width="50%"><img src="docs/screenshot-light.png" alt="A light Space with pinned developer sites and a Wikipedia article"><br><sub><b>Light and dark</b>: a Space's theme colours the whole window.</sub></td>
+  </tr>
+</table>
 
-## Run it
+## Install
+
+1. Download **Bow-…-arm64.dmg** from the [latest release](https://github.com/Rektoooooo/bow/releases/latest).
+   Bow runs on Macs with Apple silicon (M1 or newer) and macOS 13 or later.
+2. Open the disk image and drag **Bow** to **Applications**. Bow is signed and notarized by Apple, so it opens
+   without warnings.
+3. To make it your everyday browser, choose **Bow › Set as Default Browser…** (or type "default" in the Command
+   Bar). Links from other apps then open in a Little Window, or in a Space when an Air Traffic Control rule matches.
+
+**Coming from Arc?** **File › Import from Arc…** reads Arc's files on this Mac (read-only) and adds your Spaces,
+Favorites, pinned folders and tabs, Today tabs, Space themes, Arc's cached icons, your archive (newest 250), your
+browsing history and your Chrome Web Store extensions (copied, so they survive Arc; each keeps the on/off it had in
+Arc). Running it twice adds nothing twice. Chrome, Brave, Edge, Vivaldi and Safari can be imported too
+(Library › Settings).
+
+Bow does not update itself yet: watch the repository's releases (Watch › Custom › Releases) to hear about new
+versions.
+
+## Build it yourself
 
 ```bash
-nvm use        # Node 24 (see .nvmrc); Node 22.12+ also works
+nvm use        # Node 24 (see .nvmrc)
 npm install
-npm start      # builds, then opens the window
+npm start      # builds, then opens Bow
 npm test       # unit tests (Vitest)
-npm run e2e    # drives the real app with Playwright (opens windows briefly; throwaway profiles)
+npm run e2e    # drives the real app with Playwright (opens windows for a few minutes; throwaway profiles)
 ```
 
-To use it as your everyday browser, build the app and make it the default:
-
-```bash
-npm run package   # → release/Bow-darwin-arm64/Bow.app
-```
-
-Move **Bow.app** to Applications, open it, and choose **Bow › Set as Default Browser…**
-(or type "default" in the Command Bar). macOS asks you to confirm. Links from other apps then open in a Little
-Window, or in a Space when an Air Traffic Control rule matches. The app is signed ad hoc for this Mac, not
-notarized, so copy the built app rather than downloading it elsewhere.
-
-To bring over your Arc setup: **File › Import from Arc…** reads Arc's files on this Mac (read-only) and adds your
-Spaces, Favorites, pinned folders and tabs, Today tabs, Space themes, Arc's cached icons, your archive (newest 250),
-your browsing history and your Chrome Web Store extensions (copied, so they survive Arc; each keeps the on/off it had
-in Arc). Running it twice adds nothing twice.
+`npm run package` builds **release/Bow-darwin-arm64/Bow.app**, signed ad hoc for your own Mac. `npm run release`
+builds the signed, notarized disk image (it needs a Developer ID certificate and notarytool credentials; see the top
+of `tools/release-mac.sh`).
 
 ## What works
 
@@ -46,9 +86,10 @@ in Arc). Running it twice adds nothing twice.
   one gets a border in the colour that appears most in its icon, like Arc's.
 - A Space title (click to collapse Pinned), Pinned tabs and nested folders, a divider with **Clear**, **+ New Tab**,
   and the Today list. A closed folder still shows the tab you are on.
-- A Pinned tab that left its page shows Arc's "/" and a button back to its pinned address. ⌘W on a Pinned tab
-  puts its page away but keeps the tab.
-- Drag and drop: reorder, pin, make a Favorite, drop into a folder, move to another Space, or drop a link to open it.
+- A Pinned tab that left its page shows Arc's "/" (its menu has Back to Pinned URL). ⌘W on a Pinned tab puts its
+  page away but keeps the tab.
+- Drag and drop: reorder, pin, make a Favorite, drop into a folder, move to another Space, drop a tab on another
+  tab to put them side by side, or drop a link to open it.
 - Bottom bar: Library, the Space switcher (emoji for the active Space, dots for the others), and a **+** menu.
 - ⌘S hides the sidebar; touching the window's left edge shows it again for a moment, as a floating panel like Arc's.
   Drag its edge to resize it. Icons fade while the window is in the background, text does not (Arc's look).
@@ -106,13 +147,12 @@ in Arc). Running it twice adds nothing twice.
   Backspace in the empty field goes back. The sites and their search addresses are listed in
   `src/shared/siteSearch.ts`.
 
-![The Command Bar: typing "wiki" offers the open Wikipedia Favorite first, and Tab to search Wikipedia](docs/screenshot-command-bar.png)
-
 **Pages**
 - **Peek**: a link from a Pinned tab or Favorite to another site, or any Shift-clicked link, opens in a card that
   hangs from the window's top edge with its own back / forward / reload row, the page behind dimmed, like Arc's.
   ⌘O (or the round ↗ button) makes it a tab without reloading, Split puts it next to the page, Esc closes it.
-- **Split View**: two to four tabs side by side or stacked, one row in the sidebar.
+- **Split View**: two to four tabs side by side or stacked, one row in the sidebar. Drop a tab on the middle of
+  another tab (or ⌃⇧=) to make one.
 - **Little Window**: links from other apps (and ⌥⌘N) open in a small window; "Open in Space" moves the page into the
   sidebar. A Little Window left alone for 6 hours goes to the Archive.
 - **Boosts**: change a site's colors (shift them, or invert for a dark look) and font, Zap elements away, and add
@@ -210,3 +250,15 @@ Three ideas keep it simple:
   everything else is refused, except full screen and clipboard writes. Our own pages are refused without asking. `e2e/permission-check.mjs` proves it.
 - Our pages cannot navigate away or open windows, and only load their own scripts.
 - Import from Arc only reads Arc's files (its history database through a temporary copy) and never changes them.
+
+## Contributing
+
+Bug reports, ideas and pull requests are welcome: start with [CONTRIBUTING.md](CONTRIBUTING.md). Please report
+security problems privately ([SECURITY.md](SECURITY.md)). Everyone taking part follows the
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+Bow is released under the [MIT License](LICENSE). It is built on [Electron](https://www.electronjs.org) and
+[electron-chrome-extensions](https://github.com/samuelmaddock/electron-browser-shell) (both MIT); ad blocking uses
+the EasyList and EasyPrivacy lists, downloaded when you turn it on.

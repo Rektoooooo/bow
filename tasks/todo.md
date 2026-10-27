@@ -9,7 +9,7 @@
 - [x] Auto-archive design mapped from Arc's Swift metadata
 - [x] Milestone 1: sidebar, Spaces, pinned/today tabs, inset card, Archive, auto-archive, saving, permission lockdown
 - [x] Tests: 20 unit, 23 end-to-end + permission check
-- [x] Public repo: https://github.com/Rektoooooo/sidebar-browser
+- [x] Public repo: https://github.com/Rektoooooo/bow
 - [x] 2026-10-26: Arc data backed up to `~/Arc-Backup-2026-10-26` (Application Support/Arc + preferences plist; not in the repo)
 
 ## Milestone 2 — "as close to Arc as we can" (started 2026-10-26)
