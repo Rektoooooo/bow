@@ -90,6 +90,9 @@ approved fixes Peek (3), tab tooltip (6) and sidebar width (7). The user was awa
   takeover was proven on a local page with a sticky header and a transformed container, not on YouTube itself. The
   drag region was not tried with a real drag (no event posting here; the debug paint mode froze the panel). Videos
   inside iframes (embedded players) and shadow DOM are not found; one window at a time, a new one pauses the old.
+- The corner masks are two more renderer processes per window (each of our own views gets one, like the overlay and
+  the status bubble; about 89 MB resident each, most of it the shared Chromium framework). One view cannot cover
+  both corners: a view takes the clicks over its whole area, see-through parts too.
 - Arc's peeking sidebar is darker than its frame (a material over the page); ours keeps the frame's gradient.
 
 ## Next (approved order)
