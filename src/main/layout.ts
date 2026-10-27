@@ -10,7 +10,7 @@
  * Data flow:
  *   tabViews.ts → computeCardBounds() → computePaneBounds() → WebContentsView.setBounds()
  */
-import { CARD_GAP_PX, CARD_INSET_PX, DEVELOPER_TOOLBAR_HEIGHT_PX, SIDEBAR_WIDTH_PX, SPLIT_GAP_PX, TOOLBAR_HEIGHT_PX } from "../shared/settings";
+import { CARD_GAP_PX, CARD_INSET_PX, DEVELOPER_TOOLBAR_HEIGHT_PX, LIBRARY_COLUMN_WIDTH_PX, SIDEBAR_WIDTH_PX, SPLIT_GAP_PX, TOOLBAR_HEIGHT_PX } from "../shared/settings";
 import type { SplitOrientation } from "../shared/types";
 
 /** A rectangle in window content coordinates, in pixels. */
@@ -31,6 +31,8 @@ export interface CardLayoutOptions {
   sidebarWidth?: number;
   /** The selected page's site is in Developer Mode: its toolbar is taller. */
   isDeveloperToolbar?: boolean;
+  /** The Library is open in the sidebar column (Arc's): the column is LIBRARY_COLUMN_WIDTH_PX wide, sidebar or not. */
+  isLibraryOpen?: boolean;
 }
 
 /**
@@ -41,13 +43,15 @@ export interface CardLayoutOptions {
  */
 export function computeCardBounds(contentWidth: number, contentHeight: number, options: CardLayoutOptions): Bounds {
   const sidebarWidth = options.sidebarWidth ?? SIDEBAR_WIDTH_PX;
-  const left = options.isSidebarVisible ? sidebarWidth + CARD_GAP_PX : CARD_INSET_PX;
+  const sidebarLeft = options.isSidebarVisible ? sidebarWidth + CARD_GAP_PX : CARD_INSET_PX;
+  const left = options.isLibraryOpen === true ? LIBRARY_COLUMN_WIDTH_PX + CARD_GAP_PX : sidebarLeft;
   const toolbarHeight = options.isDeveloperToolbar === true ? DEVELOPER_TOOLBAR_HEIGHT_PX : TOOLBAR_HEIGHT_PX;
   const top = options.isToolbarVisible ? CARD_INSET_PX + toolbarHeight : CARD_INSET_PX;
   const width = contentWidth - left - CARD_INSET_PX;
   const height = contentHeight - top - CARD_INSET_PX;
   // Sliding instead of shrinking keeps the page from re-laying out while the sidebar is only peeking.
-  const peekOffset = !options.isSidebarVisible && options.isSidebarPeeking === true ? sidebarWidth : 0;
+  const isPeekSliding = !options.isSidebarVisible && options.isSidebarPeeking === true && options.isLibraryOpen !== true;
+  const peekOffset = isPeekSliding ? sidebarWidth : 0;
   return { x: left + peekOffset, y: top, width: Math.max(width, 0), height: Math.max(height, 0) };
 }
 

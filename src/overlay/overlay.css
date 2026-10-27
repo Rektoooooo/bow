@@ -440,39 +440,89 @@ body.dark .command-info-button {
   color: var(--ink);
 }
 
-/* ---------- Library ---------- */
+/* ---------- Library ----------
+   Arc's Library takes the sidebar column (the user's recording, frames f0177–f0243, 1 px per pt): a 112 pt rail with
+   a hairline at its right edge (33 on a frame of 17), then the list. Rail sections: icon over label in 80 pt boxes
+   100 pt apart, centered in the column; the selected one on a 6 % white box 96 pt wide. Back sits at the bottom left.
+   The search field is 36 pt tall, 7 pt in from the rail, 10 pt from the top. The overlay is exactly the column
+   (overlayController.ts) and draws nothing behind the Library: the sidebar's frame shows through. */
 
 .library {
-  top: 8vh;
-  left: 50%;
-  width: min(760px, calc(100vw - 48px));
-  height: min(620px, 84vh);
-  translate: -50% 0;
+  --library-rail-width: 112px; /* = LIBRARY_RAIL_WIDTH_PX */
+  inset: 0;
+  display: grid;
+  grid-template-columns: var(--library-rail-width) minmax(0, 1fr);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  animation: fade-in var(--motion-layout, 260ms) var(--motion-ease);
+}
+
+.library-rail {
+  position: relative;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--line);
 }
 
-.library-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 14px 14px 10px 20px;
-  border-bottom: 1px solid var(--line);
+.library-drag-strip {
+  flex: none;
+  height: 44px;
+  -webkit-app-region: drag;
 }
 
-.library-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 650;
-}
-
-.library-tabs {
+.library-rail-entries {
   flex: 1;
+  min-height: 0;
   display: flex;
-  gap: 2px;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(2px, calc((100vh - 744px) / 7), 20px);
+  padding: 0 8px 56px;
+  overflow-y: auto;
 }
 
-.library-tab,
+.library-tab {
+  flex: 0 1 80px;
+  min-height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  transition:
+    background-color var(--motion-fast) linear,
+    color var(--motion-fast) linear;
+}
+
+.library-tab .icon {
+  --symbol-scale: 1.45;
+}
+
+.library-tab:hover {
+  background: var(--highlight);
+  color: var(--ink);
+}
+
+.library-tab.is-active {
+  background: var(--highlight);
+  color: var(--ink);
+}
+
+.library-rail .library-close {
+  position: absolute;
+  left: 10px;
+  bottom: 12px;
+}
+
 .library-chip {
   border: 0;
   border-radius: 7px;
@@ -482,13 +532,11 @@ body.dark .command-info-button {
   font-weight: 500;
 }
 
-.library-tab:hover,
 .library-chip:hover {
   background: var(--highlight);
   color: var(--ink);
 }
 
-.library-tab.is-active,
 .library-chip.is-active {
   background: var(--chip-active);
   color: var(--chip-active-ink);
@@ -527,18 +575,20 @@ body.dark .command-info-button {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px 8px;
+  gap: 6px;
+  padding: 10px 2px 6px 7px;
 }
 
 .library-search {
-  flex: 1 1 220px;
+  flex: 1 1 200px;
+  height: 36px;
   border: 0;
-  border-radius: 8px;
-  padding: 7px 10px;
+  border-radius: 10px;
+  padding: 0 12px;
   background: var(--field);
   color: var(--ink);
   font: inherit;
+  font-size: 14px;
   outline: none;
   user-select: text;
 }
@@ -552,7 +602,7 @@ body.dark .command-info-button {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 4px 8px 12px;
+  padding: 4px 2px 12px 7px;
 }
 
 .library-count,
@@ -621,11 +671,11 @@ body.dark .command-info-button {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 20px 24px;
+  padding: 16px 10px 16px 14px;
 }
 
 .library-extensions {
-  padding: 16px 20px;
+  padding: 12px 8px 12px 10px;
 }
 
 .library-toolbar {
@@ -1241,11 +1291,12 @@ body.dark .tab-tooltip-hint {
 
 /* ---------- Library › Media ---------- */
 
+/* One column in the Library's narrow list, like Arc's Media. */
 .media-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 14px;
-  padding: 14px 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 10px 14px 14px;
   overflow-y: auto;
 }
 

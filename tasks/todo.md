@@ -185,8 +185,13 @@ tooltip, 7 sidebar width, then AppleScript.
       sets, calibrated on the real screen (screencapture → sRGB): ours active 20/57/115/213, tile 38; background
       52/73/145/216, tile 73. The old values had been calibrated on Chromium's own snapshots and were 7–23 levels too
       light on screen. Not measured yet: icon, faint, dot, line, field tokens, light themes, the floating peek panel.
-- [ ] Library lives in the sidebar column: a vertical icon rail (Media, Downloads, Easels, Spaces, Boosts, Archived
-      Tabs) with the list beside it; Spaces spread over the window in columns → ours is a floating panel
+- [x] Library lives in the sidebar column: a vertical icon rail (Media, Downloads, Easels, Spaces, Boosts, Archived
+      Tabs) with the list beside it; Spaces spread over the window in columns → ours was a floating panel. Done,
+      measured on frames f0177–f0243: the column is 410 pt (card at 417) at any sidebar width, rail 112 pt with a
+      hairline, sections 80 pt boxes 100 pt apart and centered, search 36 pt tall; ours adds History, Extensions and
+      Settings to Arc's rail (no Easels section: Easels are tabs here). The overlay is exactly the column and draws
+      see-through over the sidebar's frame; the page glides aside (check-motion). Not done: Spaces spread over the
+      window in columns (Library › Spaces stays a list)
 - [x] Peek: a card almost the whole page card wide, over the toolbar, with its own toolbar row (back, forward,
       reload, address) inside; close / expand / split stacked vertically outside its right edge; page dimmed behind →
       ours was a smaller card with a header above it. Done, measured on frame f0491: the card hangs from the window's

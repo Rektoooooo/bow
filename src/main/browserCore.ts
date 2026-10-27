@@ -72,6 +72,9 @@ let recentTabIds: ItemId[] = [];
 /** The windows whose hidden sidebar shows because the mouse is at the window's left edge. Not saved. */
 const peekingWindowIds = new Set<WindowId>();
 
+/** The window whose sidebar column shows the Library (the overlay is in one window at a time), or null. */
+let libraryWindowId: WindowId | null = null;
+
 /** True while the Command Bar is open to make a new tab (RuntimeState.isNewTabPending). */
 let isNewTabPending = false;
 
@@ -224,6 +227,7 @@ export function getLayoutOptions(windowId: WindowId = currentState.focusedWindow
     isSidebarPeeking: peekingWindowIds.has(windowId),
     sidebarWidth: sidebarWidth,
     isDeveloperToolbar: isDeveloperToolbar,
+    isLibraryOpen: libraryWindowId === windowId,
   };
 }
 
@@ -254,6 +258,25 @@ export function relayoutWindow(windowId: WindowId, isAnimated: boolean = false):
 export function previewSidebarWidthWhileDragging(width: number | null): void {
   previewSidebarWidth = width === null ? null : Math.max(SIDEBAR_MIN_WIDTH_PX, Math.min(width, SIDEBAR_MAX_WIDTH_PX));
   relayoutWindow(currentState.focusedWindowId);
+}
+
+/**
+ * Notes which window shows the Library in its sidebar column (null: none). That window's page card glides aside to
+ * make room, and back when it closes.
+ */
+export function setLibraryWindow(windowId: WindowId | null): void {
+  if (windowId === libraryWindowId) {
+    return;
+  }
+  const previousWindowId = libraryWindowId;
+  libraryWindowId = windowId;
+  if (previousWindowId !== null) {
+    relayoutWindow(previousWindowId, true);
+  }
+  if (windowId !== null) {
+    relayoutWindow(windowId, true);
+  }
+  scheduleRuntimePush();
 }
 
 /**
@@ -415,6 +438,7 @@ export function collectRuntimeState(windowId: WindowId = currentState.focusedWin
     itemDraggedInOtherWindow: itemDrag !== null && itemDrag.windowId !== windowId ? itemDrag.itemId : null,
     extensionsBeingAdded: extensionsBeingAdded,
     isWindowActive: getMainWindow(windowId)?.isFocused() ?? false,
+    isLibraryOpen: libraryWindowId === windowId,
   };
 }
 

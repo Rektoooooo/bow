@@ -49,6 +49,7 @@
   --row-gap: 5px;
   --row-radius: 10px;
   --peek-inset: 5px; /* the peeking sidebar's distance from the window edges (Arc, the user's recording) */
+  --library-width: 410px; /* = LIBRARY_COLUMN_WIDTH_PX */
   --peek-radius: 12px;
 
   /* Motion, close to Arc's: quick and soft. */
@@ -257,6 +258,22 @@ body.sidebar-hidden.sidebar-peeking .sidebar-header {
   from {
     transform: translateX(calc(-1 * (var(--sidebar-width) + var(--peek-inset))));
   }
+}
+
+/*
+  The Library open in the sidebar column (Arc's): the column widens to --library-width and the overlay draws the
+  Library over it; the card glides aside on the same curve as main.ts moves the page. Shown even while the sidebar
+  is hidden (our choice: ⇧⌘L should always show it).
+*/
+body.library-open,
+body.sidebar-hidden.library-open {
+  grid-template-columns: var(--library-width) minmax(0, 1fr);
+}
+
+/* The overlay draws the Library see-through, so the column keeps the sidebar's own frame (theme, grain, the window's
+   focus); the sidebar's rows step aside under it. */
+body.library-open .sidebar > * {
+  visibility: hidden;
 }
 
 /* The strip that reveals a hidden sidebar: the card's left inset, where the page does not cover the window. */
@@ -1218,6 +1235,10 @@ body.sidebar-hidden .main-column {
   padding-left: var(--card-inset);
 }
 
+body.sidebar-hidden.library-open .main-column {
+  padding-left: var(--card-gap);
+}
+
 .card {
   display: flex;
   flex-direction: column;
@@ -1247,6 +1268,10 @@ body.sidebar-hidden .main-column {
 /* With the sidebar hidden, the toolbar starts right of the traffic lights. */
 body.sidebar-hidden .toolbar {
   padding-left: 72px;
+}
+
+body.sidebar-hidden.library-open .toolbar {
+  padding-left: 7px;
 }
 
 /* Loading glow: a soft line moving along the toolbar's bottom edge while the page loads. */

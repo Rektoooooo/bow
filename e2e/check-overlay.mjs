@@ -122,6 +122,17 @@ await dispatch({ type: "openLibrary" });
 await overlay.waitForSelector(".library .library-line", { timeout: 5000 });
 const archiveLines = await overlay.locator(".library .library-line").count();
 check("the Library lists the archived tab", archiveLines === 1, String(archiveLines));
+// Like Arc's, the Library takes the sidebar column (410 pt wide); the sidebar page widens its column to match.
+const libraryPlacement = await app.evaluate(({ BrowserWindow }) => {
+  const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  const overlayView = win.contentView.children.find((child) => child.webContents?.getURL().endsWith("/overlay/overlay.html"));
+  return overlayView === undefined ? null : overlayView.getBounds();
+});
+// The column glides open (260 ms) after the runtime push.
+await sidebar.waitForFunction(() => document.body.classList.contains("library-open") && Math.round(document.querySelector(".sidebar").getBoundingClientRect().width) === 410, null, { timeout: 3000 }).catch(() => undefined);
+const sidebarColumn = await sidebar.evaluate(() => (document.body.classList.contains("library-open") ? Math.round(document.querySelector(".sidebar").getBoundingClientRect().width) : 0));
+const railSections = await overlay.$$eval(".library-rail .library-tab", (tabs) => tabs.map((tab) => tab.dataset.section).join(","));
+check("the Library takes the sidebar column, with Arc's rail of sections", libraryPlacement?.x === 0 && libraryPlacement?.width === 410 && sidebarColumn === 410 && railSections.startsWith("media,downloads,spaces,boosts,archive"), `${JSON.stringify(libraryPlacement)} column=${sidebarColumn} ${railSections}`);
 await overlay.click(".library .library-line");
 await sidebar.waitForTimeout(500);
 state = await getState();

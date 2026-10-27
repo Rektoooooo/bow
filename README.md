@@ -144,9 +144,10 @@ in Arc). Running it twice adds nothing twice.
 - Some extensions need Chrome features Electron does not have (side panels, tab capture); those load but only
   partly work.
 
-**Library** (⇧⌘L): the Archive (search, filter by reason, click to restore), History, Media (screenshots and
-captures), Downloads, Spaces, Boosts, Extensions and Settings (sounds, ad blocking, app icon, import from Arc,
-Chrome, Brave, Edge, Vivaldi or Safari).
+**Library** (⇧⌘L): like Arc's, it takes the sidebar column (which widens for it) with a rail of sections: Media
+(screenshots and captures), Downloads, Spaces, Boosts, Archived Tabs (search, filter by reason, click to restore),
+History, Extensions and Settings (sounds, ad blocking, app icon, import from Arc, Chrome, Brave, Edge, Vivaldi or
+Safari). The page stays usable beside it; ← or Esc closes it.
 
 **Also**: a short welcome tour on the first start, Handoff of the page you are reading to your other Apple devices,
 and alternate app icons for the Dock.

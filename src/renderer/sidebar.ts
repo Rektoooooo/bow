@@ -58,6 +58,7 @@ let currentRuntime: RuntimeState = {
   itemDraggedInOtherWindow: null,
   extensionsBeingAdded: [],
   isWindowActive: true,
+  isLibraryOpen: false,
 };
 
 /** The Note or Easel tab whose editor this page last told main it has open, or null. */
@@ -489,6 +490,7 @@ function renderAll(): void {
   const context = createRowContext(state);
   document.body.classList.toggle("sidebar-hidden", !state.settings.isSidebarVisible);
   document.body.classList.toggle("sidebar-peeking", currentRuntime.isSidebarPeeking);
+  document.body.classList.toggle("library-open", currentRuntime.isLibraryOpen);
   // An item dragged in another window shows this sidebar's drop places too (the Favorites end zone).
   document.body.classList.toggle("is-dragging", currentRuntime.itemDraggedInOtherWindow !== null);
   applySidebarWidth(draggedSidebarWidth ?? state.settings.sidebarWidth ?? SIDEBAR_WIDTH_PX);

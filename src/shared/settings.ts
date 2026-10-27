@@ -155,3 +155,12 @@ export const TAB_TOOLTIP_RENAME_HINT = "Double-click to rename";
 
 /** How long the pointer rests on a row before its tooltip shows. Our choice; Arc's appeared within about 0.9 s. */
 export const TAB_TOOLTIP_DELAY_MS = 600;
+
+/*
+ * Arc's Library lives in the sidebar column (the user's recording, 2026-10-27, frames f0177–f0243): the column widens
+ * to a rail of sections (112 pt, then a 1 pt line) and a list beside it, and the page card moves to x = 417 pt. In
+ * our terms (the card starts CARD_GAP_PX after the sidebar's width) that is a 410 pt column, the same at any sidebar
+ * width (the user's sidebar was 254).
+ */
+export const LIBRARY_COLUMN_WIDTH_PX = 410;
+export const LIBRARY_RAIL_WIDTH_PX = 112;

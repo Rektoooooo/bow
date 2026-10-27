@@ -363,6 +363,11 @@ export interface RuntimeState {
    */
   isWindowActive: boolean;
   /**
+   * True while this window's sidebar column shows the Library (Arc's): the column widens to LIBRARY_COLUMN_WIDTH_PX
+   * and the overlay draws the Library over it.
+   */
+  isLibraryOpen: boolean;
+  /**
    * The sidebar item being dragged in another main window right now, or null: this window's sidebar accepts it as a
    * drop (main carries the id, because a drag's data stays in the page it started in).
    */

@@ -19,6 +19,7 @@ const SIDEBAR_WIDTH = 242;
 const CARD_GAP = 7;
 const CARD_INSET = 10;
 const LAYOUT_MOTION_MS = 260;
+const LIBRARY_COLUMN_WIDTH = 410;
 
 const results = [];
 function check(name, ok, detail = "") {
@@ -114,6 +115,15 @@ await dispatch({ type: "setSidebarPeek", isPeeking: false });
 await sidebar.waitForTimeout(LAYOUT_MOTION_MS + 200);
 await dispatch({ type: "setSidebarVisible", isVisible: true });
 await sidebar.waitForTimeout(LAYOUT_MOTION_MS + 200);
+
+// The Library takes the sidebar column, like Arc's: the page glides aside to make room for it, and back when it closes.
+const libraryLeft = LIBRARY_COLUMN_WIDTH + CARD_GAP;
+const openingLibrary = await sampleWhile(() => dispatch({ type: "openLibrary" }), LAYOUT_MOTION_MS + 250);
+const libraryViewSteps = between(distinct(openingLibrary.views), shownLeft, libraryLeft);
+check("opening the Library glides the page aside for its column, the card with it", libraryViewSteps.length >= 3 && openingLibrary.views.at(-1) === libraryLeft && openingLibrary.cards.at(-1) === libraryLeft, `${distinct(openingLibrary.views).join(" ")} / ${distinct(openingLibrary.cards).join(" ")}`);
+const overlayPage = app.windows().find((candidate) => candidate.url().endsWith("/overlay/overlay.html"));
+const closingLibrary = await sampleWhile(() => overlayPage.evaluate(() => window.overlayApi.close()), LAYOUT_MOTION_MS + 250);
+check("closing it glides the page back", between(distinct(closingLibrary.views), shownLeft, libraryLeft).length >= 3 && closingLibrary.views.at(-1) === shownLeft, distinct(closingLibrary.views).join(" "));
 
 // A split: the page already on screen glides from the full card to its half.
 const widths = [];

@@ -458,7 +458,7 @@ function showPanel(message: OverlayShowMessage): void {
   document.body.dataset.panel = message.panel.kind;
   // The Find bar's and a permission prompt's overlay is only as big as the card, so it needs no backdrop; Capture
   // draws its own dimming.
-  const hasOwnBackground = ["find", "permission", "capture", "tabTooltip"].includes(message.panel.kind);
+  const hasOwnBackground = ["find", "permission", "capture", "tabTooltip", "library"].includes(message.panel.kind);
   backdrop.hidden = hasOwnBackground;
 
   if (message.panel.kind === "commandBar") {

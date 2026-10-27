@@ -21,7 +21,7 @@ import { copyPngToClipboard, listCaptures, runCaptureCommand, saveCapture } from
 import { describeCaptureSource } from "./liveCaptures";
 import type { CaptureCommand } from "./captures";
 import type { BrowserState, ItemId, SitePermissionKind } from "../shared/types";
-import { applyChange, getLayoutOptions, getRecentTabIds, getState, getWindow, sendSidebarCommand, setNewTabPending } from "./browserCore";
+import { applyChange, getLayoutOptions, getRecentTabIds, getState, getWindow, sendSidebarCommand, setLibraryWindow, setNewTabPending } from "./browserCore";
 import { rankCommandBarResults } from "./commandBar";
 import type { CommandBarResult } from "./commandBar";
 import type { CommandActionRegistry } from "./commandBarActions";
@@ -34,7 +34,7 @@ import { THEME_PRESETS } from "./themePresets";
 import { addZappedSelector, findBoostForUrl } from "./boosts";
 import { reapplyBoostsToAllPages, zapElements } from "./boostPages";
 import { getSiteKey } from "./urls";
-import { DEFAULT_PROFILE_ID, SIDEBAR_WIDTH_PX } from "../shared/settings";
+import { DEFAULT_PROFILE_ID, LIBRARY_COLUMN_WIDTH_PX, SIDEBAR_WIDTH_PX } from "../shared/settings";
 import type { Bounds } from "./layout";
 import { getOverlayContents, hideOverlay, sendToOverlay, setOverlayBounds, showOverlay } from "./overlay";
 import { closePeek, isPeekOpen, navigatePeek, openPeekAsTab, openPeekInSplit } from "./peek";
@@ -149,6 +149,10 @@ function computeOverlayBounds(panel: OverlayPanel): Bounds | null {
   const contentSize = window.getContentSize();
   const contentWidth = contentSize[0] ?? 0;
   const contentHeight = contentSize[1] ?? 0;
+  if (panel.kind === "library") {
+    // Arc's Library takes the sidebar column, which widens for it (layout.ts); the page stays usable beside it.
+    return { x: 0, y: 0, width: LIBRARY_COLUMN_WIDTH_PX, height: contentHeight };
+  }
   if (panel.kind === "tabTooltip") {
     // Kept inside the window (the sidebar placed it beside the pointer; the window may have shrunk since).
     const width = Math.min(panel.frame.width, contentWidth);
@@ -314,6 +318,8 @@ function openPanel(panel: OverlayPanel): void {
   const replacedPanel = shownPanel;
   shownPanel = panel;
   setNewTabPending(panel.kind === "commandBar" && panel.mode === "newTab");
+  // The Library takes the focused window's sidebar column; any other panel gives it back.
+  setLibraryWindow(panel.kind === "library" ? state.focusedWindowId : null);
   if (replacedPanel !== null) {
     notifyPanelEnded(replacedPanel, "replaced");
   }
@@ -514,6 +520,7 @@ export function closeOverlay(returnsKeyboard: boolean = true): void {
   const closedPanel = shownPanel;
   shownPanel = null;
   setNewTabPending(false);
+  setLibraryWindow(null);
   // A tooltip goes at once: the pointer is on its way somewhere and must not click into the fading box.
   hideOverlay(closedPanel?.kind === "tabTooltip");
   if (closedPanel !== null) {

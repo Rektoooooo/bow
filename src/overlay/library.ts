@@ -1,7 +1,9 @@
 /**
  * WHY this file exists:
  *   The Library, like Arc's: the Archive (every closed, cleared and auto-archived tab, searchable and restorable),
- *   browsing History, Downloads, and the auto-archive setting. It is a large panel in the overlay.
+ *   browsing History, Media, Downloads, Spaces, Boosts, Extensions and the settings. Like Arc's it takes the sidebar
+ *   column, which widens for it (LIBRARY_COLUMN_WIDTH_PX): a rail of sections with the list beside it. The overlay is
+ *   exactly that column and draws see-through, so the sidebar's own frame shows behind it.
  *
  * Data source:
  *   LibraryData from overlayController.ts (archive, Spaces, recent history, downloads, setting), refreshed while open,
@@ -15,6 +17,8 @@ import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS } from "../shared
 import { APP_ICON_VARIANTS } from "../shared/appIconDrawing.js";
 import type { ArchiveReason, ArchivedTab } from "../shared/types";
 import { createElement, createFavicon, createIconButton, createTextButton, dispatch, getDisplayHost } from "../renderer/dom.js";
+import { createIcon } from "../renderer/icons.js";
+import type { IconName } from "../renderer/icons";
 import { createSpaceIcon } from "../renderer/spaceIcon.js";
 import { describeSpaceIconAsText } from "../shared/spaceIcons.js";
 
@@ -25,16 +29,16 @@ const REASON_LABELS: Record<ArchiveReason, string> = {
   "clear-button": "Cleared",
 };
 
-/** Section tabs in display order. */
-const SECTIONS: { id: LibrarySection; label: string }[] = [
-  { id: "archive", label: "Archive" },
-  { id: "history", label: "History" },
-  { id: "media", label: "Media" },
-  { id: "downloads", label: "Downloads" },
-  { id: "spaces", label: "Spaces" },
-  { id: "boosts", label: "Boosts" },
-  { id: "extensions", label: "Extensions" },
-  { id: "settings", label: "Settings" },
+/** The rail's sections in display order: Arc's (Media … Archived Tabs), then ours that Arc keeps elsewhere. */
+const SECTIONS: { id: LibrarySection; label: string; icon: IconName }[] = [
+  { id: "media", label: "Media", icon: "media" },
+  { id: "downloads", label: "Downloads", icon: "download" },
+  { id: "spaces", label: "Spaces", icon: "spaces" },
+  { id: "boosts", label: "Boosts", icon: "boost" },
+  { id: "archive", label: "Archived Tabs", icon: "archiveOutline" },
+  { id: "history", label: "History", icon: "clock" },
+  { id: "extensions", label: "Extensions", icon: "puzzle" },
+  { id: "settings", label: "Settings", icon: "gear" },
 ];
 
 /** Most archive lines drawn at once; the search finds older ones. */
@@ -715,24 +719,28 @@ export function renderLibrary(host: HTMLElement, data: LibraryData, requestedSec
   const panel = createElement("div", "panel library");
   panel.setAttribute("role", "dialog");
   panel.setAttribute("aria-label", "Library");
-  const header = createElement("div", "library-header");
-  header.append(createElement("h1", "library-title", "Library"));
-  const tabs = createElement("nav", "library-tabs");
-  tabs.id = "library-tabs";
+  // The rail: the window can be dragged by its top strip (the traffic lights sit there); Back closes the Library.
+  const rail = createElement("nav", "library-rail");
+  rail.id = "library-tabs";
+  const entries = createElement("div", "library-rail-entries");
   for (const choice of SECTIONS) {
-    const button = createTextButton(choice.label, "library-tab", () => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "library-tab";
+    button.dataset.section = choice.id;
+    button.append(createIcon(choice.icon), createElement("span", "library-tab-label", choice.label));
+    button.addEventListener("click", () => {
       section = choice.id;
       if (library !== null) {
         renderBody(library);
       }
     });
-    button.dataset.section = choice.id;
-    tabs.append(button);
+    entries.append(button);
   }
-  header.append(tabs, createIconButton("close", "Close (Esc)", "library-close", () => window.overlayApi.close()));
+  rail.append(createElement("div", "library-drag-strip"), entries, createIconButton("back", "Close Library (Esc)", "library-close", () => window.overlayApi.close()));
   const body = createElement("div", "library-body");
   body.id = "library-body";
-  panel.append(header, body);
+  panel.append(rail, body);
   host.replaceChildren(panel);
   renderBody(data);
 }
