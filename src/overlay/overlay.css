@@ -53,6 +53,10 @@ body.dark {
 
 * {
   box-sizing: border-box;
+  /* Chromium draws a classic 15 pt scroll bar when a mouse is connected (measured 2026-10-27); the panels' lists get
+     a thin, quiet one instead, grey enough for light and dark panels. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(128, 128, 128, 0.45) transparent;
 }
 
 html,
