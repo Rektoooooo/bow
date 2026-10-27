@@ -52,6 +52,11 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   `e2e/` for `version ===` with every bump (missed twice on 2026-10-27).
 
 ## Matching Arc from screenshots
+- Screen captures: Claude Desktop runs our commands through its own "Claude Code" app (com.anthropic.claude-code,
+  started via a `disclaimer` helper), so Screen Recording must be granted to that app, not only to Claude. The list
+  in System Settings may not show it after adding; test with `screencapture -l <window number>` (the number is in
+  `BrowserWindow.getMediaSourceId()`). Captures carry the display's colour profile while the reference shots are
+  sRGB: convert with PIL's ImageCms before comparing pixel values.
 - When a reference screenshot shows a state I don't recognize, ask the user what it shows before deriving a feature
   from it. (Shot 5 was Arc's per-site Developer Mode; I had planned it as a global "Show full URL" option.)
 - The user's screenshots are 1 px per point (macOS window shadow: window at 56, 38). Measure with

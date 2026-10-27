@@ -102,6 +102,13 @@ differs from it); every snapshot fits "the sidebar of the last window closed", a
   drags between windows (50 checks). `E2E_DEBUG=1` streams the main process's output. `check-package` (packaged app, not
   part of `npm run e2e`) is green too (12).
 
+## Native window check (after 3.6)
+
+Screen Recording now works for Claude Code's own app (see tasks/lessons.md), so the real window was captured and
+compared with the reference shots in sRGB: traffic lights at Arc's place (close button identical, the other two 0.5 /
+1 pt to the right), corners the same size, frame 49 vs 50. Arc's inactive traffic lights keep coloured rims; ours are
+plain grey (drawn by macOS for apps built with the new SDK; the compatibility Info.plist key makes them worse).
+
 ## Known limits (our choices or not done)
 
 - Extensions: a tab belongs to the window it was first shown in for `chrome.tabs` / `chrome.windows` (the library

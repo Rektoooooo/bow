@@ -118,7 +118,11 @@ Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 �
 - [x] Library (grouped settings with switches), Find, theme editor (with intensity), Boost editor, Little Window
       reviewed in the same language · [x] permission prompt (two lines like Chromium's bubble, no empty gap)
       · [x] Peek frame, status bubble, crash page review (e2e/review-shots.mjs; the crash page says why in words)
-- [ ] Verify the traffic lights and native rendering once screen recording works (Claude restart)
+- [x] Verify the traffic lights and native rendering (2026-10-27, `screencapture -l` of our own window, converted
+      from the display profile to sRGB like the reference shots): close button at the same pixels as Arc's (12–25,
+      16–29), minimize and zoom 0.5 / 1 pt further right (macOS's spacing; Electron cannot change it), corners the same
+      size by eye, frame 49 vs Arc's 50. Left: inactive traffic lights are plain grey here and keep coloured rims in
+      Arc (drawn by macOS; `UIDesignRequiresCompatibility` does not help, it brings back the old 12 pt buttons)
 
 ### 3.3 Remaining Arc features
 - [x] Tab hover previews · [x] Recent-tab switcher (⌃Tab, with page pictures) · [x] Inline URL autocomplete (also
