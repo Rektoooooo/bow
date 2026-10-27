@@ -109,6 +109,14 @@ compared with the reference shots in sRGB: traffic lights at Arc's place (close 
 1 pt to the right), corners the same size, frame 49 vs 50. Arc's inactive traffic lights keep coloured rims; ours are
 plain grey (drawn by macOS for apps built with the new SDK; the compatibility Info.plist key makes them worse).
 
+## Live Arc comparison (3.7)
+
+The user recorded their real Arc (frames in the git-ignored reference/arc-live/); the differences are listed in
+tasks/todo.md 3.7 with the user's order. Fix 1 is done: Arc draws its whole sidebar darker while the window is active
+(black frame 19 vs 53), so the sidebar now switches palette on RuntimeState.isWindowActive (data-window). Calibration
+method that works: render ours, `screencapture -l` our window, convert to sRGB, compare with Arc measured the same way
+(scratch scripts were throwaway; the values and their sources are in sidebar.css and themePalette.ts).
+
 ## Known limits (our choices or not done)
 
 - Extensions: a tab belongs to the window it was first shown in for `chrome.tabs` / `chrome.windows` (the library

@@ -211,6 +211,30 @@ check(
   JSON.stringify(legacyBounds),
 );
 
+// Arc draws an active window darker than one in the background (measured on the user's Arc): the sidebar follows.
+const framePaletteOf = (sidebar) => sidebar.evaluate(() => ({ window: document.documentElement.dataset.window, frame: document.documentElement.style.getPropertyValue("--frame-1").trim() }));
+const setFirstWindowFocus = (isFocused) =>
+  app.evaluate(({ app: electronApp, BrowserWindow }, focus) => {
+    const window = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+    if (focus) {
+      electronApp.focus({ steal: true });
+      window.focus();
+    } else {
+      window.blur();
+    }
+  }, isFocused);
+await setFirstWindowFocus(true);
+await firstSidebar.waitForTimeout(600);
+const activePalette = await framePaletteOf(firstSidebar);
+await setFirstWindowFocus(false);
+await firstSidebar.waitForTimeout(600);
+const backgroundPalette = await framePaletteOf(firstSidebar);
+check(
+  "the active window draws Arc's darker frame, and the lighter one in the background",
+  activePalette.window === "active" && activePalette.frame === "#131313" && backgroundPalette.window === "inactive" && backgroundPalette.frame === "#343434",
+  `${JSON.stringify(activePalette)} / ${JSON.stringify(backgroundPalette)}`,
+);
+
 await clickMenuItem(app, "New Window");
 let sidebars = await waitForSidebars(app, 2);
 let secondSidebar = sidebars.find((sidebar) => sidebar !== firstSidebar);

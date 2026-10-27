@@ -17,7 +17,7 @@ import { app, BrowserWindow } from "electron";
 import type { Rectangle } from "electron";
 import * as path from "node:path";
 import type { WindowId } from "../shared/types";
-import { applyChange, attachWindow, detachWindow, getMainWindow, getState, getWindow, listMainWindows, relayoutWindow } from "./browserCore";
+import { applyChange, attachWindow, detachWindow, getMainWindow, getState, getWindow, listMainWindows, relayoutWindow, scheduleRuntimePush } from "./browserCore";
 import { closeOverlay, openCommandBar, relayoutOverlay } from "./overlayController";
 import { leaveWindow as overlayLeaveWindow } from "./overlay";
 import { closePeekIn, relayoutPeek } from "./peek";
@@ -129,6 +129,9 @@ function createMainWindow(windowId: WindowId, bounds: Rectangle | null): Browser
   });
   window.on("move", () => rememberWindowBounds(windowId, window));
   window.on("focus", () => handleWindowFocus(windowId));
+  // Arc draws an active window darker than an inactive one: the sidebar hears of every change (also to another app).
+  window.on("focus", () => scheduleRuntimePush());
+  window.on("blur", () => scheduleRuntimePush());
   window.on("close", () => handleWindowClose(windowId, window));
   // Little Windows cannot live without a main window; closing the last one ends the app.
   window.on("closed", () => {

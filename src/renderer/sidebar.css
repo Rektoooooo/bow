@@ -17,19 +17,19 @@
 @property --frame-1 {
   syntax: "<color>";
   inherits: true;
-  initial-value: #313131;
+  initial-value: #131313;
 }
 
 @property --frame-2 {
   syntax: "<color>";
   inherits: true;
-  initial-value: #313131;
+  initial-value: #131313;
 }
 
 @property --frame-3 {
   syntax: "<color>";
   inherits: true;
-  initial-value: #313131;
+  initial-value: #131313;
 }
 
 @property --card-bg {
@@ -69,25 +69,28 @@
 }
 
 /*
-  Dark: white overlays, calibrated against the user's Arc pixel by pixel (e2e/arc-compare.mjs) on #313131: selected
-  row #5f5f5f, Favorites tile #494949, divider #525252, text #dedede, "New Tab" #999, sidebar toggle #b1b1b1.
-  Chromium blends in the display's color space, so these strengths are what reproduces Arc's pixels, not the
-  plain sRGB arithmetic.
+  Dark: white overlays on the frame. Arc draws an active window darker than one in the background (data-window,
+  from RuntimeState.isWindowActive). Measured on the real screen (screencapture of our window and of the user's Arc,
+  converted to sRGB), black Space: in the background frame 53, selected row 73, Favorites tile 73, Space label 145,
+  row text 217; active (their recording) frame 19, selected row 57, tile 37, label 115, row text 213, hovered row 29.
+  Chromium blends in the display's color space, so these strengths are what reproduces Arc's pixels, not the plain
+  sRGB arithmetic. Tile hover and selected tile are scaled from the measured tile; icon, faint, dot, line and field
+  were calibrated earlier on Chromium's own snapshots and not measured again.
 */
 :root[data-appearance="dark"] {
   color-scheme: dark;
-  --ink: rgba(255, 255, 255, 0.83);
-  --muted: rgba(255, 255, 255, 0.46);
+  --ink: rgba(255, 255, 255, 0.79);
+  --muted: rgba(255, 255, 255, 0.42);
   --icon: rgba(255, 255, 255, 0.64);
   --faint: rgba(255, 255, 255, 0.22);
   --dot: rgba(255, 255, 255, 0.18);
   --line: rgba(255, 255, 255, 0.14);
-  --row-hover: rgba(255, 255, 255, 0.08);
-  --row-selected: rgba(255, 255, 255, 0.195);
+  --row-hover: rgba(255, 255, 255, 0.035);
+  --row-selected: rgba(255, 255, 255, 0.085);
   --row-shadow: none;
-  --tile: rgba(255, 255, 255, 0.1);
-  --tile-hover: rgba(255, 255, 255, 0.145);
-  --tile-selected: rgba(255, 255, 255, 0.225);
+  --tile: rgba(255, 255, 255, 0.085);
+  --tile-hover: rgba(255, 255, 255, 0.125);
+  --tile-selected: rgba(255, 255, 255, 0.19);
   --field: rgba(255, 255, 255, 0.09);
   --letter-icon: rgba(255, 255, 255, 0.14);
   --drop-line: rgba(255, 255, 255, 0.7);
@@ -95,6 +98,17 @@
   --card-bg-default: #2a2a2c;
   --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 3px 12px rgba(0, 0, 0, 0.28);
   --card-empty: rgba(255, 255, 255, 0.03);
+}
+
+/* The active window: Arc's darker palette (measured above). */
+:root[data-appearance="dark"][data-window="active"] {
+  --ink: rgba(255, 255, 255, 0.795);
+  --muted: rgba(255, 255, 255, 0.355);
+  --row-hover: rgba(255, 255, 255, 0.035);
+  --row-selected: rgba(255, 255, 255, 0.13);
+  --tile: rgba(255, 255, 255, 0.06);
+  --tile-hover: rgba(255, 255, 255, 0.087);
+  --tile-selected: rgba(255, 255, 255, 0.135);
 }
 
 /* Light: black overlays, white selection with a soft shadow (Arc's light Spaces). */
@@ -912,7 +926,7 @@ button:disabled {
   padding: 0 5px;
   border-radius: 8px;
   background: var(--ink);
-  color: var(--frame-1, #313131);
+  color: var(--frame-1, #131313);
   font-size: 10.5px;
   font-weight: 700;
   line-height: 16px;

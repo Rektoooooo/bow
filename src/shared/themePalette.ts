@@ -5,24 +5,29 @@
  *   does, so an imported Space looks like it did in Arc.
  *
  * Data source:
- *   Calibrated on the user's Arc: their Main Space is black at intensity 1 in dark mode and its frame measures
- *   #313131 in their screenshots. Arc's own saved palettes (StorableSidebar.json, semanticColorPalette) give the dark
- *   scale: a pink #a6729d at intensity 0.57 has the dark background #231721, which is the color × 0.21, i.e.
- *   × 0.37 per unit of intensity. The lift toward white is what turns black into #313131 (49/255 ≈ 0.192).
+ *   Calibrated on the user's Arc: their Main Space is black at intensity 1 in dark mode. Arc draws the frame darker
+ *   while its window is active: black measures 19 active (their screen recording) and 53 inactive (a capture of the
+ *   window in the background), sRGB, on the real screen. Arc's own saved palettes (StorableSidebar.json,
+ *   semanticColorPalette) give the dark scale: a pink #a6729d at intensity 0.57 has the dark background #231721,
+ *   which is the color × 0.21, i.e. × 0.37 per unit of intensity. The lift toward white is what turns black into
+ *   that grey (52/255 inactive, 19/255 active); colored themes are assumed to follow the same two lifts.
  *   Light appearance: a dark color would make a black frame, so Arc shows dark colors as a light grey instead (its
  *   saved light palette for a black Space is #e5e5e5, about 10 % of the color over white). Other colors: full
  *   intensity keeps the color, lower intensity fades it toward white (our choice).
  *
  * Data flow:
- *   theme.ts (sidebar page) → computeFramePalette(space.theme, isSystemDark) → --frame-1…3 on the page
+ *   theme.ts (sidebar page) → computeFramePalette(space.theme, isSystemDark, isWindowActive) → --frame-1…3
  */
 import type { SpaceTheme } from "./types";
 
 /** Dark appearance: the color is scaled down by this much per unit of intensity (Arc's saved palettes). */
 export const DARK_COLOR_SCALE_PER_INTENSITY = 0.37;
 
-/** Dark appearance: then lifted this far toward white (black → #313131, measured). */
-export const DARK_LIFT_TOWARD_WHITE = 0.192;
+/** Dark appearance, window in the background: then lifted this far toward white (black → #343434, measured). */
+export const DARK_LIFT_TOWARD_WHITE = 0.204;
+
+/** Dark appearance, active window: lifted this little (black → #131313, measured in the user's recording). */
+export const DARK_LIFT_TOWARD_WHITE_ACTIVE = 0.0745;
 
 /** Light appearance: share of the color kept at intensity 0; full intensity keeps it all. Our choice. */
 export const LIGHT_MINIMUM_COLOR_SHARE = 0.5;
@@ -74,15 +79,17 @@ function clampIntensity(intensity: number | undefined): number {
 }
 
 /**
- * The frame color for one theme color.
- * Examples: ("#000000", 1, dark) → "#313131"; ("#a6729d", 0.57, dark) → a dark plum; ("#e9d8d4", 1, light) → itself
+ * The frame color for one theme color, in an active window or one in the background (light frames do not change:
+ * no measurement of Arc's yet).
+ * Examples: ("#000000", 1, dark) → "#343434"; ("#000000", 1, dark, active) → "#131313"; ("#e9d8d4", 1, light) → itself
  */
-export function computeFrameColor(color: string, intensity: number | undefined, isDark: boolean): string {
+export function computeFrameColor(color: string, intensity: number | undefined, isDark: boolean, isWindowActive: boolean = false): string {
   const channels = parseHex(color);
   const strength = clampIntensity(intensity);
   if (isDark) {
     const scale = DARK_COLOR_SCALE_PER_INTENSITY * strength;
-    return toHex(channels.map((channel) => channel * scale + (255 - channel * scale) * DARK_LIFT_TOWARD_WHITE) as [number, number, number]);
+    const lift = isWindowActive ? DARK_LIFT_TOWARD_WHITE_ACTIVE : DARK_LIFT_TOWARD_WHITE;
+    return toHex(channels.map((channel) => channel * scale + (255 - channel * scale) * lift) as [number, number, number]);
   }
   const luminance = (0.299 * channels[0] + 0.587 * channels[1] + 0.114 * channels[2]) / 255;
   if (luminance < DARK_COLOR_LUMINANCE) {
@@ -106,14 +113,15 @@ export function isThemeDark(theme: SpaceTheme, isSystemDark: boolean): boolean {
 }
 
 /**
- * The three gradient stops of a Space's frame.
+ * The three gradient stops of a Space's frame, in an active window or one in the background.
  */
-export function computeFramePalette(theme: SpaceTheme, isSystemDark: boolean): FramePalette {
+export function computeFramePalette(theme: SpaceTheme, isSystemDark: boolean, isWindowActive: boolean = false): FramePalette {
   const isDark = isThemeDark(theme, isSystemDark);
   const colors = theme.colors.length === 0 ? [FALLBACK_COLOR] : theme.colors;
   const pick = (index: number): string => colors[Math.min(index, colors.length - 1)] ?? FALLBACK_COLOR;
+  const frameColors = [0, 1, 2].map((index) => computeFrameColor(pick(index), theme.intensity, isDark, isWindowActive));
   return {
-    colors: [computeFrameColor(pick(0), theme.intensity, isDark), computeFrameColor(pick(1), theme.intensity, isDark), computeFrameColor(pick(2), theme.intensity, isDark)],
+    colors: frameColors as [string, string, string],
     isDark: isDark,
   };
 }

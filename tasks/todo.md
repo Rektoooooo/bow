@@ -176,11 +176,15 @@ differs from it), and new windows start from it.
 Found by watching the user's real Arc (active window) next to ours. Each item: what Arc does → what we do.
 User's go-ahead and order (2026-10-27): 1 active look, 2 theme editor, 3 Peek, 4 Library, 5 folder hover list, 6 tab
 tooltip, 7 sidebar width, then AppleScript.
-- [ ] Active vs inactive window: Arc's whole sidebar palette is darker while its window is active. Measured on the
+- [x] Active vs inactive window: Arc's whole sidebar palette is darker while its window is active. Measured on the
       user's black "Main" Space (sRGB values; active = recording frame f0136, inactive = live window capture):
       frame 17 vs 53, selected row 55 vs 73, Space label 113 vs 145, row text 211 vs 217, GitHub (near-black page)
       toolbar 56 vs 66. Our tokens and palette match only the inactive column (all five reference shots were inactive).
       The hidden sidebar shown at the edge is its own darker floating panel (6, rounded, bordered).
+      Done: RuntimeState.isWindowActive → data-window on the sidebar page; frame lifts 0.0745 / 0.204 and two token
+      sets, calibrated on the real screen (screencapture → sRGB): ours active 20/57/115/213, tile 38; background
+      52/73/145/216, tile 73. The old values had been calibrated on Chromium's own snapshots and were 7–23 levels too
+      light on screen. Not measured yet: icon, faint, dot, line, field tokens, light themes, the floating peek panel.
 - [ ] Library lives in the sidebar column: a vertical icon rail (Media, Downloads, Easels, Spaces, Boosts, Archived
       Tabs) with the list beside it; Spaces spread over the window in columns → ours is a floating panel
 - [ ] Peek: a card almost the whole page card wide, over the toolbar, with its own toolbar row (back, forward,

@@ -414,6 +414,7 @@ export function collectRuntimeState(windowId: WindowId = currentState.focusedWin
     editorTabIdsHere: getEditorTabIdsHere(windowId),
     itemDraggedInOtherWindow: itemDrag !== null && itemDrag.windowId !== windowId ? itemDrag.itemId : null,
     extensionsBeingAdded: extensionsBeingAdded,
+    isWindowActive: getMainWindow(windowId)?.isFocused() ?? false,
   };
 }
 

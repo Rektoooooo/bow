@@ -358,6 +358,11 @@ export interface RuntimeState {
    */
   editorTabIdsHere: ItemId[];
   /**
+   * True while this main window is the active (key) window. Arc draws its whole frame darker then (measured on the
+   * user's Arc: black frame 19 active, 53 inactive); the sidebar switches its palette on it.
+   */
+  isWindowActive: boolean;
+  /**
    * The sidebar item being dragged in another main window right now, or null: this window's sidebar accepts it as a
    * drop (main carries the id, because a drag's data stays in the page it started in).
    */

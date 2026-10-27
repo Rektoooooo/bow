@@ -10,7 +10,8 @@
  *   mode (for themes set to "auto").
  *
  * Data flow:
- *   sidebar.ts renderAll() → applySpaceTheme(space.theme) → --frame-1…3, data-appearance, --grain-opacity
+ *   sidebar.ts renderAll() → applySpaceTheme(space.theme, isWindowActive) → --frame-1…3, data-appearance,
+ *   data-window (active / inactive: Arc draws an active window darker), --grain-opacity
  *   macOS switches light/dark → onSystemAppearanceChange listener → sidebar.ts redraws
  */
 import { computeFramePalette } from "../shared/themePalette.js";
@@ -38,9 +39,10 @@ export function onSystemAppearanceChange(listener: () => void): void {
 /**
  * Applies a Space's theme to the whole sidebar page.
  */
-export function applySpaceTheme(theme: SpaceTheme): void {
+export function applySpaceTheme(theme: SpaceTheme, isWindowActive: boolean): void {
   const root = document.documentElement;
-  const palette = computeFramePalette(theme, isSystemDark());
+  const palette = computeFramePalette(theme, isSystemDark(), isWindowActive);
+  root.dataset.window = isWindowActive ? "active" : "inactive";
   root.style.setProperty("--frame-1", palette.colors[0]);
   root.style.setProperty("--frame-2", palette.colors[1]);
   root.style.setProperty("--frame-3", palette.colors[2]);

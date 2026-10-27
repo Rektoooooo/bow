@@ -56,6 +56,7 @@ let currentRuntime: RuntimeState = {
   editorTabIdsHere: [],
   itemDraggedInOtherWindow: null,
   extensionsBeingAdded: [],
+  isWindowActive: true,
 };
 
 /** The Note or Easel tab whose editor this page last told main it has open, or null. */
@@ -412,11 +413,13 @@ const LIGHT_TOOLBAR_LUMINANCE = 0.55;
 
 /**
  * A page whose top is nearly black gets a grey toolbar instead, like Arc's: GitHub's #010409 header shows a #424242
- * toolbar in the user's screenshots (shots 3 and 4), while Google's #202124 is matched as is (shot 1). One sample
- * each side, so the threshold sits between them.
+ * toolbar in the user's screenshots (shots 3 and 4, window in the background) and #3a3a3a in their recording of the
+ * active window, while Google's #202124 is matched as is (shot 1). One sample each side, so the threshold sits
+ * between them.
  */
 const NEAR_BLACK_LUMINANCE = 0.06;
 const NEAR_BLACK_TOOLBAR_COLOR = "#424242";
+const NEAR_BLACK_TOOLBAR_COLOR_ACTIVE = "#3a3a3a";
 
 /**
  * Returns a "#rrggbb" color's perceived brightness, 0 (black) to 1 (white).
@@ -443,7 +446,8 @@ function applyToolbarTint(selectedTabId: ItemId | null): void {
     card.dataset.toolbarTone = document.documentElement.dataset.appearance === "light" ? "light" : "dark";
     return;
   }
-  const shownColor = getLuminance(color) < NEAR_BLACK_LUMINANCE ? NEAR_BLACK_TOOLBAR_COLOR : color;
+  const nearBlackColor = currentRuntime.isWindowActive ? NEAR_BLACK_TOOLBAR_COLOR_ACTIVE : NEAR_BLACK_TOOLBAR_COLOR;
+  const shownColor = getLuminance(color) < NEAR_BLACK_LUMINANCE ? nearBlackColor : color;
   card.style.setProperty("--card-bg", shownColor);
   card.dataset.toolbarTone = getLuminance(shownColor) > LIGHT_TOOLBAR_LUMINANCE ? "light" : "dark";
 }
@@ -495,7 +499,7 @@ function renderAll(): void {
   // An item dragged in another window shows this sidebar's drop places too (the Favorites end zone).
   document.body.classList.toggle("is-dragging", currentRuntime.itemDraggedInOtherWindow !== null);
   applySidebarWidth(draggedSidebarWidth ?? state.settings.sidebarWidth ?? SIDEBAR_WIDTH_PX);
-  applySpaceTheme(space.theme);
+  applySpaceTheme(space.theme, currentRuntime.isWindowActive);
   // A Space switch replaces the whole list: it slides in instead of every row growing in one by one.
   const isSpaceSwitch = lastRenderedSpaceId !== null && lastRenderedSpaceId !== state.activeSpaceId;
   const motion: MorphOptions = { animate: hasRenderedOnce && !isSpaceSwitch };
