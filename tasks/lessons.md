@@ -100,6 +100,9 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 - `webContents.removeInsertedCSS(key)` only removes **author** style sheets: a sheet inserted with
   `cssOrigin: "user"` stays for good (the picture-in-picture takeover left pages blank). Insert author sheets with
   `!important`, and scope injected rules to a mark you can take off, so the page recovers even if removal fails.
+- A view's corner radius is all four corners or none (`View.setBorderRadius`), and a rounded plain `View` does not
+  clip a `WebContentsView` inside it on macOS (tried 2026-10-27). Hiding a corner behind a sampled colour fails
+  whenever the colour is unknown or the page dims or changes its top; draw what lies behind instead (cornerMasks.ts).
 - `ELECTRON_DEBUG_DRAGGABLE_REGIONS=1` froze the app when a `type: "panel"` window opened; check drag regions in other
   windows only.
 

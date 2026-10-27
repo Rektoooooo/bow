@@ -55,6 +55,16 @@ approved fixes Peek (3), tab tooltip (6) and sidebar width (7). The user was awa
   from the chosen engine's own service (all answer in the OpenSearch shape, checked by hand), so typed text no
   longer goes to DuckDuckGo when another engine is chosen. Optional `settings.searchEngine`; missing means
   DuckDuckGo, an unknown id falls back to it, so the saved version stays 4.
+- Square top, rounded bottom for the page (the user: no rounded corner under the toolbar, but "keep the bottom
+  corner radius"). Electron rounds a view's four corners alike and a rounded parent `View` does not clip a page on
+  macOS, and the old trick (the page's sampled top colour under the corners) showed a notch whenever that colour was
+  unknown or the page dimmed (YouTube's cookie dialog). Now page views have no radius, and `main/cornerMasks.ts` puts
+  two see-through 10 pt views over the card's bottom corners. Their page (`src/corner`) loads `sidebar.css` and
+  `theme.ts`, so a window-sized copy of the frame (gradient, grain, card shadow; `body, .frame-replica` share the
+  rules) is shifted to the corner's spot and the curve is cut with a radial mask: same pixels as the frame, also
+  while the theme cross-fades. They glide with the page (`moveView`), are raised when page views are added, update on
+  focus / blur, and close with the window. Inner corners of split panes are square now (they face the card's own
+  colour, not the frame). The Peek's page still has a uniform radius.
 
 ## How it was measured (keep doing it this way)
 

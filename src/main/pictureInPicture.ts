@@ -24,7 +24,6 @@ import type { IpcMainInvokeEvent, Rectangle, WebContents } from "electron";
 import * as path from "node:path";
 import { PIP_CHANNELS, PIP_COMMANDS } from "../shared/pictureInPicture";
 import type { PictureInPictureCommand, PictureInPictureStatus } from "../shared/pictureInPicture";
-import { CARD_RADIUS_PX } from "../shared/settings";
 import type { ItemId } from "../shared/types";
 import { applyChange, getState, getWindow } from "./browserCore";
 import { selectTab } from "./state";
@@ -382,7 +381,6 @@ function closePictureInPicture(pausesVideo: boolean): void {
     }
   }
   if (!contents.isDestroyed()) {
-    pip.pageView.setBorderRadius(CARD_RADIUS_PX);
     contents.removeInsertedCSS(pip.cssKey).catch(() => undefined);
     runScript(contents, buildUnmarkScript(pausesVideo));
   }
@@ -423,8 +421,6 @@ export async function enterPictureInPicture(tabId: ItemId): Promise<void> {
   const aspectRatio = computeAspectRatio(videoSize);
   const window = createWindow(computeOpeningBounds(aspectRatio), aspectRatio);
   const controlsView = createControlsView();
-  // The window's own corners round the page; a radius of its own would leave a gap there.
-  pageView.setBorderRadius(0);
   window.contentView.addChildView(pageView);
   window.contentView.addChildView(controlsView);
 

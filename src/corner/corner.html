@@ -1,0 +1,29 @@
+<!doctype html>
+<!--
+  WHY this file exists:
+    One rounded bottom corner of the page card. The page view is square (Electron rounds all four corners of a view
+    alike, and the page must meet the toolbar square), so this tiny see-through page lies over each bottom corner
+    and paints the window's frame outside the corner's curve. It reuses the sidebar's own stylesheet, so the frame,
+    grain and card shadow are drawn by the same rules as in the sidebar page.
+
+  Data source:
+    corner.ts receives the window's size, this corner's place, the card and the Space theme from cornerMasks.ts.
+
+  Data flow:
+    cornerMasks.ts → window.showCorner(info) → corner.ts places #frame-replica → corner.css cuts the curve
+-->
+<html lang="en" class="is-starting">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+    <title>Corner</title>
+    <link rel="stylesheet" href="../renderer/sidebar.css">
+    <link rel="stylesheet" href="./corner.css">
+  </head>
+  <body>
+    <div id="frame-replica" class="frame-replica">
+      <div id="card-replica" class="card"></div>
+    </div>
+    <script type="module" src="./corner.js"></script>
+  </body>
+</html>

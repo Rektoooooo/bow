@@ -6,7 +6,7 @@
   "private": true,
   "main": "dist/node/main/main.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json && tsc -p tsconfig.renderer.json && cp src/renderer/index.html src/renderer/sidebar.css dist/web/renderer/ && cp src/overlay/overlay.html src/overlay/overlay.css dist/web/overlay/ && cp src/little/little.html src/little/little.css dist/web/little/ && cp src/pip/pip.html src/pip/pip.css dist/web/pip/ && mkdir -p dist/web/crash dist/web/status && cp src/crash/crash.html src/crash/crash.css dist/web/crash/ && cp src/status/status.html src/status/status.css dist/web/status/",
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.renderer.json && cp src/renderer/index.html src/renderer/sidebar.css dist/web/renderer/ && cp src/overlay/overlay.html src/overlay/overlay.css dist/web/overlay/ && cp src/little/little.html src/little/little.css dist/web/little/ && cp src/pip/pip.html src/pip/pip.css dist/web/pip/ && cp src/corner/corner.html src/corner/corner.css dist/web/corner/ && mkdir -p dist/web/crash dist/web/status && cp src/crash/crash.html src/crash/crash.css dist/web/crash/ && cp src/status/status.html src/status/status.css dist/web/status/",
     "start": "npm run build && electron .",
     "test": "vitest run",
     "e2e": "npm run build && node e2e/check-app.mjs && node e2e/check-overlay.mjs && node e2e/check-extensions.mjs && node e2e/permission-check.mjs && node e2e/check-motion.mjs && node e2e/check-live-folders.mjs && node e2e/check-performance.mjs && node e2e/check-windows.mjs",

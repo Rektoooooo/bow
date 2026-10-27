@@ -134,6 +134,9 @@ function createMainWindow(windowId: WindowId, bounds: Rectangle | null): Browser
   window.on("blur", () => scheduleRuntimePush());
   window.on("focus", () => refreshPeekFrame(window));
   window.on("blur", () => refreshPeekFrame(window));
+  // The frame is darker in the active window, and so are the card's rounded corners drawn over the page.
+  window.on("focus", () => relayoutWindow(windowId));
+  window.on("blur", () => relayoutWindow(windowId));
   window.on("close", () => handleWindowClose(windowId, window));
   // Little Windows cannot live without a main window; closing the last one ends the app.
   window.on("closed", () => {

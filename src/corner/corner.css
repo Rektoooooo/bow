@@ -1,0 +1,43 @@
+/*
+  WHY this file exists:
+    Places the corner page's copy of the window frame and cuts the corner's curve out of it. The frame itself (colors,
+    grain, the card's shadow) comes from sidebar.css, loaded before this file.
+*/
+
+/* The first colors appear at once; later theme changes cross-fade like the sidebar's (sidebar.css :root). */
+html.is-starting {
+  transition: none !important;
+}
+
+/* The page is one corner of the window; the frame copy below it is window-sized and shifted into place. */
+body {
+  display: block;
+  overflow: hidden;
+  background: none;
+}
+
+body::before {
+  content: none;
+}
+
+/* Inside the curve the page shows through; outside it, the frame. The card's radius is sidebar.css --card-radius. */
+html[data-corner="bottom-left"] body {
+  -webkit-mask-image: radial-gradient(circle at 100% 0, transparent calc(var(--card-radius) - 1px), #000 var(--card-radius));
+  mask-image: radial-gradient(circle at 100% 0, transparent calc(var(--card-radius) - 1px), #000 var(--card-radius));
+}
+
+html[data-corner="bottom-right"] body {
+  -webkit-mask-image: radial-gradient(circle at 0 0, transparent calc(var(--card-radius) - 1px), #000 var(--card-radius));
+  mask-image: radial-gradient(circle at 0 0, transparent calc(var(--card-radius) - 1px), #000 var(--card-radius));
+}
+
+.frame-replica {
+  position: absolute;
+}
+
+/* Only the card's shadow matters here: its inside is the page. */
+.frame-replica .card {
+  position: absolute;
+  background: transparent;
+  transition: none;
+}

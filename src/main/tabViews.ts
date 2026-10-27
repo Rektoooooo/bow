@@ -27,7 +27,7 @@
 import { WebContentsView } from "electron";
 import * as path from "node:path";
 import type { BrowserWindow, ContextMenuParams, HandlerDetails, Rectangle, WebContents } from "electron";
-import { CARD_RADIUS_PX, LAYOUT_MOTION_MS } from "../shared/settings";
+import { LAYOUT_MOTION_MS } from "../shared/settings";
 import type { BrowserState, ItemId, TabItem, TabRuntimeInfo, WindowId } from "../shared/types";
 import { computeCardBounds, computePaneBounds } from "./layout";
 import type { CardLayoutOptions } from "./layout";
@@ -37,7 +37,8 @@ import { captureSnapshotSoon, forgetSnapshot } from "./tabSnapshots";
 import { isNoteUrl } from "../shared/notes";
 import { isEaselUrl } from "../shared/easels";
 import { getSelectedTabId } from "./state";
-import { findProfileIdOfItem, findSplitOfTab, findTab } from "./tree";
+import { findProfileIdOfItem, findSplitOfTab, findTab, getActiveSpace } from "./tree";
+import { forgetCornerMasks, layoutCornerMasks, raiseCornerMasks } from "./cornerMasks";
 import { DEFAULT_PROFILE_ID } from "../shared/settings";
 
 /** How a page asked to open a link somewhere else. */
@@ -405,7 +406,7 @@ function watchTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvent
     events.onContextMenu(tabId, contents, params);
   });
   contents.setWindowOpenHandler((details) => handleWindowOpen(tabId, contents, details, events));
-  view.setBorderRadius(CARD_RADIUS_PX);
+  // No radius: the page meets the toolbar square, and cornerMasks.ts rounds the card's bottom corners over it.
 }
 
 /**
@@ -517,6 +518,7 @@ export function forgetWindow(windowId: WindowId): void {
     }
   }
   shownByWindow.delete(windowId);
+  forgetCornerMasks(windowId);
   shownElsewhereByWindow.delete(windowId);
   openEditorsByWindow.delete(windowId);
   editorsHereByWindow.delete(windowId);
@@ -567,26 +569,39 @@ export function layoutShownTabViews(target: WindowTarget, isAnimated: boolean = 
   for (let index = 0; index < shownTabIds.length; index++) {
     const view = tabViews.get(shownTabIds[index] as ItemId);
     const bounds = paneBounds[index];
-    if (view === undefined || bounds === undefined) {
-      continue;
+    if (view !== undefined && bounds !== undefined) {
+      moveView(view, bounds, isAnimated);
     }
-    const previousTarget = targetBounds.get(view);
-    const isSameTarget =
-      previousTarget !== undefined &&
-      previousTarget.x === bounds.x &&
-      previousTarget.y === bounds.y &&
-      previousTarget.width === bounds.width &&
-      previousTarget.height === bounds.height;
-    if (isSameTarget) {
-      continue;
-    }
-    targetBounds.set(view, bounds);
-    // A view that was off screen (just added) appears in place; only views already showing glide.
-    if (isAnimated && previousTarget !== undefined && previousTarget.width > 0) {
-      glideView(view, bounds);
-    } else {
-      placeAt(view, bounds);
-    }
+  }
+  const frame = {
+    theme: getActiveSpace(state).theme,
+    isWindowActive: target.window.isFocused(),
+    windowWidth: contentWidth,
+    windowHeight: contentHeight,
+  };
+  layoutCornerMasks(target.windowId, card, frame, isAnimated);
+}
+
+/**
+ * Sends a view to its place in the window. With isAnimated, a view already on screen glides there; a view that was
+ * off screen (just added) appears in place. An unchanged place sends nothing. The corner masks move this way too.
+ */
+export function moveView(view: WebContentsView, bounds: Rectangle, isAnimated: boolean): void {
+  const previousTarget = targetBounds.get(view);
+  const isSameTarget =
+    previousTarget !== undefined &&
+    previousTarget.x === bounds.x &&
+    previousTarget.y === bounds.y &&
+    previousTarget.width === bounds.width &&
+    previousTarget.height === bounds.height;
+  if (isSameTarget) {
+    return;
+  }
+  targetBounds.set(view, bounds);
+  if (isAnimated && previousTarget !== undefined && previousTarget.width > 0) {
+    glideView(view, bounds);
+  } else {
+    placeAt(view, bounds);
   }
 }
 
@@ -655,6 +670,7 @@ function showTabsInWindow(target: WindowTarget, tabIds: ItemId[], events: TabVie
   shown.window = target.window;
   shown.tabIds = tabIds;
   shownByWindow.set(target.windowId, shown);
+  raiseCornerMasks(target.windowId, target.window);
 }
 
 /**

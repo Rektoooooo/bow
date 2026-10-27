@@ -193,7 +193,6 @@ body {
   position: relative;
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-  background: linear-gradient(165deg, var(--frame-1), var(--frame-2) 55%, var(--frame-3));
   color: var(--ink);
   font: 13.5px/1.25 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   -webkit-font-smoothing: auto;
@@ -202,8 +201,18 @@ body {
   transition: grid-template-columns var(--motion-layout) var(--motion-layout-ease);
 }
 
+/*
+  The window frame. The corner masks (src/corner, main/cornerMasks.ts) draw a copy of it at the page's bottom corners,
+  so both use these two rules: change the frame here and the corners follow.
+*/
+body,
+.frame-replica {
+  background: linear-gradient(165deg, var(--frame-1), var(--frame-2) 55%, var(--frame-3));
+}
+
 /* Film grain over the frame. Our own noise, drawn by an SVG filter. */
-body::before {
+body::before,
+.frame-replica::before {
   content: "";
   position: absolute;
   inset: 0;
