@@ -252,6 +252,28 @@ await dispatch({ type: "selectTab", tabId: pinnedSourceId });
 await sidebar.waitForTimeout(800);
 await clickLinkInPage("example.com/peek-source");
 await sidebar.waitForTimeout(2000);
+// The menu's Back acts on the Peek, like Arc (the page behind is dimmed): the Peek goes to a second page, then back.
+const newestPeekUrl = () =>
+  app.evaluate(({ webContents }) => {
+    const ianaPages = webContents.getAllWebContents().filter((contents) => contents.getURL().includes("iana.org"));
+    return ianaPages.sort((first, second) => second.id - first.id)[0]?.getURL() ?? "";
+  });
+const firstPeekUrl = await newestPeekUrl();
+await app.evaluate(({ webContents }) => {
+  const ianaPages = webContents.getAllWebContents().filter((contents) => contents.getURL().includes("iana.org"));
+  ianaPages.sort((first, second) => second.id - first.id)[0].loadURL("https://www.iana.org/about");
+});
+await sidebar.waitForTimeout(2500);
+const secondPeekUrl = await newestPeekUrl();
+await app.evaluate(({ Menu }) => {
+  const backItem = Menu.getApplicationMenu().items.flatMap((menu) => menu.submenu?.items ?? []).find((item) => item.label === "Back");
+  backItem.click();
+});
+await sidebar.waitForTimeout(2500);
+const peekUrlAfterBack = await newestPeekUrl();
+state = await getState();
+const isPeekBack = secondPeekUrl.includes("/about") && peekUrlAfterBack === firstPeekUrl;
+check("the menu's Back goes back in the Peek, not in the tab behind it", isPeekBack && state.items[pinnedSourceId]?.url.startsWith("https://example.com/peek-source"), `${firstPeekUrl} → ${secondPeekUrl} → ${peekUrlAfterBack}`);
 // Press Escape in the Peek's page: the newest iana.org page (the adopted tab is an older one).
 await app.evaluate(({ webContents }) => {
   const ianaPages = webContents.getAllWebContents().filter((contents) => contents.getURL().includes("iana.org"));

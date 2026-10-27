@@ -82,6 +82,16 @@ export function isPeekOpen(): boolean {
 }
 
 /**
+ * The Peek's page, or null when no Peek is open: the menu's Back, Forward, Reload and zoom act on it then, like Arc.
+ */
+export function getPeekContents(): WebContents | null {
+  if (peekView === null || peekView.webContents.isDestroyed()) {
+    return null;
+  }
+  return peekView.webContents;
+}
+
+/**
  * The page card of a window (what the Peek is centered on and what dims behind it).
  */
 function computeWindowCard(window: BrowserWindow): Bounds {

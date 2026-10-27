@@ -18,7 +18,7 @@ import { openLittleWindow } from "./littleWindow";
 import { closeFrontWindow, openNewWindow } from "./mainWindows";
 import { findNextMatch, openCommandBar, openFind, openLibrary, openTabSwitcher, runSiteCommand } from "./overlayController";
 import { copyTabUrl, toggleDevTools, zoomPage } from "./pageCommands";
-import { closePeek, isPeekOpen, openPeekAsTab } from "./peek";
+import { closePeek, getPeekContents, isPeekOpen, openPeekAsTab } from "./peek";
 import { buildImportMenu, showMenuRequest } from "./menus";
 import { menuHost } from "./actionRunner";
 import {
@@ -35,7 +35,7 @@ import {
   unpinTab,
 } from "./state";
 import { switchSpaceByNumber, switchSpaceByOffset } from "./spaces";
-import { closeSelectedTab, closeTabByUser, navigateFocusedPage, openLinkInNewTab, selectTabIfAny } from "./tabActions";
+import { closeSelectedTab, closeTabByUser, navigateFocusedPage, navigatePage, openLinkInNewTab, selectTabIfAny } from "./tabActions";
 import { getFocusedContents } from "./tabViews";
 import { findSplitOfTab, findTab, isInToday } from "./tree";
 
@@ -102,10 +102,21 @@ export const appMenuCommands: AppMenuCommands = {
   newFolder: () => applyChange((state) => createFolder(state, "New Folder", Date.now())),
   toggleSidebar: () => applyChange((state) => setSidebarVisible(state, !state.settings.isSidebarVisible)),
   toggleFullUrls: () => applyChange((state) => setShowFullUrls(state, state.settings.showsFullUrls !== true)),
-  navigate: (command) => navigateFocusedPage(command),
-  forceReload: () => getFocusedContents()?.reloadIgnoringCache(),
+  // With a Peek open, ⌘[ / ⌘] / ⌘R and zoom act on the Peek's page (the page behind it is dimmed), like Arc.
+  navigate: (command) => {
+    const peekContents = getPeekContents();
+    if (peekContents === null) {
+      navigateFocusedPage(command);
+      return;
+    }
+    navigatePage(peekContents, command);
+  },
+  forceReload: () => {
+    const contents = getPeekContents() ?? getFocusedContents();
+    contents?.reloadIgnoringCache();
+  },
   zoom: (direction) => {
-    const contents = getFocusedContents();
+    const contents = getPeekContents() ?? getFocusedContents();
     if (contents !== null) {
       zoomPage(contents, direction);
     }

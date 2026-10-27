@@ -10,6 +10,7 @@
  * Data flow:
  *   action runner / menu / Command Bar → one function here → applyChange() and/or a WebContents call
  */
+import type { WebContents } from "electron";
 import type { NavigationCommand } from "../shared/actions";
 import type { ItemId } from "../shared/types";
 import { applyChange, getState, scheduleRuntimePush } from "./browserCore";
@@ -96,6 +97,13 @@ export function navigateFocusedPage(command: NavigationCommand): void {
   if (contents === null) {
     return;
   }
+  navigatePage(contents, command);
+}
+
+/**
+ * Back, forward, reload and stop for one page (a tab's, or the Peek's from the menu).
+ */
+export function navigatePage(contents: WebContents, command: NavigationCommand): void {
   if (command === "back" && contents.navigationHistory.canGoBack()) {
     contents.navigationHistory.goBack();
   }
