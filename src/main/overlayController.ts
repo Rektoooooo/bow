@@ -486,6 +486,9 @@ export function showTabTooltip(title: string, showsRenameHint: boolean, frame: O
 /** Vertical padding inside the folder list, around its rows (overlay.css .folder-list-rows). */
 const FOLDER_LIST_PADDING_PX = 8;
 
+/** The panel's 1 px border at the top and the bottom (.panel in overlay.css), which the rows' area does not get. */
+const FOLDER_LIST_BORDER_PX = 2;
+
 /** The folder whose list shows, and the close that waits while the pointer is away from its row and the list. */
 let folderListFolderId: string | null = null;
 let folderListCloseTimer: ReturnType<typeof setTimeout> | null = null;
@@ -536,7 +539,8 @@ export function showFolderList(folderId: string, anchor: OverlayRect): void {
     return;
   }
   const contentHeight = window.getContentSize()[1] ?? 0;
-  const listHeight = FOLDER_LIST_SEARCH_HEIGHT_PX + entries.length * FOLDER_LIST_ROW_HEIGHT_PX + FOLDER_LIST_PADDING_PX;
+  // Without the border the rows were 2 px short and the list scrolled even when everything fit.
+  const listHeight = FOLDER_LIST_SEARCH_HEIGHT_PX + entries.length * FOLDER_LIST_ROW_HEIGHT_PX + FOLDER_LIST_PADDING_PX + FOLDER_LIST_BORDER_PX;
   const height = Math.min(listHeight, FOLDER_LIST_MAX_HEIGHT_PX, contentHeight - 2 * FOLDER_LIST_EDGE_PX);
   const centeredTop = anchor.y + anchor.height / 2 - height / 2;
   const top = Math.max(FOLDER_LIST_EDGE_PX, Math.min(centeredTop, contentHeight - FOLDER_LIST_EDGE_PX - height));
