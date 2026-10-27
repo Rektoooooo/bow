@@ -158,7 +158,8 @@ source never updates itself.
   another tab (or ⌃⇧=) to make one.
 - **Sleeping tabs**: a page you have not used for 30 minutes (Library › Settings: 15 minutes to 2 hours, or never)
   closes to free its memory, about 80 MB each, and wakes where you left it, scroll position, form values and Back
-  included, when you go back. Favorites, pages playing sound and pages on screen stay awake.
+  included, when you go back. Favorites and pages on screen, playing sound, in a call or sharing the screen stay
+  awake.
 - **Little Window**: links from other apps (and ⌥⌘N) open in a small window; "Open in Space" moves the page into the
   sidebar. A Little Window left alone for 6 hours goes to the Archive.
 - **Boosts**: change a site's colors (shift them, or invert for a dark look) and font, Zap elements away, and add

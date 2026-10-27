@@ -16,6 +16,7 @@
 import { app, session } from "electron";
 import type { Session, WebContents } from "electron";
 import type { ProfileId, SitePermissionKind } from "../shared/types";
+import { markCapturing } from "./mediaCapture";
 import { getPermissionOrigin, toPermissionKinds } from "./sitePermissions";
 
 /**
@@ -92,7 +93,12 @@ export function restrictWebPermissions(targetSession: Session): void {
     // the user picks there is shared. Our own pages never share.
     const isScreenShare = permission === "media" && mediaTypes.length === 0;
     if (isScreenShare) {
-      callback(sessionProfileIds.has(targetSession));
+      const isAllowed = sessionProfileIds.has(targetSession);
+      // A page sharing the screen stays awake and out of the Archive (mediaCapture.ts).
+      if (isAllowed && webContents !== null) {
+        markCapturing(webContents);
+      }
+      callback(isAllowed);
       return;
     }
     const kinds = toPermissionKinds(permission, mediaTypes);
@@ -100,7 +106,14 @@ export function restrictWebPermissions(targetSession: Session): void {
       callback(false);
       return;
     }
-    permissionDecider.request(webContents, profileId, origin, kinds).then(callback, () => callback(false));
+    const answer = (isAllowed: boolean): void => {
+      // A page in a call stays awake and out of the Archive, even muted (mediaCapture.ts).
+      if (isAllowed && permission === "media" && webContents !== null) {
+        markCapturing(webContents);
+      }
+      callback(isAllowed);
+    };
+    permissionDecider.request(webContents, profileId, origin, kinds).then(answer, () => callback(false));
   });
   targetSession.setPermissionCheckHandler((_webContents, permission, requestingOrigin, details) => {
     if (ALLOWED_WEB_PERMISSIONS.has(permission)) {

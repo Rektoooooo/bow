@@ -725,7 +725,7 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
     ),
     createSettingRow(
       "Sleep unused tabs after",
-      "A page you have not used for this long closes to free memory and wakes where you left it when you go back. Favorites, pages playing sound and pages on screen stay awake.",
+      "A page you have not used for this long closes to free memory and wakes where you left it when you go back. Favorites, pages on screen, playing sound or in a call stay awake.",
       createTabSleepSelect(data),
     ),
     createSettingRow(

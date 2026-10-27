@@ -1,7 +1,8 @@
 /**
  * WHY this file exists:
- *   Auto-archive must leave alone any tab you are actually using. We decided "in use" means:
- *   the tab is visible, OR it is playing sound, OR it is in picture-in-picture.
+ *   Auto-archive (and tab sleep) must leave alone any tab you are actually using. We decided "in use" means:
+ *   the tab is visible, OR it is playing sound, OR it is in picture-in-picture, OR it uses the camera, the microphone
+ *   or a screen share (a muted call is silent).
  *   This file asks Electron about each tab and refreshes lastActiveAt for the ones in use.
  *
  * Data source:
@@ -9,12 +10,14 @@
  *     - visible: the tabs whose pages are on screen right now (the selected tab, or every pane of its split view)
  *     - audible: webContents.isCurrentlyAudible()
  *     - picture-in-picture: the tab whose video is in our floating window (pictureInPicture.ts)
+ *     - capturing: a page allowed the camera, microphone or a screen share (mediaCapture.ts)
  *
  * Data flow:
  *   main.ts refresh timer → findTabsInUse() → markTabsActive() → new BrowserState with fresh lastActiveAt
  */
 import type { WebContentsView } from "electron";
 import type { BrowserState, ItemId } from "../shared/types";
+import { isCapturing } from "./mediaCapture";
 import { updateTab } from "./state";
 
 /**
@@ -34,7 +37,7 @@ export function findTabsInUse(tabViews: Map<ItemId, WebContentsView>, visibleTab
     const isVisible = visibleTabSet.has(tabId);
     const isAudible = view.webContents.isCurrentlyAudible();
     const isPictureInPicture = tabId === pictureInPictureTabId;
-    if (isVisible || isAudible || isPictureInPicture) {
+    if (isVisible || isAudible || isPictureInPicture || isCapturing(view.webContents)) {
       inUseTabIds.push(tabId);
     }
   }

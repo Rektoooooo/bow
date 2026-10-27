@@ -8,7 +8,7 @@
  * Data source:
  *   The state (each tab's lastActiveAt, which auto-archive refreshes every minute while a tab is in use; the
  *   Favorites; the "Sleep unused tabs after" setting), the tabs that have a page now, and the ones in use (on
- *   screen, playing sound or in picture-in-picture, activity.ts).
+ *   screen, playing sound, in picture-in-picture, or using the camera, microphone or a screen share; activity.ts).
  *
  * Data flow:
  *   main.ts every minute → findTabsToSleep(state, awakeTabIds, inUseTabIds, now) → tabViews.sleepTabView(tabId)

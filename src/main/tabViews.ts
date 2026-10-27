@@ -41,6 +41,7 @@ import { isEaselUrl } from "../shared/easels";
 import { getSelectedTabId } from "./state";
 import { findProfileIdOfItem, findSplitOfTab, findTab, getActiveSpace } from "./tree";
 import { forgetCornerMasks, layoutCornerMasks, raiseCornerMasks } from "./cornerMasks";
+import { isCapturing } from "./mediaCapture";
 import { DEFAULT_PROFILE_ID } from "../shared/settings";
 
 /** How a page asked to open a link somewhere else. */
@@ -472,12 +473,16 @@ export function createTabView(state: BrowserState, tab: TabItem, events: TabView
 
 /**
  * Puts a page to sleep: keeps its back/forward list (with scroll and form state) and closes it, which ends its
- * renderer process. A page on screen in any window, or with developer tools open, stays awake. Returns whether it
+ * renderer process. A page on screen in any window, with developer tools open, or in a call or screen share
+ * (mediaCapture.ts) stays awake. Returns whether it
  * slept. The tab's snapshot stays for the tab switcher.
  */
 export function sleepTabView(tabId: ItemId): boolean {
   const view = tabViews.get(tabId);
   if (view === undefined || view.webContents.isDestroyed() || findWindowShowingTab(tabId) !== null || view.webContents.isDevToolsOpened()) {
+    return false;
+  }
+  if (isCapturing(view.webContents)) {
     return false;
   }
   const history = view.webContents.navigationHistory;

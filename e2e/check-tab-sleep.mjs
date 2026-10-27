@@ -1,7 +1,10 @@
 // End-to-end check that a sleeping page frees its renderer and wakes where it was: a tab goes from page one to a long
 // page two and scrolls down, another tab is selected, the page is put to sleep (what the minute timer does once the
 // tab has been unused for "Sleep unused tabs after"), and selecting the tab again shows page two at the same scroll
-// position with page one still behind Back. Also checks that a page on screen refuses to sleep.
+// position with page one still behind Back. Also checks that a page on screen refuses to sleep, and that a page in a
+// call (allowed the camera or microphone, or sharing the screen) stays awake until it loads another page.
+// The app's own functions are reached with process.mainModule.require (the module instance the app uses, cached by
+// path): deprecated in Node, so if this check breaks with "mainModule", that is why.
 // usage: npm run build && node e2e/check-tab-sleep.mjs      (uses a throwaway --user-data-dir and a local web server)
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
@@ -72,6 +75,14 @@ const tabViewsModulePath = path.join(appDir, "dist", "node", "main", "tabViews.j
 const sleepTab = (tabId) =>
   app.evaluate((_electron, { modulePath, id }) => process.mainModule.require(modulePath).sleepTabView(id), { modulePath: tabViewsModulePath, id: tabId });
 
+/** Marks the page of an address as in a call, as profiles.ts does when the camera or microphone is allowed. */
+const mediaCaptureModulePath = path.join(appDir, "dist", "node", "main", "mediaCapture.js");
+const markCapturing = (urlPart) =>
+  app.evaluate(({ webContents }, { modulePath, urlPart }) => {
+    const page = webContents.getAllWebContents().find((contents) => contents.getURL().includes(urlPart));
+    process.mainModule.require(modulePath).markCapturing(page);
+  }, { modulePath: mediaCaptureModulePath, urlPart });
+
 const rendererCount = () => app.evaluate(({ app }) => app.getAppMetrics().filter((metric) => metric.type === "Tab").length);
 
 await sidebar.waitForTimeout(1500);
@@ -99,6 +110,15 @@ const scrollAfterWake = await inPage("/two", "window.scrollY");
 check("selecting it wakes the page where it was, scrolled down", scrollAfterWake !== null && Math.abs(scrollAfterWake - SCROLL_Y) < 50, `scrollY ${scrollAfterWake}`);
 const canGoBack = await app.evaluate(({ webContents }) => webContents.getAllWebContents().find((contents) => contents.getURL().includes("/two"))?.navigationHistory.canGoBack() ?? false);
 check("and with page one still behind Back", canGoBack === true);
+
+// A page in a call never sleeps, even silent; once it loads another page, the call is over and it may sleep.
+await dispatch({ type: "selectTab", tabId: "tab-other" });
+await sidebar.waitForTimeout(800);
+await markCapturing("/two");
+check("a page in a call (camera, microphone or screen share) refuses to sleep", (await sleepTab("tab-reader")) === false);
+await inPage("/two", `location.href = "${origin}/three"`);
+await sidebar.waitForTimeout(1500);
+check("after it loads another page it may sleep again", (await sleepTab("tab-reader")) === true);
 
 await app.close();
 server.close();
