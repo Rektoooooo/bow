@@ -121,19 +121,20 @@
   --card-empty: rgba(0, 0, 0, 0.02);
 }
 
-/* The toolbar's own text colors follow its tint (sidebar.ts sets data-toolbar-tone from the tint's brightness). */
+/* The toolbar's own text colors follow its tint (sidebar.ts sets data-toolbar-tone and --card-bg on the card, not the
+   root: a tint change then restyles the card alone, not every row of a long sidebar). */
 :root {
   --card-bg: var(--card-bg-default);
 }
 
-:root[data-toolbar-tone="dark"] {
+.card[data-toolbar-tone="dark"] {
   --toolbar-ink: rgba(255, 255, 255, 0.92);
   --toolbar-icon: rgba(255, 255, 255, 0.58);
   --toolbar-hover: rgba(255, 255, 255, 0.1);
   --hairline: rgba(255, 255, 255, 0.06);
 }
 
-:root[data-toolbar-tone="light"] {
+.card[data-toolbar-tone="light"] {
   --toolbar-ink: rgba(0, 0, 0, 0.85);
   --toolbar-icon: rgba(0, 0, 0, 0.5);
   --toolbar-hover: rgba(0, 0, 0, 0.06);

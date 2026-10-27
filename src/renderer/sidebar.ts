@@ -23,7 +23,7 @@ import { createActionButton, createElement, createFavicon, dispatch } from "./do
 import { installDragAndDrop, markListDropZone, onDragStateChanged } from "./dragDrop.js";
 import { morphChildren } from "./morph.js";
 import type { MorphOptions } from "./morph.js";
-import { renderFavoriteTile, renderItemRows } from "./rows.js";
+import { renderFavoriteTile, renderItemRows, startRowRedraw } from "./rows.js";
 import type { RowContext } from "./rows.js";
 import { installSidebarEvents } from "./sidebarEvents.js";
 import { createIcon, installSymbols } from "./icons.js";
@@ -280,6 +280,7 @@ function renderSpaceContent(state: BrowserState, space: Space, context: RowConte
   const pinnedLocation: ItemLocation = { kind: "pinned", spaceId: space.id };
   const todayLocation: ItemLocation = { kind: "today", spaceId: space.id };
   const children: HTMLElement[] = [renderSpaceTitle(space)];
+  startRowRedraw();
 
   if (space.isPinnedOpen) {
     const pinnedSection = createElement("div", "item-list pinned-list");
@@ -418,16 +419,19 @@ function getLuminance(hex: string): number {
  * Without a known color the card takes the theme's default.
  */
 function applyToolbarTint(selectedTabId: ItemId | null): void {
-  const root = document.documentElement;
+  const card = document.getElementById("card");
+  if (card === null) {
+    return;
+  }
   const color = selectedTabId === null ? null : currentRuntime.tabs[selectedTabId]?.toolbarColor ?? null;
   if (color === null || !/^#[0-9a-f]{6}$/.test(color)) {
-    root.style.removeProperty("--card-bg");
-    root.dataset.toolbarTone = root.dataset.appearance === "light" ? "light" : "dark";
+    card.style.removeProperty("--card-bg");
+    card.dataset.toolbarTone = document.documentElement.dataset.appearance === "light" ? "light" : "dark";
     return;
   }
   const shownColor = getLuminance(color) < NEAR_BLACK_LUMINANCE ? NEAR_BLACK_TOOLBAR_COLOR : color;
-  root.style.setProperty("--card-bg", shownColor);
-  root.dataset.toolbarTone = getLuminance(shownColor) > LIGHT_TOOLBAR_LUMINANCE ? "light" : "dark";
+  card.style.setProperty("--card-bg", shownColor);
+  card.dataset.toolbarTone = getLuminance(shownColor) > LIGHT_TOOLBAR_LUMINANCE ? "light" : "dark";
 }
 
 /**

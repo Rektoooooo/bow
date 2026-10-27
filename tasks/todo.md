@@ -138,7 +138,9 @@ Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 �
 ### 3.4 Verification
 - [x] e2e/arc-compare.mjs (side-by-side with the reference; positions match within about a point)
 - [x] Motion checks for ⌘S, peek and resize (e2e/check-motion.mjs, part of `npm run e2e`)
-- [ ] Long-task probe, 300-tab sidebar
+- [x] 331-tab sidebar within a frame (e2e/check-performance.mjs, DevTools metrics): was 35 ms per change and 44 ms
+      per selection; unchanged rows now come as placeholders morph.ts keeps as they are, move animations only
+      measure when the order changed, the toolbar tint restyles the card alone → about 8 ms per redraw
 - [ ] Hands-on runs of the packaged app; all suites green; docs + teardown page current
 
 ## Review (2026-10-26, end of the Arc-parity session)

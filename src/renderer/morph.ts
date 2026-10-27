@@ -4,7 +4,9 @@
  *   hover states, CSS transitions (a selection fading in), and any chance to animate rows coming and going.
  *   morphChildren() folds freshly built elements into the ones already on the page instead: an element with the same
  *   key is kept and only its attributes and text change; a new one is inserted (and grows in); a gone one shrinks
- *   away; a moved one slides to its new place.
+ *   away; a moved one slides to its new place. A list item that did not change at all comes as a placeholder
+ *   (createKeepPlaceholder, used by rows.ts): its element stays exactly as it is, so a change in a 300-tab sidebar
+ *   costs what the changed rows cost.
  *
  * Data source:
  *   Freshly built elements (rows.ts, sidebar.ts, toolbar.ts). Elements in a list carry `data-key`; list items that
@@ -33,6 +35,12 @@ const MIN_MOVE_PX = 0.5;
 /** Elements shrinking away: still in the page until their animation ends, but no longer part of any list. */
 const leavingElements = new WeakSet<Element>();
 
+/** Placeholders for unchanged list items, and how to build the real element when the page does not have it. */
+const placeholderBuilders = new WeakMap<Element, () => HTMLElement>();
+
+/** The system's "reduce motion" setting, asked once and read live (it updates when the setting changes). */
+const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+
 /** Attributes that make an element clickable, draggable or a drop target (sidebarEvents.ts, dragDrop.ts). */
 const INTERACTIVE_ATTRIBUTES = ["data-key", "data-row", "data-action", "data-drop", "data-item-id", "draggable"];
 
@@ -45,7 +53,18 @@ export interface MorphOptions {
  * True when the user asked the system for less motion.
  */
 function prefersReducedMotion(): boolean {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return reducedMotionQuery.matches;
+}
+
+/**
+ * A stand-in for a list item that has not changed since the last redraw. morphChildren keeps the page's element with
+ * this key as it is; if the page has none (it never should), it builds one with `build`.
+ */
+export function createKeepPlaceholder(key: string, build: () => HTMLElement): HTMLElement {
+  const placeholder = document.createElement("div");
+  placeholder.setAttribute("data-key", key);
+  placeholderBuilders.set(placeholder, build);
+  return placeholder;
 }
 
 /**
@@ -55,7 +74,20 @@ function getKey(node: Node): string | null {
   if (!(node instanceof HTMLElement)) {
     return null;
   }
-  return node.dataset.key ?? null;
+  return node.getAttribute("data-key");
+}
+
+/**
+ * True when the new children have the same keys in the same order as the page's: nothing enters, leaves or moves,
+ * so there is nothing to slide.
+ */
+function hasSameKeyOrder(keyedCurrent: Map<string, Element>, freshChildren: Node[]): boolean {
+  const currentKeys = Array.from(keyedCurrent.keys());
+  const freshKeys = freshChildren.map(getKey).filter((key) => key !== null);
+  if (currentKeys.length !== freshKeys.length) {
+    return false;
+  }
+  return currentKeys.every((key, index) => key === freshKeys[index]);
 }
 
 /**
@@ -179,7 +211,9 @@ export function morphChildren(container: HTMLElement, freshChildren: Node[], opt
   }
   const unkeyedCurrent = currentChildren.filter((node) => getKey(node) === null);
   const previousPositions = new Map<Element, DOMRect>();
-  if (shouldAnimate) {
+  // Measuring every row forces a layout: only worth it when something can actually move.
+  const canMove = shouldAnimate && !hasSameKeyOrder(keyedCurrent, freshChildren);
+  if (canMove) {
     for (const element of keyedCurrent.values()) {
       if (element instanceof HTMLElement && element.dataset.presence !== undefined) {
         previousPositions.set(element, element.getBoundingClientRect());
@@ -191,8 +225,8 @@ export function morphChildren(container: HTMLElement, freshChildren: Node[], opt
   const placed: Node[] = [];
   const entering: HTMLElement[] = [];
   let unkeyedIndex = 0;
-  for (const fresh of freshChildren) {
-    const key = getKey(fresh);
+  for (const freshChild of freshChildren) {
+    const key = getKey(freshChild);
     let match: Node | undefined;
     if (key !== null) {
       match = keyedCurrent.get(key);
@@ -201,6 +235,12 @@ export function morphChildren(container: HTMLElement, freshChildren: Node[], opt
       match = unkeyedCurrent[unkeyedIndex];
       unkeyedIndex = unkeyedIndex + 1;
     }
+    const buildFromPlaceholder = placeholderBuilders.get(freshChild as Element);
+    if (buildFromPlaceholder !== undefined && match !== undefined) {
+      placed.push(match);
+      continue;
+    }
+    const fresh: Node = buildFromPlaceholder === undefined ? freshChild : buildFromPlaceholder();
     const result = match === undefined ? fresh : morphNode(match, fresh, options);
     placed.push(result);
     if (result === fresh && fresh instanceof HTMLElement && fresh.dataset.presence !== undefined) {

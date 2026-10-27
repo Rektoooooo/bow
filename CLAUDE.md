@@ -21,7 +21,7 @@ npm start            # build + open the browser
 npm test             # Vitest unit tests (pure state rules, ranking, importers)
 npm run e2e          # build + drive the real app: check-app, check-overlay, check-extensions, permission-check,
                      # check-motion (layout changes glide instead of jumping), check-live-folders (local feed + fake
-                     # GitHub via --github-origin)
+                     # GitHub via --github-origin), check-performance (331-tab sidebar redraws within a frame)
 node e2e/window-shot.mjs   # README screenshots from sample data → docs/screenshot-*.png
 node e2e/arc-compare.mjs   # side-by-side crops with the user's Arc screenshots (reference/, local only) → e2e/output
 npm run package      # release/Sidebar Browser-darwin-arm64/Sidebar Browser.app (ad-hoc signed, git-ignored)

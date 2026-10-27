@@ -18,6 +18,7 @@ import type { BrowserState, FolderItem, ItemId, ItemLocation, LiveFolderSource, 
 import { createActionButton, createElement, createFavicon, dispatch, getDisplayHost } from "./dom.js";
 import { createIcon } from "./icons.js";
 import { encodeLocation, markDraggable, markDropTarget } from "./dragDrop.js";
+import { createKeepPlaceholder } from "./morph.js";
 import { isDeveloperModeOn } from "../shared/developerMode.js";
 import { tidyTitle } from "../shared/tidyTitles.js";
 import { isNoteUrl } from "../shared/notes.js";
@@ -151,18 +152,89 @@ function setIndent(row: HTMLElement, depth: number, basePadding: number = ROW_BA
   row.style.paddingLeft = `${basePadding}px`;
 }
 
+/** What a tab row was built from, as text, and its key: the same text means the same row. */
+interface TabRowInputs {
+  key: string;
+  text: string;
+}
+
+/**
+ * The tab rows of the previous redraw and of this one, by key: what each was built from. A row built from the same
+ * inputs as last time is not built again; it comes as a placeholder and morph.ts keeps its element as it is. Rows
+ * not drawn in a redraw are forgotten, so a row that comes back is always built fresh.
+ */
+let previousTabRowInputs = new Map<string, string>();
+let currentTabRowInputs = new Map<string, string>();
+
+/**
+ * Starts a redraw of the rows (sidebar.ts calls it before drawing them).
+ */
+export function startRowRedraw(): void {
+  previousTabRowInputs = currentTabRowInputs;
+  currentTabRowInputs = new Map();
+}
+
+/**
+ * True when a list belongs to a live folder: its source decides what it holds, so its rows take no drops.
+ */
+function isLiveFolderList(location: ItemLocation, state: BrowserState): boolean {
+  if (location.kind !== "folder") {
+    return false;
+  }
+  const folder = state.items[location.folderId];
+  return folder !== undefined && folder.kind === "folder" && folder.live !== undefined;
+}
+
+/**
+ * Everything a tab row shows depends on, as one text: the tab, where it sits, its runtime facts, whether it is
+ * selected or in Developer Mode, and the tidy-titles setting.
+ */
+function describeTabRowInputs(tab: TabItem, location: ItemLocation, index: number, depth: number, context: RowContext): TabRowInputs {
+  const encodedLocation = encodeLocation(location);
+  const facts = [
+    tab,
+    encodedLocation,
+    index,
+    depth,
+    context.runtime.tabs[tab.id] ?? null,
+    tab.id === context.selectedTabId,
+    isDeveloperModeOn(context.state, tab.url),
+    context.state.settings.areTitlesTidy !== false,
+    isLiveFolderList(location, context.state),
+  ];
+  return { key: `tab:${encodedLocation}:${tab.id}`, text: JSON.stringify(facts) };
+}
+
+/**
+ * One tab row: built, or a placeholder when nothing it shows changed since the last redraw. A row being renamed is
+ * always built (its field holds what the user types).
+ */
+export function renderTabRow(tab: TabItem, location: ItemLocation, index: number, depth: number, context: RowContext): HTMLElement {
+  const isRenaming = context.renamingItemId === tab.id;
+  const inputs = describeTabRowInputs(tab, location, index, depth, context);
+  const build = (): HTMLElement => buildTabRow(tab, location, index, depth, context, inputs.key);
+  if (isRenaming) {
+    return build();
+  }
+  currentTabRowInputs.set(inputs.key, inputs.text);
+  if (previousTabRowInputs.get(inputs.key) === inputs.text) {
+    return createKeepPlaceholder(inputs.key, build);
+  }
+  return build();
+}
+
 /**
  * Builds one tab row: icon, title, a speaker when it plays or is muted, and a close button on hover.
  * Pinned tabs only show the close button while their page is loaded, because closing puts the page away.
  */
-export function renderTabRow(tab: TabItem, location: ItemLocation, index: number, depth: number, context: RowContext): HTMLElement {
+function buildTabRow(tab: TabItem, location: ItemLocation, index: number, depth: number, context: RowContext, key: string): HTMLElement {
   const runtimeInfo = context.runtime.tabs[tab.id];
   const isLoaded = runtimeInfo !== undefined;
   const isSelected = tab.id === context.selectedTabId;
   const isToday = location.kind === "today" || location.kind === "split";
 
   const row = createElement("div", "row tab-row");
-  row.dataset.key = `tab:${encodeLocation(location)}:${tab.id}`;
+  row.dataset.key = key;
   row.dataset.presence = "row";
   row.dataset.row = "tab";
   row.title = tab.url;
@@ -205,7 +277,9 @@ export function renderTabRow(tab: TabItem, location: ItemLocation, index: number
   }
 
   markDraggable(row, tab.id);
-  markDropTarget(row, location, index, null);
+  if (!isLiveFolderList(location, context.state)) {
+    markDropTarget(row, location, index, null);
+  }
   return row;
 }
 
@@ -364,9 +438,6 @@ export function renderFolderRows(folder: FolderItem, location: ItemLocation, ind
   }
   if (folder.isOpen && live !== undefined) {
     const childRows = renderItemRows(folder.childIds, childLocation, depth + 1, context);
-    for (const childRow of childRows) {
-      delete childRow.dataset.drop;
-    }
     const statusLine = describeLiveStatus(folder, live.source, context.runtime.liveFolders[folder.id]);
     if (statusLine !== null) {
       childRows.push(renderLiveStatusRow(folder, statusLine, depth + 1));
