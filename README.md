@@ -88,6 +88,8 @@ in Arc). Running it twice adds nothing twice.
   your own CSS and JavaScript (only once switched on). Turn a Boost off or reset it any time; Library › Boosts.
 - **Developer Mode** per site (on by itself for localhost): a striped toolbar with the full address, Console,
   Network and Inspect buttons, a reload menu with Hard Reload, and the tab outlined in yellow.
+- **Show full URLs** (Library › Settings, View › Toggle Full URLs, or the Command Bar): the toolbar shows the whole
+  address instead of site and path, like Arc's preference of the same name.
 - **Notes** and **Easels**: rich-text notes and boards (text, drawing, pictures, captures) that sit in the sidebar
   like tabs (File › New Note / New Easel).
 - **Ad and tracker blocking** with EasyList and EasyPrivacy (off until you turn it on in Library › Settings), allowed

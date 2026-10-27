@@ -807,6 +807,16 @@ export function finishWelcome(state: BrowserState): BrowserState {
 }
 
 /**
+ * Shows the whole address in the toolbar, or host and path (Arc's default).
+ */
+export function setShowFullUrls(state: BrowserState, isOn: boolean): BrowserState {
+  if ((state.settings.showsFullUrls ?? false) === isOn) {
+    return state;
+  }
+  return { ...state, settings: { ...state.settings, showsFullUrls: isOn } };
+}
+
+/**
  * Turns tidy titles for pinned tabs on or off.
  */
 export function setTidyTitles(state: BrowserState, isOn: boolean): BrowserState {

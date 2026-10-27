@@ -203,6 +203,7 @@ function buildLibraryData(state: BrowserState): LibraryData {
     areSoundEffectsOn: state.settings.areSoundEffectsOn !== false,
     appIcon: state.settings.appIcon ?? "classic",
     areTitlesTidy: state.settings.areTitlesTidy !== false,
+    showsFullUrls: state.settings.showsFullUrls === true,
     adBlock: describeAdBlock(state),
     routingRules: state.routingRules ?? [],
     extensions: (state.extensions ?? []).map((extension) => ({

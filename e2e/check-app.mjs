@@ -135,6 +135,13 @@ let state = await getState(page);
 check("opening example.com adds a Today tab with https://", todayTabs(state)[0]?.url.startsWith("https://example.com"), todayTabs(state)[0]?.url);
 check("page title flows back into the sidebar", titleOk, todayTabs(state)[0]?.title);
 check("toolbar shows the page's host", (await page.textContent(".address-text")) === "example.com");
+await dispatch(page, { type: "setShowFullUrls", isOn: true });
+await page.waitForTimeout(300);
+const fullAddress = await page.textContent(".address-text");
+await dispatch(page, { type: "setShowFullUrls", isOn: false });
+await page.waitForTimeout(300);
+const shortAgain = await page.textContent(".address-text");
+check("Show full URLs shows the whole address, and turning it off goes back", fullAddress === "https://example.com" && shortAgain === "example.com", `${fullAddress} → ${shortAgain}`);
 const bounds = await tabViewBounds(app);
 // Arc's measured layout: sidebar 242 + gap 7 → x 249; card inset 10 + toolbar 32 → y 42 (shared/settings.ts).
 const SIDEBAR_WIDTH = 242;

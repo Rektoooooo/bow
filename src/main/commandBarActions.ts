@@ -50,6 +50,7 @@ function buildFixedActions(host: CommandActionHost): FixedAction[] {
     { entry: { id: "translate-page", title: "Translate Page (Google Translate)", keywords: ["translate", "language"] }, run: () => host.runAction({ type: "translatePage" }) },
     { entry: { id: "edit-theme", title: "Edit Theme", keywords: ["space color", "gradient", "appearance"] }, run: () => host.runAction({ type: "openThemeEditor", spaceId: host.getState().activeSpaceId }) },
     { entry: { id: "toggle-sidebar", title: "Toggle Sidebar", keywords: ["hide sidebar", "show sidebar"] }, run: () => commands.toggleSidebar() },
+    { entry: { id: "toggle-full-urls", title: "Toggle Full URLs", keywords: ["show full url", "full address", "hide full url"] }, run: () => commands.toggleFullUrls() },
     { entry: { id: "copy-url", title: "Copy URL", keywords: ["copy link", "copy address"] }, run: () => commands.copySelectedUrl("plain") },
     { entry: { id: "copy-markdown", title: "Copy URL as Markdown", keywords: ["markdown link"] }, run: () => commands.copySelectedUrl("markdown") },
     { entry: { id: "toggle-pin", title: "Pin / Unpin Tab", keywords: ["pin tab", "unpin tab"] }, run: () => commands.togglePinSelected() },

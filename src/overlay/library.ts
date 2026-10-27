@@ -599,7 +599,14 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
       createSwitch(data.areSoundEffectsOn, "Sound effects", (isOn) => dispatch({ type: "setSoundEffects", isOn: isOn })),
     ),
   ]);
-  const appearance = createSettingGroup("Appearance", [createSettingRow("App icon", "Shown in the Dock while the browser runs.", createAppIconChoices(data))]);
+  const appearance = createSettingGroup("Appearance", [
+    createSettingRow(
+      "Show full URLs",
+      "The toolbar shows the whole address, with https:// and everything after the page's path. Off: just the site and path, like Arc.",
+      createSwitch(data.showsFullUrls, "Show full URLs", (isOn) => dispatch({ type: "setShowFullUrls", isOn: isOn })),
+    ),
+    createSettingRow("App icon", "Shown in the Dock while the browser runs.", createAppIconChoices(data)),
+  ]);
   const importing = createSettingGroup("Import", [
     createSettingRow(
       "Bookmarks and history from another browser",

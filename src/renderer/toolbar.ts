@@ -42,9 +42,10 @@ function getDisplayAddress(url: string): string {
 }
 
 /**
- * Builds the address pill: a link icon for https pages (Arc's), a globe otherwise, and the address. Clicking edits it.
+ * Builds the address pill: a link icon for https pages (Arc's), a globe otherwise, and the address (the whole of it
+ * with "Show full URLs"). Clicking edits it.
  */
-function createAddressPill(url: string | null): HTMLElement {
+function createAddressPill(url: string | null, showsFullUrl: boolean): HTMLElement {
   const pill = document.createElement("button");
   pill.type = "button";
   pill.className = "address-pill";
@@ -56,7 +57,8 @@ function createAddressPill(url: string | null): HTMLElement {
 
   const isSecure = url !== null && url.startsWith("https://");
   pill.append(createIcon(isSecure ? "link" : "globe", "icon address-icon"));
-  const address = url === null ? "" : getDisplayAddress(url);
+  const shortAddress = url === null ? "" : getDisplayAddress(url);
+  const address = url !== null && showsFullUrl ? getFullAddress(url) : shortAddress;
   const label = address === "" ? url ?? "Search or enter address" : address;
   pill.append(createElement("span", "address-text", label));
   return pill;
@@ -212,7 +214,7 @@ export function renderToolbar(state: BrowserState, runtime: RuntimeState, select
     pagePill.append(createIcon(isNote ? "note" : "easel", "icon address-icon"), createElement("span", "address-text", isNote ? "Note" : "Easel"));
     centerGroup.append(pagePill);
   } else if (!isDeveloper) {
-    centerGroup.append(createAddressPill(selectedTab === null ? null : selectedTab.url));
+    centerGroup.append(createAddressPill(selectedTab === null ? null : selectedTab.url, state.settings.showsFullUrls === true));
   }
 
   const rightGroup = createElement("div", "toolbar-group toolbar-right");

@@ -105,7 +105,8 @@ Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 �
 - [x] Developer Mode per site (shot 5 was this, not a "full URL" option): striped 38 pt toolbar, full address in
       monospace, copy / capture / screenshot / console / network / inspect, nav buttons in the sidebar's strip with
       reload ▾, dashed yellow tab outline with the host; on by default for local servers
-- [ ] Arc's global "Show full URLs" preference (toolbarShowFullURLsEnabledPreference exists in its plist)
+- [x] Arc's global "Show full URLs" preference (toolbarShowFullURLsEnabledPreference): Library › Settings, View menu,
+      Command Bar
 - [x] Sidebar to the measurements: width 242 (rows 7…241.5), card at 249, toolbar 31 + hairline, Favorites at 43,
       46 tall, 7 apart; rows 35.33 on a 40.33 pitch (long lists), Space title as tall as a row, children indented
       as whole rows by 16, divider only while Today has tabs (10.5 under the last pinned row), New Tab highlighted
@@ -116,7 +117,7 @@ Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 �
       Settings rows (sound, zoom, Boost, permission answers), Secure pill, "…" native menu
 - [x] Library (grouped settings with switches), Find, theme editor (with intensity), Boost editor, Little Window
       reviewed in the same language · [x] permission prompt (two lines like Chromium's bubble, no empty gap)
-      · [ ] Peek frame, status bubble, crash page review
+      · [x] Peek frame, status bubble, crash page review (e2e/review-shots.mjs; the crash page says why in words)
 - [ ] Verify the traffic lights and native rendering once screen recording works (Claude restart)
 
 ### 3.3 Remaining Arc features

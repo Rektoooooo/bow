@@ -293,6 +293,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   showTabPreview: { tabId: isText, anchor: isAnchor },
   hideTabPreview: {},
   setTidyTitles: { isOn: isBoolean },
+  setShowFullUrls: { isOn: isBoolean },
   createNote: {},
   createEasel: {},
   finishWelcome: {},

@@ -53,6 +53,7 @@ import {
   setAdBlockForSite,
   setAppIcon,
   setTidyTitles,
+  setShowFullUrls,
   createNote,
   createEasel,
   finishWelcome,
@@ -321,6 +322,8 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => createNote(state, createId("note", now), now));
     case "setTidyTitles":
       return applyChange((state) => setTidyTitles(state, action.isOn));
+    case "setShowFullUrls":
+      return applyChange((state) => setShowFullUrls(state, action.isOn));
     case "showTabPreview":
       return showTabPreview(action.tabId, action.anchor);
     case "hideTabPreview":

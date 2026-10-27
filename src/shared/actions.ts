@@ -117,6 +117,7 @@ export type BrowserAction =
   | { type: "showTabPreview"; tabId: ItemId; anchor: { x: number; y: number; width: number; height: number } }
   | { type: "hideTabPreview" }
   | { type: "setTidyTitles"; isOn: boolean }
+  | { type: "setShowFullUrls"; isOn: boolean }
   | { type: "createNote" }
   | { type: "createEasel" }
   | { type: "finishWelcome" }
@@ -202,6 +203,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "showTabPreview",
   "hideTabPreview",
   "setTidyTitles",
+  "setShowFullUrls",
   "createNote",
   "createEasel",
   "finishWelcome",

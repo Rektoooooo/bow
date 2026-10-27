@@ -148,6 +148,7 @@ export interface LibraryData {
   areSoundEffectsOn: boolean;
   appIcon: string;
   areTitlesTidy: boolean;
+  showsFullUrls: boolean;
   adBlock: { isOn: boolean; status: "off" | "loading" | "ready" | "failed"; filterCount: number };
   routingRules: RoutingRule[];
   extensions: ExtensionLine[];

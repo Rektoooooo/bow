@@ -35,6 +35,7 @@ export interface AppMenuCommands {
   newSpace(): void;
   newFolder(): void;
   toggleSidebar(): void;
+  toggleFullUrls(): void;
   navigate(command: NavigationCommand): void;
   forceReload(): void;
   zoom(direction: "in" | "out" | "reset"): void;
@@ -141,6 +142,7 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
       label: "View",
       submenu: [
         { label: "Toggle Sidebar", accelerator: "CommandOrControl+S", click: () => commands.toggleSidebar() },
+        { label: "Toggle Full URLs", click: () => commands.toggleFullUrls() },
         { type: "separator" },
         { label: "Reload Page", accelerator: "CommandOrControl+R", click: () => commands.navigate("reload") },
         { label: "Force Reload Page", accelerator: "CommandOrControl+Shift+R", click: () => commands.forceReload() },

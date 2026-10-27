@@ -21,6 +21,7 @@ body {
 }
 
 .crash {
+  max-width: min(560px, calc(100vw - 48px));
   text-align: center;
 }
 
@@ -29,10 +30,18 @@ body {
   font-size: 20px;
 }
 
-.crash-detail {
-  margin: 0 0 18px;
-  color: light-dark(rgba(0, 0, 0, 0.55), rgba(255, 255, 255, 0.55));
-  word-break: break-all;
+.crash-reason {
+  margin: 0 0 4px;
+  color: light-dark(rgba(0, 0, 0, 0.7), rgba(255, 255, 255, 0.7));
+}
+
+.crash-address {
+  margin: 0 0 20px;
+  overflow: hidden;
+  color: light-dark(rgba(0, 0, 0, 0.4), rgba(255, 255, 255, 0.4));
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .crash-reload {

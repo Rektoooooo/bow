@@ -29,6 +29,7 @@ import {
   pinTab,
   restoreLastArchivedTab,
   setSidebarVisible,
+  setShowFullUrls,
   unpinTab,
 } from "./state";
 import { switchSpaceByNumber, switchSpaceByOffset } from "./spaces";
@@ -98,6 +99,7 @@ export const appMenuCommands: AppMenuCommands = {
   newSpace: () => showMenuRequest(menuHost, { menu: "plus" }),
   newFolder: () => applyChange((state) => createFolder(state, "New Folder", Date.now())),
   toggleSidebar: () => applyChange((state) => setSidebarVisible(state, !state.settings.isSidebarVisible)),
+  toggleFullUrls: () => applyChange((state) => setShowFullUrls(state, state.settings.showsFullUrls !== true)),
   navigate: (command) => navigateFocusedPage(command),
   forceReload: () => getFocusedContents()?.reloadIgnoringCache(),
   zoom: (direction) => {
