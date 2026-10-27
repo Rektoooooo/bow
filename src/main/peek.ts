@@ -12,7 +12,7 @@
  *   "Open as Tab" → adoptTabView() + openTab({ id }) → the same page becomes a Today tab, nothing reloads
  */
 import { WebContentsView } from "electron";
-import type { WebContents } from "electron";
+import type { BrowserWindow, WebContents } from "electron";
 import { DEFAULT_PROFILE_ID } from "../shared/settings";
 import type { ItemId } from "../shared/types";
 import { addAfterSyncHook, applyChange, getLayoutOptions, getState, getWindow } from "./browserCore";
@@ -55,6 +55,9 @@ function scaleAboutCenter(bounds: Bounds, scale: number): Bounds {
 /** The open Peek, or null. */
 let peekView: WebContentsView | null = null;
 
+/** The main window the open Peek is in (the focused one when it opened; it closes when another window is focused). */
+let peekWindow: BrowserWindow | null = null;
+
 /** The tab the Peek was opened from; "Split" puts the Peek next to it. */
 let peekSourceTabId: ItemId | null = null;
 
@@ -75,11 +78,10 @@ export function isPeekOpen(): boolean {
 }
 
 /**
- * Where the Peek card goes: centered over the page card, leaving room for its header above.
+ * Where the Peek card goes in a window: centered over the page card, leaving room for its header above.
  */
-function computePeekBounds(): Bounds | null {
-  const window = getWindow();
-  if (window === null) {
+function computePeekBounds(window: BrowserWindow | null): Bounds | null {
+  if (window === null || window.isDestroyed()) {
     return null;
   }
   const contentSize = window.getContentSize();
@@ -99,8 +101,8 @@ function computePeekBounds(): Bounds | null {
  * Draws the overlay part of the Peek (dimmed page, shadow, header with buttons) under the Peek's page view.
  */
 function showPeekFrame(contents: WebContents): void {
-  const window = getWindow();
-  const frame = computePeekBounds();
+  const window = peekWindow;
+  const frame = computePeekBounds(window);
   if (window === null || frame === null || peekView === null) {
     return;
   }
@@ -121,8 +123,8 @@ function showPeekFrame(contents: WebContents): void {
  * Keeps the Peek above everything after other views were added.
  */
 function raisePeek(): void {
-  const window = getWindow();
-  if (window === null || peekView === null) {
+  const window = peekWindow;
+  if (window === null || window.isDestroyed() || peekView === null) {
     return;
   }
   raiseOverlayIfShown(window);
@@ -133,7 +135,7 @@ function raisePeek(): void {
  * Re-places the Peek after the window was resized.
  */
 export function relayoutPeek(): void {
-  const bounds = computePeekBounds();
+  const bounds = computePeekBounds(peekWindow);
   if (peekView === null || bounds === null) {
     return;
   }
@@ -146,11 +148,12 @@ export function relayoutPeek(): void {
  */
 export function openPeek(url: string, sourceTabId: ItemId | null): void {
   const window = getWindow();
-  const bounds = computePeekBounds();
+  const bounds = computePeekBounds(window);
   if (window === null || bounds === null) {
     return;
   }
   closePeek();
+  peekWindow = window;
 
   const state = getState();
   const profileId = sourceTabId === null ? DEFAULT_PROFILE_ID : findProfileIdOfItem(state, sourceTabId) ?? DEFAULT_PROFILE_ID;
@@ -189,12 +192,11 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
  * Takes the Peek off the screen. With `keepPage` its page lives on (it is becoming a tab); otherwise it is closed.
  */
 function removePeek(keepPage: boolean): WebContentsView | null {
-  const window = getWindow();
+  const window = peekWindow;
   const view = peekView;
   peekView = null;
-  if (window !== null) {
-    hideOverlay(window);
-  }
+  peekWindow = null;
+  hideOverlay();
   if (view === null) {
     return null;
   }
@@ -202,12 +204,31 @@ function removePeek(keepPage: boolean): WebContentsView | null {
     // It shrinks away while its frame fades, then the page goes.
     glideView(view, scaleAboutCenter(view.getBounds(), PEEK_START_SCALE));
     setTimeout(() => {
-      window?.contentView.removeChildView(view);
+      if (window !== null && !window.isDestroyed()) {
+        window.contentView.removeChildView(view);
+      }
       view.webContents.close();
     }, PEEK_CLOSE_MS);
     return null;
   }
   return view;
+}
+
+/**
+ * A main window is closing: its Peek goes at once, without the shrink.
+ */
+export function closePeekIn(window: BrowserWindow): void {
+  if (peekView === null || peekWindow !== window) {
+    return;
+  }
+  const view = peekView;
+  peekView = null;
+  peekWindow = null;
+  peekSourceTabId = null;
+  if (!window.isDestroyed()) {
+    window.contentView.removeChildView(view);
+  }
+  view.webContents.close();
 }
 
 /**

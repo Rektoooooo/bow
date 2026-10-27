@@ -8,14 +8,17 @@
  *   "update-target-url" from the tabs' pages (tabViews.ts), the card's position and the pointer position.
  *
  * Data flow:
- *   pointer over a link → main.ts → showLinkStatus(url) → bubble shown with the address; "" → hidden
+ *   pointer over a link → main.ts → showLinkStatus(tabId, url) → bubble shown in the focused window; "" → hidden
  */
 import { screen, WebContentsView } from "electron";
+import type { BrowserWindow } from "electron";
 import * as path from "node:path";
-import { getLayoutOptions, getWindow } from "./browserCore";
+import type { ItemId } from "../shared/types";
+import { getLayoutOptions, getState, getWindow } from "./browserCore";
 import { computeCardBounds } from "./layout";
 import type { Bounds } from "./layout";
 import { isOverlayShown } from "./overlay";
+import { getShownTabIdsInWindow } from "./tabViews";
 
 /** Bubble size and distance from the card's corner. Our choice. */
 const BUBBLE_MAX_WIDTH_PX = 520;
@@ -27,6 +30,9 @@ const MAX_SHOWN_LENGTH = 300;
 
 let bubbleView: WebContentsView | null = null;
 let isBubbleShown = false;
+
+/** The main window the bubble is in while shown (it moves to the focused window). */
+let bubbleWindow: BrowserWindow | null = null;
 let bubbleReady: Promise<void> = Promise.resolve();
 
 /**
@@ -68,17 +74,39 @@ function computeBubbleBounds(): Bounds | null {
 }
 
 /**
- * Shows where a hovered link goes, or hides the bubble for an empty address. Stays out of the way of open panels.
+ * Takes the bubble out of the window it is in.
  */
-export async function showLinkStatus(url: string): Promise<void> {
+function hideBubble(): void {
+  if (bubbleView !== null && bubbleWindow !== null && !bubbleWindow.isDestroyed()) {
+    bubbleWindow.contentView.removeChildView(bubbleView);
+  }
+  bubbleWindow = null;
+  isBubbleShown = false;
+}
+
+/**
+ * A main window is closing: the bubble leaves it (it lives on for the other windows).
+ */
+export function leaveWindow(window: BrowserWindow): void {
+  if (window === bubbleWindow) {
+    hideBubble();
+  }
+}
+
+/**
+ * Shows where a hovered link in a tab's page goes, or hides the bubble for an empty address. Only for pages in the
+ * focused window (the mouse also moves over background windows); stays out of the way of open panels.
+ */
+export async function showLinkStatus(tabId: ItemId, url: string): Promise<void> {
   const window = getWindow();
   if (window === null || bubbleView === null) {
     return;
   }
-  if (url === "" || isOverlayShown()) {
+  const focusedWindowTabIds = getShownTabIdsInWindow(getState().focusedWindowId);
+  const isInFocusedWindow = focusedWindowTabIds.includes(tabId);
+  if (url === "" || isOverlayShown() || !isInFocusedWindow) {
     if (isBubbleShown) {
-      window.contentView.removeChildView(bubbleView);
-      isBubbleShown = false;
+      hideBubble();
     }
     return;
   }
@@ -92,6 +120,8 @@ export async function showLinkStatus(url: string): Promise<void> {
   // JSON.stringify makes the address a safe string literal inside the script.
   bubbleView.webContents.executeJavaScript(`window.showStatus(${JSON.stringify(shownText)})`).catch(() => undefined);
   bubbleView.setBounds(bounds);
+  // Adding it to another window moves it there.
   window.contentView.addChildView(bubbleView);
+  bubbleWindow = window;
   isBubbleShown = true;
 }

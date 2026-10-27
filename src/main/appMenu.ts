@@ -44,6 +44,10 @@ export interface AppMenuCommands {
   findNext(forward: boolean): void;
   openLibrary(): void;
   openLittleWindow(): void;
+  /** File › New Window (⌘N): another full main window. */
+  openNewWindow(): void;
+  /** File › Close Window (⇧⌘W): the window in front. */
+  closeWindow(): void;
   importFromArc(): void;
   newNote(): void;
   newEasel(): void;
@@ -102,6 +106,7 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
       label: "File",
       submenu: [
         { label: "New Tab", accelerator: "CommandOrControl+T", click: () => commands.openCommandBar("newTab") },
+        { label: "New Window", accelerator: "CommandOrControl+N", click: () => commands.openNewWindow() },
         { label: "New Little Window", accelerator: "CommandOrControl+Alt+N", click: () => commands.openLittleWindow() },
         { label: "New Note", accelerator: "Control+Command+N", click: () => commands.newNote() },
         { label: "New Easel", click: () => commands.newEasel() },
@@ -110,6 +115,7 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
         { label: "Open Peek as Tab", accelerator: "CommandOrControl+O", click: () => commands.openPeekAsTab() },
         { type: "separator" },
         { label: "Close Tab", accelerator: "CommandOrControl+W", click: () => commands.closeSelectedTab() },
+        { label: "Close Window", accelerator: "CommandOrControl+Shift+W", click: () => commands.closeWindow() },
         { label: "Reopen Closed Tab", accelerator: "CommandOrControl+Shift+T", click: () => commands.reopenClosedTab() },
         { type: "separator" },
         { label: "Import from Arc…", click: () => commands.importFromArc() },

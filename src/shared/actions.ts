@@ -127,7 +127,9 @@ export type BrowserAction =
   | { type: "createFeedLiveFolder" }
   | { type: "refreshLiveFolder"; folderId: ItemId }
   | { type: "openLiveFolderSource"; folderId: ItemId }
-  | { type: "showHiddenLiveFolderItems"; folderId: ItemId };
+  | { type: "showHiddenLiveFolderItems"; folderId: ItemId }
+  /** "Move to This Window": the window takes the pages it selected that another window shows. */
+  | { type: "moveTabToThisWindow" };
 
 /** Every action type, for checking an incoming `type` string. */
 export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
@@ -214,4 +216,5 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "refreshLiveFolder",
   "openLiveFolderSource",
   "showHiddenLiveFolderItems",
+  "moveTabToThisWindow",
 ];

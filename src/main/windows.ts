@@ -163,10 +163,9 @@ export function collectSelectedTabIdsOfAllWindows(state: BrowserState): Set<Item
   const selectedTabIds = new Set<ItemId>();
   const selections = [readFocusedSelection(state), ...state.otherWindows];
   for (const selection of selections) {
-    for (const tabId of Object.values(selection.selectedTabIdBySpace)) {
-      if (tabId !== null) {
-        selectedTabIds.add(tabId);
-      }
+    const tabIds = Object.values(selection.selectedTabIdBySpace).filter((tabId): tabId is ItemId => tabId !== null);
+    for (const tabId of tabIds) {
+      selectedTabIds.add(tabId);
     }
   }
   return selectedTabIds;

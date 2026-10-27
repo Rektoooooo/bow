@@ -5,10 +5,11 @@ Public repo: https://github.com/Rektoooooo/sidebar-browser
 
 ## Start here
 
-1. Read the newest file in `.handoffs/` (`2026-10-26-arc-look.md`, then `2026-10-26-arc-parity.md` and the oldest).
+1. Read the newest file in `.handoffs/` (`2026-10-27-multiple-windows.md`, then `2026-10-26-arc-look.md`,
+   `2026-10-26-arc-parity.md` and the oldest).
    They have the history, decisions, how the look is measured, status and next steps.
 2. Arc research: `docs/research/arc-findings.md` (text), `docs/research/arc-data-model.md` (how Arc stores the
-   sidebar and archive on disk) and `docs/arc-teardown.html` (feature map, all 53 features, with what is built here).
+   sidebar and archive on disk) and `docs/arc-teardown.html` (feature map, all 54 features, with what is built here).
 3. Reverse-engineering tools and how to resume the Ghidra pass: `docs/research/reverse-engineering-setup.md`.
 4. Open work: `tasks/todo.md`.
 
@@ -21,7 +22,8 @@ npm start            # build + open the browser
 npm test             # Vitest unit tests (pure state rules, ranking, importers)
 npm run e2e          # build + drive the real app: check-app, check-overlay, check-extensions, permission-check,
                      # check-motion (layout changes glide instead of jumping), check-live-folders (local feed + fake
-                     # GitHub via --github-origin), check-performance (331-tab sidebar redraws within a frame)
+                     # GitHub via --github-origin), check-performance (331-tab sidebar redraws within a frame),
+                     # check-windows (⌘N, a Space and selection per window, restart restores every window)
 node e2e/window-shot.mjs   # README screenshots from sample data → docs/screenshot-*.png
 node e2e/arc-compare.mjs   # side-by-side crops with the user's Arc screenshots (reference/, local only) → e2e/output
 npm run package      # release/Sidebar Browser-darwin-arm64/Sidebar Browser.app (ad-hoc signed, git-ignored)
@@ -36,15 +38,21 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
 
 ## Architecture rules (keep them)
 
-- **Pure core.** `state.ts`, `spaces.ts`, `split.ts`, `tree.ts`, `autoArchive.ts`, `commandBar.ts`, `history.ts`,
-  `layout.ts`, `migrate.ts` and the Arc importers take data in and return a changed copy. No Electron, no
+- **Pure core.** `state.ts`, `spaces.ts`, `split.ts`, `tree.ts`, `windows.ts`, `autoArchive.ts`, `commandBar.ts`,
+  `history.ts`, `layout.ts`, `migrate.ts` and the Arc importers take data in and return a changed copy. No Electron, no
   `Date.now()` inside; `now` is a parameter. Return the *same object* when nothing changed.
-- **Data model** (`src/shared/types.ts`, version 2) follows Arc's: every sidebar object is an item; order lives only
+- **Data model** (`src/shared/types.ts`, version 3) follows Arc's: every sidebar object is an item; order lives only
   in ordered id lists (profile Favorites, Space Pinned / Today, folder and split children). No parent pointers.
   A saved-shape change needs a version bump and an upgrade step in `migrate.ts`.
 - **One way to change state.** Only `applyChange()` in `src/main/browserCore.ts` replaces the state; it saves, calls
   `syncTabViews()`, keeps floating layers (overlay, Peek) on top and pushes state to the sidebar. Runtime facts that
   are not saved (loading, sound, downloads, media, sidebar peek) go out separately as `RuntimeState`.
+- **Several main windows** (⌘N, `mainWindows.ts`). The focused window's Space and selection are the usual
+  `activeSpaceId` / `selectedTabIdBySpace`, so every pure function acts on "the focused window"; the other windows'
+  are parked in `otherWindows` and swapped in on focus (`windows.ts`). Each sidebar gets the state projected for its
+  window. `getWindow()` is the last focused main window (never `BrowserWindow.getFocusedWindow()`). A page view has
+  one parent: it stays with the window that shows it, another window shows "Open in another window". The overlay,
+  Peek and status bubble move to the focused window when they open.
 - **Actions.** The sidebar sends one `BrowserAction` (`src/shared/actions.ts`) on one channel; `ipc.ts` checks every
   field (`parseAction`) and only from our own pages; `actionRunner.ts` runs it. Menu items live in `appMenu.ts`
   (accelerators = Arc's shortcuts) and `appMenuCommands.ts`; the Command Bar's actions reuse them.

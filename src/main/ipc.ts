@@ -28,11 +28,13 @@ import type { BrowserState, RuntimeState } from "../shared/types";
 
 /** What main.ts must provide so the handlers have something to call. */
 export interface IpcHandlers {
-  /** True for our own pages (the sidebar and the overlay). Messages from anything else are ignored. */
+  /** True for our own pages (every main window's sidebar and the overlay). Messages from anything else are ignored. */
   isTrustedSender(sender: WebContents): boolean;
-  getState(): BrowserState;
-  getRuntimeState(): RuntimeState;
-  runAction(action: BrowserAction): void;
+  /** The state as the sender's window shows it (each main window has its own Space and selection). */
+  getState(sender: WebContents): BrowserState;
+  getRuntimeState(sender: WebContents): RuntimeState;
+  /** Runs an action; the sender tells which window it came from. */
+  runAction(action: BrowserAction, sender: WebContents): void;
   readNote(noteId: string): string;
   saveNote(noteId: string, html: string, title: string): void;
   readEasel(easelId: string): string;
@@ -306,6 +308,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   refreshLiveFolder: { folderId: isText },
   openLiveFolderSource: { folderId: isText },
   showHiddenLiveFolderItems: { folderId: isText },
+  moveTabToThisWindow: {},
 };
 
 /**
@@ -336,10 +339,10 @@ export function parseAction(value: unknown): BrowserAction | null {
  */
 export function registerIpcHandlers(handlers: IpcHandlers): void {
   ipcMain.handle(IPC_CHANNELS.getState, (event) => {
-    return handlers.isTrustedSender(event.sender) ? handlers.getState() : null;
+    return handlers.isTrustedSender(event.sender) ? handlers.getState(event.sender) : null;
   });
   ipcMain.handle(IPC_CHANNELS.getRuntimeState, (event) => {
-    return handlers.isTrustedSender(event.sender) ? handlers.getRuntimeState() : null;
+    return handlers.isTrustedSender(event.sender) ? handlers.getRuntimeState(event.sender) : null;
   });
   ipcMain.handle(IPC_CHANNELS.readNote, (event, noteId: unknown) => {
     if (!handlers.isTrustedSender(event.sender) || !isNoteId(noteId)) {
@@ -390,6 +393,6 @@ export function registerIpcHandlers(handlers: IpcHandlers): void {
     if (action === null) {
       return;
     }
-    handlers.runAction(action);
+    handlers.runAction(action, event.sender);
   });
 }

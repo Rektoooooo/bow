@@ -66,6 +66,16 @@ in Arc). Running it twice adds nothing twice.
   moves a Space to another profile or a new one.
 - Private windows (⇧⌘N) keep nothing: an in-memory session, no history, no archive.
 
+**Windows**
+- File › New Window (⌘N) opens another full window, like Arc: the same Spaces, Favorites, Pinned and Today lists,
+  but its own Space and its own selected tab in each Space. It opens on the Space you were in, with the Command Bar
+  ready for a new tab.
+- A page is on screen in one window at a time. Selecting a tab another window shows says "Open in another window",
+  with **Move to This Window**.
+- Menus, shortcuts, the Command Bar, the Library, Peek and the other panels act in the window in front. ⇧⌘W closes a
+  window; the app quits with the last one. Every window (place, size, Space, selection) opens again at the next
+  start; links from Little Windows go to the main window you used last.
+
 **Command Bar** (⌘T, ⌘L)
 - Finishes addresses as you type ("git" → github.com, also well-known sites you never visited).
 - Open tabs ("Switch to Tab"), history, what you typed, search suggestions and about 40 browser actions
@@ -139,7 +149,7 @@ The evidence is in [docs/research/arc-findings.md](docs/research/arc-findings.md
 
 ## Keyboard shortcuts
 
-Same keys as Arc. ⌘T new tab, ⌘L edit address, ⌘W close, ⇧⌘T reopen, ⌘D pin/unpin, ⇧⌘C copy URL
+Same keys as Arc. ⌘T new tab, ⌘N new window, ⇧⌘W close window, ⌘L edit address, ⌘W close, ⇧⌘T reopen, ⌘D pin/unpin, ⇧⌘C copy URL
 (⌥⇧⌘C as Markdown), ⌘S sidebar, ⌘[ / ⌘] back/forward, ⌘R reload, ⌥⌘↑ / ⌥⌘↓ previous/next tab, ⌘1–⌘9 tab N,
 ⌃Tab / ⌃⇧Tab recent tabs, ⌃⌘N new note, ⌥⌘← / ⌥⌘→ previous/next Space, ⌃1–⌃9 Space N, ⇧⌘K clear Today, ⌃⇧= split view, ⌃⇧- close pane,
 ⌘O open Peek as tab, ⌥⌘N Little Window, ⌘F find, ⇧⌘L Library, ⌘+ / ⌘- / ⌘0 zoom, ⌥⌘I developer tools.
@@ -148,7 +158,7 @@ Same keys as Arc. ⌘T new tab, ⌘L edit address, ⌘W close, ⇧⌘T reopen, �
 
 | Folder | Runs in | What it holds |
 |---|---|---|
-| `src/main` | Electron's main process | State rules (pure functions), web views, menus, overlay panels, Peek, Little Windows, import from Arc |
+| `src/main` | Electron's main process | State rules (pure functions), main windows, web views, menus, overlay panels, Peek, Little Windows, import from Arc |
 | `src/renderer` | The sidebar page | The sidebar and toolbar, drawn from the state |
 | `src/overlay` | The overlay page | Command Bar, Library, site controls, Find, the Peek frame |
 | `src/little` | A Little Window's bar | Address, Copy Link, Open in Space |
@@ -157,7 +167,7 @@ Same keys as Arc. ⌘T new tab, ⌘L edit address, ⌘W close, ⇧⌘T reopen, �
 | `tests` | Vitest | Rules for state, Spaces, splits, auto-archive, ranking, history, the Arc importers |
 | `e2e` | Playwright + Electron | The real app driven end to end, extensions (with a synthetic test extension), the permission check, the packaged app, the README screenshots |
 | `build`, `tools` | — | The app icon (our own drawing) and Info.plist additions; scripts that draw the icon and package the app |
-| `docs` | — | Screenshots, `arc-teardown.html` (Arc's 53 features and which are built here), `research/` (findings, Arc's data model, RE setup) |
+| `docs` | — | Screenshots, `arc-teardown.html` (Arc's 54 features and which are built here), `research/` (findings, Arc's data model, RE setup) |
 
 Three ideas keep it simple:
 

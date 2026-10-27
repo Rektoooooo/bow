@@ -1,16 +1,16 @@
 /**
  * WHY this file exists:
- *   The app's starting point. It wires the parts together once Electron is ready: state, window, overlay, menus,
+ *   The app's starting point. It wires the parts together once Electron is ready: state, windows, overlay, menus,
  *   IPC, history, downloads and the auto-archive timers. The work itself lives in the modules it imports.
  *
  * Data source:
- *   Electron's app / BrowserWindow, the saved state (browserCore.ts), and the clock for the timers.
+ *   Electron's app, the saved state (browserCore.ts), and the clock for the timers.
  *
  * Data flow:
- *   app ready → initializeState() → createMainWindow() → createOverlayView() → registerIpcHandlers() → timers
+ *   app ready → initializeState() → registerIpcHandlers() → restoreMainWindows() → createOverlayView() → timers
  *   page events → tabViewEvents → applyChange() / history / menus
  */
-import { app, BrowserWindow, session } from "electron";
+import { app, session } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
@@ -21,21 +21,24 @@ import {
   IN_USE_REFRESH_INTERVAL_MS,
 } from "../shared/settings";
 import type { ItemId } from "../shared/types";
-import { menuHost, runAction } from "./actionRunner";
+import { menuHost, runAction, runActionFromWindow } from "./actionRunner";
 import { findTabsInUse, markTabsActive } from "./activity";
 import { installAppMenu } from "./appMenu";
 import { appMenuCommands } from "./appMenuCommands";
 import { findTabsToArchive, pruneArchive } from "./autoArchive";
 import {
   applyChange,
-  attachWindow,
   collectRuntimeState,
-  getLayoutOptions,
+  findMainWindowIdOf,
   getState,
+  getStateForWindow,
+  getWindow,
   initializeState,
   scheduleRuntimePush,
+  setTabViewEvents,
   syncViews,
 } from "./browserCore";
+import { restoreMainWindows } from "./mainWindows";
 import { createCommandActionRegistry } from "./commandBarActions";
 import { startTrackingDownloads } from "./downloads";
 import { getExtensionMenuItems, initializeExtensionHost, prepareExtensions } from "./extensionHost";
@@ -50,9 +53,9 @@ import { archiveIdleLittleWindows, handleExternalUrl, registerLittleWindowIpc } 
 import { showPageContextMenu } from "./menus";
 import { applyBoostToPage, runBoostJavaScript } from "./boostPages";
 import { createStatusBubble, showLinkStatus } from "./statusBubble";
-import { initializePeek, openPeek, relayoutPeek } from "./peek";
+import { initializePeek, openPeek } from "./peek";
 import { createOverlayView, getOverlayContents } from "./overlay";
-import { openWelcome, refreshOpenPanel, registerOverlayIpc, relayoutOverlay, setCommandActionRegistry } from "./overlayController";
+import { openWelcome, refreshOpenPanel, registerOverlayIpc, setCommandActionRegistry } from "./overlayController";
 import { startHandoff } from "./handoff";
 import { noticeVisitedPage, startLiveFolderRefreshing } from "./liveFolderRefresher";
 import { getProfileSession, onProfileSessionCreated, restrictWebPermissions, useChromeUserAgent } from "./profiles";
@@ -60,9 +63,8 @@ import { retakeCapture } from "./liveCaptures";
 import { linkNativeMessagingHosts, listOtherBrowserHostFolders } from "./nativeMessagingHosts";
 import { moveTabsToArchive, setNoteTitle, updateTabFavicon, updateTabPage } from "./state";
 import { getStateFilePath } from "./store";
-import { loadWindowBounds, rememberWindowBounds } from "./windowState";
 import { openLinkInNewTab } from "./tabActions";
-import { getShownTabIds, getTabViews, layoutShownTabViews, refreshShownSnapshots } from "./tabViews";
+import { getShownTabIds, getTabViews, refreshShownSnapshots } from "./tabViews";
 import { SNAPSHOT_REFRESH_MS } from "./tabSnapshots";
 import { listCaptures, loadCaptures, readCaptureAsDataUrl } from "./captures";
 import { initializeEaselsStore, readEasel, writeEasel } from "./easelsStore";
@@ -74,21 +76,6 @@ import { findRootLocation, findTab, getActiveSpace } from "./tree";
 import { isSameSite } from "./urls";
 import type { TabViewEvents } from "./tabViews";
 
-/** Starting window size in pixels. Our choice: fits a 13-inch laptop screen. */
-const WINDOW_WIDTH_PX = 1280;
-const WINDOW_HEIGHT_PX = 820;
-
-/** Smallest window that still leaves a usable page next to the sidebar. */
-const MIN_WINDOW_WIDTH_PX = 640;
-const MIN_WINDOW_HEIGHT_PX = 400;
-
-/**
- * Where macOS draws the close/minimize/zoom buttons, so they sit in the sidebar's top strip: the top-left corner of
- * the close button's 14 × 14 pt frame (Electron centers the buttons in a strip 2 × y taller than them). Measured on
- * the user's Arc (1 px per pt): the close button's center is at 19, 22.5 pt.
- */
-const TRAFFIC_LIGHT_POSITION = { x: 12, y: 16 };
-
 /** Command-line flag that skips the first-start tour (the end-to-end checks start with empty data folders). */
 const SKIP_WELCOME_FLAG = "--skip-welcome";
 
@@ -97,9 +84,6 @@ const EASEL_CAPTURE_CHOICES = 40;
 
 /** When this run of the app started. Auto-archive counts inactivity from here at the earliest. */
 const launchedAt = Date.now();
-
-/** The browser window. */
-let mainWindow: BrowserWindow | null = null;
 
 /** Where the per-site toolbar colors are remembered (like Arc's TopBarColorCache). */
 const TOOLBAR_COLORS_FILE_NAME = "toolbar-colors.json";
@@ -141,8 +125,8 @@ const tabViewEvents: TabViewEvents = {
     runBoostJavaScript(contents, getState());
     applyCosmeticFilters(contents).catch(() => undefined);
   },
-  onLinkHover: (url) => {
-    showLinkStatus(url).catch(() => undefined);
+  onLinkHover: (tabId, url) => {
+    showLinkStatus(tabId, url).catch(() => undefined);
   },
 };
 
@@ -158,53 +142,6 @@ function shouldOpenInPeek(tabId: ItemId, url: string): boolean {
     return false;
   }
   return !isSameSite(tab.url, url);
-}
-
-/**
- * Creates the window: sidebar page on the left, hidden title bar with the traffic-light buttons inset,
- * the sidebar's preload script attached, and a resize listener that re-lays out the page and the overlay.
- */
-function createMainWindow(): BrowserWindow {
-  // __dirname is dist/node/main when running, so these paths point into the build output.
-  const preloadPath = path.join(__dirname, "..", "preload", "sidebarPreload.js");
-  const sidebarPagePath = path.join(__dirname, "..", "..", "web", "renderer", "index.html");
-
-  const savedBounds = loadWindowBounds();
-  const window = new BrowserWindow({
-    width: savedBounds?.width ?? WINDOW_WIDTH_PX,
-    height: savedBounds?.height ?? WINDOW_HEIGHT_PX,
-    x: savedBounds?.x,
-    y: savedBounds?.y,
-    minWidth: MIN_WINDOW_WIDTH_PX,
-    minHeight: MIN_WINDOW_HEIGHT_PX,
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: TRAFFIC_LIGHT_POSITION,
-    webPreferences: {
-      preload: preloadPath,
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false,
-    },
-  });
-
-  // The sidebar page holds the bridge to Electron, so it must never navigate away or open windows.
-  // Without this, dropping a link onto the sidebar would load that website with the bridge attached.
-  window.webContents.on("will-navigate", (event) => {
-    event.preventDefault();
-  });
-  window.webContents.setWindowOpenHandler(() => {
-    return { action: "deny" };
-  });
-
-  window.loadFile(sidebarPagePath);
-  window.on("resize", () => {
-    layoutShownTabViews(window, getState(), getLayoutOptions());
-    relayoutOverlay();
-    relayoutPeek();
-    rememberWindowBounds(window);
-  });
-  window.on("move", () => rememberWindowBounds(window));
-  return window;
 }
 
 /**
@@ -328,11 +265,12 @@ async function handleAppReady(): Promise<void> {
     refreshOpenPanel();
   });
   registerIpcHandlers({
-    isTrustedSender: (sender) => sender === mainWindow?.webContents || sender === getOverlayContents(),
-    getState: () => getState(),
-    getRuntimeState: () => collectRuntimeState(),
-    runAction: (action) => {
-      runAction(action);
+    isTrustedSender: (sender) => findMainWindowIdOf(sender) !== null || sender === getOverlayContents(),
+    // The overlay is always in the focused window, so it gets the focused window's state.
+    getState: (sender) => getStateForWindow(findMainWindowIdOf(sender) ?? getState().focusedWindowId),
+    getRuntimeState: (sender) => collectRuntimeState(findMainWindowIdOf(sender) ?? getState().focusedWindowId),
+    runAction: (action, sender) => {
+      runActionFromWindow(action, findMainWindowIdOf(sender));
       refreshOpenPanel();
     },
     readNote: (noteId) => readNote(noteId),
@@ -362,11 +300,10 @@ async function handleAppReady(): Promise<void> {
   initializeExtensionHost(tabViewEvents);
   await prepareExtensions();
 
-  mainWindow = createMainWindow();
+  setTabViewEvents(tabViewEvents);
+  // Every window of the last session opens again, each with its own Space and selection (mainWindows.ts).
+  restoreMainWindows();
   applyAppIcon(getState().settings.appIcon).catch((error) => console.warn("Could not show the chosen app icon:", error));
-  // Little Windows cannot live without the main window; closing it ends the app.
-  mainWindow.on("closed", () => app.quit());
-  attachWindow(mainWindow, tabViewEvents);
   initializePeek(tabViewEvents);
   createOverlayView();
   createStatusBubble();
@@ -388,10 +325,11 @@ async function handleAppReady(): Promise<void> {
   startExtensionUpdates();
   startLiveFolderRefreshing();
   startHandoff();
-  if (isFirstStart && getState().settings.hasSeenWelcome !== true) {
+  const firstWindow = getWindow();
+  if (isFirstStart && getState().settings.hasSeenWelcome !== true && firstWindow !== null) {
     // Once the sidebar has drawn, so the tour opens over a finished window.
-    if (mainWindow.webContents.isLoading()) {
-      mainWindow.webContents.once("did-finish-load", () => openWelcome());
+    if (firstWindow.webContents.isLoading()) {
+      firstWindow.webContents.once("did-finish-load", () => openWelcome());
     } else {
       openWelcome();
     }
@@ -400,7 +338,7 @@ async function handleAppReady(): Promise<void> {
 
 /**
  * Entry point: one instance only (a second launch with a link opens it in a Little Window, like Arc),
- * then start once Electron is ready. Quits when the main window closes.
+ * then start once Electron is ready. Quits when the last main window closes (mainWindows.ts).
  */
 function startApp(): void {
   useChromeUserAgent();
@@ -415,8 +353,9 @@ function startApp(): void {
       handleExternalUrl(url);
       return;
     }
-    mainWindow?.show();
-    mainWindow?.focus();
+    const lastFocusedWindow = getWindow();
+    lastFocusedWindow?.show();
+    lastFocusedWindow?.focus();
   });
   // Links from other apps (when this browser is the default) open in a Little Window, like Arc. A link that
   // launched the app arrives before it is ready and waits in pendingExternalUrls.

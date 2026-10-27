@@ -1,18 +1,30 @@
 /**
  * WHY this file exists:
  *   Every action from the sidebar (and many menu items) arrives as one BrowserAction object. This file turns each
- *   one into the matching state change, page action, native menu or overlay panel.
+ *   one into the matching state change, page action, native menu or overlay panel. Actions act on the focused main
+ *   window; one from a background window's sidebar first gives that window the focus.
  *
  * Data source:
- *   A BrowserAction that ipc.ts already checked field by field.
+ *   A BrowserAction that ipc.ts already checked field by field, and the window whose sidebar sent it.
  *
  * Data flow:
- *   ipc.ts parseAction() → runAction(action) → applyChange(state function) / tabActions / menus / overlayController
+ *   ipc.ts parseAction() → runActionFromWindow(action, windowId) → runAction(action) → applyChange(state function) /
+ *   tabActions / menus / overlayController
  */
 import type { BrowserAction } from "../shared/actions";
 import { SIDEBAR_COLLAPSE_WIDTH_PX } from "../shared/settings";
-import type { SpaceTheme } from "../shared/types";
-import { applyChange, getState, getWindow, previewSidebarWidthWhileDragging, scheduleRuntimePush, sendSidebarCommand, setSidebarPeek } from "./browserCore";
+import type { SpaceTheme, WindowId } from "../shared/types";
+import {
+  applyChange,
+  getState,
+  getWindow,
+  moveShownElsewhereTabsHere,
+  previewSidebarWidthWhileDragging,
+  scheduleRuntimePush,
+  sendSidebarCommand,
+  setSidebarPeek,
+} from "./browserCore";
+import { focusMainWindow } from "./mainWindows";
 import { dismissMedia, toggleMediaPlayback } from "./media";
 import { addRoutingRule, removeRoutingRule } from "./routing";
 import { deleteBoost, setBoostCss, setBoostEnabled, setBoostJavaScript, setBoostStyle } from "./boosts";
@@ -130,7 +142,34 @@ function reapplyCosmeticFiltersToAllPages(): void {
 }
 
 /**
- * Runs one action. Each state action is one applyChange() call with the matching pure function.
+ * Actions that come from the pointer moving (the edge of a hidden sidebar, a tab row's preview). The pointer also moves
+ * over background windows, so these never bring a window forward.
+ */
+const POINTER_ACTION_TYPES: BrowserAction["type"][] = ["setSidebarPeek", "showTabPreview", "hideTabPreview"];
+
+/**
+ * Runs an action from a page: the sidebar of a main window (windowId), or the overlay (null, it is always in the
+ * focused window). An action from a background window's sidebar (a drop, a click that arrived before the window's
+ * focus event) gives that window the focus first, so it acts there. Pointer actions stay where they are: the sidebar
+ * peek is per window, and previews only show in the focused window.
+ */
+export function runActionFromWindow(action: BrowserAction, windowId: WindowId | null): void {
+  const isFromBackgroundWindow = windowId !== null && windowId !== getState().focusedWindowId;
+  if (windowId !== null && action.type === "setSidebarPeek") {
+    setSidebarPeek(windowId, action.isPeeking);
+    return;
+  }
+  if (isFromBackgroundWindow && POINTER_ACTION_TYPES.includes(action.type)) {
+    return;
+  }
+  if (isFromBackgroundWindow) {
+    focusMainWindow(windowId);
+  }
+  runAction(action);
+}
+
+/**
+ * Runs one action in the focused window. Each state action is one applyChange() call with the matching pure function.
  */
 export function runAction(action: BrowserAction): void {
   const now = Date.now();
@@ -206,7 +245,7 @@ export function runAction(action: BrowserAction): void {
     case "setSidebarVisible":
       return applyChange((state) => setSidebarVisible(state, action.isVisible));
     case "setSidebarPeek":
-      return setSidebarPeek(action.isPeeking);
+      return setSidebarPeek(getState().focusedWindowId, action.isPeeking);
     case "setSidebarWidth":
       return resizeSidebar(action.width, action.isFinal);
     case "setSpaceProfile":
@@ -350,5 +389,7 @@ export function runAction(action: BrowserAction): void {
       applyChange((state) => showHiddenLiveFolderItems(state, action.folderId));
       refreshLiveFolder(action.folderId);
       return;
+    case "moveTabToThisWindow":
+      return moveShownElsewhereTabsHere();
   }
 }

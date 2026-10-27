@@ -1376,6 +1376,24 @@ body.sidebar-hidden .toolbar {
   opacity: 0.55;
 }
 
+/* "Move to This Window" under "Open in another window". Our design, in the toolbar's ink. */
+.move-here-button {
+  margin-top: 10px;
+  align-self: center;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--toolbar-ink) 12%, transparent);
+  color: var(--toolbar-ink);
+  font: inherit;
+  font-weight: 500;
+  cursor: default;
+}
+
+.move-here-button:hover {
+  background: color-mix(in srgb, var(--toolbar-ink) 18%, transparent);
+}
+
 /* ---------- Less motion when the system asks for it ---------- */
 
 @media (prefers-reduced-motion: reduce) {

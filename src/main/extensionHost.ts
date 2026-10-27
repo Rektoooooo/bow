@@ -25,7 +25,7 @@ import { ElectronChromeExtensions } from "electron-chrome-extensions";
 import * as path from "node:path";
 import { DEFAULT_PROFILE_ID } from "../shared/settings";
 import type { BrowserState, InstalledExtension, ItemId, ProfileId } from "../shared/types";
-import { addAfterSyncHook, applyChange, getState, getWindow, onStateChanged } from "./browserCore";
+import { addAfterSyncHook, applyChange, findMainWindowShowingTab, getState, getWindow, onStateChanged } from "./browserCore";
 import { getProfileExtensions } from "./extensionList";
 import { readExtensionManifestInfo } from "./extensionManifest";
 import { openLibrary } from "./overlayController";
@@ -226,14 +226,16 @@ export function loadExtensionNow(profileId: ProfileId, folder: string): Promise<
 }
 
 /**
- * Registers every tab page in a session with extensions (so chrome.tabs sees it), and reports the selected one.
+ * Registers every tab page in a session with extensions (so chrome.tabs sees it), and reports the selected one. A
+ * page belongs to the window it is first seen in (the library cannot move a tab between windows without closing it).
  */
 function registerTabPages(state: BrowserState): void {
-  const window = getWindow();
-  if (window === null) {
+  const focusedWindow = getWindow();
+  if (focusedWindow === null) {
     return;
   }
   for (const [tabId, view] of getTabViews()) {
+    const window = findMainWindowShowingTab(tabId) ?? focusedWindow;
     const host = hostsByProfile.get(findProfileIdOfItem(state, tabId) ?? DEFAULT_PROFILE_ID);
     const contents = view.webContents;
     if (host === undefined || contents.isDestroyed() || contents.session !== host.session || host.registeredContents.has(contents)) {

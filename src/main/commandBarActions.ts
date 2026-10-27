@@ -69,6 +69,7 @@ function buildFixedActions(host: CommandActionHost): FixedAction[] {
     { entry: { id: "zoom-reset", title: "Actual Size", keywords: ["reset zoom"] }, run: () => commands.zoom("reset") },
     { entry: { id: "next-space", title: "Next Space", keywords: ["switch space"] }, run: () => commands.switchSpaceByOffset(1) },
     { entry: { id: "previous-space", title: "Previous Space", keywords: ["switch space"] }, run: () => commands.switchSpaceByOffset(-1) },
+    { entry: { id: "new-window", title: "New Window", keywords: ["window", "another window"] }, run: () => commands.openNewWindow() },
     { entry: { id: "little-window", title: "New Little Window", keywords: ["little arc", "small window"] }, run: () => commands.openLittleWindow() },
     { entry: { id: "private-window", title: "New Private Window", keywords: ["incognito", "private browsing"] }, run: () => commands.openPrivateWindow() },
     { entry: { id: "import-arc", title: "Import from Arc", keywords: ["arc", "migrate"] }, run: () => commands.importFromArc() },

@@ -45,7 +45,15 @@ const SWIPE_COOLDOWN_MS = 450;
 
 /** The newest state and runtime facts received. */
 let currentState: BrowserState | null = null;
-let currentRuntime: RuntimeState = { tabs: {}, activeDownloadCount: 0, isSidebarPeeking: false, media: null, isNewTabPending: false, liveFolders: {} };
+let currentRuntime: RuntimeState = {
+  tabs: {},
+  activeDownloadCount: 0,
+  isSidebarPeeking: false,
+  media: null,
+  isNewTabPending: false,
+  liveFolders: {},
+  tabIdsInOtherWindows: [],
+};
 
 /** The sidebar item, Space name or Space icon being edited inline, or null. */
 let renamingItemId: ItemId | null = null;
@@ -435,12 +443,17 @@ function applyToolbarTint(selectedTabId: ItemId | null): void {
 }
 
 /**
- * Shows the "No tab open" message only while the active Space has no selected tab.
+ * Shows the "No tab open" message only while the active Space has no selected tab, and "Open in another window"
+ * while another window has the selected tab's page on screen.
  */
 function updateEmptyCard(selectedTabId: ItemId | null): void {
   const emptyCard = document.getElementById("empty-card");
   if (emptyCard !== null) {
     emptyCard.hidden = selectedTabId !== null;
+  }
+  const elsewhereCard = document.getElementById("elsewhere-card");
+  if (elsewhereCard !== null) {
+    elsewhereCard.hidden = selectedTabId === null || !currentRuntime.tabIdsInOtherWindows.includes(selectedTabId);
   }
 }
 
@@ -731,6 +744,7 @@ async function startSidebar(): Promise<void> {
   }
   setUpSidebarPeek();
   setUpSidebarResizer();
+  document.getElementById("move-here-button")?.addEventListener("click", () => dispatch({ type: "moveTabToThisWindow" }));
 
   window.browserApi.getSymbols().then(installSymbols).catch(() => undefined);
   // Themes set to "auto" follow macOS between light and dark.

@@ -44,6 +44,12 @@
             <p class="empty-title">No tab open</p>
             <p class="empty-hint">Press ⌘T to search or type an address.</p>
           </div>
+          <!-- A page is on screen in one window at a time: another window that shows this tab keeps it. -->
+          <div id="elsewhere-card" class="empty-card" hidden>
+            <p class="empty-title">Open in another window</p>
+            <p class="empty-hint">This tab is showing in another window.</p>
+            <button id="move-here-button" class="move-here-button" type="button">Move to This Window</button>
+          </div>
         </main>
       </div>
     </section>

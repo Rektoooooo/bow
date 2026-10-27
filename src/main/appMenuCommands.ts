@@ -14,6 +14,7 @@ import { importFromArc } from "./arcImportController";
 import { setAsDefaultBrowser } from "./defaultBrowser";
 import { applyChange, getState } from "./browserCore";
 import { openLittleWindow } from "./littleWindow";
+import { closeFrontWindow, openNewWindow } from "./mainWindows";
 import { findNextMatch, openCommandBar, openFind, openLibrary, openTabSwitcher, runSiteCommand } from "./overlayController";
 import { copyTabUrl, toggleDevTools, zoomPage } from "./pageCommands";
 import { closePeek, isPeekOpen, openPeekAsTab } from "./peek";
@@ -118,6 +119,8 @@ export const appMenuCommands: AppMenuCommands = {
   findNext: (forward) => findNextMatch(forward),
   openLibrary: () => openLibrary(),
   openLittleWindow: () => openLittleWindow(null),
+  openNewWindow: () => openNewWindow(),
+  closeWindow: () => closeFrontWindow(),
   buildImportMenu: () => buildImportMenu(menuHost),
   newNote: () => menuHost.runAction({ type: "createNote" }),
   newEasel: () => menuHost.runAction({ type: "createEasel" }),

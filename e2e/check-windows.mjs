@@ -1,0 +1,330 @@
+// End-to-end check of several main windows (File › New Window, ⌘N, like Arc): a second window opens with its own
+// sidebar over the same Spaces and tabs; each window keeps its own Space and selection; a tab selected in both shows
+// "Open in another window" in the second one (and Move to This Window takes the page over); the Command Bar opens in
+// the focused window; menus act on the focused window; closing one window keeps the other; a restart opens both
+// again where they were; and the app quits with the last window, which the next start opens again.
+// usage: npm run build && node e2e/check-windows.mjs      (uses a throwaway --user-data-dir)
+import { _electron } from "playwright-core";
+import { createRequire } from "node:module";
+import * as fs from "node:fs";
+import * as http from "node:http";
+import * as path from "node:path";
+
+const appDir = path.resolve(import.meta.dirname, "..");
+const outDir = process.env.E2E_OUTPUT_DIR || path.join(appDir, "e2e", "output");
+const userDataDir = path.join(outDir, "user-data-windows");
+fs.rmSync(userDataDir, { recursive: true, force: true });
+fs.mkdirSync(userDataDir, { recursive: true });
+
+const results = [];
+function check(name, ok, detail = "") {
+  results.push({ name, ok: Boolean(ok) });
+  console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  — " + detail : ""}`);
+}
+
+// Three small pages, so each window's page views can be told apart by address.
+const server = http.createServer((request, response) => {
+  const name = request.url.slice(1) || "index";
+  response.writeHead(200, { "content-type": "text/html" });
+  response.end(`<!doctype html><title>${name}</title><h1>${name}</h1>`);
+});
+await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+const origin = `http://127.0.0.1:${server.address().port}`;
+const urlOf = (name) => `${origin}/${name}`;
+
+const now = Date.now();
+const tab = (id, name) => ({ kind: "tab", id, url: urlOf(name), title: name, customTitle: null, faviconUrl: null, homeUrl: null, lastActiveAt: now, isMuted: false });
+const space = (id, name, todayIds) => ({ id, name, icon: "✦", theme: { colors: ["#000000"], appearance: "dark", grain: 0 }, profileId: "profile-default", pinnedIds: [], todayIds, isPinnedOpen: true });
+fs.writeFileSync(
+  path.join(userDataDir, "browser-state.json"),
+  JSON.stringify({
+    version: 3,
+    items: { "tab-alpha": tab("tab-alpha", "alpha"), "tab-beta": tab("tab-beta", "beta"), "tab-work": tab("tab-work", "work") },
+    profiles: [{ id: "profile-default", name: "Default", favoriteIds: [] }],
+    spaces: [space("space-main", "Main", ["tab-alpha", "tab-beta"]), space("space-work", "Work", ["tab-work"])],
+    activeSpaceId: "space-main",
+    selectedTabIdBySpace: { "space-main": "tab-alpha", "space-work": "tab-work" },
+    focusedWindowId: "window-1",
+    otherWindows: [],
+    archive: [],
+    settings: { archiveAfterMs: 43200000, isSidebarVisible: true },
+  }),
+);
+
+const isSidebarPage = (page) => page.url().endsWith("/renderer/index.html");
+
+async function launch() {
+  const app = await _electron.launch({
+    executablePath: createRequire(import.meta.url)("electron"),
+    args: [`--user-data-dir=${userDataDir}`, "--skip-welcome", appDir],
+    timeout: 30000,
+  });
+  const mainLog = [];
+  // E2E_DEBUG=1 prints the main process's own output as it comes.
+  const keep = (data) => {
+    mainLog.push(data.toString());
+    if (process.env.E2E_DEBUG) process.stdout.write(`[main] ${data}`);
+  };
+  app.process().stdout.on("data", keep);
+  app.process().stderr.on("data", keep);
+  return { app, mainLog };
+}
+
+/** Waits until the app has this many sidebar pages and returns them (oldest first). */
+async function waitForSidebars(app, count) {
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
+    const sidebars = app.windows().filter(isSidebarPage);
+    if (sidebars.length >= count) {
+      for (const sidebar of sidebars) await sidebar.waitForSelector(".space-title", { timeout: 30000 });
+      return sidebars;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  throw new Error(`Expected ${count} sidebar pages, found ${app.windows().filter(isSidebarPage).length}`);
+}
+
+const getState = (sidebar) => sidebar.evaluate(() => window.browserApi.getState());
+const getRuntime = (sidebar) => sidebar.evaluate(() => window.browserApi.getRuntimeState());
+const dispatch = (sidebar, action) => sidebar.evaluate((value) => window.browserApi.dispatch(value), action);
+const selectedTabId = (state) => state.selectedTabIdBySpace[state.activeSpaceId] ?? null;
+
+/** Every main window as the main process sees it: its name tag, bounds, page addresses and whether the overlay is in it. */
+function describeWindows(app) {
+  return app.evaluate(async ({ BrowserWindow }) => {
+    // A closing window can still be listed while its page is already gone.
+    const isOpenMainWindow = (candidate) => !candidate.isDestroyed() && !candidate.webContents.isDestroyed() && candidate.webContents.getURL().endsWith("/renderer/index.html");
+    const windows = BrowserWindow.getAllWindows().filter(isOpenMainWindow);
+    const described = [];
+    for (const window of windows) {
+      if (window.isDestroyed()) continue;
+      const children = window.contentView.children.filter((child) => child.webContents && !child.webContents.isDestroyed() && child.webContents !== window.webContents);
+      const urls = children.map((child) => child.webContents.getURL());
+      // A window that is closing never answers; it counts as gone.
+      const tag = await Promise.race([window.webContents.executeJavaScript("window.name"), new Promise((resolve) => setTimeout(() => resolve(null), 500))]);
+      if (tag === null) continue;
+      described.push({
+        tag: tag,
+        bounds: window.getNormalBounds(),
+        pageUrls: urls.filter((url) => url.startsWith("http")),
+        hasOverlay: urls.some((url) => url.endsWith("/overlay/overlay.html")),
+      });
+    }
+    return described;
+  });
+}
+
+/** Names each sidebar page (window.name), so describeWindows can tell the windows apart. */
+async function tagWindows(sidebars, tags) {
+  for (let index = 0; index < sidebars.length; index++) {
+    await sidebars[index].evaluate((tag) => { window.name = tag; }, tags[index]);
+  }
+}
+
+const findWindow = (windows, tag) => windows.find((candidate) => candidate.tag === tag);
+
+/** Waits until a condition on the windows holds (views move after a state change), then returns them. */
+async function waitForWindows(app, condition) {
+  const deadline = Date.now() + 5000;
+  let windows = await describeWindows(app);
+  while (!condition(windows) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    windows = await describeWindows(app);
+  }
+  return windows;
+}
+
+/** Clicks an app menu item by its label, like the user choosing it. */
+const clickMenuItem = (app, label) =>
+  app.evaluate(({ Menu }, wanted) => {
+    const search = (items) => {
+      for (const item of items) {
+        if (item.label === wanted) return item;
+        const inside = item.submenu ? search(item.submenu.items) : null;
+        if (inside) return inside;
+      }
+      return null;
+    };
+    const item = search(Menu.getApplicationMenu().items);
+    item?.click();
+    return item !== null;
+  }, label);
+
+/** Whether the "Open in another window" card shows in a sidebar page. */
+const showsElsewhereCard = (sidebar) => sidebar.evaluate(() => document.getElementById("elsewhere-card")?.hidden === false);
+
+// ---------- first run: two windows ----------
+let { app, mainLog } = await launch();
+let [firstSidebar] = await waitForSidebars(app, 1);
+await firstSidebar.waitForTimeout(800);
+await tagWindows([firstSidebar], ["first"]);
+
+await clickMenuItem(app, "New Window");
+let sidebars = await waitForSidebars(app, 2);
+let secondSidebar = sidebars.find((sidebar) => sidebar !== firstSidebar);
+await tagWindows([secondSidebar], ["second"]);
+let windows = await waitForWindows(app, (list) => findWindow(list, "second")?.hasOverlay === true);
+check("⌘N opens a second main window with its own sidebar", windows.length === 2 && secondSidebar !== undefined, `${windows.length} windows`);
+check("it opens beside the first one, not on top of it", findWindow(windows, "second").bounds.x !== findWindow(windows, "first").bounds.x);
+check("the Command Bar opens in the new window, ready for a new tab", findWindow(windows, "second").hasOverlay && !findWindow(windows, "first").hasOverlay);
+const overlayPage = app.windows().find((page) => page.url().endsWith("/overlay/overlay.html"));
+await overlayPage.keyboard.press("Escape");
+await secondSidebar.waitForTimeout(400);
+
+let firstState = await getState(firstSidebar);
+let secondState = await getState(secondSidebar);
+check(
+  "both windows show the same Spaces and tabs",
+  JSON.stringify(firstState.spaces) === JSON.stringify(secondState.spaces) && Object.keys(secondState.items).length === 3,
+);
+check("the new window starts on the same Space with nothing selected", secondState.activeSpaceId === "space-main" && selectedTabId(secondState) === null && selectedTabId(firstState) === "tab-alpha");
+check("the new window has the focus", secondState.focusedWindowId !== "window-1" && firstState.otherWindows.length === 1);
+
+// Each window keeps its own Space.
+await dispatch(secondSidebar, { type: "switchSpace", spaceId: "space-work" });
+await secondSidebar.waitForTimeout(500);
+firstState = await getState(firstSidebar);
+secondState = await getState(secondSidebar);
+const firstTitle = await firstSidebar.textContent(".space-title");
+const secondTitle = await secondSidebar.textContent(".space-title");
+check("switching Spaces in one window does not move the other", secondState.activeSpaceId === "space-work" && firstState.activeSpaceId === "space-main", `${firstTitle?.trim()} / ${secondTitle?.trim()}`);
+check("the new window has nothing selected in the other Space either (an empty card)", selectedTabId(secondState) === null);
+await dispatch(secondSidebar, { type: "selectTab", tabId: "tab-work" });
+windows = await waitForWindows(app, (list) => findWindow(list, "second")?.pageUrls.includes(urlOf("work")));
+check("each window shows its own Space's page", findWindow(windows, "first").pageUrls.join() === urlOf("alpha") && findWindow(windows, "second").pageUrls.join() === urlOf("work"), JSON.stringify(windows.map((window) => window.pageUrls)));
+
+// Each window keeps its own selection in the same Space.
+await dispatch(secondSidebar, { type: "switchSpace", spaceId: "space-main" });
+await dispatch(secondSidebar, { type: "selectTab", tabId: "tab-beta" });
+windows = await waitForWindows(app, (list) => findWindow(list, "second")?.pageUrls.includes(urlOf("beta")));
+firstState = await getState(firstSidebar);
+secondState = await getState(secondSidebar);
+check("each window keeps its own selected tab in the same Space", selectedTabId(firstState) === "tab-alpha" && selectedTabId(secondState) === "tab-beta");
+check("and has its page on screen", findWindow(windows, "first").pageUrls.join() === urlOf("alpha") && findWindow(windows, "second").pageUrls.join() === urlOf("beta"), JSON.stringify(windows.map((window) => window.pageUrls)));
+
+// A tab selected in both windows: the one that shows it keeps it, the other shows the placeholder.
+await dispatch(secondSidebar, { type: "selectTab", tabId: "tab-alpha" });
+windows = await waitForWindows(app, (list) => findWindow(list, "second")?.pageUrls.length === 0);
+await secondSidebar.waitForTimeout(300);
+let secondRuntime = await getRuntime(secondSidebar);
+check("a tab another window shows stays in that window", findWindow(windows, "first").pageUrls.join() === urlOf("alpha") && findWindow(windows, "second").pageUrls.length === 0, JSON.stringify(windows.map((window) => window.pageUrls)));
+check("and this window says \"Open in another window\"", (await showsElsewhereCard(secondSidebar)) && secondRuntime.tabIdsInOtherWindows.includes("tab-alpha") && !(await showsElsewhereCard(firstSidebar)));
+
+await secondSidebar.click("#move-here-button");
+windows = await waitForWindows(app, (list) => findWindow(list, "second")?.pageUrls.includes(urlOf("alpha")));
+await firstSidebar.waitForTimeout(300);
+check("Move to This Window takes the page over", findWindow(windows, "second").pageUrls.join() === urlOf("alpha") && findWindow(windows, "first").pageUrls.length === 0, JSON.stringify(windows.map((window) => window.pageUrls)));
+check("and the other window now shows the placeholder", (await showsElsewhereCard(firstSidebar)) && !(await showsElsewhereCard(secondSidebar)));
+
+// Selecting another tab lets go of the page: the other window gets it back at once.
+await dispatch(secondSidebar, { type: "selectTab", tabId: "tab-beta" });
+windows = await waitForWindows(app, (list) => findWindow(list, "first")?.pageUrls.includes(urlOf("alpha")));
+// The card follows the runtime push, a moment after the views moved.
+await firstSidebar.waitForTimeout(300);
+check(
+  "a page let go of goes back to the window that still selects it",
+  findWindow(windows, "first").pageUrls.join() === urlOf("alpha") && findWindow(windows, "second").pageUrls.join() === urlOf("beta") && !(await showsElsewhereCard(firstSidebar)),
+  JSON.stringify(windows.map((window) => window.pageUrls)),
+);
+
+// Actions from a window's sidebar act there, and the overlay goes to that window.
+await dispatch(firstSidebar, { type: "openCommandBar", mode: "newTab" });
+windows = await waitForWindows(app, (list) => findWindow(list, "first")?.hasOverlay === true);
+firstState = await getState(firstSidebar);
+check("an action from a background window's sidebar gives that window the focus", firstState.focusedWindowId === "window-1");
+check("and its Command Bar opens in that window", findWindow(windows, "first").hasOverlay && !findWindow(windows, "second").hasOverlay);
+await overlayPage.keyboard.press("Escape");
+await firstSidebar.waitForTimeout(400);
+
+// Menus act on the focused window only.
+await clickMenuItem(app, "Next Space");
+await firstSidebar.waitForTimeout(500);
+firstState = await getState(firstSidebar);
+secondState = await getState(secondSidebar);
+check("a menu command acts on the focused window only", firstState.activeSpaceId === "space-work" && secondState.activeSpaceId === "space-main");
+await dispatch(firstSidebar, { type: "switchSpace", spaceId: "space-main" });
+
+// Close Window (⇧⌘W) closes one window; the other stays and keeps working.
+await dispatch(secondSidebar, { type: "switchSpace", spaceId: "space-main" });
+await secondSidebar.waitForTimeout(300);
+const focusBeforeClose = await app.evaluate(async ({ BrowserWindow }) => {
+  const focused = BrowserWindow.getFocusedWindow();
+  return focused === null ? "none" : await focused.webContents.executeJavaScript("window.name");
+});
+await clickMenuItem(app, "Close Window");
+windows = await waitForWindows(app, (list) => list.length === 1);
+await firstSidebar.waitForTimeout(500);
+firstState = await getState(firstSidebar);
+check(
+  "Close Window closes one window and the other stays",
+  windows.length === 1 && findWindow(windows, "first") !== undefined && firstState.otherWindows.length === 0 && firstState.focusedWindowId === "window-1",
+  `window in front before: ${focusBeforeClose}; left open: ${windows.map((window) => window.tag).join()}`,
+);
+await dispatch(firstSidebar, { type: "selectTab", tabId: "tab-beta" });
+windows = await waitForWindows(app, (list) => findWindow(list, "first")?.pageUrls.includes(urlOf("beta")));
+check("the remaining window shows the pages the closed one had", findWindow(windows, "first").pageUrls.join() === urlOf("beta"));
+
+// Two windows again, each with its own Space, then quit (⌘Q keeps both).
+await clickMenuItem(app, "New Window");
+sidebars = await waitForSidebars(app, 2);
+secondSidebar = sidebars.find((sidebar) => sidebar !== firstSidebar);
+await tagWindows([secondSidebar], ["second"]);
+await waitForWindows(app, (list) => findWindow(list, "second")?.hasOverlay === true);
+await overlayPage.keyboard.press("Escape");
+await dispatch(secondSidebar, { type: "switchSpace", spaceId: "space-work" });
+await dispatch(secondSidebar, { type: "selectTab", tabId: "tab-work" });
+await secondSidebar.waitForTimeout(400);
+const boundsBeforeQuit = await describeWindows(app);
+const savedSecondId = (await getState(secondSidebar)).focusedWindowId;
+const firstRunLog = mainLog.join("");
+await app.close();
+await new Promise((resolve) => setTimeout(resolve, 1500));
+
+// ---------- second run: both windows come back ----------
+({ app, mainLog } = await launch());
+sidebars = await waitForSidebars(app, 2);
+await sidebars[0].waitForTimeout(1000);
+const restoredStates = await Promise.all(sidebars.map((sidebar) => getState(sidebar)));
+const restoredSpaces = restoredStates.map((state) => state.activeSpaceId).sort();
+check("a restart opens both windows again", sidebars.length === 2, `${sidebars.length} sidebars`);
+check("each with its own Space and selection", restoredSpaces.join() === "space-main,space-work" && restoredStates.some((state) => state.activeSpaceId === "space-main" && selectedTabId(state) === "tab-beta"), restoredSpaces.join());
+check("the window that had the focus has it again", restoredStates[0].focusedWindowId === savedSecondId);
+const workIndex = restoredStates.findIndex((state) => state.activeSpaceId === "space-work");
+await tagWindows(sidebars, sidebars.map((_sidebar, index) => (index === workIndex ? "second" : "first")));
+windows = await waitForWindows(app, (list) => findWindow(list, "second")?.pageUrls.length === 1 && findWindow(list, "first")?.pageUrls.length === 1);
+const sameBounds = (before, after) => before && after && before.x === after.x && before.y === after.y && before.width === after.width && before.height === after.height;
+const firstBefore = boundsBeforeQuit.find((window) => window.tag === "first")?.bounds;
+const secondBefore = boundsBeforeQuit.find((window) => window.tag === "second")?.bounds;
+check("each window opens where it was", sameBounds(firstBefore, findWindow(windows, "first")?.bounds) && sameBounds(secondBefore, findWindow(windows, "second")?.bounds), JSON.stringify(windows.map((window) => window.bounds)));
+check("and shows its pages", findWindow(windows, "first").pageUrls.join() === urlOf("beta") && findWindow(windows, "second").pageUrls.join() === urlOf("work"), JSON.stringify(windows.map((window) => window.pageUrls)));
+
+// Closing every window ends the app; the last one is kept for the next start.
+const exited = new Promise((resolve) => app.process().once("exit", () => resolve(true)));
+const secondRunLog = mainLog.join("");
+await app.evaluate(({ BrowserWindow }) => {
+  const mainWindows = BrowserWindow.getAllWindows().filter((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  mainWindows[0]?.close();
+  setTimeout(() => mainWindows[1]?.close(), 500);
+}).catch(() => undefined);
+const didQuit = await Promise.race([exited, new Promise((resolve) => setTimeout(() => resolve(false), 10000))]);
+check("the app quits when the last main window closes", didQuit === true);
+if (!didQuit) await app.close().catch(() => undefined);
+await new Promise((resolve) => setTimeout(resolve, 1500));
+
+// ---------- third run: the last window comes back alone ----------
+({ app, mainLog } = await launch());
+sidebars = await waitForSidebars(app, 1);
+await sidebars[0].waitForTimeout(1000);
+const lastState = await getState(sidebars[0]);
+check("the next start opens the last closed window", app.windows().filter(isSidebarPage).length === 1 && lastState.otherWindows.length === 0);
+const thirdRunLog = mainLog.join("");
+await app.close();
+server.close();
+
+const allLogs = firstRunLog + secondRunLog + thirdRunLog;
+const mainErrors = allLogs.split("\n").filter((line) => /Error|Uncaught|TypeError/.test(line) && !line.includes("Autofill"));
+check("no errors in the main process", mainErrors.length === 0, mainErrors.slice(0, 3).join(" | "));
+
+const passed = results.filter((result) => result.ok).length;
+console.log(`\n${passed}/${results.length} window checks passed.`);
+process.exit(passed === results.length ? 0 : 1);

@@ -3,6 +3,7 @@
  *   The page card is a native view drawn above the window's own page, so nothing in the sidebar page can float over
  *   a web page. Panels that must (Command Bar, Library, site controls, Find) live in one more view, the overlay: a
  *   transparent page that is added on top only while a panel is open, and removed afterwards so it never blocks clicks.
+ *   There is one overlay for all main windows: it goes into the window a panel opens in (the focused one).
  *
  * Data source:
  *   Electron's WebContentsView; the overlay page in dist/web/overlay and its preload script.
@@ -30,6 +31,9 @@ let removalTimer: NodeJS.Timeout | null = null;
 
 let overlayView: WebContentsView | null = null;
 let isShown = false;
+
+/** The main window the overlay sits in: it moves to the focused window when a panel opens there. */
+let overlayWindow: BrowserWindow | null = null;
 
 /** Resolves once the overlay page has loaded; messages sent earlier would be lost. */
 let overlayReady: Promise<void> = Promise.resolve();
@@ -71,8 +75,9 @@ export async function showOverlay(window: BrowserWindow, bounds: Bounds, message
     removalTimer = null;
   }
   overlayView.setBounds(bounds);
-  // Adding a view that is already a child moves it to the top.
+  // Adding a view that is already a child moves it to the top; adding it to another window moves it there.
   window.contentView.addChildView(overlayView);
+  overlayWindow = window;
   isShown = true;
   overlayView.webContents.send(OVERLAY_CHANNELS.show, message);
   if (takesKeyboard) {
@@ -81,10 +86,11 @@ export async function showOverlay(window: BrowserWindow, bounds: Bounds, message
 }
 
 /**
- * Takes the overlay out of the window: the panel animates out first, then the view goes.
+ * Takes the overlay out of its window: the panel animates out first, then the view goes.
  */
-export function hideOverlay(window: BrowserWindow): void {
-  if (overlayView === null || !isShown) {
+export function hideOverlay(): void {
+  const window = overlayWindow;
+  if (overlayView === null || window === null || !isShown) {
     return;
   }
   isShown = false;
@@ -99,13 +105,31 @@ export function hideOverlay(window: BrowserWindow): void {
 }
 
 /**
- * Puts the overlay back on top after new page views were added (they land above it).
+ * Puts the overlay back on top of its window after new page views were added there (they land above it).
  */
 export function raiseOverlayIfShown(window: BrowserWindow): void {
-  if (overlayView === null || !isShown) {
+  if (overlayView === null || !isShown || window !== overlayWindow) {
     return;
   }
   window.contentView.addChildView(overlayView);
+}
+
+/**
+ * A main window is closing: the overlay leaves it at once (it lives on for the other windows).
+ */
+export function leaveWindow(window: BrowserWindow): void {
+  if (overlayView === null || window !== overlayWindow) {
+    return;
+  }
+  if (removalTimer !== null) {
+    clearTimeout(removalTimer);
+    removalTimer = null;
+  }
+  if (!window.isDestroyed()) {
+    window.contentView.removeChildView(overlayView);
+  }
+  overlayWindow = null;
+  isShown = false;
 }
 
 /**

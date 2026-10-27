@@ -491,9 +491,10 @@ export function findNextMatch(forward: boolean): void {
 }
 
 /**
- * Closes whatever panel is open and gives the keyboard back to the page.
+ * Closes whatever panel is open and gives the keyboard back to the page. When another main window is taking the
+ * focus, `returnsKeyboard` is false: focusing this window's page would pull the focus back.
  */
-export function closeOverlay(): void {
+export function closeOverlay(returnsKeyboard: boolean = true): void {
   const window = getWindow();
   if (window === null) {
     return;
@@ -509,12 +510,12 @@ export function closeOverlay(): void {
   const closedPanel = shownPanel;
   shownPanel = null;
   setNewTabPending(false);
-  hideOverlay(window);
+  hideOverlay();
   if (closedPanel !== null) {
     notifyPanelEnded(closedPanel, "closed");
   }
   // A preview never had the keyboard, so there is nothing to give back.
-  if (closedPanel?.kind === "preview") {
+  if (closedPanel?.kind === "preview" || !returnsKeyboard) {
     return;
   }
   // Give the keyboard back to the page, or to the sidebar when no page is open.

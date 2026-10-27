@@ -1,14 +1,18 @@
 /**
  * WHY this file exists:
- *   Each tab's web page is an Electron WebContentsView laid over the window as the "card". BrowserState says which
- *   tabs exist and which one is selected; this file makes the views match it: it shows the selected tab, or every
- *   pane of its split view, and reports what the pages do (navigation, titles, icons, loading, sound).
+ *   Each tab's web page is an Electron WebContentsView laid over a main window as the "card". BrowserState says which
+ *   tabs exist and which one each window selected; this file makes the views match it: every window shows its
+ *   selected tab, or every pane of its split view, and the pages report what they do (navigation, titles, icons,
+ *   loading, sound). A view has one parent, so a page is on screen in one window at a time: it stays with the window
+ *   that shows it, and another window selecting it gets "Open in another window" instead (until it is moved there).
  *
  * Data source:
- *   BrowserState (from main.ts), Electron's BrowserWindow / WebContentsView APIs, and profile sessions (profiles.ts).
+ *   BrowserState as each window shows it (browserCore.ts), Electron's BrowserWindow / WebContentsView APIs, and
+ *   profile sessions (profiles.ts).
  *
  * Data flow:
- *   main.ts applyChange() → syncTabViews() → destroy views of removed tabs → show the visible tabs → lay out panes
+ *   browserCore.ts applyChange() → syncTabViews(windows) → destroy views of removed tabs → take views out of the
+ *   windows that no longer show them → put each window's visible tabs in → lay out panes
  *   page events → TabViewEvents callbacks → main.ts → state change or runtime update
  *
  * Pattern: "reconcile". We never add or remove views by hand from a click handler.
@@ -21,7 +25,7 @@ import { WebContentsView } from "electron";
 import * as path from "node:path";
 import type { BrowserWindow, ContextMenuParams, HandlerDetails, Rectangle, WebContents } from "electron";
 import { CARD_RADIUS_PX, LAYOUT_MOTION_MS } from "../shared/settings";
-import type { BrowserState, ItemId, TabItem, TabRuntimeInfo } from "../shared/types";
+import type { BrowserState, ItemId, TabItem, TabRuntimeInfo, WindowId } from "../shared/types";
 import { computeCardBounds, computePaneBounds } from "./layout";
 import type { CardLayoutOptions } from "./layout";
 import { getProfileSession } from "./profiles";
@@ -59,8 +63,23 @@ export interface TabViewEvents {
   onContextMenu(tabId: ItemId, contents: WebContents, params: ContextMenuParams): void;
   /** The page's document is ready (Boost CSS goes in now). */
   onDomReady(tabId: ItemId, contents: WebContents): void;
-  /** The pointer moved onto a link (its address) or off it (""). */
-  onLinkHover(url: string): void;
+  /** The pointer moved onto a link in a tab's page (its address) or off it (""). */
+  onLinkHover(tabId: ItemId, url: string): void;
+}
+
+/** One main window as this file sees it: where its pages go, and the state as that window shows it. */
+export interface WindowTarget {
+  windowId: WindowId;
+  window: BrowserWindow;
+  /** The state projected for this window (windows.ts projectStateForWindow): its Space and selection. */
+  state: BrowserState;
+  layoutOptions: CardLayoutOptions;
+}
+
+/** The views a main window holds right now: the window, and its shown tabs in pane order. */
+interface ShownInWindow {
+  window: BrowserWindow;
+  tabIds: ItemId[];
 }
 
 /** One web view per loaded tab, keyed by tab id. Lives only in memory. */
@@ -69,8 +88,14 @@ const tabViews = new Map<ItemId, WebContentsView>();
 /** The profile whose session each loaded tab's page runs in. A tab moved to another profile must reload there. */
 const viewProfileIds = new Map<ItemId, string>();
 
-/** The tabs whose views are in the window right now, in pane order. */
-let shownTabIds: ItemId[] = [];
+/** The tabs whose views are in each main window right now. A tab is in one window's list at most. */
+const shownByWindow = new Map<WindowId, ShownInWindow>();
+
+/** The tabs each window would show but another window has on screen (the card says "Open in another window"). */
+const shownElsewhereByWindow = new Map<WindowId, ItemId[]>();
+
+/** Tabs asked to move to a window ("Move to This Window"); the next sync puts them there. */
+const requestedMoves = new Map<ItemId, WindowId>();
 
 /** Where each shown view was last sent (it may still be gliding there), so an unchanged layout sends nothing. */
 const targetBounds = new WeakMap<WebContentsView, Rectangle>();
@@ -145,7 +170,7 @@ function placeAt(view: WebContentsView, bounds: Rectangle): void {
   view.setBounds(bounds);
 }
 
-/** The tab whose pane has focus (the selected tab), or null. */
+/** The focused window's selected tab while that window shows its page, or null. */
 let focusedTabId: ItemId | null = null;
 
 /** When the user last clicked or pressed a key in each tab's page, to tell link clicks from redirects. */
@@ -162,10 +187,50 @@ export function getTabViews(): Map<ItemId, WebContentsView> {
 }
 
 /**
- * Returns the ids of the tabs whose pages are on screen, in pane order.
+ * Returns the ids of the tabs whose pages are on screen in any window.
  */
 export function getShownTabIds(): ItemId[] {
+  const shownTabIds: ItemId[] = [];
+  for (const shown of shownByWindow.values()) {
+    shownTabIds.push(...shown.tabIds);
+  }
   return shownTabIds;
+}
+
+/**
+ * Returns the ids of the tabs whose pages are in one window, in pane order.
+ */
+export function getShownTabIdsInWindow(windowId: WindowId): ItemId[] {
+  return shownByWindow.get(windowId)?.tabIds ?? [];
+}
+
+/**
+ * Returns the window that has a tab's page on screen, or null.
+ */
+export function findWindowShowingTab(tabId: ItemId): WindowId | null {
+  for (const [windowId, shown] of shownByWindow) {
+    if (shown.tabIds.includes(tabId)) {
+      return windowId;
+    }
+  }
+  return null;
+}
+
+/**
+ * Returns the tabs a window would show that another window has on screen.
+ */
+export function getTabIdsShownElsewhere(windowId: WindowId): ItemId[] {
+  return shownElsewhereByWindow.get(windowId) ?? [];
+}
+
+/**
+ * Asks for tabs to move to a window at the next sync ("Move to This Window"). The window they leave shows
+ * "Open in another window" while it still selects them.
+ */
+export function requestTabsMoveToWindow(tabIds: ItemId[], windowId: WindowId): void {
+  for (const tabId of tabIds) {
+    requestedMoves.set(tabId, windowId);
+  }
 }
 
 /**
@@ -243,7 +308,7 @@ function watchTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvent
       events.onPageChanged(tabId, contents.getURL(), title);
     }
   });
-  contents.on("update-target-url", (_event, url) => events.onLinkHover(url));
+  contents.on("update-target-url", (_event, url) => events.onLinkHover(tabId, url));
   contents.on("render-process-gone", (_event, details) => {
     if (details.reason === "clean-exit") {
       return;
@@ -306,7 +371,7 @@ function watchTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvent
  * captured).
  */
 function sampleIfShown(tabId: ItemId, contents: WebContents): void {
-  if (shownTabIds.includes(tabId)) {
+  if (findWindowShowingTab(tabId) !== null) {
     sampleToolbarColorSoon(contents);
     captureSnapshotSoon(tabId, contents);
   }
@@ -316,7 +381,7 @@ function sampleIfShown(tabId: ItemId, contents: WebContents): void {
  * Refreshes the pictures of the pages on screen (main.ts calls this every SNAPSHOT_REFRESH_MS).
  */
 export function refreshShownSnapshots(): void {
-  for (const tabId of shownTabIds) {
+  for (const tabId of getShownTabIds()) {
     const contents = tabViews.get(tabId)?.webContents;
     if (contents !== undefined && !contents.isLoading()) {
       captureSnapshotSoon(tabId, contents);
@@ -361,23 +426,56 @@ function ignoreLoadFailure(): void {
 }
 
 /**
- * Removes a tab's web view from the window and closes its page to free memory.
+ * Takes a shown view out of its window (the page keeps running, so audio keeps playing).
  */
-export function destroyTabView(window: BrowserWindow, tabId: ItemId): void {
+function takeOutOfWindow(shown: ShownInWindow, tabId: ItemId): void {
+  const view = tabViews.get(tabId);
+  if (view !== undefined && !shown.window.isDestroyed()) {
+    shown.window.contentView.removeChildView(view);
+  }
+  if (view !== undefined) {
+    targetBounds.delete(view);
+    glides.delete(view);
+  }
+  shown.tabIds = shown.tabIds.filter((shownId) => shownId !== tabId);
+}
+
+/**
+ * Removes a tab's web view from the window that shows it and closes its page to free memory.
+ */
+export function destroyTabView(tabId: ItemId): void {
   const view = tabViews.get(tabId);
   if (view === undefined) {
     return;
   }
 
-  window.contentView.removeChildView(view);
+  for (const shown of shownByWindow.values()) {
+    if (shown.tabIds.includes(tabId)) {
+      takeOutOfWindow(shown, tabId);
+    }
+  }
   view.webContents.close();
   tabViews.delete(tabId);
   forgetSnapshot(tabId);
   viewProfileIds.delete(tabId);
-  shownTabIds = shownTabIds.filter((shownId) => shownId !== tabId);
+  requestedMoves.delete(tabId);
   if (focusedTabId === tabId) {
     focusedTabId = null;
   }
+}
+
+/**
+ * A window is closing: its pages leave it but stay loaded, so another window can show them.
+ */
+export function forgetWindow(windowId: WindowId): void {
+  const shown = shownByWindow.get(windowId);
+  if (shown !== undefined) {
+    for (const tabId of [...shown.tabIds]) {
+      takeOutOfWindow(shown, tabId);
+    }
+  }
+  shownByWindow.delete(windowId);
+  shownElsewhereByWindow.delete(windowId);
 }
 
 /**
@@ -399,15 +497,17 @@ export function computeVisibleTabIds(state: BrowserState): ItemId[] {
 }
 
 /**
- * Places the shown views: one card, or the card divided into split panes. With isAnimated, views already on screen
- * glide to their new place (⌘S, the sidebar peeking in, split changes); window resizes and drags follow at once.
+ * Places a window's shown views: one card, or the card divided into split panes. With isAnimated, views already on
+ * screen glide to their new place (⌘S, the sidebar peeking in, split changes); window resizes and drags follow at once.
  */
-export function layoutShownTabViews(window: BrowserWindow, state: BrowserState, layoutOptions: CardLayoutOptions, isAnimated: boolean = false): void {
-  const contentSize = window.getContentSize();
+export function layoutShownTabViews(target: WindowTarget, isAnimated: boolean = false): void {
+  const contentSize = target.window.getContentSize();
   const contentWidth = contentSize[0] ?? 0;
   const contentHeight = contentSize[1] ?? 0;
-  const card = computeCardBounds(contentWidth, contentHeight, layoutOptions);
+  const card = computeCardBounds(contentWidth, contentHeight, target.layoutOptions);
 
+  const state = target.state;
+  const shownTabIds = getShownTabIdsInWindow(target.windowId);
   const selectedTabId = getSelectedTabId(state);
   const splitId = selectedTabId === null ? null : findSplitOfTab(state, selectedTabId);
   const split = splitId === null ? undefined : state.items[splitId];
@@ -441,11 +541,9 @@ export function layoutShownTabViews(window: BrowserWindow, state: BrowserState, 
 }
 
 /**
- * Makes the views match the state: destroys views for tabs that left the sidebar, shows exactly the visible tabs,
- * and lays them out. Returns true when the set of shown views changed (main.ts then raises the overlay again,
- * because a newly added view lands on top of it).
+ * Destroys the views of tabs that left the sidebar, and of tabs moved to another profile (they reload there).
  */
-export function syncTabViews(window: BrowserWindow, state: BrowserState, layoutOptions: CardLayoutOptions, events: TabViewEvents): boolean {
+function destroyLeftoverViews(state: BrowserState): void {
   // Copy the keys first, because destroyTabView deletes from the map we are looping over.
   const loadedTabIds = Array.from(tabViews.keys());
   for (const tabId of loadedTabIds) {
@@ -453,43 +551,125 @@ export function syncTabViews(window: BrowserWindow, state: BrowserState, layoutO
     const recordedProfileId = viewProfileIds.get(tabId);
     const changedProfile = recordedProfileId !== undefined && recordedProfileId !== expectedProfileId;
     if (findTab(state, tabId) === undefined || changedProfile) {
-      destroyTabView(window, tabId);
+      destroyTabView(tabId);
     }
   }
+}
 
-  const visibleTabIds = computeVisibleTabIds(state);
-  const sameTabsShown = visibleTabIds.length === shownTabIds.length && visibleTabIds.every((tabId, index) => shownTabIds[index] === tabId);
-  focusedTabId = getSelectedTabId(state);
-  if (sameTabsShown) {
-    // Same pages, new places: the sidebar was hidden or shown, or a split changed. They glide there.
-    layoutShownTabViews(window, state, layoutOptions, true);
-    return false;
-  }
-
-  for (const shownTabId of shownTabIds) {
-    const view = tabViews.get(shownTabId);
-    if (view !== undefined && !visibleTabIds.includes(shownTabId)) {
-      // The page keeps running after it leaves the window, so audio keeps playing.
-      window.contentView.removeChildView(view);
-      targetBounds.delete(view);
-      glides.delete(view);
+/**
+ * Decides which window gets each wanted tab's view. A tab stays with the window that shows it while that window still
+ * wants it, unless it was asked to move; a free tab goes to the first window (the focused one first) that wants it.
+ */
+function assignTabsToWindows(targets: WindowTarget[], wantedByWindow: Map<WindowId, ItemId[]>): Map<ItemId, WindowId> {
+  const owners = new Map<ItemId, WindowId>();
+  for (const target of targets) {
+    const wanted = wantedByWindow.get(target.windowId) ?? [];
+    const keptTabIds = getShownTabIdsInWindow(target.windowId).filter((tabId) => wanted.includes(tabId));
+    for (const tabId of keptTabIds) {
+      owners.set(tabId, target.windowId);
     }
   }
+  for (const [tabId, windowId] of requestedMoves) {
+    const wantedThere = wantedByWindow.get(windowId) ?? [];
+    if (wantedThere.includes(tabId)) {
+      owners.set(tabId, windowId);
+    }
+  }
+  requestedMoves.clear();
+  for (const target of targets) {
+    const wanted = wantedByWindow.get(target.windowId) ?? [];
+    const freeTabIds = wanted.filter((tabId) => !owners.has(tabId));
+    for (const tabId of freeTabIds) {
+      owners.set(tabId, target.windowId);
+    }
+  }
+  return owners;
+}
 
-  for (const tabId of visibleTabIds) {
-    const tab = findTab(state, tabId) as TabItem;
-    const view = tabViews.get(tabId) ?? createTabView(state, tab, events);
-    window.contentView.addChildView(view);
+/**
+ * Puts a window's tabs on screen (making views for tabs shown for the first time) and lays them out.
+ */
+function showTabsInWindow(target: WindowTarget, tabIds: ItemId[], events: TabViewEvents): void {
+  const shown = shownByWindow.get(target.windowId) ?? { window: target.window, tabIds: [] };
+  for (const tabId of tabIds) {
+    const tab = findTab(target.state, tabId) as TabItem;
+    const view = tabViews.get(tabId) ?? createTabView(target.state, tab, events);
+    target.window.contentView.addChildView(view);
     // A page coming on screen may be on a site whose toolbar color is not known yet.
     if (getToolbarColor(view.webContents.getURL()) === null) {
       sampleToolbarColorSoon(view.webContents);
     }
     captureSnapshotSoon(tabId, view.webContents);
   }
-  shownTabIds = visibleTabIds;
-  // Pages that stay on screen (a split gaining or losing a pane) glide to their new place; new ones appear in place.
-  layoutShownTabViews(window, state, layoutOptions, true);
-  return true;
+  shown.window = target.window;
+  shown.tabIds = tabIds;
+  shownByWindow.set(target.windowId, shown);
+}
+
+/**
+ * Makes the views match the state in every main window (the focused one first): destroys views for tabs that left
+ * the sidebar, takes views out of windows that no longer show them (all windows first, so a tab one window lets go
+ * of is free for another in the same change), then puts each window's tabs in and lays them out. Returns the
+ * windows whose set of shown views changed (browserCore.ts then raises the floating layers there, because a newly
+ * added view lands on top of them).
+ */
+export function syncTabViews(targets: WindowTarget[], events: TabViewEvents): Set<WindowId> {
+  const firstTarget = targets[0];
+  if (firstTarget === undefined) {
+    return new Set();
+  }
+  destroyLeftoverViews(firstTarget.state);
+  // Windows that closed without saying so keep nothing.
+  const targetIds = new Set(targets.map((target) => target.windowId));
+  for (const windowId of Array.from(shownByWindow.keys())) {
+    if (!targetIds.has(windowId)) {
+      forgetWindow(windowId);
+    }
+  }
+
+  const wantedByWindow = new Map<WindowId, ItemId[]>();
+  for (const target of targets) {
+    wantedByWindow.set(target.windowId, computeVisibleTabIds(target.state));
+  }
+  const owners = assignTabsToWindows(targets, wantedByWindow);
+
+  const newShownByWindow = new Map<WindowId, ItemId[]>();
+  for (const target of targets) {
+    const wanted = wantedByWindow.get(target.windowId) ?? [];
+    const ownTabIds = wanted.filter((tabId) => owners.get(tabId) === target.windowId);
+    const elsewhereTabIds = wanted.filter((tabId) => owners.get(tabId) !== target.windowId);
+    newShownByWindow.set(target.windowId, ownTabIds);
+    shownElsewhereByWindow.set(target.windowId, elsewhereTabIds);
+  }
+
+  // Release first: every view leaving a window goes before any window takes one.
+  for (const [windowId, shown] of shownByWindow) {
+    const newTabIds = newShownByWindow.get(windowId) ?? [];
+    const leavingTabIds = shown.tabIds.filter((tabId) => !newTabIds.includes(tabId));
+    for (const tabId of leavingTabIds) {
+      takeOutOfWindow(shown, tabId);
+    }
+  }
+
+  const changedWindowIds = new Set<WindowId>();
+  for (const target of targets) {
+    const previousTabIds = getShownTabIdsInWindow(target.windowId);
+    const newTabIds = newShownByWindow.get(target.windowId) ?? [];
+    const sameTabsShown = previousTabIds.length === newTabIds.length && previousTabIds.every((tabId, index) => newTabIds[index] === tabId);
+    if (!sameTabsShown) {
+      showTabsInWindow(target, newTabIds, events);
+      changedWindowIds.add(target.windowId);
+    }
+    // Pages that stay on screen (the sidebar hidden or shown, a split gaining or losing a pane) glide to their new
+    // place; new ones appear in place.
+    layoutShownTabViews(target, true);
+  }
+
+  const focusedSelectedTabId = getSelectedTabId(firstTarget.state);
+  const focusedWindowTabIds = getShownTabIdsInWindow(firstTarget.windowId);
+  const isFocusedTabHere = focusedSelectedTabId !== null && focusedWindowTabIds.includes(focusedSelectedTabId);
+  focusedTabId = isFocusedTabHere ? focusedSelectedTabId : null;
+  return changedWindowIds;
 }
 
 /**

@@ -445,6 +445,7 @@ const FEATURES = [
   ["layout","Glow loading indicator","","Loading shows as a soft animated glow instead of a thin progress bar.","Animate a blurred gradient along the card edge while the page loads.","ARC_GlowProgressLoadingIndicator (.metallib)","observe"],
   ["layout","Tab hover previews","","Hovering a sidebar tab shows a preview card of the page.","Snapshot each tab when it loses focus and show the cached image in a popover on hover.","Browser/Sidebar/Previews","observe"],
   ["layout","Link status text","","Hovering a link shows its URL in a small label at the bottom of the card.","Listen for the engine's hovered-link event and show a fading label.","Browser/WindowContent/StatusTextView","observe"],
+  ["layout","Multiple windows","⌘N","Several full browser windows over one sidebar: the same Spaces, Favorites and tabs, but each window has its own Space and selected tab. A tab open in another window shows a placeholder.","Keep each window's Space and selection next to the shared sidebar tree. A web view has one parent, so a second window shows a placeholder with a move button. Save the window list for restore.","Windows/BrowserWindow, StorableWindows.json","observe"],
   ["layout","Crashed-tab page","","A friendly page with a reload button when a tab's renderer crashes.","Handle the engine's render-process-gone event and show your own view.","ARC_SadTab","observe"],
 
   ["org","Spaces","⌃1–9","Named workspaces with an icon and theme. Swipe between them with two fingers on the trackpad.","A Space holds a name, icon, theme, profile and pinned-tab tree. Switch with horizontal paging that follows the trackpad.","ARC_SpaceCreation, space_swiping.mp4","observe"],
@@ -507,6 +508,7 @@ const FEATURES = [
 const BUILT = {
   "Vertical sidebar":"built", "Inset web card":"built", "Split View":"built", "Space themes & grain":"built",
   "Glow loading indicator":"built", "Link status text":"built", "Crashed-tab page":"built", "Tab hover previews":"built",
+  "Multiple windows":"built",
   "Spaces":"built", "Profiles per Space":"built", "Favorites":"built", "Pinned tabs & folders":"built", "Live folders":"built",
   "Today tabs & auto-archive":"built", "Archive":"built", "Sidebar restore":"built", "Tidy titles":"built",
   "Command Bar":"built", "URL autocomplete":"built", "Recent-tab switcher":"built", "Copy URL":"built", "Context menus":"built",

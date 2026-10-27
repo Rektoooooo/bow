@@ -145,13 +145,13 @@ focused window", and each window's sidebar gets the state projected for it. Boun
 by window id), because they change on every drag.
 - [x] Step 1: saved shape v3 (`focusedWindowId`, `otherWindows`), pure `windows.ts` (project, focus, open, close,
       repair after every change), migrate v2 → v3 (+ v1 chain), live folders keep every window's selection; tests
-- [ ] Step 2: main process: window registry in browserCore (focused = last focused main window, never
+- [x] Step 2: main process: window registry in browserCore (focused = last focused main window, never
       `getFocusedWindow()`), per-window pushes and runtime (sidebar peek, New Tab highlight, tabs shown elsewhere),
       tabViews per window (release before claim; a tab stays with the window that shows it), overlay / Peek /
       status bubble follow the focused window and leave a closing window, actions from a background window's
       sidebar focus it first, File › New Window ⌘N and Close Window ⇧⌘W, quit with the last main window (⌘Q keeps
       every window for the next start), bounds per window, extensions see each tab's window
-- [ ] Step 3: placeholder card "Open in another window" with Move to This Window; e2e/check-windows.mjs in
+- [x] Step 3: placeholder card "Open in another window" with Move to This Window; e2e/check-windows.mjs in
       `npm run e2e`; README, teardown page, handoff
 
 ### 3.4 Verification
@@ -161,6 +161,16 @@ by window id), because they change on every drag.
       per selection; unchanged rows now come as placeholders morph.ts keeps as they are, move animations only
       measure when the order changed, the toolbar tint restyles the card alone → about 8 ms per redraw
 - [ ] Hands-on runs of the packaged app; all suites green; docs + teardown page current
+
+## Review (2026-10-27, multiple main windows)
+- **Works and verified:** ⌘N, a Space and selection per window, "Open in another window" + Move to This Window, a
+  page let go of returning to the window that still selects it, actions and panels in the window they came from,
+  menus on the focused window, ⇧⌘W, restart with both windows (place, Space, selection, focus), quitting with the
+  last window and the next start opening it. Suites: `npm test` 301, `check-app` 47, `check-overlay` 68,
+  `check-extensions` 20, `permission-check`, `check-motion` 6, `check-live-folders` 21, `check-performance` 4,
+  `check-windows` 29.
+- **Known limits:** in `.handoffs/2026-10-27-multiple-windows.md` (⌘S and sidebar width are global, one note editor
+  per window, extensions keep a tab's first window, no drag between windows).
 
 ## Review (2026-10-26, end of the Arc-parity session)
 - **Works and verified:** everything in README "What works". Suites: `npm test` 166, `check-app` 36,
@@ -176,10 +186,11 @@ by window id), because they change on every drag.
 ## Later
 - [ ] Ghidra pass when RAM allows (Command Bar ranking, Peek triggers, sync merge, Easel captures)
 - [x] Easels, Notes, tab hover previews, built-in ad blocking, screen sharing (macOS's sharing picker)
-- [ ] Multiple main windows (⌘N opens a second window, like Arc). Deferred on evidence: every StorableWindows
-      snapshot in the user's Arc backup (March–October 2026) holds 0 or 1 window. Sketch when it is needed: keep
-      activeSpaceId/selectedTabIdBySpace as the focused window's, park the other windows' in a `windows` list, project
-      the state per window for its sidebar, move the overlay/Peek/status views to the focused window.
+- [x] Multiple main windows (⌘N opens a second window, like Arc): built 2026-10-27, see 3.5 and
+      `.handoffs/2026-10-27-multiple-windows.md`. (It had been deferred because every StorableWindows snapshot in the
+      user's Arc backup holds 0 or 1 window; the user asked for it.)
+- [ ] Multiple windows follow-ups: ⌘S and the sidebar width per window (if Arc does that; unverified), dragging a tab
+      between two windows' sidebars, one editor per note/easel across windows
 - [ ] Sign and notarize the app (needs a Developer ID) so it runs on other Macs
 - [ ] Adding a Web Store extension to a second profile re-downloads into the folder the first profile has loaded;
       reuse the existing copy instead (rare)

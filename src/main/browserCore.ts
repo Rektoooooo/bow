@@ -1,23 +1,27 @@
 /**
  * WHY this file exists:
  *   The one copy of BrowserState lives here, with the only function allowed to replace it: applyChange().
- *   Every change is saved, reflected in the web views and pushed to the sidebar the same way, from one place.
- *   Other main-process modules read the state and request changes through these functions.
+ *   Every change is saved, reflected in the web views and pushed to the sidebars the same way, from one place.
+ *   Other main-process modules read the state and request changes through these functions. It also knows the open
+ *   main windows: each window's sidebar gets the state as that window shows it (its own Space and selection,
+ *   windows.ts), and "the window" for menus, panels and dialogs is the focused one.
  *
  * Data source:
- *   store.ts (the saved file), the main window, tabViews.ts (web views), downloads.ts (download count).
+ *   store.ts (the saved file), the main windows (mainWindows.ts registers them), tabViews.ts (web views),
+ *   downloads.ts (download count).
  *
  * Data flow:
- *   any module → applyChange(change) → saveState() → syncTabViews() → raise overlay → push state to the sidebar
- *   page events → scheduleRuntimePush() → one runtime message per burst
+ *   any module → applyChange(change) → repair parked windows → saveState() → syncTabViews(every window) → raise
+ *   overlay → push each window's projected state to its sidebar
+ *   page events → scheduleRuntimePush() → one runtime message per window per burst
  *
  * Pattern: "single source of truth". Only applyChange() replaces the state.
  */
-import type { BrowserWindow } from "electron";
+import type { BrowserWindow, WebContents } from "electron";
 import type { SidebarCommand } from "../shared/actions";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
 import { SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_WIDTH_PX } from "../shared/settings";
-import type { BrowserState, ItemId, LiveFolderStatus, RuntimeState } from "../shared/types";
+import type { BrowserState, ItemId, LiveFolderStatus, RuntimeState, WindowId } from "../shared/types";
 import { getActiveDownloadCount } from "./downloads";
 import { findMediaInfo, handleShownTabsChanged } from "./media";
 import type { CardLayoutOptions } from "./layout";
@@ -26,8 +30,18 @@ import { getSelectedTabId } from "./state";
 import { findTab } from "./tree";
 import { isDeveloperModeOn } from "../shared/developerMode";
 import { loadState, saveState } from "./store";
-import { collectTabRuntime, getShownTabIds, layoutShownTabViews, syncTabViews } from "./tabViews";
-import type { TabViewEvents } from "./tabViews";
+import {
+  collectTabRuntime,
+  findWindowShowingTab,
+  forgetWindow,
+  getShownTabIds,
+  getTabIdsShownElsewhere,
+  layoutShownTabViews,
+  requestTabsMoveToWindow,
+  syncTabViews,
+} from "./tabViews";
+import type { TabViewEvents, WindowTarget } from "./tabViews";
+import { listWindowIds, projectStateForWindow, repairOtherWindows } from "./windows";
 
 /** Page events come in bursts (a load fires several); wait this long and send one runtime update. */
 const RUNTIME_PUSH_DELAY_MS = 50;
@@ -38,8 +52,8 @@ const RECENT_TABS_LIMIT = 20;
 /** The current state. Replaced only inside applyChange(). */
 let currentState: BrowserState;
 
-/** The browser window. Null before the app is ready. */
-let mainWindow: BrowserWindow | null = null;
+/** The open main windows by id (mainWindows.ts adds and removes them). The focused one is state.focusedWindowId. */
+const mainWindows = new Map<WindowId, BrowserWindow>();
 
 /** Where the state is saved. */
 let stateFilePath = "";
@@ -53,8 +67,8 @@ let runtimePushTimer: NodeJS.Timeout | null = null;
 /** Recently selected tabs, newest first, for ⌃Tab and the Command Bar. Lives only in memory. */
 let recentTabIds: ItemId[] = [];
 
-/** True while the hidden sidebar shows because the mouse is at the window's left edge. Not saved. */
-let isSidebarPeeking = false;
+/** The windows whose hidden sidebar shows because the mouse is at the window's left edge. Not saved. */
+const peekingWindowIds = new Set<WindowId>();
 
 /** True while the Command Bar is open to make a new tab (RuntimeState.isNewTabPending). */
 let isNewTabPending = false;
@@ -62,7 +76,7 @@ let isNewTabPending = false;
 /** How each live folder's last refresh went (RuntimeState.liveFolders); liveFolderRefresher.ts sets them. */
 const liveFolderStatuses = new Map<ItemId, LiveFolderStatus>();
 
-/** The sidebar width while its edge is being dragged; null otherwise (the saved width applies). */
+/** The sidebar width while its edge is being dragged in the focused window; null otherwise (the saved width applies). */
 let previewSidebarWidth: number | null = null;
 
 /** Functions to run after new page views were added (they land on top): floating layers raise themselves again. */
@@ -95,11 +109,26 @@ export function initializeState(filePath: string, now: number): void {
 }
 
 /**
- * Connects the window and the page-event handlers. Runs once the window exists.
+ * Connects the page-event handlers. Runs once at startup, before the first window opens.
  */
-export function attachWindow(window: BrowserWindow, events: TabViewEvents): void {
-  mainWindow = window;
+export function setTabViewEvents(events: TabViewEvents): void {
   tabViewEvents = events;
+}
+
+/**
+ * Registers an open main window under its id (its views follow at the next sync).
+ */
+export function attachWindow(windowId: WindowId, window: BrowserWindow): void {
+  mainWindows.set(windowId, window);
+}
+
+/**
+ * Forgets a main window that is closing: its pages leave it, so another window can show them.
+ */
+export function detachWindow(windowId: WindowId): void {
+  mainWindows.delete(windowId);
+  peekingWindowIds.delete(windowId);
+  forgetWindow(windowId);
 }
 
 export function getState(): BrowserState {
@@ -107,11 +136,61 @@ export function getState(): BrowserState {
 }
 
 /**
- * Returns the main window, or null before it exists and once it is destroyed (while quitting, page events still
- * arrive; touching a destroyed window throws, and an uncaught error's dialog would stop the app from quitting).
+ * The state as one window shows it: its own Space and selection (windows.ts).
+ */
+export function getStateForWindow(windowId: WindowId): BrowserState {
+  return projectStateForWindow(currentState, windowId);
+}
+
+/**
+ * Returns a main window by id, or null when it is not open or already destroyed.
+ */
+export function getMainWindow(windowId: WindowId): BrowserWindow | null {
+  const window = mainWindows.get(windowId);
+  return window !== undefined && !window.isDestroyed() ? window : null;
+}
+
+/**
+ * Returns the focused main window (the last main window that had the focus, also while a Little Window or another
+ * app has it), or null before it exists and once it is destroyed (while quitting, page events still arrive; touching
+ * a destroyed window throws, and an uncaught error's dialog would stop the app from quitting).
  */
 export function getWindow(): BrowserWindow | null {
-  return mainWindow !== null && !mainWindow.isDestroyed() ? mainWindow : null;
+  return getMainWindow(currentState.focusedWindowId);
+}
+
+/**
+ * The open main windows, the focused one first, then the others from the most recently focused.
+ */
+export function listMainWindows(): { windowId: WindowId; window: BrowserWindow }[] {
+  const openWindows: { windowId: WindowId; window: BrowserWindow }[] = [];
+  for (const windowId of listWindowIds(currentState)) {
+    const window = getMainWindow(windowId);
+    if (window !== null) {
+      openWindows.push({ windowId: windowId, window: window });
+    }
+  }
+  return openWindows;
+}
+
+/**
+ * Returns the id of the main window whose sidebar page this is, or null for anything else (the overlay, pages).
+ */
+export function findMainWindowIdOf(contents: WebContents): WindowId | null {
+  for (const [windowId, window] of mainWindows) {
+    if (!window.isDestroyed() && window.webContents === contents) {
+      return windowId;
+    }
+  }
+  return null;
+}
+
+/**
+ * Returns the main window that has a tab's page on screen, or null.
+ */
+export function findMainWindowShowingTab(tabId: ItemId): BrowserWindow | null {
+  const windowId = findWindowShowingTab(tabId);
+  return windowId === null ? null : getMainWindow(windowId);
 }
 
 export function getRecentTabIds(): ItemId[] {
@@ -119,44 +198,84 @@ export function getRecentTabIds(): ItemId[] {
 }
 
 /**
- * The card sits right of the sidebar (unless hidden) and below the toolbar.
+ * The card of a window (the focused one unless named) sits right of the sidebar (unless hidden) and below the
+ * toolbar.
  */
-export function getLayoutOptions(): CardLayoutOptions {
-  const sidebarWidth = previewSidebarWidth ?? currentState.settings.sidebarWidth ?? SIDEBAR_WIDTH_PX;
-  const selectedTabId = getSelectedTabId(currentState);
-  const selectedTab = selectedTabId === null ? undefined : findTab(currentState, selectedTabId);
-  const isDeveloperToolbar = selectedTab !== undefined && isDeveloperModeOn(currentState, selectedTab.url);
+export function getLayoutOptions(windowId: WindowId = currentState.focusedWindowId): CardLayoutOptions {
+  const windowState = getStateForWindow(windowId);
+  const isFocused = windowId === currentState.focusedWindowId;
+  const draggedWidth = isFocused ? previewSidebarWidth : null;
+  const sidebarWidth = draggedWidth ?? currentState.settings.sidebarWidth ?? SIDEBAR_WIDTH_PX;
+  const selectedTabId = getSelectedTabId(windowState);
+  const selectedTab = selectedTabId === null ? undefined : findTab(windowState, selectedTabId);
+  const isDeveloperToolbar = selectedTab !== undefined && isDeveloperModeOn(windowState, selectedTab.url);
   return {
     isSidebarVisible: currentState.settings.isSidebarVisible,
     isToolbarVisible: true,
-    isSidebarPeeking: isSidebarPeeking,
+    isSidebarPeeking: peekingWindowIds.has(windowId),
     sidebarWidth: sidebarWidth,
     isDeveloperToolbar: isDeveloperToolbar,
   };
 }
 
 /**
- * Moves the page card while the sidebar's edge is dragged, without saving (null ends the preview).
+ * What tabViews.ts needs to place one window's pages, or null when the window is not open.
  */
-export function previewSidebarWidthWhileDragging(width: number | null): void {
-  previewSidebarWidth = width === null ? null : Math.max(SIDEBAR_MIN_WIDTH_PX, Math.min(width, SIDEBAR_MAX_WIDTH_PX));
-  if (mainWindow !== null) {
-    layoutShownTabViews(mainWindow, currentState, getLayoutOptions());
+function buildWindowTarget(windowId: WindowId): WindowTarget | null {
+  const window = getMainWindow(windowId);
+  if (window === null) {
+    return null;
+  }
+  return { windowId: windowId, window: window, state: getStateForWindow(windowId), layoutOptions: getLayoutOptions(windowId) };
+}
+
+/**
+ * Places a window's pages again at once (after it was resized), or gliding.
+ */
+export function relayoutWindow(windowId: WindowId, isAnimated: boolean = false): void {
+  const target = buildWindowTarget(windowId);
+  if (target !== null) {
+    layoutShownTabViews(target, isAnimated);
   }
 }
 
 /**
- * Shows or hides the sidebar for a moment while it is hidden (Arc's hover at the left edge). The page slides aside.
+ * Moves the focused window's page card while the sidebar's edge is dragged, without saving (null ends the preview).
  */
-export function setSidebarPeek(isPeeking: boolean): void {
+export function previewSidebarWidthWhileDragging(width: number | null): void {
+  previewSidebarWidth = width === null ? null : Math.max(SIDEBAR_MIN_WIDTH_PX, Math.min(width, SIDEBAR_MAX_WIDTH_PX));
+  relayoutWindow(currentState.focusedWindowId);
+}
+
+/**
+ * Shows or hides a window's sidebar for a moment while it is hidden (Arc's hover at the left edge). The page slides
+ * aside.
+ */
+export function setSidebarPeek(windowId: WindowId, isPeeking: boolean): void {
   const canPeek = !currentState.settings.isSidebarVisible;
   const newValue = isPeeking && canPeek;
-  if (newValue === isSidebarPeeking || mainWindow === null) {
+  const isPeekingNow = peekingWindowIds.has(windowId);
+  if (newValue === isPeekingNow || getMainWindow(windowId) === null) {
     return;
   }
-  isSidebarPeeking = newValue;
+  if (newValue) {
+    peekingWindowIds.add(windowId);
+  } else {
+    peekingWindowIds.delete(windowId);
+  }
   // The page slides aside (and back) together with the sidebar sliding in.
-  layoutShownTabViews(mainWindow, currentState, getLayoutOptions(), true);
+  relayoutWindow(windowId, true);
+  scheduleRuntimePush();
+}
+
+/**
+ * "Move to This Window": the focused window takes the pages it selected that another window shows. That window then
+ * says "Open in another window" while it still selects them.
+ */
+export function moveShownElsewhereTabsHere(): void {
+  const focusedWindowId = currentState.focusedWindowId;
+  requestTabsMoveToWindow(getTabIdsShownElsewhere(focusedWindowId), focusedWindowId);
+  syncViews();
   scheduleRuntimePush();
 }
 
@@ -173,19 +292,34 @@ function rememberSelectedTab(): void {
 }
 
 /**
- * Makes the web views match the state and keeps the overlay above any view that was just added.
+ * Makes the web views of every main window match the state and keeps the overlay above any view that was just added.
  */
 export function syncViews(): void {
-  if (mainWindow === null || mainWindow.isDestroyed() || tabViewEvents === null) {
+  if (tabViewEvents === null) {
     return;
   }
-  const previouslyShownTabIds = [...getShownTabIds()];
-  const viewsChanged = syncTabViews(mainWindow, currentState, getLayoutOptions(), tabViewEvents);
-  if (!viewsChanged) {
+  const targets: WindowTarget[] = [];
+  for (const windowId of listWindowIds(currentState)) {
+    const target = buildWindowTarget(windowId);
+    if (target !== null) {
+      targets.push(target);
+    }
+  }
+  if (targets.length === 0) {
+    return;
+  }
+  const previouslyShownTabIds = getShownTabIds();
+  const changedWindowIds = syncTabViews(targets, tabViewEvents);
+  if (changedWindowIds.size === 0) {
     return;
   }
   handleShownTabsChanged(previouslyShownTabIds, getShownTabIds());
-  raiseOverlayIfShown(mainWindow);
+  for (const windowId of changedWindowIds) {
+    const window = getMainWindow(windowId);
+    if (window !== null) {
+      raiseOverlayIfShown(window);
+    }
+  }
   for (const hook of afterSyncHooks) {
     hook();
   }
@@ -197,7 +331,8 @@ export function syncViews(): void {
  * Example: applyChange((state) => selectTab(state, "tab-3", Date.now()))
  */
 export function applyChange(change: (state: BrowserState) => BrowserState): void {
-  const newState = change(currentState);
+  // Changes act on the focused window; the other windows' choices are fixed up after each one (windows.ts).
+  const newState = repairOtherWindows(change(currentState));
   // Functions in state.ts return the same object when nothing changed; then there is nothing to do.
   if (newState === currentState) {
     return;
@@ -205,7 +340,7 @@ export function applyChange(change: (state: BrowserState) => BrowserState): void
 
   currentState = newState;
   if (currentState.settings.isSidebarVisible) {
-    isSidebarPeeking = false;
+    peekingWindowIds.clear();
   }
   rememberSelectedTab();
   saveState(stateFilePath, currentState);
@@ -218,27 +353,30 @@ export function applyChange(change: (state: BrowserState) => BrowserState): void
 }
 
 /**
- * Sends the current state to the sidebar page so it can redraw.
+ * Sends the current state to every main window's sidebar page, as that window shows it, so it can redraw.
  */
 export function pushStateToSidebar(): void {
-  if (mainWindow === null || mainWindow.isDestroyed()) {
-    return;
+  for (const { windowId, window } of listMainWindows()) {
+    window.webContents.send(IPC_CHANNELS.stateChanged, getStateForWindow(windowId));
   }
-  mainWindow.webContents.send(IPC_CHANNELS.stateChanged, currentState);
 }
 
 /**
- * Builds the runtime facts: every loaded tab's loading / sound / history, and the downloads in progress.
+ * Builds a window's runtime facts (the focused window's unless named): every loaded tab's loading / sound / history,
+ * the downloads in progress, and what only that window has (its sidebar peeking, pages another window shows).
  */
-export function collectRuntimeState(): RuntimeState {
+export function collectRuntimeState(windowId: WindowId = currentState.focusedWindowId): RuntimeState {
   const tabs = collectTabRuntime();
+  const isFocused = windowId === currentState.focusedWindowId;
   return {
     tabs: tabs,
     activeDownloadCount: getActiveDownloadCount(),
-    isSidebarPeeking: isSidebarPeeking,
+    isSidebarPeeking: peekingWindowIds.has(windowId),
     media: findMediaInfo(tabs, getShownTabIds()),
-    isNewTabPending: isNewTabPending,
+    // The Command Bar opens in the focused window, so only its "New Tab" row lights up.
+    isNewTabPending: isNewTabPending && isFocused,
     liveFolders: getLiveFolderStatuses(),
+    tabIdsInOtherWindows: getTabIdsShownElsewhere(windowId),
   };
 }
 
@@ -281,19 +419,19 @@ export function scheduleRuntimePush(): void {
   }
   runtimePushTimer = setTimeout(() => {
     runtimePushTimer = null;
-    if (mainWindow === null || mainWindow.isDestroyed()) {
-      return;
+    for (const { windowId, window } of listMainWindows()) {
+      window.webContents.send(IPC_CHANNELS.runtimeChanged, collectRuntimeState(windowId));
     }
-    mainWindow.webContents.send(IPC_CHANNELS.runtimeChanged, collectRuntimeState());
   }, RUNTIME_PUSH_DELAY_MS);
 }
 
 /**
- * Sends a request to the sidebar page that only it can carry out (inline renaming).
+ * Sends a request to the focused window's sidebar page that only it can carry out (inline renaming).
  */
 export function sendSidebarCommand(command: SidebarCommand): void {
-  if (mainWindow === null || mainWindow.isDestroyed()) {
+  const window = getWindow();
+  if (window === null) {
     return;
   }
-  mainWindow.webContents.send(IPC_CHANNELS.sidebarCommand, command);
+  window.webContents.send(IPC_CHANNELS.sidebarCommand, command);
 }

@@ -12,7 +12,7 @@
  */
 import type { NavigationCommand } from "../shared/actions";
 import type { ItemId } from "../shared/types";
-import { applyChange, getState, getWindow, scheduleRuntimePush } from "./browserCore";
+import { applyChange, getState, scheduleRuntimePush } from "./browserCore";
 import { closeTab, getSelectedTabId, openTab, resetPinnedTab, selectTab, setTabMuted, updateTab } from "./state";
 import type { OpenTabOptions } from "./state";
 import { destroyTabView, getFocusedContents, getTabContents } from "./tabViews";
@@ -36,10 +36,8 @@ export function closeTabByUser(tabId: ItemId): void {
     applyChange((state) => closeTab(state, tabId, Date.now()));
     return;
   }
-  const window = getWindow();
-  if (window !== null) {
-    destroyTabView(window, tabId);
-  }
+  // The page may be on screen in another window (this one showed "Open in another window"); it goes there too.
+  destroyTabView(tabId);
   applyChange((state) => resetPinnedTab(state, tabId));
   // The page is gone even when the state did not change, so the sidebar must hear about it.
   scheduleRuntimePush();

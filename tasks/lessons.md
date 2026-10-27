@@ -41,6 +41,13 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 - On macOS, `getUserMedia` waits on the system's camera/microphone dialog before our permission handler runs, so
   e2e checks use notifications for the prompt flow.
 
+- `webContents.executeJavaScript` on a window that is closing never resolves, so an `app.evaluate` that asks every
+  window something hangs the whole check (no timeout, no output). Skip destroyed windows and race such calls with a
+  short timeout (`describeWindows` in `e2e/check-windows.mjs`). Pipe a check through `| tail` and a hang shows nothing
+  at all: write to a log file and watch it instead (`E2E_DEBUG=1` streams the main process there).
+- Electron 44 facts, checked with a throwaway script: `addChildView` into another window moves the view out of its
+  old parent, and closing a window does not destroy its child views' pages.
+
 ## Matching Arc from screenshots
 - When a reference screenshot shows a state I don't recognize, ask the user what it shows before deriving a feature
   from it. (Shot 5 was Arc's per-site Developer Mode; I had planned it as a global "Show full URL" option.)

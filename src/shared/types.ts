@@ -326,6 +326,11 @@ export interface RuntimeState {
   isNewTabPending: boolean;
   /** How each live folder's last refresh went, by folder id. Folders not refreshed since the start are missing. */
   liveFolders: Record<ItemId, LiveFolderStatus>;
+  /**
+   * Tabs this window would show that another main window has on screen (a page is in one window at a time): the
+   * card says "Open in another window" instead.
+   */
+  tabIdsInOtherWindows: ItemId[];
 }
 
 /** What the sidebar's small media player shows. */
