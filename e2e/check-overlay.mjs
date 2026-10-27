@@ -128,9 +128,9 @@ const libraryPlacement = await app.evaluate(({ BrowserWindow }) => {
   const overlayView = win.contentView.children.find((child) => child.webContents?.getURL().endsWith("/overlay/overlay.html"));
   return overlayView === undefined ? null : overlayView.getBounds();
 });
-// The column glides open (260 ms) after the runtime push.
-await sidebar.waitForFunction(() => document.body.classList.contains("library-open") && Math.round(document.querySelector(".sidebar").getBoundingClientRect().width) === 410, null, { timeout: 3000 }).catch(() => undefined);
-const sidebarColumn = await sidebar.evaluate(() => (document.body.classList.contains("library-open") ? Math.round(document.querySelector(".sidebar").getBoundingClientRect().width) : 0));
+// The column glides open (260 ms) after the runtime push; the card then starts after it (410 + the 7 pt gap).
+await sidebar.waitForFunction(() => document.body.classList.contains("library-open") && Math.round(document.getElementById("card").getBoundingClientRect().x) === 417, null, { timeout: 3000 }).catch(() => undefined);
+const sidebarColumn = await sidebar.evaluate(() => (document.body.classList.contains("library-open") ? Math.round(document.getElementById("card").getBoundingClientRect().x) - 7 : 0));
 const railSections = await overlay.$$eval(".library-rail .library-tab", (tabs) => tabs.map((tab) => tab.dataset.section).join(","));
 check("the Library takes the sidebar column, with Arc's rail of sections", libraryPlacement?.x === 0 && libraryPlacement?.width === 410 && sidebarColumn === 410 && railSections.startsWith("media,downloads,spaces,boosts,archive"), `${JSON.stringify(libraryPlacement)} column=${sidebarColumn} ${railSections}`);
 await overlay.click(".library .library-line");
@@ -868,6 +868,20 @@ check("the selected tab's tooltip adds \"Double-click to rename\"", hintText ===
 await sidebar.mouse.move(60, 20);
 await sidebar.waitForTimeout(300);
 check("moving away hides it", !(await overlayIsShown()));
+
+// A press while the tooltip shows: the tooltip fades at once, but its view stays in the window until the button comes
+// up (taking a view out mid-press may stop a real tab drag from starting).
+await sidebar.mouse.move(selectedRowBox.x + 40, selectedRowBox.y + selectedRowBox.height / 2);
+await sidebar.mouse.move(selectedRowBox.x + 42, selectedRowBox.y + selectedRowBox.height / 2);
+await overlay.waitForSelector(".tab-tooltip", { timeout: 4000 }).catch(() => undefined);
+await sidebar.mouse.down();
+await sidebar.waitForTimeout(300);
+const isViewKeptDuringPress = await overlayIsShown();
+const isTooltipFaded = await overlay.evaluate(() => document.body.classList.contains("is-closing"));
+await sidebar.mouse.up();
+await sidebar.waitForTimeout(300);
+check("a press fades the tooltip but keeps its view until the button comes up", isViewKeptDuringPress && isTooltipFaded && !(await overlayIsShown()), `kept=${isViewKeptDuringPress} faded=${isTooltipFaded}`);
+await sidebar.mouse.move(60, 20);
 
 // A closed folder's list (Arc's): resting on a closed folder shows its tabs beside the sidebar, newest first, with a
 // focused search field; leaving the row (and not entering the list) closes it; clicking a tab in it opens that tab.

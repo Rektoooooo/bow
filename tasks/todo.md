@@ -220,8 +220,12 @@ tooltip, 7 sidebar width, then AppleScript.
       sidebar (no longer squeezed); the sidebar's own buttons go at once
 - [x] The page meets the toolbar square: the card shows the page's own top colour under the page view's rounded corners
 - [x] The selected Favorite: Arc's 2 pt border in the icon's colour and a tinted fill (main/faviconAccents.ts)
-- [ ] Dragging tabs in the sidebar does not work for the user with a real mouse (e2e only simulates drag events);
-      needs a look with real input
+- [ ] Dragging tabs in the sidebar does not work for the user with a real mouse ("could not even grab it"; e2e only
+      simulates drag events). Ruled out: window drag regions (rows clear in ELECTRON_DEBUG_DRAGGABLE_REGIONS). Tried:
+      a press no longer takes the tooltip's / folder list's view out of the window mid-press. To confirm with the
+      user: does a drag work when pressed within half a second of reaching a row (before the tooltip shows)? The
+      diagnostic window (logs every pointer and drag event) is in the handoff. If it still fails: replace native drag
+      with pointer events (testable with Playwright's mouse; cross-window drops then need main's help)
 - New window: the purple window in the first recording was most likely incognito (⇧⌘N; the user is not sure), so
   Arc's ⌘N window and its "open in another window" placeholder are still unobserved; no change planned
 - [ ] AppleScript dictionary (the user runs Raycast, which talks to Arc through AppleScript; ours has none yet).

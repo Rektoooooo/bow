@@ -38,7 +38,8 @@ in Arc). Running it twice adds nothing twice.
 ## What works
 
 **Sidebar**
-- Favorites as tiles at the top, shared by every Space that uses the same profile (up to 12, like Arc).
+- Favorites as tiles at the top, shared by every Space that uses the same profile (up to 12, like Arc). The selected
+  one gets a border in the colour that appears most in its icon, like Arc's.
 - A Space title (click to collapse Pinned), Pinned tabs and nested folders, a divider with **Clear**, **+ New Tab**,
   and the Today list. A closed folder still shows the tab you are on.
 - A Pinned tab that left its page shows Arc's "/" and a button back to its pinned address. ⌘W on a Pinned tab
