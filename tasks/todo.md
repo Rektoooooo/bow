@@ -217,7 +217,10 @@ tooltip, 7 sidebar width, then AppleScript.
 - [ ] Sidebar scrollbar: thin overlay scrollbar while scrolling → check ours
 - New window: the purple window in the first recording was most likely incognito (⇧⌘N; the user is not sure), so
   Arc's ⌘N window and its "open in another window" placeholder are still unobserved; no change planned
-- [ ] AppleScript dictionary (the user runs Raycast, which talks to Arc through AppleScript; ours has none yet)
+- [ ] AppleScript dictionary (the user runs Raycast, which talks to Arc through AppleScript; ours has none yet).
+      Electron answers only the standard "open location"; Arc's own commands (tabs, Spaces, `make new tab`) need an
+      `.sdef` plus native Apple Event handlers (an Objective-C addon) or a URL-scheme / CLI bridge for Raycast script
+      commands instead. Needs the user's choice (handoff 2026-10-27-arc-polish)
 
 User decisions (2026-10-27): publish releases on GitHub for auto-updates (yes); notarize with the user's Apple
 Developer account (yes; the repo is open source, so certificates, notary credentials and team ids never go into the
@@ -230,6 +233,18 @@ repo: the user stores them in their own keychain); Arc Max and sync/sharing stay
       per selection; unchanged rows now come as placeholders morph.ts keeps as they are, move animations only
       measure when the order changed, the toolbar tint restyles the card alone → about 8 ms per redraw
 - [ ] Hands-on runs of the packaged app; all suites green; docs + teardown page current
+
+## Review (2026-10-27, polish tour and Arc fixes 3–7 from the live comparison, 3.7)
+- **Works and verified:** background-window icon fading, toolbar strengths, planet, tab title weight, New Tab pitch,
+  floating peek panel (`7211ac4`); Arc's tab tooltip (`fa4360b`); Arc import sets the sidebar width (`f85eebe`, also
+  run once against the user's real Arc files in a throwaway profile: 247); Arc's Peek (`9fe877e`); the Library in
+  the sidebar column (`49827f6`); the closed-folder list. Each compared on the real screen with the user's Arc
+  (captures and recording frames). Suites on the last run: `npm test` 335, `check-app` 47, `check-overlay` 79,
+  `check-extensions` 35, `permission-check`, `check-motion` 8, `check-live-folders` 21, `check-performance` 4,
+  `check-windows` 51.
+- **Not verified:** the active-window look of the new pieces on the real screen (unattended runs never get the
+  focus; the active tokens were checked by forcing `data-window="active"`); light Spaces against Arc (no capture).
+- **Open:** AppleScript (needs a decision), releases + notarization, Spaces spread over the window (Library).
 
 ## Review (2026-10-27, multiple windows closer to Arc, 3.6)
 - **Works and verified:** per-window sidebar (⌘S, width, peek), Pinned sections and folders; new windows from the

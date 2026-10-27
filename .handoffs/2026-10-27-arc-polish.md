@@ -27,7 +27,16 @@ approved fixes Peek (3), tab tooltip (6) and sidebar width (7). The user was awa
   a profile that already has Arc's Spaces keeps its width (drag the edge, or import into a fresh profile).
 - `9fe877e` Arc's Peek: the card hangs from the window's top edge with its own 44 pt toolbar row (back, forward,
   reload, address) in the frame's color, 80 % of the page card wide, 12 pt above the bottom; only the page card
-  dims (black 55 %); round black Close / Open as Tab / Split buttons stacked right of it.
+  dims (black 55 %); round black Close / Open as Tab / Split buttons stacked right of it. (Its first suite run had
+  three Capture failures — a live YouTube page loading slowly — and was pushed by mistake before the summary was
+  read; the rerun passed everything. Lesson in `tasks/lessons.md`.)
+- `49827f6` Arc's Library in the sidebar column: the column widens to 410 pt (card at 417) at any sidebar width, a
+  112 pt rail (Media, Downloads, Spaces, Boosts, Archived Tabs, then our History, Extensions, Settings) with the
+  list beside it; the overlay is exactly the column and draws see-through over the sidebar's frame; the page glides
+  aside (`check-motion`). Spaces spread over the window in columns: not done (Library › Spaces is a list).
+- Closed-folder list (after `027a559`): rest on a closed folder → its tabs beside the sidebar, newest first, "1 minute
+  ago", a focused search field; closes 300 ms after the pointer left the row and the list (each page reports its
+  side to main; a cursor poll could not be tested, since Playwright never moves the real cursor).
 
 ## How it was measured (keep doing it this way)
 
@@ -53,8 +62,15 @@ approved fixes Peek (3), tab tooltip (6) and sidebar width (7). The user was awa
 
 ## Next (approved order)
 
-4. Library in the sidebar column (see `tasks/todo.md` 3.7 for the measured spec), 5. closed-folder hover list,
-then AppleScript, GitHub releases with auto-update, notarization (credentials only in the user's keychain).
+AppleScript (the user drives Arc from Raycast), then GitHub releases with auto-update and notarization (credentials
+only in the user's keychain, never in this public repo).
+
+AppleScript needs more than Electron offers: the standard suite (open a URL) works through `open-url`, but Raycast's
+Arc commands use Arc's own dictionary (windows, tabs, Spaces, `make new tab`, `URL of active tab`). An Electron app
+can ship an `.sdef` and `NSAppleScriptEnabled` in Info.plist, but answering custom Apple Events needs native code
+(an Objective-C addon registering NSScriptCommand handlers, or `NSAppleEventManager` handlers that forward to main).
+Decide with the user: a small native addon (build tooling, signing) or a URL-scheme / CLI bridge that Raycast script
+commands can call instead.
 
 ## Shared checkout
 
