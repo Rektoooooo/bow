@@ -172,6 +172,27 @@ differs from it), and new windows start from it.
       Space switcher): main carries the dragged item id between windows; a dropped tab is selected there and its
       page moves along
 
+### 3.7 Live Arc comparison (user's screen recording of Arc, 2026-10-27; frames in reference/arc-live/, git-ignored)
+Found by watching the user's real Arc (active window) next to ours. Each item: what Arc does → what we do.
+- [ ] Frame colour follows window focus: black theme sidebar #060606 while active, #353535 while inactive (all five
+      reference shots were inactive, so our palette only matches the inactive look) → ours never changes
+- [ ] Library lives in the sidebar column: a vertical icon rail (Media, Downloads, Easels, Spaces, Boosts, Archived
+      Tabs) with the list beside it; Spaces spread over the window in columns → ours is a floating panel
+- [ ] Peek: a card almost the whole page card wide, over the toolbar, with its own toolbar row (back, forward,
+      reload, address) inside; close / expand / split stacked vertically outside its right edge; page dimmed behind →
+      ours is a smaller card with a header above it
+- [ ] Theme editor and icon picker are popovers above the sidebar's bottom bar (theme: auto/light/dark, grainy colour
+      field with handle and − / +, preset dots with arrows, wavy slider, dial; icon: Emoji / Icon tabs and a grid) →
+      ours are overlay panels
+- [ ] Hovering a closed folder opens a searchable list of its tabs with "1 minute ago" times → missing
+- [ ] Hovering a tab row: × button and a small tooltip "Title / Double-click to rename" (no page preview seen after
+      3 s) → ours shows a page preview card
+- [ ] Sidebar width: the user's Arc is 254 pt (StorableWindows sidebarWidth) → ours 242; the Arc import should carry it
+- [ ] Sidebar scrollbar: thin overlay scrollbar while scrolling → check ours
+- [ ] New window (⌘N?): a purple gradient window, sidebar with only the Space name and New Tab, Command Bar open →
+      ours shows the full sidebar; ask the user which command opened it before changing anything
+- Note: the user runs Raycast, which talks to Arc through AppleScript; ours has no AppleScript yet
+
 ### 3.4 Verification
 - [x] e2e/arc-compare.mjs (side-by-side with the reference; positions match within about a point)
 - [x] Motion checks for ⌘S, peek and resize (e2e/check-motion.mjs, part of `npm run e2e`)
