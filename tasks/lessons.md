@@ -15,6 +15,9 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   reworded before a push. Write "three of the user's titles", never the titles.
 
 ## Testing
+- Playwright's mouse leaves each page's pointer where it last was, and a hover-driven panel that later opens under
+  that spot gets a `mouseenter` (removing an unrelated click made the ⌃Tab switcher start on the wrong card). Move
+  the pointer somewhere neutral before checking anything that reacts to hover.
 - Window dragging cannot be driven from a test (Playwright's mouse never reaches the native window, and posting real
   mouse events needs a permission we do not have). Check drag regions with `ELECTRON_DEBUG_DRAGGABLE_REGIONS=1`
   (Electron 44.3+): it paints the regions main hit-tests on the page, and a window capture shows them. Since
@@ -92,6 +95,13 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 - Compare every state a shot shows, not only the resting one: with the Command Bar or Control Center open, Arc's
   frame stays #313131 (no dimming). I had a 30 % backdrop under both for a whole session; measuring the frame pixel
   of shots 3 and 4 found it.
+
+## Electron APIs
+- `webContents.removeInsertedCSS(key)` only removes **author** style sheets: a sheet inserted with
+  `cssOrigin: "user"` stays for good (the picture-in-picture takeover left pages blank). Insert author sheets with
+  `!important`, and scope injected rules to a mark you can take off, so the page recovers even if removal fails.
+- `ELECTRON_DEBUG_DRAGGABLE_REGIONS=1` froze the app when a `type: "panel"` window opened; check drag regions in other
+  windows only.
 
 ## Dependencies
 - Check a package's license **per version** and diff a just-published release against the previous one before

@@ -1,0 +1,211 @@
+/*
+  WHY this file exists:
+    Look of the picture-in-picture controls, the user's approved design (2026-10-27): at rest only the video; with
+    the pointer over the window, a dark fade at the top and bottom, glass buttons and a thin progress bar. The page is
+    see-through: the video below is the tab's own page in another view, so the glass cannot blur it; the fade and the
+    light rims carry the glass look instead.
+*/
+
+:root {
+  --glass: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.1)), rgba(28, 28, 32, 0.38);
+  --glass-hover: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.16)), rgba(28, 28, 32, 0.42);
+  --glass-rim: inset 0 0.5px 0 rgba(255, 255, 255, 0.5), inset 0 0 0 0.5px rgba(255, 255, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --ink: #fff;
+  --button-size: 28px;
+  --play-size: 52px;
+  --edge: 10px;
+  --fade-ms: 160ms;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  color: var(--ink);
+  font: 12px/1.2 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  user-select: none;
+  cursor: default;
+  /* The window moves by any spot that is not a control. */
+  -webkit-app-region: drag;
+}
+
+.icon {
+  display: block;
+  flex: none;
+}
+
+/* SF Symbols (icons.ts): a mask tinted with the text color, drawn at the symbol's natural size. */
+.icon-symbol {
+  width: var(--symbol-width, 16px);
+  height: var(--symbol-height, 16px);
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.pip-controls {
+  position: fixed;
+  inset: 0;
+  opacity: 0;
+  transition: opacity var(--fade-ms) ease-out;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent 32%, transparent 62%, rgba(0, 0, 0, 0.6));
+}
+
+body.is-hovered .pip-controls {
+  opacity: 1;
+}
+
+.pip-glass {
+  background: var(--glass);
+  box-shadow: var(--glass-rim);
+  color: var(--ink);
+}
+
+.pip-button {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: var(--button-size);
+  height: var(--button-size);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  font: inherit;
+  -webkit-app-region: no-drag;
+}
+
+.pip-button:hover {
+  background: var(--glass-hover);
+}
+
+.pip-button:active {
+  transform: scale(0.94);
+}
+
+.pip-site {
+  position: absolute;
+  left: var(--edge);
+  top: var(--edge);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 2 * var(--edge) - 2 * var(--button-size) - 16px);
+  height: 26px;
+  padding: 0 10px 0 7px;
+  border-radius: 13px;
+  font-weight: 600;
+}
+
+.pip-favicon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.pip-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pip-back {
+  right: calc(var(--edge) + var(--button-size) + 6px);
+  top: var(--edge);
+}
+
+.pip-close {
+  right: var(--edge);
+  top: var(--edge);
+}
+
+.pip-back .icon-symbol,
+.pip-close .icon-symbol,
+.pip-mute .icon-symbol {
+  width: 14px;
+  height: 14px;
+}
+
+.pip-play {
+  left: 50%;
+  top: 50%;
+  width: var(--play-size);
+  height: var(--play-size);
+  transform: translate(-50%, -50%);
+}
+
+.pip-play:active {
+  transform: translate(-50%, -50%) scale(0.94);
+}
+
+.pip-play .icon-symbol {
+  width: 20px;
+  height: 20px;
+}
+
+.pip-mute {
+  left: var(--edge);
+  bottom: var(--edge);
+}
+
+/* Taller than it looks, so the bar is easy to hit. */
+.pip-progress {
+  position: absolute;
+  left: calc(var(--edge) + var(--button-size) + 8px);
+  right: 82px;
+  bottom: 15px;
+  height: 20px;
+  -webkit-app-region: no-drag;
+}
+
+.pip-progress-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 8px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.28);
+  overflow: hidden;
+}
+
+.pip-progress-fill {
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  background: #fff;
+  transform-origin: left center;
+  transform: scaleX(var(--progress, 0));
+}
+
+.pip-time {
+  position: absolute;
+  right: 12px;
+  bottom: 16px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.pip-controls.is-live .pip-progress,
+.pip-controls.is-live .pip-time {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pip-controls {
+    transition: none;
+  }
+}

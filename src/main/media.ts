@@ -1,51 +1,25 @@
 /**
  * WHY this file exists:
  *   Two Arc media behaviors. When a tab plays sound in the background, the sidebar shows a small player (play /
- *   pause, dismiss). When you leave a tab whose video is playing, the video continues in Picture-in-Picture, and
- *   comes back into the page when you return to the tab.
+ *   pause, dismiss). When you leave a tab whose video is playing, the video continues in a floating window
+ *   (pictureInPicture.ts), and comes back into the page when you return to the tab.
  *
  * Data source:
  *   Which tabs are on screen (tabViews.ts), which are audible (runtime facts), and the pages' <video>/<audio>
  *   elements, reached with small scripts run in an isolated world (the page's own scripts cannot interfere).
  *
  * Data flow:
- *   browserCore.syncViews() → handleShownTabsChanged(before, after) → Picture-in-Picture in / out
+ *   browserCore.syncViews() → handleShownTabsChanged(before, after) → pictureInPicture.ts in / out
  *   browserCore.collectRuntimeState() → findMediaInfo() → sidebar player
  *   sidebar play/pause → toggleMediaPlayback() → script in the tab
  */
 import type { MediaInfo, TabRuntimeInfo } from "../shared/types";
 import type { ItemId } from "../shared/types";
+import { endPictureInPictureOfTab, enterPictureInPicture } from "./pictureInPicture";
 import { getTabContents } from "./tabViews";
 
 /** A world of our own inside the page: shares the page's DOM, not its JavaScript. Any number above 0 works. */
 const MEDIA_SCRIPT_WORLD_ID = 1031;
-
-/**
- * Puts the first playing video with sound into Picture-in-Picture. Resolves to true when it did. Muted videos (the
- * silent previews many sites autoplay) are left alone, like Arc does.
- */
-const ENTER_PICTURE_IN_PICTURE_SCRIPT = `(async () => {
-  const videos = Array.from(document.querySelectorAll("video"));
-  const playingVideo = videos.find((video) => !video.paused && !video.ended && !video.muted && video.volume > 0 && !video.disablePictureInPicture);
-  if (playingVideo === undefined || document.pictureInPictureElement !== null) {
-    return false;
-  }
-  try {
-    await playingVideo.requestPictureInPicture();
-    return true;
-  } catch {
-    return false;
-  }
-})()`;
-
-/** Brings a Picture-in-Picture video back into the page. */
-const EXIT_PICTURE_IN_PICTURE_SCRIPT = `(async () => {
-  if (document.pictureInPictureElement === null) {
-    return false;
-  }
-  await document.exitPictureInPicture();
-  return true;
-})()`;
 
 /** Pauses everything that plays, or resumes the media that was playing. Resolves to the new "is playing". */
 const TOGGLE_PLAYBACK_SCRIPT = `(() => {
@@ -81,12 +55,9 @@ let isMediaPlaying = false;
 /** The player tab's audible flag at the previous check, to notice when sound starts again. */
 let wasAudible = false;
 
-/** Tabs whose video we moved into Picture-in-Picture, so returning to them brings it back. */
-const tabsInPictureInPicture = new Set<ItemId>();
-
 /**
- * Runs one of the scripts above in a tab's isolated world. User gesture is set, because browsers only allow
- * Picture-in-Picture and play() after one.
+ * Runs one of the scripts above in a tab's isolated world. User gesture is set, because browsers only allow play()
+ * after one.
  */
 async function runMediaScript(tabId: ItemId, script: string): Promise<boolean> {
   const contents = getTabContents(tabId);
@@ -102,26 +73,17 @@ async function runMediaScript(tabId: ItemId, script: string): Promise<boolean> {
 }
 
 /**
- * Called after the shown tabs changed. Tabs that left the screen while playing video go into Picture-in-Picture
- * (Arc's automatic Picture-in-Picture); tabs that came back leave it.
+ * Called after the shown tabs changed. A tab that left the screen while playing video continues in our
+ * picture-in-picture window (Arc's automatic picture-in-picture); a tab that came back takes its video back.
  */
 export function handleShownTabsChanged(previousTabIds: ItemId[], shownTabIds: ItemId[]): void {
   for (const tabId of previousTabIds) {
-    if (shownTabIds.includes(tabId)) {
-      continue;
+    if (!shownTabIds.includes(tabId)) {
+      enterPictureInPicture(tabId);
     }
-    runMediaScript(tabId, ENTER_PICTURE_IN_PICTURE_SCRIPT).then((entered) => {
-      if (entered) {
-        tabsInPictureInPicture.add(tabId);
-      }
-    });
   }
   for (const tabId of shownTabIds) {
-    if (!tabsInPictureInPicture.has(tabId)) {
-      continue;
-    }
-    tabsInPictureInPicture.delete(tabId);
-    runMediaScript(tabId, EXIT_PICTURE_IN_PICTURE_SCRIPT);
+    endPictureInPictureOfTab(tabId);
   }
 }
 

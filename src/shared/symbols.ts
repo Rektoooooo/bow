@@ -64,6 +64,8 @@ export const SYMBOL_NAMES = {
   video: "video",
   clipboard: "doc.on.clipboard",
   pictureInPicture: "pip",
+  // The picture-in-picture window's "back to tab", like macOS's own picture-in-picture.
+  pictureInPictureExit: "pip.exit",
   note: "note.text",
   clock: "clock.arrow.circlepath",
   checkmark: "checkmark",

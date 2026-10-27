@@ -57,7 +57,8 @@ and every Arc behavior we can observe is written down before Arc shuts down.
 - [x] Little Arc-style small window (⌥⌘N, links from other apps), archives after 6 h
 - [x] Import from Arc: Spaces, Favorites, Pinned folders/tabs, Today tabs, themes, cached favicons (File › Import from Arc…)
 
-- [x] Media: sidebar player for a tab playing in the background; automatic Picture-in-Picture when leaving a playing video
+- [x] Media: sidebar player for a tab playing in the background; automatic picture-in-picture when leaving a playing
+      video (our own floating window since 2026-10-27)
 - [x] Import Arc's archive (250 tabs) and browsing history (Chromium History via sqlite3)
 
 - [x] Profiles UI (Space menu › Profile), private windows (⇧⌘N), resizable sidebar, unread dot, window bounds remembered

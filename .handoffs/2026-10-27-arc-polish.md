@@ -38,6 +38,18 @@ approved fixes Peek (3), tab tooltip (6) and sidebar width (7). The user was awa
   ago", a focused search field; closes 300 ms after the pointer left the row and the list (each page reports its
   side to main; a cursor poll could not be tested, since Playwright never moves the real cursor).
 
+- Our own picture-in-picture window (the user did not like Chromium's controls; Electron 44 has no Document
+  Picture-in-Picture). `main/pictureInPicture.ts`: leaving a tab whose video plays with sound moves **the tab's own
+  page view** into a frameless `BaseWindow` (`type: "panel"`, not focusable, floating on every Space, system rounded
+  corners and shadow, aspect ratio of the video, 400 pt wide bottom-right, last place remembered for the run). An
+  author style sheet (`!important`, every rule scoped to a mark on `<html>`) makes the marked video fill the page and
+  hides the rest; a see-through controls view (`src/pip`, own preload) lies on top: title pill, Back to Tab
+  (`pip.exit`), close, play / pause, mute (the tab's mute), progress with seek, time. Hover comes from a 100 ms cursor
+  poll, because the background is a drag region. Back to Tab selects the tab (the main window takes the view back)
+  and brings the app forward; Close pauses the video, like Chromium's. `check-overlay` drives it at its end.
+- Sound effects removed (the user: "no one does that"): `renderer/sounds.ts`, the Library switch, the action and the
+  optional `areSoundEffectsOn` setting are gone; a stray key in an old saved file is ignored, so no version bump.
+
 ## How it was measured (keep doing it this way)
 
 - Our window: `screencapture -x -o -l <windowNumber>` (the number comes from `getMediaSourceId()`), converted from
@@ -58,6 +70,10 @@ approved fixes Peek (3), tab tooltip (6) and sidebar width (7). The user was awa
 - The Peek's page keeps rounded top corners under its toolbar row (Electron gives a view one radius for all corners).
 - ⌘[ / ⌘] / ⌘R from the menu act on the selected tab, not on a Peek (only the Peek's own row buttons act on it).
 - Light Spaces: the new icon tokens were set by analogy; no light Arc capture exists to measure against.
+- Picture-in-picture: YouTube would not play under automation (it pauses a start it did not make), so the style
+  takeover was proven on a local page with a sticky header and a transformed container, not on YouTube itself. The
+  drag region was not tried with a real drag (no event posting here; the debug paint mode froze the panel). Videos
+  inside iframes (embedded players) and shadow DOM are not found; one window at a time, a new one pauses the old.
 - Arc's peeking sidebar is darker than its frame (a material over the page); ours keeps the frame's gradient.
 
 ## Next (approved order)

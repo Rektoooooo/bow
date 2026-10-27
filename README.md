@@ -132,8 +132,9 @@ in Arc). Running it twice adds nothing twice.
 - The **Control Center** (Arc's site controls): Share, Boost, Screenshot, Capture (drag over part of the page), the
   profile's extensions, per-site settings, and more behind "…" (Translate Page, zoom, clear site data, developer
   tools). Find in page,
-  downloads, Print (⌘P), spelling suggestions, a right-click menu in pages, and automatic Picture-in-Picture when
-  you leave a tab playing a video.
+  downloads, Print (⌘P), spelling suggestions, a right-click menu in pages, and automatic picture-in-picture when
+  you leave a tab playing a video: the tab's own page floats in a small window of ours, the video filling it, with
+  its title, Back to Tab, close, play / pause, mute and the progress showing while the pointer is over it.
 
 **Extensions**
 - Chrome extensions per profile, like Arc: imported from Arc, added from the Chrome Web Store (open an extension's

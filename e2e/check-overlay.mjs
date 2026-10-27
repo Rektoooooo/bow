@@ -914,6 +914,74 @@ await sidebar.waitForTimeout(500);
 state = await getState();
 check("clicking a tab in the list opens it", selectedTab(state)?.id === folderTabId && !(await overlayIsShown()), selectedTab(state)?.id);
 
+// Picture in picture, our own window: leaving a tab whose video plays moves that tab's page into a small floating
+// window, the video filling it and our controls on top; Back to Tab returns the page still playing, Close pauses it.
+const videoServer = http.createServer((request, response) => {
+  if (request.url === "/tone.wav") {
+    response.writeHead(200, { "Content-Type": "audio/wav" });
+    response.end(toneWav);
+    return;
+  }
+  // A video element playing the tone: sound and no picture, so it also tries the window's 16:9 fallback.
+  response.writeHead(200, { "Content-Type": "text/html" });
+  response.end('<!doctype html><title>Video test</title><header style="position:sticky;top:0">Header</header><div style="transform:translateZ(0)"><video src="/tone.wav" autoplay loop width="320" height="180"></video></div>');
+});
+await new Promise((resolve) => videoServer.listen(0, "127.0.0.1", resolve));
+state = await getState();
+const tabBeforeVideo = selectedTab(state)?.id;
+const pictureInPictureFacts = () =>
+  app.evaluate(({ BaseWindow }) => {
+    const pipWindow = BaseWindow.getAllWindows().find((window) => window.getTitle() === "Picture in Picture");
+    if (pipWindow === undefined) return null;
+    const urls = pipWindow.contentView.children.map((child) => child.webContents.getURL());
+    return { urls: urls, isOnTop: pipWindow.isAlwaysOnTop(), isFocusable: pipWindow.isFocusable() };
+  });
+const videoUrl = `http://127.0.0.1:${videoServer.address().port}/video`;
+await dispatch({ type: "openTab", typedText: videoUrl });
+const videoPage = await findPage("/video");
+await videoPage.waitForFunction(() => document.querySelector("video")?.currentTime > 0, null, { timeout: 10000 }).catch(() => undefined);
+const readVideo = () =>
+  videoPage.evaluate(() => {
+    const video = document.querySelector("video");
+    const box = video.getBoundingClientRect();
+    const isFixed = getComputedStyle(video).position === "fixed";
+    return { isFixed: isFixed, fills: box.width === innerWidth && box.height === innerHeight, isPaused: video.paused, header: getComputedStyle(document.querySelector("header")).visibility };
+  });
+state = await getState();
+const videoTabId = state.selectedTabIdBySpace[state.activeSpaceId];
+await dispatch({ type: "selectTab", tabId: tabBeforeVideo });
+let pipControls = await findPage("/pip/pip.html", 8000).catch(() => null);
+await sidebar.waitForTimeout(400);
+let pipFacts = await pictureInPictureFacts();
+let videoFacts = await readVideo();
+const isVideoAlone = videoFacts.isFixed && videoFacts.fills && videoFacts.header === "hidden" && !videoFacts.isPaused;
+check("leaving a tab whose video plays moves its page into our floating picture-in-picture window, the video alone filling it", pipControls !== null && pipFacts?.urls[0] === videoUrl && pipFacts.urls[1]?.endsWith("/pip/pip.html") === true && pipFacts.isOnTop && !pipFacts.isFocusable && isVideoAlone, JSON.stringify({ pipFacts, videoFacts }));
+await pipControls?.click(".pip-play").catch(() => undefined);
+await sidebar.waitForTimeout(400);
+const isPausedByButton = (await readVideo()).isPaused;
+await pipControls?.click(".pip-play").catch(() => undefined);
+await sidebar.waitForTimeout(400);
+const isPlayingAgain = !(await readVideo()).isPaused;
+check("its play / pause button pauses and plays the video", isPausedByButton && isPlayingAgain, `paused=${isPausedByButton} again=${isPlayingAgain}`);
+await pipControls?.click(".pip-back").catch(() => undefined);
+await sidebar.waitForTimeout(800);
+state = await getState();
+pipFacts = await pictureInPictureFacts();
+videoFacts = await readVideo();
+check("Back to Tab selects the tab and puts its page back as it was, still playing", selectedTab(state)?.id === videoTabId && pipFacts === null && !videoFacts.isFixed && videoFacts.header === "visible" && !videoFacts.isPaused, JSON.stringify({ selected: selectedTab(state)?.id, pipFacts, videoFacts }));
+await dispatch({ type: "selectTab", tabId: tabBeforeVideo });
+await sidebar.waitForTimeout(800);
+pipControls = await findPage("/pip/pip.html", 8000).catch(() => null);
+await pipControls?.click(".pip-close").catch(() => undefined);
+await sidebar.waitForTimeout(800);
+state = await getState();
+pipFacts = await pictureInPictureFacts();
+videoFacts = await readVideo();
+check("Close puts the window away and pauses the video; the tab you went to stays selected", pipFacts === null && videoFacts.isPaused && !videoFacts.isFixed && videoFacts.header === "visible" && selectedTab(state)?.id === tabBeforeVideo, JSON.stringify({ selected: selectedTab(state)?.id, pipFacts, videoFacts }));
+await dispatch({ type: "closeTab", tabId: videoTabId });
+await sidebar.waitForTimeout(300);
+videoServer.close();
+
 await app.close();
 const failed = results.filter((result) => !result.ok).length;
 console.log(`\n${results.length - failed}/${results.length} overlay checks passed.`);

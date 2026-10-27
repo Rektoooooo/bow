@@ -11,5 +11,5 @@
     "outDir": "dist/web",
     "sourceMap": true
   },
-  "include": ["src/renderer", "src/overlay", "src/little", "src/crash", "src/status", "src/shared"]
+  "include": ["src/renderer", "src/overlay", "src/little", "src/pip", "src/crash", "src/status", "src/shared"]
 }

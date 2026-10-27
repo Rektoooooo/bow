@@ -45,6 +45,7 @@ import { startTrackingDownloads } from "./downloads";
 import { getExtensionMenuItems, initializeExtensionHost, prepareExtensions } from "./extensionHost";
 import { initializePermissionPrompts } from "./permissionPrompts";
 import { registerSymbolIpc } from "./symbols";
+import { getPictureInPictureTabId, registerPictureInPictureIpc } from "./pictureInPicture";
 import { loadToolbarColors } from "./toolbarTint";
 import { initializeFaviconAccents, refreshFaviconAccents } from "./faviconAccents";
 import { updateExtensionsFromWebStore } from "./extensionsController";
@@ -151,7 +152,7 @@ function shouldOpenInPeek(tabId: ItemId, url: string): boolean {
  * so a video you watch for two hours never looks unused.
  */
 async function refreshTabsInUse(): Promise<ItemId[]> {
-  const inUseTabIds = await findTabsInUse(getTabViews(), getShownTabIds());
+  const inUseTabIds = findTabsInUse(getTabViews(), getShownTabIds(), getPictureInPictureTabId());
   const now = Date.now();
   applyChange((state) => markTabsActive(state, inUseTabIds, now));
   return inUseTabIds;
@@ -298,6 +299,7 @@ async function handleAppReady(): Promise<void> {
   registerOverlayIpc();
   registerLittleWindowIpc();
   registerSymbolIpc();
+  registerPictureInPictureIpc();
   setCommandActionRegistry(createCommandActionRegistry({ commands: appMenuCommands, runAction: runAction, getState: getState }));
   installAppMenu(appMenuCommands);
   // Hosts that password managers registered for other Chromium browsers (Arc, Brave, …) are found by extensions here.

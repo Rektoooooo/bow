@@ -1,0 +1,25 @@
+<!doctype html>
+<!--
+  WHY this file exists:
+    The controls on top of the picture-in-picture video: the tab's title, back to the tab, close, play / pause, mute
+    and the progress. They show while the pointer is over the window. The video itself is the tab's page, a separate
+    view below this one.
+
+  Data source:
+    pip.ts fills #pip-controls from the status pictureInPicture.ts sends.
+
+  Data flow:
+    pictureInPicture.ts → "pip:status" / "pip:hover" → pip.ts → #pip-controls
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' https: http: data:">
+    <title>Picture in Picture</title>
+    <link rel="stylesheet" href="./pip.css">
+  </head>
+  <body>
+    <div id="pip-controls" class="pip-controls"></div>
+    <script type="module" src="./pip.js"></script>
+  </body>
+</html>
