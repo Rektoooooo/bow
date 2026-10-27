@@ -164,3 +164,18 @@ export const TAB_TOOLTIP_DELAY_MS = 600;
  */
 export const LIBRARY_COLUMN_WIDTH_PX = 410;
 export const LIBRARY_RAIL_WIDTH_PX = 112;
+
+/*
+ * Arc's list of a closed folder's tabs (the user's recording, frame f0023): 245 pt wide, 4 pt right of the sidebar, a
+ * 48 pt search row, 45 pt rows, at most 316 pt tall, centered on the folder's row but kept 18 pt from the window's
+ * edges. It opens when the pointer rests on the folder and closes once the pointer has been away from the row and the
+ * list for a moment (both delays our choice).
+ */
+export const FOLDER_LIST_WIDTH_PX = 245;
+export const FOLDER_LIST_GAP_PX = 4;
+export const FOLDER_LIST_SEARCH_HEIGHT_PX = 48;
+export const FOLDER_LIST_ROW_HEIGHT_PX = 45;
+export const FOLDER_LIST_MAX_HEIGHT_PX = 316;
+export const FOLDER_LIST_EDGE_PX = 18;
+export const FOLDER_LIST_DELAY_MS = 500;
+export const FOLDER_LIST_CLOSE_DELAY_MS = 300;

@@ -54,9 +54,20 @@ export type OverlayPanel =
   | { kind: "permission"; requestId: string; host: string; kinds: SitePermissionKind[]; appName: string | null }
   | { kind: "capture"; frame: { x: number; y: number; width: number; height: number } }
   | { kind: "switcher"; tabs: SwitcherTab[]; index: number }
+  /** Arc's list of a closed folder's tabs, beside the sidebar (the frame is the list itself, window coordinates). */
+  | { kind: "folderList"; frame: OverlayRect; folderTitle: string; entries: FolderListEntry[] }
   /** Arc's tab tooltip; the frame (window coordinates) is the box itself, sized by the sidebar. */
   | { kind: "tabTooltip"; frame: OverlayRect; title: string; showsRenameHint: boolean }
   | { kind: "welcome"; spaceId: string; importSources: { id: string; label: string }[]; presets: { label: string; colors: string[]; appearance: ThemeAppearance }[] };
+
+/** One tab in the list a closed folder shows on hover (main/folderList.ts). */
+export interface FolderListEntry {
+  tabId: string;
+  title: string;
+  url: string;
+  faviconUrl: string | null;
+  lastActiveAt: number;
+}
 
 /** One card of the recent-tab switcher (⌃Tab): most recently used first, the selected tab at index 0. */
 export interface SwitcherTab {

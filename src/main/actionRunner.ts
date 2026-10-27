@@ -43,6 +43,7 @@ import { removePermissionAnswer } from "./sitePermissions";
 import { showMenuRequest } from "./menus";
 import type { MenuHost } from "./menus";
 import {
+  hideFolderList,
   hideTabTooltip,
   openBoostEditor,
   openCommandBar,
@@ -51,6 +52,8 @@ import {
   openSpaceIconPicker,
   openThemeEditor,
   runSiteCommand,
+  setFolderListPointer,
+  showFolderList,
   showTabTooltip,
 } from "./overlayController";
 import { setDeveloperMode } from "../shared/developerMode";
@@ -158,7 +161,7 @@ function reapplyCosmeticFiltersToAllPages(): void {
  * Actions that come from the pointer moving (the edge of a hidden sidebar, a tab row's tooltip). The pointer also moves
  * over background windows, so these never bring a window forward.
  */
-const POINTER_ACTION_TYPES: BrowserAction["type"][] = ["setSidebarPeek", "showTabTooltip", "hideTabTooltip"];
+const POINTER_ACTION_TYPES: BrowserAction["type"][] = ["setSidebarPeek", "showTabTooltip", "hideTabTooltip", "showFolderList", "hideFolderList", "folderListPointer"];
 
 /**
  * Runs an action from a page: the sidebar of a main window (windowId), or the overlay (null, it is always in the
@@ -396,6 +399,12 @@ export function runAction(action: BrowserAction): void {
       return showTabTooltip(action.title, action.showsRenameHint, action.frame);
     case "hideTabTooltip":
       return hideTabTooltip();
+    case "showFolderList":
+      return showFolderList(action.folderId, action.anchor);
+    case "hideFolderList":
+      return hideFolderList();
+    case "folderListPointer":
+      return setFolderListPointer(action.isInside);
     case "setAppIcon":
       applyChange((state) => setAppIcon(state, action.variantId));
       applyAppIcon(action.variantId).catch((error) => console.error("Changing the app icon failed:", error));

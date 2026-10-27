@@ -30,6 +30,7 @@ import { createIcon, installSymbols } from "./icons.js";
 import { applySpaceTheme, onSystemAppearanceChange } from "./theme.js";
 import { createNavigationButtons, renderToolbar } from "./toolbar.js";
 import { playSound } from "./sounds.js";
+import { installFolderListHover } from "./folderListHover.js";
 import { installTabTooltipHover } from "./tabTooltipHover.js";
 import { showNoteEditor } from "./noteEditor.js";
 import { createSpaceIcon } from "./spaceIcon.js";
@@ -778,6 +779,7 @@ async function startSidebar(): Promise<void> {
   if (sidebar !== null) {
     installSidebarEvents(sidebar, callbacks);
     installTabTooltipHover(sidebar);
+    installFolderListHover(sidebar);
     installDragAndDrop(sidebar);
     sidebar.addEventListener("wheel", handleSidebarWheel, { passive: true });
   }

@@ -203,7 +203,10 @@ tooltip, 7 sidebar width, then AppleScript.
       documented in shared/themePad.ts) (theme: auto/light/dark, grainy colour
       field with handle and − / +, preset dots with arrows, wavy slider, dial; icon: Emoji / Icon tabs and a grid) →
       ours are overlay panels
-- [ ] Hovering a closed folder opens a searchable list of its tabs with "1 minute ago" times → missing
+- [x] Hovering a closed folder opens a searchable list of its tabs with "1 minute ago" times → was missing. Done,
+      measured on frame f0023: 245 pt wide, 4 pt right of the sidebar, 48 pt search row (focused), 45 pt rows newest
+      first, at most 316 pt, centered on the row but 18 pt from the window's edges; it closes 300 ms after the pointer
+      left both the row and the list (the sidebar and the overlay each report their side to main)
 - [x] Hovering a tab row: × button and a small tooltip "Title / Double-click to rename" (no page preview seen after
       3 s) → ours showed a page preview card. Done: Arc's black tooltip beside the pointer (measured 29 / 44 pt tall,
       10 pt padding), the rename hint only on the selected tab (Arc's other tabs show the title alone), hidden as soon

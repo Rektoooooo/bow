@@ -34,7 +34,19 @@ import { THEME_PRESETS } from "./themePresets";
 import { addZappedSelector, findBoostForUrl } from "./boosts";
 import { reapplyBoostsToAllPages, zapElements } from "./boostPages";
 import { getSiteKey } from "./urls";
-import { DEFAULT_PROFILE_ID, LIBRARY_COLUMN_WIDTH_PX, SIDEBAR_WIDTH_PX } from "../shared/settings";
+import {
+  DEFAULT_PROFILE_ID,
+  FOLDER_LIST_CLOSE_DELAY_MS,
+  FOLDER_LIST_EDGE_PX,
+  FOLDER_LIST_GAP_PX,
+  FOLDER_LIST_MAX_HEIGHT_PX,
+  FOLDER_LIST_ROW_HEIGHT_PX,
+  FOLDER_LIST_SEARCH_HEIGHT_PX,
+  FOLDER_LIST_WIDTH_PX,
+  LIBRARY_COLUMN_WIDTH_PX,
+  SIDEBAR_WIDTH_PX,
+} from "../shared/settings";
+import { buildFolderList } from "./folderList";
 import type { Bounds } from "./layout";
 import { getOverlayContents, hideOverlay, sendToOverlay, setOverlayBounds, showOverlay } from "./overlay";
 import { closePeek, isPeekOpen, navigatePeek, openPeekAsTab, openPeekInSplit } from "./peek";
@@ -152,6 +164,9 @@ function computeOverlayBounds(panel: OverlayPanel): Bounds | null {
   if (panel.kind === "library") {
     // Arc's Library takes the sidebar column, which widens for it (layout.ts); the page stays usable beside it.
     return { x: 0, y: 0, width: LIBRARY_COLUMN_WIDTH_PX, height: contentHeight };
+  }
+  if (panel.kind === "folderList") {
+    return panel.frame;
   }
   if (panel.kind === "tabTooltip") {
     // Kept inside the window (the sidebar placed it beside the pointer; the window may have shrunk since).
@@ -320,6 +335,9 @@ function openPanel(panel: OverlayPanel): void {
   setNewTabPending(panel.kind === "commandBar" && panel.mode === "newTab");
   // The Library takes the focused window's sidebar column; any other panel gives it back.
   setLibraryWindow(panel.kind === "library" ? state.focusedWindowId : null);
+  if (panel.kind !== "folderList") {
+    stopWatchingFolderListPointer();
+  }
   if (replacedPanel !== null) {
     notifyPanelEnded(replacedPanel, "replaced");
   }
@@ -407,6 +425,77 @@ export function showTabTooltip(title: string, showsRenameHint: boolean, frame: O
     return;
   }
   openPanel({ kind: "tabTooltip", frame: frame, title: title, showsRenameHint: showsRenameHint });
+}
+
+/** Vertical padding inside the folder list, around its rows (overlay.css .folder-list-rows). */
+const FOLDER_LIST_PADDING_PX = 8;
+
+/** The folder whose list shows, and the close that waits while the pointer is away from its row and the list. */
+let folderListFolderId: string | null = null;
+let folderListCloseTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Cancels a close that waits (the pointer came back, or the list closed already).
+ */
+function stopWatchingFolderListPointer(): void {
+  if (folderListCloseTimer !== null) {
+    clearTimeout(folderListCloseTimer);
+    folderListCloseTimer = null;
+  }
+}
+
+/**
+ * Where the pointer is while a folder list shows: on the folder's row or the list (the sidebar and the overlay each
+ * report their part), or away from both, which closes the list after FOLDER_LIST_CLOSE_DELAY_MS unless it comes back.
+ */
+export function setFolderListPointer(isInside: boolean): void {
+  if (shownPanel?.kind !== "folderList") {
+    return;
+  }
+  stopWatchingFolderListPointer();
+  if (!isInside) {
+    folderListCloseTimer = setTimeout(hideFolderList, FOLDER_LIST_CLOSE_DELAY_MS);
+  }
+}
+
+/**
+ * Shows Arc's list of a closed folder's tabs beside the sidebar, centered on the folder's row (anchor, window
+ * coordinates), unless another panel is open or the folder holds no tabs. It takes the keyboard for its search field.
+ * Asked again for the list that shows, it only notes that the pointer is back on the row.
+ */
+export function showFolderList(folderId: string, anchor: OverlayRect): void {
+  if (shownPanel?.kind === "folderList" && folderListFolderId === folderId) {
+    setFolderListPointer(true);
+    return;
+  }
+  const isOtherPanelOpen = shownPanel !== null && shownPanel.kind !== "tabTooltip" && shownPanel.kind !== "folderList";
+  const window = getWindow();
+  const state = getState();
+  const folder = state.items[folderId];
+  if (isOtherPanelOpen || window === null || folder === undefined || folder.kind !== "folder") {
+    return;
+  }
+  const entries = buildFolderList(state, folderId);
+  if (entries.length === 0) {
+    return;
+  }
+  const contentHeight = window.getContentSize()[1] ?? 0;
+  const listHeight = FOLDER_LIST_SEARCH_HEIGHT_PX + entries.length * FOLDER_LIST_ROW_HEIGHT_PX + FOLDER_LIST_PADDING_PX;
+  const height = Math.min(listHeight, FOLDER_LIST_MAX_HEIGHT_PX, contentHeight - 2 * FOLDER_LIST_EDGE_PX);
+  const centeredTop = anchor.y + anchor.height / 2 - height / 2;
+  const top = Math.max(FOLDER_LIST_EDGE_PX, Math.min(centeredTop, contentHeight - FOLDER_LIST_EDGE_PX - height));
+  const frame = { x: Math.round(anchor.x + anchor.width + FOLDER_LIST_GAP_PX), y: Math.round(top), width: FOLDER_LIST_WIDTH_PX, height: Math.round(height) };
+  openPanel({ kind: "folderList", frame: frame, folderTitle: folder.title, entries: entries });
+  folderListFolderId = folderId;
+}
+
+/**
+ * Hides the folder list (nothing else).
+ */
+export function hideFolderList(): void {
+  if (shownPanel?.kind === "folderList") {
+    closeOverlay();
+  }
 }
 
 /**
@@ -521,6 +610,7 @@ export function closeOverlay(returnsKeyboard: boolean = true): void {
   shownPanel = null;
   setNewTabPending(false);
   setLibraryWindow(null);
+  stopWatchingFolderListPointer();
   // A tooltip goes at once: the pointer is on its way somewhere and must not click into the fading box.
   hideOverlay(closedPanel?.kind === "tabTooltip");
   if (closedPanel !== null) {

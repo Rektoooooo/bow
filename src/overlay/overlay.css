@@ -1090,6 +1090,100 @@ body.dark .tab-tooltip-hint {
   color: rgba(255, 255, 255, 0.42);
 }
 
+/* ---------- A closed folder's list (resting on a closed folder in the sidebar) ----------
+   Arc's, measured in the user's recording (frame f0023): a dark panel (20) with a rim (51), a 48 pt search row with
+   a hairline under it, 45 pt rows (16 pt icon, the name, how long ago in grey), the first row highlighted, 12 pt
+   corners. The overlay is exactly the panel's size (overlayController.ts showFolderList). */
+
+.folder-list {
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: none;
+  animation: fade-in var(--motion-fast) linear;
+}
+
+.folder-list-search-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.folder-list-search {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+  user-select: text;
+}
+
+.folder-list-search::-webkit-search-cancel-button {
+  display: none;
+}
+
+.folder-list-rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.folder-list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 45px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+}
+
+.folder-list-row.is-first,
+.folder-list-row:hover {
+  background: var(--highlight);
+}
+
+.folder-list-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.folder-list-title,
+.folder-list-time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-list-title {
+  font-size: 14px;
+  font-weight: 450;
+}
+
+.folder-list-time {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 /* ---------- Welcome (first start) ---------- */
 
 .welcome {

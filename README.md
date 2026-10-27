@@ -45,10 +45,14 @@ in Arc). Running it twice adds nothing twice.
   puts its page away but keeps the tab.
 - Drag and drop: reorder, pin, make a Favorite, drop into a folder, move to another Space, or drop a link to open it.
 - Bottom bar: Library, the Space switcher (emoji for the active Space, dots for the others), and a **+** menu.
-- ⌘S hides the sidebar; touching the window's left edge shows it again for a moment. Drag its edge to resize it.
+- ⌘S hides the sidebar; touching the window's left edge shows it again for a moment, as a floating panel like Arc's.
+  Drag its edge to resize it. Icons fade while the window is in the background, text does not (Arc's look).
 - A dot on a Pinned tab or Favorite whose page changed while you were elsewhere (a new mail count), like Arc.
 - A small player for a tab playing sound in the background.
-- Rest the pointer on a tab to see a preview of its page; ⌃Tab shows the recently used tabs as cards with pictures.
+- Rest the pointer on a tab for Arc's tooltip (its title; "Double-click to rename" on the selected tab); ⌃Tab shows
+  the recently used tabs as cards with pictures.
+- Rest the pointer on a closed folder to see its tabs beside it, newest first ("1 minute ago"), with a search field,
+  like Arc; click one to open it.
 - Pinned tabs show tidy titles ("Inbox" rather than "(3) Inbox - Mail"), our own rules (Library › Settings).
 - **Live folders** (+ › New Live Folder) fill themselves, like Arc's: your open GitHub pull requests, review requests
   or assigned issues (read from github.com with the Space's own GitHub sign-in: no token, private repositories

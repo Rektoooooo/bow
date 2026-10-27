@@ -869,6 +869,37 @@ await sidebar.mouse.move(60, 20);
 await sidebar.waitForTimeout(300);
 check("moving away hides it", !(await overlayIsShown()));
 
+// A closed folder's list (Arc's): resting on a closed folder shows its tabs beside the sidebar, newest first, with a
+// focused search field; leaving the row (and not entering the list) closes it; clicking a tab in it opens that tab.
+state = await getState();
+const folderTabId = activeSpace(state).todayIds.find((itemId) => state.items[itemId]?.kind === "tab");
+const folderTabTitle = state.items[folderTabId]?.title;
+await dispatch({ type: "createFolder", title: "Reading" });
+await sidebar.waitForTimeout(300);
+state = await getState();
+const readingFolderId = Object.values(state.items).find((item) => item.kind === "folder" && item.title === "Reading")?.id;
+await dispatch({ type: "moveItem", itemId: folderTabId, target: { kind: "folder", folderId: readingFolderId }, index: 0 });
+await dispatch({ type: "toggleFolder", folderId: readingFolderId });
+await sidebar.waitForTimeout(500);
+const readingRow = await sidebar.locator(`[data-row="folder"][data-item-id="${readingFolderId}"]`).boundingBox();
+await sidebar.mouse.move(readingRow.x + 40, readingRow.y + readingRow.height / 2);
+await sidebar.mouse.move(readingRow.x + 42, readingRow.y + readingRow.height / 2);
+await overlay.waitForSelector(".folder-list .folder-list-row", { timeout: 4000 }).catch(() => undefined);
+const folderListTitles = await overlay.$$eval(".folder-list-title", (titles) => titles.map((title) => title.textContent)).catch(() => []);
+const folderListTime = await overlay.$eval(".folder-list-time", (time) => time.textContent).catch(() => "");
+const isSearchFocused = await overlay.evaluate(() => document.activeElement?.classList.contains("folder-list-search") === true);
+check("resting on a closed folder lists its tabs beside the sidebar, with how long ago and the search focused", folderListTitles.length === 1 && folderListTitles[0] === folderTabTitle && (folderListTime.endsWith("ago") || folderListTime === "Just now") && isSearchFocused, `${folderListTitles.join(",")} / ${folderTabTitle} ${folderListTime} focused=${isSearchFocused}`);
+await sidebar.mouse.move(60, 20);
+await sidebar.waitForTimeout(700);
+check("leaving the folder (not into the list) closes it", !(await overlayIsShown()));
+await sidebar.mouse.move(readingRow.x + 40, readingRow.y + readingRow.height / 2);
+await sidebar.mouse.move(readingRow.x + 42, readingRow.y + readingRow.height / 2);
+await overlay.waitForSelector(".folder-list .folder-list-row", { timeout: 4000 }).catch(() => undefined);
+await overlay.click(".folder-list .folder-list-row");
+await sidebar.waitForTimeout(500);
+state = await getState();
+check("clicking a tab in the list opens it", selectedTab(state)?.id === folderTabId && !(await overlayIsShown()), selectedTab(state)?.id);
+
 await app.close();
 const failed = results.filter((result) => !result.ok).length;
 console.log(`\n${results.length - failed}/${results.length} overlay checks passed.`);
