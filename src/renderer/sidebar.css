@@ -123,11 +123,15 @@
   --tile-selected: rgba(255, 255, 255, 0.135);
 }
 
-/* Light: black overlays, white selection with a soft shadow (Arc's light Spaces). */
+/*
+  Light: black overlays, white selection with a soft shadow (Arc's light Spaces). --muted (the Space title, New Tab)
+  was 45 % black, about 3:1 on a pale Space; 55 % reaches about 4.4:1 (a design review, 2026-10-28; no light Arc
+  capture exists to match instead).
+*/
 :root[data-appearance="light"] {
   color-scheme: light;
   --ink: rgba(0, 0, 0, 0.85);
-  --muted: rgba(0, 0, 0, 0.45);
+  --muted: rgba(0, 0, 0, 0.55);
   --icon: rgba(0, 0, 0, 0.5);
   --space-icon: rgba(0, 0, 0, 0.85);
   --switcher-icon: rgba(0, 0, 0, 0.5);

@@ -8,6 +8,7 @@
  *
  * Data flow:
  *   overlay/folderList.ts → describeTimeAgo(tab.lastActiveAt, Date.now()) → the line under the tab's title
+ *   overlay/library.ts → describeDay(entry.lastVisitAt, Date.now()) → a heading over each day of History
  */
 import { DAY_MS, HOUR_MS, MINUTE_MS } from "./settings.js";
 
@@ -42,4 +43,39 @@ export function describeTimeAgo(time: number, now: number): string {
     return `${count} ${unit} ago`;
   }
   return "Just now";
+}
+
+/** Within this many days, a day is named by its weekday ("Monday"); older ones by their date. Our choice. */
+const WEEKDAY_NAME_DAYS = 6;
+
+/**
+ * The start of a time's calendar day, in the Mac's own time zone.
+ */
+function startOfDay(time: number): number {
+  const date = new Date(time);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+/**
+ * The name of a time's day, for headings over a list: "Today", "Yesterday", a weekday within the last week, then a
+ * date ("12 October", with the year when it is not this year's). Calendar days in the Mac's time zone.
+ */
+export function describeDay(time: number, now: number): string {
+  const today = startOfDay(now);
+  const day = startOfDay(time);
+  // Rounded: a day with a daylight-saving change is 23 or 25 hours long.
+  const daysAgo = Math.round((today - day) / DAY_MS);
+  if (daysAgo <= 0) {
+    return "Today";
+  }
+  if (daysAgo === 1) {
+    return "Yesterday";
+  }
+  const date = new Date(time);
+  if (daysAgo <= WEEKDAY_NAME_DAYS) {
+    return date.toLocaleDateString("en-GB", { weekday: "long" });
+  }
+  const isThisYear = date.getFullYear() === new Date(now).getFullYear();
+  const options: Intl.DateTimeFormatOptions = isThisYear ? { day: "numeric", month: "long" } : { day: "numeric", month: "long", year: "numeric" };
+  return date.toLocaleDateString("en-GB", options);
 }

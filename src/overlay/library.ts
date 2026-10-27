@@ -23,6 +23,7 @@ import { createIcon } from "../renderer/icons.js";
 import type { IconName } from "../renderer/icons";
 import { createSpaceIcon } from "../renderer/spaceIcon.js";
 import { describeSpaceIconAsText } from "../shared/spaceIcons.js";
+import { describeDay } from "../shared/timeAgo.js";
 
 /** Words shown for each archive reason. */
 const REASON_LABELS: Record<ArchiveReason, string> = {
@@ -42,6 +43,20 @@ const SECTIONS: { id: LibrarySection; label: string; icon: IconName }[] = [
   { id: "extensions", label: "Extensions", icon: "puzzle" },
   { id: "settings", label: "Settings", icon: "gear" },
 ];
+
+/**
+ * What an empty section shows: its own icon from the rail, a short title and one sentence on how things get there,
+ * centered in the column (a single grey line at the top looked like something had failed to load).
+ */
+function createEmptyState(sectionId: LibrarySection, title: string, text: string): HTMLElement {
+  const emptyState = createElement("div", "library-empty-state");
+  const choice = SECTIONS.find((candidate) => candidate.id === sectionId);
+  if (choice !== undefined) {
+    emptyState.append(createIcon(choice.icon, "icon library-empty-icon"));
+  }
+  emptyState.append(createElement("h3", "library-empty-title", title), createElement("p", "library-empty-text", text));
+  return emptyState;
+}
 
 /** Most archive lines drawn at once; the search finds older ones. */
 const MAX_ARCHIVE_LINES = 200;
@@ -192,8 +207,11 @@ function drawArchiveLines(data: LibraryData): void {
   const matching = data.archive.filter(matchesArchiveFilters);
   const lines = matching.slice(0, MAX_ARCHIVE_LINES).map((entry) => createArchiveLine(entry, data, now));
   if (lines.length === 0) {
-    const emptyText = data.archive.length === 0 ? "Closed and auto-archived tabs land here." : "No archived tab matches.";
-    list.replaceChildren(createElement("p", "library-empty", emptyText));
+    const emptyElement =
+      data.archive.length === 0
+        ? createEmptyState("archive", "No archived tabs", "Tabs you close, clear or leave unused land here, ready to open again.")
+        : createElement("p", "library-empty", "No archived tab matches.");
+    list.replaceChildren(emptyElement);
     return;
   }
   const countText = `${matching.length} archived tab${matching.length === 1 ? "" : "s"}`;
@@ -225,10 +243,26 @@ function drawHistoryLines(): void {
   }
   const now = Date.now();
   if (historyLines.length === 0) {
-    list.replaceChildren(createElement("p", "library-empty", historyQuery === "" ? "Pages you visit show up here." : "No page matches."));
+    const emptyElement = historyQuery === "" ? createEmptyState("history", "No history yet", "Pages you visit show up here.") : createElement("p", "library-empty", "No page matches.");
+    list.replaceChildren(emptyElement);
     return;
   }
-  list.replaceChildren(...historyLines.map((entry) => createHistoryLine(entry, now)));
+  // Search results come by how well they match, so only the plain list (newest first) is split into days.
+  if (historyQuery !== "") {
+    list.replaceChildren(...historyLines.map((entry) => createHistoryLine(entry, now)));
+    return;
+  }
+  const elements: HTMLElement[] = [];
+  let shownDay = "";
+  for (const entry of historyLines) {
+    const day = describeDay(entry.lastVisitAt, now);
+    if (day !== shownDay) {
+      elements.push(createElement("h3", "library-day-heading", day));
+      shownDay = day;
+    }
+    elements.push(createHistoryLine(entry, now));
+  }
+  list.replaceChildren(...elements);
 }
 
 /**
@@ -252,7 +286,8 @@ function renderHistorySection(body: HTMLElement, data: LibraryData): void {
   const controls = createElement("div", "library-controls");
   const search = createSearchField("Search history", historyQuery, scheduleHistorySearch);
   const clearLabel = isConfirmingClearHistory ? "Click again to delete all history" : "Clear History";
-  const clearButton = createTextButton(clearLabel, "library-chip danger", () => {
+  const clearClass = isConfirmingClearHistory ? "library-chip danger is-confirming" : "library-chip danger";
+  const clearButton = createTextButton(clearLabel, clearClass, () => {
     if (!isConfirmingClearHistory) {
       isConfirmingClearHistory = true;
       renderBody(data);
@@ -279,7 +314,7 @@ function renderHistorySection(body: HTMLElement, data: LibraryData): void {
 function renderDownloadsSection(body: HTMLElement, data: LibraryData): void {
   const list = createElement("div", "library-list");
   if (data.downloads.length === 0) {
-    list.append(createElement("p", "library-empty", "Files you download in this session show up here. They are saved in your Downloads folder."));
+    list.append(createEmptyState("downloads", "No downloads", "Files you download show up here while Bow is open. They are saved in your Downloads folder."));
   }
   const now = Date.now();
   for (const download of data.downloads) {
@@ -334,7 +369,7 @@ function createMediaTile(media: MediaLine, now: number): HTMLElement {
  */
 function renderMediaSection(body: HTMLElement, data: LibraryData): void {
   if (data.media.length === 0) {
-    body.replaceChildren(createElement("p", "library-empty", "Screenshots and captures from the Control Center land here (and on the clipboard)."));
+    body.replaceChildren(createEmptyState("media", "No screenshots yet", "Screenshots and captures from the Control Center land here and on the clipboard."));
     return;
   }
   const grid = createElement("div", "media-grid");
@@ -463,7 +498,7 @@ function createBoostLine(boost: LibraryBoost): HTMLElement {
  */
 function renderBoostsSection(body: HTMLElement, data: LibraryData): void {
   if (data.boosts.length === 0) {
-    body.replaceChildren(createElement("p", "library-empty", "Boosts change how a site looks. Open the Control Center on a site and choose Boost."));
+    body.replaceChildren(createEmptyState("boosts", "No Boosts yet", "Boosts change how a site looks. Open the Control Center on a site and choose Boost."));
     return;
   }
   const list = createElement("div", "library-list");
@@ -522,13 +557,13 @@ function renderExtensionsSection(body: HTMLElement, data: LibraryData): void {
     createElement(
       "p",
       "library-setting-note",
-      "Chrome extensions run per profile, like in Arc. Open one from the puzzle button in the toolbar; add more with " +
+      "Chrome extensions run per profile. Open one from the puzzle button in the toolbar; add more with " +
         "Add Extension on a Chrome Web Store page. Web Store extensions update by themselves. " +
         "Reload open pages after adding or turning one on. Extensions that need Chrome features this browser lacks may only partly work.",
     ),
   );
   if (data.extensions.length === 0) {
-    section.append(createElement("p", "library-empty", "No extensions yet. Import your Arc extensions, or load an unpacked extension folder."));
+    section.append(createEmptyState("extensions", "No extensions yet", "Add one from the Chrome Web Store, import your Arc extensions, or load an unpacked folder."));
   }
   const profileIds = Array.from(new Set(data.extensions.map((extension) => extension.profileId)));
   for (const profileId of profileIds) {
@@ -685,7 +720,7 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
   const tabs = createSettingGroup("Tabs", [
     createSettingRow(
       "Archive Today tabs after",
-      "Unused Today tabs move to the Archive, like Arc (default 12 hours). Pinned tabs and Favorites never do; time with the browser closed does not count. The Archive keeps your newest 250 tabs.",
+      "Unused Today tabs move to the Archive (default 12 hours). Pinned tabs and Favorites never do; time with the browser closed does not count. The Archive keeps your newest 250 tabs.",
       createArchiveSelect(data),
     ),
     createSettingRow(
@@ -706,7 +741,7 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
   const appearance = createSettingGroup("Appearance", [
     createSettingRow(
       "Show full URLs",
-      "The toolbar shows the whole address, with https:// and everything after the page's path. Off: just the site and path, like Arc.",
+      "The toolbar shows the whole address, with https:// and everything after the page's path. Off: just the site and path.",
       createSwitch(data.showsFullUrls, "Show full URLs", (isOn) => dispatch({ type: "setShowFullUrls", isOn: isOn })),
     ),
     createSettingRow("App icon", "Shown in the Dock while the browser runs.", createAppIconChoices(data)),
@@ -728,7 +763,7 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
 function renderRoutingSettings(data: LibraryData): HTMLElement {
   const section = createElement("div", "library-routing");
   section.append(createElement("h2", "library-setting-heading", "Links from other apps"));
-  section.append(createElement("p", "library-setting-note", "Links you open in other apps open in a Little Window, unless a rule below sends them to a Space (Arc's Air Traffic Control)."));
+  section.append(createElement("p", "library-setting-note", "Links you open in other apps open in a Little Window, unless a rule below sends them to a Space."));
 
   for (const rule of data.routingRules) {
     const space = data.spaces.find((candidate) => candidate.id === rule.spaceId);
