@@ -8,6 +8,11 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 - Commit as the repo-local author (Rektoooooo noreply). A fresh clone does not have it: set it before the first commit.
 - Never stage personal data: the user's Arc bookmarks/titles, their real name, `reference/` screenshots. Grep the
   staged diff before each push.
+- Push in its own command, only after reading the suite's summary. Never chain `git push` after a command that
+  merely prints the results: on 2026-10-27 a grep of an e2e log (3 FAIL lines, exit 1) and the push ran in one call,
+  and a red run went to GitHub. Read the summary, then push.
+- Comments count as personal data too: a comment that named the user's tab titles as measurement samples had to be
+  reworded before a push. Write "three of the user's titles", never the titles.
 
 ## Testing
 - Playwright's `dragAndDrop` hangs inside Electron on macOS (it starts a real OS drag). Simulate HTML drag events in
