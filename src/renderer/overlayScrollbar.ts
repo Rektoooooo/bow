@@ -41,7 +41,8 @@ function placeThumb(scroller: HTMLElement, thumb: HTMLElement): boolean {
   const trackHeight = visibleHeight - THUMB_END_INSET_PX * 2;
   const thumbHeight = Math.max(THUMB_MIN_HEIGHT_PX, (trackHeight * visibleHeight) / contentHeight);
   const scrollRange = contentHeight - visibleHeight;
-  const thumbTravel = trackHeight - thumbHeight;
+  // A list shorter than the knob's minimum leaves it no room to travel (never upward).
+  const thumbTravel = Math.max(0, trackHeight - thumbHeight);
   const thumbOffset = (scroller.scrollTop / scrollRange) * thumbTravel;
   thumb.style.top = `${scroller.offsetTop + THUMB_END_INSET_PX + thumbOffset}px`;
   thumb.style.height = `${thumbHeight}px`;
@@ -86,6 +87,14 @@ export function installOverlayScrollbar(scroller: HTMLElement): void {
 
   scroller.addEventListener("scroll", showThumb, { passive: true });
   thumb.addEventListener("pointerleave", scheduleHide);
+  // The knob sits over the list, not in it: scrolling with the pointer on it must still move the list.
+  thumb.addEventListener(
+    "wheel",
+    (event) => {
+      scroller.scrollBy({ top: event.deltaY });
+    },
+    { passive: true },
+  );
   thumb.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     thumb.setPointerCapture(event.pointerId);
@@ -115,4 +124,5 @@ export function installOverlayScrollbar(scroller: HTMLElement): void {
   };
   thumb.addEventListener("pointerup", endDrag);
   thumb.addEventListener("pointercancel", endDrag);
+  thumb.addEventListener("lostpointercapture", endDrag);
 }
