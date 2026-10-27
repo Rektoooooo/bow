@@ -74,13 +74,15 @@ approved fixes Peek (3), tab tooltip (6) and sidebar width (7). The user was awa
   encrypted with a Keychain key in Electron by default (no "… Safe Storage" item existed), so the rename keeps
   every sign-in. The GitHub repository keeps its name (renaming it is the user's call). README says Bow is not
   affiliated with The Browser Company.
-  Icon styles after the user's feedback ("classic i like", Graphite with the colourful bow for dark mode, more like
-  Arc's many icons): eight variants drawn in code, Classic, Graphite, Neon (glow), Rainbow (three bands), Glass
-  (frosted over colour blobs), Pixel (8-bit blocks), Mint, Sunset; Midnight is gone (a saved choice falls back to
-  Classic). Classic follows macOS: the Dock shows Graphite while macOS is dark (`appIcon.ts`, nativeTheme). The
-  Finder and a Dock without the app running still show the bundled light Classic: a real dark-mode app icon needs an
-  asset catalog (Icon Composer), not done. We drew them ourselves instead of generating them in ChatGPT, as the user
-  offered: vectors stay sharp at every size and stay our own design.
+  Icons after the user's feedback: they kept Classic, Graphite (Classic's colourful bow on a dark tile), Glass and
+  Pixel, and asked for Glass, improved, as the default. Glass: soft overlapping colour light on the tile (the bow's
+  colours and two mixes), a frosted bow through which the light looks sharper and more saturated, a highlight along
+  its top, a fine bright rim, a tile sheen and edge. It is the bundled icon (`DEFAULT_APP_ICON_ID`). Dark mode: Glass
+  shows its dark twin (the same glass on a dark tile) and Classic shows Graphite in the Dock while macOS is dark
+  (`appIcon.ts`, nativeTheme); the twins cannot be chosen directly. Neon, Rainbow, Mint, Sunset and Midnight are
+  gone; a saved choice of them shows Glass. The Finder and a Dock without the app running show the bundled light
+  Glass: a real dark-mode app icon needs an asset catalog (Icon Composer), not done. Drawn in code by us instead of
+  generated in ChatGPT, as the user offered: vectors stay sharp at every size and stay our own design.
 
 ## How it was measured (keep doing it this way)
 

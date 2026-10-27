@@ -468,10 +468,10 @@ describe("ad blocking and app icon settings", () => {
     expect(setAdBlockForSite(offForSite, "example.com", true).adBlockOffSites).toEqual([]);
   });
 
-  it("remembers the chosen app icon, classic by default", () => {
+  it("remembers the chosen app icon, Glass by default", () => {
     const state = createInitialState();
 
-    expect(setAppIcon(state, "classic")).toBe(state);
-    expect(setAppIcon(state, "mint").settings.appIcon).toBe("mint");
+    expect(setAppIcon(state, "glass")).toBe(state);
+    expect(setAppIcon(state, "pixel").settings.appIcon).toBe("pixel");
   });
 });

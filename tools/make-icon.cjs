@@ -5,10 +5,10 @@
 const { app, BrowserWindow } = require("electron");
 const fs = require("fs");
 const path = require("path");
-const { APP_ICON_SIZE_PX, buildAppIconSvg, findAppIconVariant } = require(path.join(__dirname, "..", "dist", "node", "shared", "appIconDrawing.js"));
+const { APP_ICON_SIZE_PX, buildAppIconSvg, DEFAULT_APP_ICON_ID, findAppIconVariant } = require(path.join(__dirname, "..", "dist", "node", "shared", "appIconDrawing.js"));
 
 const ICON_SIZE = APP_ICON_SIZE_PX;
-const svg = buildAppIconSvg(findAppIconVariant("classic"));
+const svg = buildAppIconSvg(findAppIconVariant(DEFAULT_APP_ICON_ID));
 
 app.whenReady().then(async () => {
   const window = new BrowserWindow({ width: ICON_SIZE, height: ICON_SIZE, show: false, transparent: true, frame: false, webPreferences: { offscreen: true } });

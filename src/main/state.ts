@@ -18,6 +18,7 @@ import { ARCHIVE_LIMIT, DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_
 import type { ArchiveReason, ArchivedTab, BrowserState, FolderItem, ItemId, ItemLocation, LiveFolderData, Space, SpaceId, TabItem } from "../shared/types";
 import { createNoteUrl, NEW_NOTE_TITLE } from "../shared/notes";
 import { DEFAULT_SEARCH_ENGINE_ID } from "../shared/searchEngines";
+import { DEFAULT_APP_ICON_ID } from "../shared/appIconDrawing";
 import type { SearchEngineId } from "../shared/searchEngines";
 import { createEaselUrl, NEW_EASEL_TITLE } from "../shared/easels";
 import {
@@ -835,7 +836,7 @@ export function setTidyTitles(state: BrowserState, isOn: boolean): BrowserState 
  * Picks the app icon variant shown in the Dock.
  */
 export function setAppIcon(state: BrowserState, variantId: string): BrowserState {
-  if ((state.settings.appIcon ?? "classic") === variantId) {
+  if ((state.settings.appIcon ?? DEFAULT_APP_ICON_ID) === variantId) {
     return state;
   }
   return { ...state, settings: { ...state.settings, appIcon: variantId } };

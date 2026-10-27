@@ -1,9 +1,9 @@
 /**
  * WHY this file exists:
  *   Arc lets you pick another app icon. Ours draws the chosen variant of our own icon (shared/appIconDrawing.ts) in
- *   a hidden window and gives it to the Dock while the app runs. The Classic icon follows macOS's appearance: in dark
- *   mode the Dock shows it on the dark Graphite tile (the user's wish, 2026-10-27). The Finder keeps the bundled
- *   icon: changing that needs a Dock tile plug-in, which an Electron app cannot ship.
+ *   a hidden window and gives it to the Dock while the app runs. Glass and Classic follow macOS's appearance: in dark
+ *   mode the Dock shows their dark twin (Glass on a dark tile; Classic as Graphite, the user's wish, 2026-10-27). The
+ *   Finder keeps the bundled icon: changing that needs a Dock tile plug-in, which an Electron app cannot ship.
  *
  * Data source:
  *   BrowserState.settings.appIcon (the variant id) and whether macOS is in dark mode (nativeTheme).
@@ -13,10 +13,7 @@
  *   draws the SVG → capturePage → app.dock.setIcon(image)
  */
 import { app, BrowserWindow, nativeTheme } from "electron";
-import { APP_ICON_SIZE_PX, buildAppIconSvg, findAppIconVariant } from "../shared/appIconDrawing";
-
-/** The variant the Dock shows for Classic while macOS is in dark mode. */
-const DARK_MODE_VARIANT_ID = "graphite";
+import { APP_ICON_SIZE_PX, buildAppIconSvg, DEFAULT_APP_ICON_ID, findAppIconVariant } from "../shared/appIconDrawing";
 
 /** Wait this long after loading the drawing before capturing it, so it has painted. Our choice. */
 const PAINT_WAIT_MS = 200;
@@ -49,26 +46,27 @@ async function drawAppIcon(variantId: string | undefined): Promise<Electron.Nati
 }
 
 /**
- * Shows the chosen icon in the Dock. The bundled icon is the classic variant, so that one needs no drawing at
- * startup; switching back to it after another one draws it again.
+ * Shows the chosen icon in the Dock (its dark twin while macOS is dark). The bundled icon is the default variant, so
+ * that one needs no drawing at startup; switching back to it after another one draws it again.
  */
 export async function applyAppIcon(variantId: string | undefined): Promise<void> {
   const chosenVariant = findAppIconVariant(variantId);
-  const isDarkClassic = chosenVariant.id === "classic" && nativeTheme.shouldUseDarkColors;
-  const variant = isDarkClassic ? findAppIconVariant(DARK_MODE_VARIANT_ID) : chosenVariant;
+  const darkVariantId = chosenVariant.darkVariantId;
+  const showsDarkTwin = darkVariantId !== undefined && nativeTheme.shouldUseDarkColors;
+  const variant = showsDarkTwin ? findAppIconVariant(darkVariantId) : chosenVariant;
   const isFirstTime = shownVariantId === null;
   if (variant.id === shownVariantId || app.dock === undefined) {
     return;
   }
   shownVariantId = variant.id;
-  if (isFirstTime && variant.id === "classic") {
+  if (isFirstTime && variant.id === DEFAULT_APP_ICON_ID) {
     return;
   }
   app.dock.setIcon(await drawAppIcon(variant.id));
 }
 
 /**
- * Redraws the Dock icon when macOS switches between light and dark (Classic shows the dark tile in dark mode).
+ * Redraws the Dock icon when macOS switches between light and dark (Glass and Classic have a dark twin).
  */
 export function followSystemAppearance(readVariantId: () => string | undefined): void {
   nativeTheme.on("updated", () => {

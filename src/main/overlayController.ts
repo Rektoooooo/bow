@@ -59,6 +59,7 @@ import { findProfileIdOfItem, findTab, getActiveSpace } from "./tree";
 import { getPermissionOrigin, getSitePermissions } from "./sitePermissions";
 import { looksLikeWebAddress, normalizeTypedInput } from "./urls";
 import { buildSuggestUrl, findSearchEngine } from "../shared/searchEngines";
+import { DEFAULT_APP_ICON_ID } from "../shared/appIconDrawing";
 import { isDeveloperModeOn } from "../shared/developerMode";
 import { listImportSources } from "./browserImportController";
 import { addMenuIcons } from "./menuIcons";
@@ -224,7 +225,7 @@ function buildLibraryData(state: BrowserState): LibraryData {
     })),
     archiveAfterMs: state.settings.archiveAfterMs,
     searchEngineId: findSearchEngine(state.settings.searchEngine).id,
-    appIcon: state.settings.appIcon ?? "classic",
+    appIcon: state.settings.appIcon ?? DEFAULT_APP_ICON_ID,
     areTitlesTidy: state.settings.areTitlesTidy !== false,
     showsFullUrls: state.settings.showsFullUrls === true,
     adBlock: describeAdBlock(state),

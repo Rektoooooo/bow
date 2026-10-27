@@ -98,13 +98,15 @@ describe("parseAction", () => {
     expect(parseAction({ type: "showMenu", request: { menu: "reload" } })).not.toBeNull();
   });
 
-  it("checks the import source, the Boost editor's site and the sound switch", () => {
+  it("checks the import source, the Boost editor's site and the app icon", () => {
     expect(parseAction({ type: "importFromBrowser", sourceId: "chromium:chrome:Profile 2" })).not.toBeNull();
     expect(parseAction({ type: "importFromBrowser", sourceId: "chromium:chrome:../../etc" })).toBeNull();
     expect(parseAction({ type: "openBoostEditor" })).not.toBeNull();
     expect(parseAction({ type: "openBoostEditor", site: "example.com" })).not.toBeNull();
     expect(parseAction({ type: "openBoostEditor", site: "<script>" })).toBeNull();
-    expect(parseAction({ type: "setAppIcon", variantId: "mint" })).not.toBeNull();
+    expect(parseAction({ type: "setAppIcon", variantId: "pixel" })).not.toBeNull();
+    // The dark twins are shown by macOS's appearance, not chosen.
+    expect(parseAction({ type: "setAppIcon", variantId: "glass-dark" })).toBeNull();
     expect(parseAction({ type: "setAppIcon", variantId: "../evil" })).toBeNull();
     expect(parseAction({ type: "setAdBlockForSite", site: "example.com", isOn: false })).not.toBeNull();
   });
