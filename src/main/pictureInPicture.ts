@@ -4,7 +4,8 @@
  *   window has fixed controls the user did not like, and Document Picture-in-Picture (which would let a page draw its
  *   own) is not in Electron 44. So the window is ours: the tab's own page moves into a small floating window, a style
  *   sheet makes its video fill the page and hides the rest, and our controls page lies on top. The page keeps
- *   playing the whole time, signed in and at the same second, because it is the same page.
+ *   playing the whole time, signed in and at the same second, because it is the same page. A video inside an iframe
+ *   (a player embedded in an article) works too: the iframe is made to fill the page, and the video the iframe.
  *
  * Data source:
  *   media.ts (a tab with a playing video left the screen, or came back), the tab's page view (tabViews.ts), its
@@ -14,13 +15,15 @@
  * Data flow:
  *   media.ts → enterPictureInPicture(tabId) → mark the video, insert the style sheet → floating window: the tab's
  *   view + the controls view (src/pip) above it
+ *   no video in the page itself → findVideoInFrames(): each of its iframes is asked; the one playing marks its video
+ *   and adds the same style sheet, then posts a message the page uses to find (and mark) its <iframe> element
  *   every STATUS_INTERVAL_MS → read the video → "pip:status" → controls; every HOVER_INTERVAL_MS → cursor inside? →
  *   "pip:hover"
  *   controls → "pip:command" / "pip:seek" → play / pause, mute, seek, back to the tab, close
  *   the tab is shown in a main window again (syncTabViews took the view back) → media.ts → endPictureInPictureOfTab()
  */
 import { app, BaseWindow, ipcMain, screen, WebContentsView } from "electron";
-import type { IpcMainInvokeEvent, Rectangle, WebContents } from "electron";
+import type { IpcMainInvokeEvent, Rectangle, WebContents, WebFrameMain } from "electron";
 import * as path from "node:path";
 import { PIP_CHANNELS, PIP_COMMANDS } from "../shared/pictureInPicture";
 import type { PictureInPictureCommand, PictureInPictureStatus } from "../shared/pictureInPicture";
@@ -108,7 +111,10 @@ const TOGGLE_SCRIPT = `(() => {
   return true;
 })()`;
 
-/** Takes the marks off again; with pause, also pauses the video (the close button, like Chromium's). */
+/**
+ * Takes the marks off again; with pause, also pauses the video (the close button, like Chromium's). In an iframe it
+ * also takes away the style sheet FRAME_MARK_SCRIPT added.
+ */
 function buildUnmarkScript(pausesVideo: boolean): string {
   return `(() => {
     const video = document.querySelector('video[data-sidebar-browser-pip="video"]');
@@ -116,6 +122,11 @@ function buildUnmarkScript(pausesVideo: boolean): string {
       video.pause();
     }
     document.querySelectorAll("[data-sidebar-browser-pip]").forEach((element) => element.removeAttribute("data-sidebar-browser-pip"));
+    const sheet = document.sidebarBrowserPipSheet;
+    if (sheet !== undefined) {
+      document.adoptedStyleSheets = document.adoptedStyleSheets.filter((adopted) => adopted !== sheet);
+      delete document.sidebarBrowserPipSheet;
+    }
     return true;
   })()`;
 }
@@ -146,7 +157,7 @@ html[data-sidebar-browser-pip="page"], html[data-sidebar-browser-pip="page"] bod
   will-change: auto !important; contain: none !important; clip-path: none !important; mask: none !important;
   overflow: visible !important; opacity: 1 !important;
 }
-video[data-sidebar-browser-pip="video"] {
+[data-sidebar-browser-pip="video"] {
   visibility: visible !important; position: fixed !important; inset: 0 !important;
   width: 100vw !important; height: 100vh !important; min-width: 0 !important; min-height: 0 !important;
   max-width: none !important; max-height: none !important; margin: 0 !important; padding: 0 !important;
@@ -154,11 +165,74 @@ video[data-sidebar-browser-pip="video"] {
   z-index: 2147483647 !important;
 }`;
 
+/**
+ * In an iframe: marks its playing video like MARK_SCRIPT and makes it fill the iframe with the same rules. Electron
+ * cannot put a style sheet into an iframe from outside, and a <style> element could be refused by the frame's
+ * Content-Security-Policy, so the rules go into a constructed style sheet (CSP does not apply to those).
+ */
+const FRAME_MARK_SCRIPT = `(() => {
+  ${MARK_PLAYING_VIDEO_FUNCTION}
+  const video = markPlayingVideo();
+  if (video === null) {
+    return null;
+  }
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync(${JSON.stringify(FILL_WITH_VIDEO_CSS)});
+  document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+  document.sidebarBrowserPipSheet = sheet;
+  return { width: video.videoWidth, height: video.videoHeight };
+})()`;
+
+/** How long the page waits for its iframe's message (it comes at once; this only ends a wait that went wrong). */
+const FRAME_MESSAGE_WAIT_MS = 1000;
+
+/**
+ * In the page: waits for the message an iframe posts (buildFrameAnnounceScript), finds the <iframe> element it came
+ * from and marks it like a video (so the page's style sheet makes it fill the window), then resolves to true; false
+ * when no such message comes. The token keeps the page's own messages from being taken for ours.
+ */
+function buildFrameListenScript(token: string): string {
+  return `new Promise((resolve) => {
+    const finish = (isMarked) => {
+      clearTimeout(timer);
+      window.removeEventListener("message", listen);
+      resolve(isMarked);
+    };
+    const listen = (event) => {
+      if (event.data === null || typeof event.data !== "object" || event.data.sidebarBrowserPip !== ${JSON.stringify(token)}) {
+        return;
+      }
+      const frameElement = Array.from(document.querySelectorAll("iframe")).find((element) => element.contentWindow === event.source);
+      if (frameElement === undefined) {
+        return;
+      }
+      document.documentElement.setAttribute("data-sidebar-browser-pip", "page");
+      frameElement.setAttribute("data-sidebar-browser-pip", "video");
+      for (let element = frameElement.parentElement; element !== null && element !== document.body; element = element.parentElement) {
+        element.setAttribute("data-sidebar-browser-pip", "around");
+      }
+      finish(true);
+    };
+    const timer = setTimeout(() => finish(false), ${FRAME_MESSAGE_WAIT_MS});
+    window.addEventListener("message", listen);
+  })`;
+}
+
+/** In the iframe: tells the page which iframe plays (buildFrameListenScript). */
+function buildFrameAnnounceScript(token: string): string {
+  return `(() => {
+    window.parent.postMessage({ sidebarBrowserPip: ${JSON.stringify(token)} }, "*");
+    return true;
+  })()`;
+}
+
 /** The picture-in-picture window that is open. */
 interface OpenPictureInPicture {
   tabId: ItemId;
   window: BaseWindow;
   pageView: WebContentsView;
+  /** The iframe whose video plays, or null when the video is in the page itself. */
+  videoFrame: WebFrameMain | null;
   controlsView: WebContentsView;
   cssKey: string;
   aspectRatio: number;
@@ -185,6 +259,59 @@ interface VideoReading extends VideoSize {
   isPaused: boolean;
   currentTime: number;
   duration: number;
+}
+
+/**
+ * Runs one of the scripts above in an iframe. Electron has no isolated world for iframes, so it runs in the frame's
+ * own: the frame's scripts could interfere, which at worst confuses our window (its size, the play state), never the
+ * app. Resolves to null when the frame is gone or the script failed.
+ */
+async function runFrameScript(frame: WebFrameMain, script: string, isUserGesture: boolean = false): Promise<unknown> {
+  if (frame.detached) {
+    return null;
+  }
+  try {
+    return await frame.executeJavaScript(script, isUserGesture);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Runs a video script where the window's video is: in its iframe, or in the page.
+ */
+function runVideoScript(pip: OpenPictureInPicture, script: string, isUserGesture: boolean = false): Promise<unknown> {
+  if (pip.videoFrame !== null) {
+    return runFrameScript(pip.videoFrame, script, isUserGesture);
+  }
+  return runScript(pip.pageView.webContents, script, isUserGesture);
+}
+
+/** A playing video found in one of the page's iframes, already marked there and in the page. */
+interface FramedVideo {
+  frame: WebFrameMain;
+  size: VideoSize;
+}
+
+/**
+ * Looks for a video playing with sound in the page's iframes (one level deep: embedded players). The first one found
+ * is marked in its frame, and its <iframe> element in the page. Null when no iframe plays one.
+ */
+async function findVideoInFrames(contents: WebContents): Promise<FramedVideo | null> {
+  for (const frame of contents.mainFrame.frames) {
+    const size = await runFrameScript(frame, FRAME_MARK_SCRIPT);
+    if (!isVideoSize(size)) {
+      continue;
+    }
+    const token = crypto.randomUUID();
+    const isMarkedInPage = runScript(contents, buildFrameListenScript(token));
+    await runFrameScript(frame, buildFrameAnnounceScript(token));
+    if ((await isMarkedInPage) === true) {
+      return { frame: frame, size: size };
+    }
+    runFrameScript(frame, buildUnmarkScript(false));
+  }
+  return null;
 }
 
 /**
@@ -278,7 +405,7 @@ function applyAspectRatio(pip: OpenPictureInPicture, aspectRatio: number): void 
  * Reads the video and tells the controls what to show.
  */
 async function sendStatus(pip: OpenPictureInPicture): Promise<void> {
-  const reading = await runScript(pip.pageView.webContents, READ_SCRIPT);
+  const reading = await runVideoScript(pip, READ_SCRIPT);
   const tab = findTab(getState(), pip.tabId);
   if (current !== pip || tab === undefined || pip.controlsView.webContents.isDestroyed()) {
     return;
@@ -384,6 +511,9 @@ function closePictureInPicture(pausesVideo: boolean): void {
     contents.removeInsertedCSS(pip.cssKey).catch(() => undefined);
     runScript(contents, buildUnmarkScript(pausesVideo));
   }
+  if (pip.videoFrame !== null) {
+    runFrameScript(pip.videoFrame, buildUnmarkScript(pausesVideo));
+  }
   if (!pip.controlsView.webContents.isDestroyed()) {
     pip.controlsView.webContents.close();
   }
@@ -402,7 +532,11 @@ export async function enterPictureInPicture(tabId: ItemId): Promise<void> {
     return;
   }
   const contents = pageView.webContents;
-  const videoSize = await runScript(contents, MARK_SCRIPT);
+  const pageVideoSize = await runScript(contents, MARK_SCRIPT);
+  // No video in the page itself: maybe one plays in an embedded player.
+  const framedVideo = isVideoSize(pageVideoSize) ? null : await findVideoInFrames(contents);
+  const videoSize = framedVideo === null ? pageVideoSize : framedVideo.size;
+  const videoFrame = framedVideo === null ? null : framedVideo.frame;
   if (!isVideoSize(videoSize)) {
     return;
   }
@@ -414,6 +548,9 @@ export async function enterPictureInPicture(tabId: ItemId): Promise<void> {
       contents.removeInsertedCSS(cssKey).catch(() => undefined);
     }
     runScript(contents, buildUnmarkScript(false));
+    if (videoFrame !== null) {
+      runFrameScript(videoFrame, buildUnmarkScript(false));
+    }
     return;
   }
   closePictureInPicture(true);
@@ -434,6 +571,7 @@ export async function enterPictureInPicture(tabId: ItemId): Promise<void> {
     tabId: tabId,
     window: window,
     pageView: pageView,
+    videoFrame: videoFrame,
     controlsView: controlsView,
     cssKey: cssKey,
     aspectRatio: aspectRatio,
@@ -515,7 +653,7 @@ async function runCommand(pip: OpenPictureInPicture, command: PictureInPictureCo
       setMuted(pip.tabId, !tab.isMuted);
     }
   } else {
-    await runScript(pip.pageView.webContents, TOGGLE_SCRIPT, true);
+    await runVideoScript(pip, TOGGLE_SCRIPT, true);
   }
   await sendStatus(pip);
 }
@@ -550,7 +688,7 @@ export function registerPictureInPictureIpc(): void {
     if (pip === null || !isShare) {
       return;
     }
-    await runScript(pip.pageView.webContents, buildSeekScript(fraction));
+    await runVideoScript(pip, buildSeekScript(fraction));
     await sendStatus(pip);
   });
 }

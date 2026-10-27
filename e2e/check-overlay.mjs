@@ -994,6 +994,17 @@ const videoServer = http.createServer((request, response) => {
     response.end(toneWav);
     return;
   }
+  // An article with an embedded player: the iframe comes from another site (localhost, while the page is 127.0.0.1).
+  if (request.url === "/embed") {
+    response.writeHead(200, { "Content-Type": "text/html" });
+    response.end(`<!doctype html><title>Embed test</title><h1>An article</h1><p>Text around the player.</p><div style="transform:translateZ(0)"><iframe src="http://localhost:${videoServer.address().port}/player" width="400" height="225" allow="autoplay"></iframe></div>`);
+    return;
+  }
+  if (request.url === "/player") {
+    response.writeHead(200, { "Content-Type": "text/html" });
+    response.end('<!doctype html><title>Player</title><p>Player chrome</p><video src="/tone.wav" autoplay loop width="320" height="180"></video>');
+    return;
+  }
   // A video element playing the tone: sound and no picture, so it also tries the window's 16:9 fallback.
   response.writeHead(200, { "Content-Type": "text/html" });
   response.end('<!doctype html><title>Video test</title><header style="position:sticky;top:0">Header</header><div style="transform:translateZ(0)"><video src="/tone.wav" autoplay loop width="320" height="180"></video></div>');
@@ -1051,6 +1062,58 @@ pipFacts = await pictureInPictureFacts();
 videoFacts = await readVideo();
 check("Close puts the window away and pauses the video; the tab you went to stays selected", pipFacts === null && videoFacts.isPaused && !videoFacts.isFixed && videoFacts.header === "visible" && selectedTab(state)?.id === tabBeforeVideo, JSON.stringify({ selected: selectedTab(state)?.id, pipFacts, videoFacts }));
 await dispatch({ type: "closeTab", tabId: videoTabId });
+await sidebar.waitForTimeout(300);
+
+// An embedded player: its video plays inside an iframe from another site. The iframe fills the window and the video
+// fills the iframe; Back to Tab puts both back.
+const embedUrl = `http://127.0.0.1:${videoServer.address().port}/embed`;
+const readEmbed = () =>
+  app.evaluate(async ({ webContents }) => {
+    const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL().endsWith("/embed"));
+    const frame = contents?.mainFrame.frames[0];
+    if (contents === undefined || frame === undefined) return null;
+    const inPage = await contents.executeJavaScript(`(() => {
+      const element = document.querySelector("iframe");
+      const box = element.getBoundingClientRect();
+      return { iframeFixed: getComputedStyle(element).position === "fixed", iframeFills: box.width === innerWidth && box.height === innerHeight };
+    })()`);
+    const inFrame = await frame.executeJavaScript(`(() => {
+      const video = document.querySelector("video");
+      const box = video.getBoundingClientRect();
+      return { videoFixed: getComputedStyle(video).position === "fixed", videoFills: box.width === innerWidth && box.height === innerHeight, isPaused: video.paused, time: video.currentTime };
+    })()`);
+    return { ...inPage, ...inFrame };
+  });
+await dispatch({ type: "openTab", typedText: embedUrl });
+await findPage("/embed");
+const embedDeadline = Date.now() + 10000;
+let embedFacts = await readEmbed();
+while ((embedFacts === null || !(embedFacts.time > 0)) && Date.now() < embedDeadline) {
+  await sidebar.waitForTimeout(250);
+  embedFacts = await readEmbed();
+}
+state = await getState();
+const embedTabId = state.selectedTabIdBySpace[state.activeSpaceId];
+await dispatch({ type: "selectTab", tabId: tabBeforeVideo });
+pipControls = await findPage("/pip/pip.html", 8000).catch(() => null);
+await sidebar.waitForTimeout(600);
+pipFacts = await pictureInPictureFacts();
+embedFacts = await readEmbed();
+const isPlayerFilling = embedFacts?.iframeFixed && embedFacts.iframeFills && embedFacts.videoFixed && embedFacts.videoFills && !embedFacts.isPaused;
+check("an embedded player's video (an iframe from another site) goes into the window too, filling it", pipFacts?.urls[0] === embedUrl && isPlayerFilling === true, JSON.stringify({ pipFacts, embedFacts }));
+await pipControls?.click(".pip-play").catch(() => undefined);
+await sidebar.waitForTimeout(500);
+const pausedInFrame = (await readEmbed())?.isPaused;
+await pipControls?.click(".pip-play").catch(() => undefined);
+await sidebar.waitForTimeout(500);
+const playingInFrame = (await readEmbed())?.isPaused === false;
+check("its play / pause button reaches the video inside the iframe", pausedInFrame === true && playingInFrame, `paused ${pausedInFrame}, playing again ${playingInFrame}`);
+await pipControls?.click(".pip-back").catch(() => undefined);
+await sidebar.waitForTimeout(800);
+pipFacts = await pictureInPictureFacts();
+embedFacts = await readEmbed();
+check("and Back to Tab puts the page and its player back, still playing", pipFacts === null && embedFacts !== null && !embedFacts.iframeFixed && !embedFacts.videoFixed && !embedFacts.isPaused, JSON.stringify({ pipFacts, embedFacts }));
+await dispatch({ type: "closeTab", tabId: embedTabId });
 await sidebar.waitForTimeout(300);
 videoServer.close();
 
