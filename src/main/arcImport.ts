@@ -16,7 +16,7 @@
  * Rules: never change the state that was passed in; never throw. When the file cannot be understood, the same
  * state object comes back together with a report whose `error` says why.
  */
-import { DEFAULT_PROFILE_ID, FAVORITES_LIMIT, SPLIT_PANES_LIMIT } from "../shared/settings";
+import { CARD_GAP_PX, DEFAULT_PROFILE_ID, FAVORITES_LIMIT, SPLIT_PANES_LIMIT } from "../shared/settings";
 import type {
   BrowserState,
   FolderItem,
@@ -633,6 +633,24 @@ function createArcItemMap(rawItems: unknown): Map<string, JsonObject> {
     }
   }
   return arcItems;
+}
+
+/**
+ * Our sidebar width for the width the user gave Arc's, from the parsed StorableWindows.json (null when the file has
+ * none): the preference new windows get, else the first window's. Arc's width reaches the page card (the user's Arc:
+ * 254 pt with the card at 254), ours stops at the sidebar's content, the card gap before the card. Clamping is
+ * setSidebarWidth()'s.
+ * Example: { sidebarViewPreferences: { sidebarWidth: 254 } } → 247
+ */
+export function readArcSidebarWidth(windowsFile: unknown): number | null {
+  const preferredWidth = readNumber(readObject(windowsFile, "sidebarViewPreferences"), "sidebarWidth");
+  const firstWindow = readArray(windowsFile, "windows")?.[0];
+  const firstWindowWidth = readNumber(firstWindow, "sidebarWidth");
+  const arcWidth = preferredWidth ?? firstWindowWidth;
+  if (arcWidth === null) {
+    return null;
+  }
+  return Math.round(arcWidth - CARD_GAP_PX);
 }
 
 /**

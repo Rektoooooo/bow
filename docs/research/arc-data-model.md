@@ -16,6 +16,7 @@ All in `~/Library/Application Support/Arc/` of the macOS account that uses Arc.
 | `StorableSidebar.<date>.json` | Copies kept from earlier app versions (one per update). |
 | `StorableArchiveItems.json` | The Archive: tabs that left the sidebar, with reason and source. |
 | `StorableArchive.json` | `{ "version": 1, "autoArchiveStartTime": <seconds> }` |
+| `StorableWindows.json` | The open windows (sidebar mode and width, what each shows) and `sidebarViewPreferences` for new ones |
 | `SidebarItemsFaviconCache/`, `ArchiveItemsFaviconCache/`, `ArchiveSnapshotCache/` | Favicons (16×16 PNG files named `md5(<item id>)` in lowercase hex; checked: 23 of 26 tabs matched) and page snapshots |
 | `User Data/` | The Chromium profiles (history, cookies, logins); one folder per Arc profile |
 | `~/Library/Preferences/company.thebrowser.Browser.plist` | App settings (`defaults read company.thebrowser.Browser`) |
@@ -138,6 +139,17 @@ ArchivedItem = {
 ```
 
 The user's archive held **exactly 250 items** (the oldest 60 days old), see `arc-findings.md` §2.
+
+## `StorableWindows.json`
+
+```text
+{ "windows": [{ "sidebarMode": "anchored", "sidebarWidth": 254, "style": …, "contents": … }, …],
+  "sidebarViewPreferences": { "sidebarWidth": 254, "sidebarMode": "noChrome" } }
+```
+
+`sidebarWidth` is in points and reaches the page card: with 254 the user's card starts at x = 254 and the selected
+row ends at 245.5 (live capture, 2026-10-27). Our width stops at the sidebar's content, so the importer takes
+Arc's width minus the 7 pt card gap (`readArcSidebarWidth`, 254 → 247).
 
 ## Settings worth knowing (`company.thebrowser.Browser.plist`)
 

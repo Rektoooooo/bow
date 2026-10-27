@@ -6,8 +6,8 @@
  *
  * Data source:
  *   ~/Library/Application Support/Arc/StorableSidebar.json (or a file the user picks, such as a backup of that
- *   folder), and next to it StorableArchiveItems.json, the favicon cache folders, and "User Data" with the History
- *   databases and the extensions.
+ *   folder), and next to it StorableArchiveItems.json, StorableWindows.json (the sidebar width), the favicon cache
+ *   folders, and "User Data" with the History databases and the extensions.
  *
  * Data flow:
  *   menu → importFromArc() → importArcSidebar() → importArcArchive() → attachArcFavicons() → applyChange()
@@ -20,18 +20,22 @@ import { importArcArchive } from "./arcArchiveImport";
 import type { ArcArchiveImportReport } from "./arcArchiveImport";
 import { attachArcArchiveFavicons, attachArcFavicons } from "./arcFavicons";
 import { readArcHistory } from "./arcHistoryImport";
-import { importArcSidebar } from "./arcImport";
+import { importArcSidebar, readArcSidebarWidth } from "./arcImport";
 import type { ArcImportReport } from "./arcImport";
 import { applyChange, getState, getWindow } from "./browserCore";
 import { importArcExtensions } from "./extensionsController";
 import type { ArcExtensionsImportReport } from "./extensionsController";
 import { importHistoryEntries } from "./historyStore";
 import { removeEmptySpaces, switchSpace } from "./spaces";
+import { setSidebarWidth } from "./state";
 
 /** Where Arc keeps its sidebar on the account that uses it (docs/research/arc-data-model.md). */
 const ARC_SIDEBAR_FILE = path.join(app.getPath("home"), "Library", "Application Support", "Arc", "StorableSidebar.json");
 
 const ARCHIVE_FILE_NAME = "StorableArchiveItems.json";
+
+/** Arc's windows, with the sidebar width the user dragged to (docs/research/arc-data-model.md). */
+const WINDOWS_FILE_NAME = "StorableWindows.json";
 
 /** The two Spaces a fresh install starts with; an import replaces them while they are still empty. */
 const STARTER_SPACE_IDS = ["space-personal", "space-work"];
@@ -97,18 +101,18 @@ function describeReport(
 }
 
 /**
- * Reads Arc's archive file next to the sidebar file. Null when it is missing or cannot be parsed (the archive is
- * optional: the sidebar import stands on its own).
+ * Reads one of Arc's files next to the sidebar file. Null when it is missing or cannot be parsed (the archive and the
+ * windows file are optional: the sidebar import stands on its own).
  */
-function readArchiveFile(sidebarFilePath: string): unknown {
-  const archiveFilePath = path.join(path.dirname(sidebarFilePath), ARCHIVE_FILE_NAME);
-  if (!fs.existsSync(archiveFilePath)) {
+function readFileNextToSidebar(sidebarFilePath: string, fileName: string): unknown {
+  const filePath = path.join(path.dirname(sidebarFilePath), fileName);
+  if (!fs.existsSync(filePath)) {
     return null;
   }
   try {
-    return JSON.parse(fs.readFileSync(archiveFilePath, "utf8"));
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
   } catch (error) {
-    console.warn("Could not read Arc's archive; importing without it:", error);
+    console.warn(`Could not read Arc's ${fileName}; importing without it:`, error);
     return null;
   }
 }
@@ -142,7 +146,8 @@ export async function importFromArc(): Promise<void> {
   const firstNewSpace = result.state.spaces.find((space) => space.id.startsWith(IMPORTED_SPACE_PREFIX) && !existingSpaceIds.has(space.id));
   const faviconFolder = path.join(path.dirname(filePath), "SidebarItemsFaviconCache");
   const archiveFaviconFolder = path.join(path.dirname(filePath), "ArchiveItemsFaviconCache");
-  const arcArchiveFile = readArchiveFile(filePath);
+  const arcArchiveFile = readFileNextToSidebar(filePath, ARCHIVE_FILE_NAME);
+  const arcSidebarWidth = readArcSidebarWidth(readFileNextToSidebar(filePath, WINDOWS_FILE_NAME));
   // A list, because the callback below fills it and TypeScript cannot see assignments to a plain variable there.
   const archiveReports: ArcArchiveImportReport[] = [];
   applyChange(() => {
@@ -154,10 +159,13 @@ export async function importFromArc(): Promise<void> {
     }
     const withIcons = attachArcFavicons(sidebarAndArchiveState, faviconFolder);
     const withoutStarters = result.report.spacesImported > 0 ? removeEmptySpaces(withIcons, STARTER_SPACE_IDS) : withIcons;
+    // Arc's sidebar width comes along with the first import only; a later run must not undo a width set here since.
+    const takesArcWidth = result.report.spacesImported > 0 && arcSidebarWidth !== null;
+    const withSidebarWidth = takesArcWidth ? setSidebarWidth(withoutStarters, arcSidebarWidth) : withoutStarters;
     if (firstNewSpace === undefined) {
-      return withoutStarters;
+      return withSidebarWidth;
     }
-    return switchSpace(withoutStarters, firstNewSpace.id, Date.now());
+    return switchSpace(withSidebarWidth, firstNewSpace.id, Date.now());
   });
 
   // History and extensions come from the folder of the chosen sidebar file: Arc's own folder, or a backup copy of it

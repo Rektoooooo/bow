@@ -10,7 +10,7 @@
  *   fixture builders → importArcSidebar() with createInitialState() → checks on the returned state and report
  */
 import { describe, expect, it } from "vitest";
-import { importArcSidebar } from "../src/main/arcImport";
+import { importArcSidebar, readArcSidebarWidth } from "../src/main/arcImport";
 import { createInitialState } from "../src/main/state";
 import { DEFAULT_PROFILE_ID, FAVORITES_LIMIT } from "../src/shared/settings";
 import type { BrowserState, FolderItem, SplitItem, TabItem } from "../src/shared/types";
@@ -405,5 +405,25 @@ describe("malformed input", () => {
     expect(result.state).toBe(state);
     expect(result.report.error).not.toBeNull();
     expect(result.report.spacesImported).toBe(0);
+  });
+});
+
+describe("Arc's sidebar width (StorableWindows.json)", () => {
+  it("takes the width new windows get, less the card gap Arc's width includes", () => {
+    const windowsFile = { windows: [{ sidebarWidth: 300 }], sidebarViewPreferences: { sidebarWidth: 254 } };
+
+    expect(readArcSidebarWidth(windowsFile)).toBe(247);
+  });
+
+  it("falls back to the first window's width", () => {
+    expect(readArcSidebarWidth({ windows: [{ sidebarWidth: 260.4 }] })).toBe(253);
+  });
+
+  it.each([
+    ["null", null],
+    ["an empty object", {}],
+    ["a width that is not a number", { sidebarViewPreferences: { sidebarWidth: "wide" } }],
+  ])("gives null for %s", (_name, windowsFile) => {
+    expect(readArcSidebarWidth(windowsFile)).toBeNull();
   });
 });

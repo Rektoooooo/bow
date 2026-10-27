@@ -200,7 +200,9 @@ tooltip, 7 sidebar width, then AppleScript.
       3 s) → ours showed a page preview card. Done: Arc's black tooltip beside the pointer (measured 29 / 44 pt tall,
       10 pt padding), the rename hint only on the selected tab (Arc's other tabs show the title alone), hidden as soon
       as the pointer moves
-- [ ] Sidebar width: the user's Arc is 254 pt (StorableWindows sidebarWidth) → ours 242; the Arc import should carry it
+- [x] Sidebar width: the user's Arc is 254 pt (StorableWindows sidebarWidth) → ours 242; the Arc import should carry it.
+      Done: Arc's width reaches the page card (card at 254, measured live), ours stops 7 pt earlier, so the first
+      import sets 247 (`readArcSidebarWidth`); a later run leaves the width alone
 - [ ] Sidebar scrollbar: thin overlay scrollbar while scrolling → check ours
 - New window: the purple window in the first recording was most likely incognito (⇧⌘N; the user is not sure), so
   Arc's ⌘N window and its "open in another window" placeholder are still unobserved; no change planned
