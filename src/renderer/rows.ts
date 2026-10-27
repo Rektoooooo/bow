@@ -107,7 +107,7 @@ function createRenameInput(itemId: ItemId, currentName: string, context: RowCont
 }
 
 /**
- * Builds the favicon slot of a tab row. A tab that left its home URL shows a "back" button on hover.
+ * Builds the favicon slot of a tab row.
  */
 function createTabIconSlot(tab: TabItem, isLoading: boolean): HTMLElement {
   const slot = createElement("span", "row-icon-slot");
@@ -122,10 +122,6 @@ function createTabIconSlot(tab: TabItem, isLoading: boolean): HTMLElement {
   const favicon = createFavicon(tab.faviconUrl, tab.url);
   favicon.classList.toggle("is-loading", isLoading);
   slot.append(favicon);
-
-  if (hasLeftHome(tab)) {
-    slot.append(createActionButton("reset", "Back to pinned URL", "row-reset", "reset-tab", { itemId: tab.id }));
-  }
   return slot;
 }
 
@@ -251,6 +247,10 @@ function buildTabRow(tab: TabItem, location: ItemLocation, index: number, depth:
     row.setAttribute("aria-current", "page");
   }
 
+  // A tab that left its home URL: a small "back" arrow just left of its icon (the user, 2026-10-27: not over the icon).
+  if (hasLeftHome(tab)) {
+    row.append(createActionButton("reset", "Back to pinned URL", "row-reset", "reset-tab", { itemId: tab.id }));
+  }
   row.append(createTabIconSlot(tab, runtimeInfo?.isLoading === true));
   // A site in Developer Mode: Arc outlines its tabs in dashed yellow and puts the host under the title (shot 5).
   const isDeveloper = isDeveloperModeOn(context.state, tab.url);
