@@ -11,8 +11,8 @@
  *
  * Data flow:
  *   findFirefoxProfiles(home) → parseProfilesIni() → profiles with a places.sqlite
- *   readFirefoxBookmarks(profile) → copy places.sqlite → /usr/bin/sqlite3 -json → convertFirefoxBookmarkRows()
- *   readFirefoxHistory(profile) → copy places.sqlite → /usr/bin/sqlite3 -json → convertFirefoxHistoryRows()
+ *   readFirefoxProfile(profile) → one copy of places.sqlite → /usr/bin/sqlite3 -json twice →
+ *   convertFirefoxBookmarkRows() and convertFirefoxHistoryRows()
  *
  * Rules: never throw. A profile that cannot be read gives no bookmarks and no history.
  */
@@ -59,9 +59,13 @@ const FALLBACK_FOLDER_TITLE = "Folder";
 /** Bookmark folders nest at most this deep; anything deeper (or a broken loop in the file) is cut off. */
 const MAX_FOLDER_DEPTH = 32;
 
-/** Every bookmark and folder with its address; a folder's children are ordered by position. */
-const BOOKMARKS_QUERY = `SELECT b.id AS id, b.parent AS parent, b.type AS type, b.position AS position, b.title AS title,
-  b.guid AS guid, p.url AS url FROM moz_bookmarks b LEFT JOIN moz_places p ON p.id = b.fk ORDER BY b.parent, b.position;`;
+/**
+ * Every bookmark and folder with its address; a folder's children are ordered by position. A bookmark saved without
+ * a name shows its page's title, as Firefox does.
+ */
+const BOOKMARKS_QUERY = `SELECT b.id AS id, b.parent AS parent, b.type AS type, b.position AS position,
+  COALESCE(b.title, p.title) AS title, b.guid AS guid, p.url AS url
+  FROM moz_bookmarks b LEFT JOIN moz_places p ON p.id = b.fk ORDER BY b.parent, b.position;`;
 
 /** Pages with a visit, newest first; hidden ones are redirects and pages inside frames. */
 const HISTORY_QUERY = `SELECT url, title, visit_count, last_visit_date FROM moz_places
@@ -256,40 +260,45 @@ export function convertFirefoxHistoryRows(rows: unknown): HistoryEntry[] {
   return entries;
 }
 
+/** What one Firefox profile has to import. */
+export interface FirefoxProfileData {
+  bookmarks: ImportedBookmarkNode[];
+  history: HistoryEntry[];
+}
+
 /**
- * Runs a query on a temporary copy of the profile's places.sqlite (Firefox may be running and holds the file).
- * Null when the file cannot be copied or read.
+ * Runs a query on the copied database and returns its rows.
  */
-async function queryPlaces(profile: FirefoxProfile, query: string): Promise<unknown> {
-  const temporaryFolder = fs.mkdtempSync(path.join(os.tmpdir(), "firefox-places-"));
+async function queryRows(databasePath: string, query: string): Promise<unknown> {
+  const queryResult = await execFileAsync(SQLITE_COMMAND, ["-readonly", "-json", databasePath, query], { maxBuffer: SQLITE_MAX_OUTPUT_BYTES });
+  // sqlite3 prints nothing at all (not "[]") when the query finds no rows.
+  const outputText = queryResult.stdout.trim();
+  return outputText === "" ? [] : JSON.parse(outputText);
+}
+
+/**
+ * Reads a profile's bookmarks (as a tree) and history (newest first) from one temporary copy of its places.sqlite:
+ * Firefox may be running and holds the file, and the copy is made without blocking the window (the file can be large).
+ * Nothing when it cannot be read.
+ */
+export async function readFirefoxProfile(profile: FirefoxProfile): Promise<FirefoxProfileData> {
+  const temporaryFolder = await fs.promises.mkdtemp(path.join(os.tmpdir(), "firefox-places-"));
+  const databasePath = path.join(temporaryFolder, PLACES_FILE_NAME);
   try {
-    fs.copyFileSync(path.join(profile.profileFolder, PLACES_FILE_NAME), path.join(temporaryFolder, PLACES_FILE_NAME));
+    await fs.promises.copyFile(path.join(profile.profileFolder, PLACES_FILE_NAME), databasePath);
     for (const companionName of PLACES_COMPANION_FILE_NAMES) {
       const companionPath = path.join(profile.profileFolder, companionName);
       if (fs.existsSync(companionPath)) {
-        fs.copyFileSync(companionPath, path.join(temporaryFolder, companionName));
+        await fs.promises.copyFile(companionPath, path.join(temporaryFolder, companionName));
       }
     }
-    const queryResult = await execFileAsync(SQLITE_COMMAND, ["-readonly", "-json", path.join(temporaryFolder, PLACES_FILE_NAME), query], {
-      maxBuffer: SQLITE_MAX_OUTPUT_BYTES,
-    });
-    // sqlite3 prints nothing at all (not "[]") when the query finds no rows.
-    const outputText = queryResult.stdout.trim();
-    return outputText === "" ? [] : JSON.parse(outputText);
+    const bookmarkRows = await queryRows(databasePath, BOOKMARKS_QUERY);
+    const historyRows = await queryRows(databasePath, HISTORY_QUERY);
+    return { bookmarks: convertFirefoxBookmarkRows(bookmarkRows), history: convertFirefoxHistoryRows(historyRows) };
   } catch (error) {
     console.warn(`Could not read Firefox's ${profile.displayName} profile:`, error);
-    return null;
+    return { bookmarks: [], history: [] };
   } finally {
-    fs.rmSync(temporaryFolder, { recursive: true, force: true });
+    await fs.promises.rm(temporaryFolder, { recursive: true, force: true });
   }
-}
-
-/** The profile's bookmarks as a tree (empty when they cannot be read). */
-export async function readFirefoxBookmarks(profile: FirefoxProfile): Promise<ImportedBookmarkNode[]> {
-  return convertFirefoxBookmarkRows(await queryPlaces(profile, BOOKMARKS_QUERY));
-}
-
-/** The profile's history, newest first (empty when it cannot be read). */
-export async function readFirefoxHistory(profile: FirefoxProfile): Promise<HistoryEntry[]> {
-  return convertFirefoxHistoryRows(await queryPlaces(profile, HISTORY_QUERY));
 }

@@ -10,8 +10,7 @@ import {
   convertFirefoxHistoryRows,
   findFirefoxProfiles,
   parseProfilesIni,
-  readFirefoxBookmarks,
-  readFirefoxHistory,
+  readFirefoxProfile,
 } from "../src/main/firefoxImport";
 
 const FIREFOX_FOLDER = "/Users/someone/Library/Application Support/Firefox";
@@ -157,7 +156,7 @@ describe("reading Firefox's files", () => {
         (2, 'https://example.org/redirect', 'Redirect', 1, 1, ${VISIT_MICROSECONDS}),
         (3, 'https://example.net/', 'Never visited', 0, 0, NULL);
       INSERT INTO moz_bookmarks VALUES (1, 2, NULL, 0, 0, '', 'root________'), (3, 2, NULL, 1, 0, 'toolbar', 'toolbar_____'),
-        (10, 1, 3, 3, 0, 'Not visited yet', 'a'), (11, 1, 1, 3, 1, 'Example', 'b');`;
+        (10, 1, 3, 3, 0, 'Not visited yet', 'a'), (11, 1, 1, 3, 1, NULL, 'b');`;
     execFileSync("/usr/bin/sqlite3", [path.join(profileFolder, "places.sqlite"), sql]);
 
     const profiles = findFirefoxProfiles(homeFolder);
@@ -166,7 +165,9 @@ describe("reading Firefox's files", () => {
     if (profile === undefined) {
       return;
     }
-    expect(await readFirefoxBookmarks(profile)).toEqual([
+    const profileData = await readFirefoxProfile(profile);
+    // The second bookmark was saved without a name: it shows its page's title.
+    expect(profileData.bookmarks).toEqual([
       {
         kind: "folder",
         title: "Bookmarks Toolbar",
@@ -176,7 +177,7 @@ describe("reading Firefox's files", () => {
         ],
       },
     ]);
-    expect(await readFirefoxHistory(profile)).toEqual([{ url: "https://example.com/", title: "Example", visitCount: 2, lastVisitAt: VISIT_MILLISECONDS }]);
+    expect(profileData.history).toEqual([{ url: "https://example.com/", title: "Example", visitCount: 2, lastVisitAt: VISIT_MILLISECONDS }]);
   });
 
   it("gives no bookmarks and no history for a damaged database", async () => {
@@ -184,7 +185,6 @@ describe("reading Firefox's files", () => {
     fs.mkdirSync(profileFolder, { recursive: true });
     fs.writeFileSync(path.join(profileFolder, "places.sqlite"), "not a database");
     const profile = { folderName: "broken-profile", displayName: "broken", profileFolder: profileFolder, isDefault: true };
-    expect(await readFirefoxBookmarks(profile)).toEqual([]);
-    expect(await readFirefoxHistory(profile)).toEqual([]);
+    expect(await readFirefoxProfile(profile)).toEqual({ bookmarks: [], history: [] });
   });
 });

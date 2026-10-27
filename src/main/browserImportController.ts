@@ -21,7 +21,7 @@ import { addImportedBookmarks, countBookmarks } from "./bookmarkImport";
 import type { ImportedBookmarkNode } from "./bookmarkImport";
 import { findChromiumProfiles, readChromiumBookmarks, readChromiumHistory } from "./chromiumImport";
 import type { ChromiumProfile } from "./chromiumImport";
-import { findFirefoxProfiles, readFirefoxBookmarks, readFirefoxHistory } from "./firefoxImport";
+import { findFirefoxProfiles, readFirefoxProfile } from "./firefoxImport";
 import type { FirefoxProfile } from "./firefoxImport";
 import { importHistoryEntries } from "./historyStore";
 import { readSafariBookmarks, readSafariHistory } from "./safariImport";
@@ -109,8 +109,9 @@ async function importChromiumProfile(profile: ChromiumProfile): Promise<void> {
  * Imports one Firefox profile.
  */
 async function importFirefoxProfile(profile: FirefoxProfile): Promise<void> {
-  const bookmarkCount = addBookmarksToActiveSpace("Firefox Bookmarks", await readFirefoxBookmarks(profile));
-  const historyCount = importHistoryEntries(await readFirefoxHistory(profile));
+  const profileData = await readFirefoxProfile(profile);
+  const bookmarkCount = addBookmarksToActiveSpace("Firefox Bookmarks", profileData.bookmarks);
+  const historyCount = importHistoryEntries(profileData.history);
   await showSummary("Firefox", bookmarkCount, historyCount);
 }
 
