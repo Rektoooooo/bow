@@ -117,7 +117,6 @@ approved fixes Peek (3), tab tooltip (6) and sidebar width (7). The user was awa
 ## Known limits
 
 - The Peek's page keeps rounded top corners under its toolbar row (Electron gives a view one radius for all corners).
-- ⌘[ / ⌘] / ⌘R from the menu act on the selected tab, not on a Peek (only the Peek's own row buttons act on it).
 - Light Spaces: the new icon tokens were set by analogy; no light Arc capture exists to measure against.
 - Picture-in-picture: YouTube would not play under automation (it pauses a start it did not make), so the style
   takeover was proven on a local page with a sticky header and a transformed container, not on YouTube itself. The

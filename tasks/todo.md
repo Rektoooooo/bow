@@ -90,10 +90,10 @@ limit, UI-test until perfect." Skip Arc Max (AI) and server features (sync, shar
       ease-out, 260 ms) and the sidebar page moves its card on the same curve. Electron's own
       `setBounds(…, {animate})` reports the end place at once and could not be verified without screen recording,
       so we step it ourselves (e2e/check-motion.mjs proves the in-between places).
-- [ ] Glide for split panes and Peek grow/shrink
+- [x] Glide for split panes and Peek grow/shrink (e64c8db)
 - [x] Panels animate in (centering moved to `translate`), the Command Bar highlight moves without rebuilding rows,
       the Control Center redraws in place instead of animating in again
-- [ ] Panels animate out (needs a "closing" round trip before the overlay view is removed)
+- [x] Panels animate out (overlay "closing" round trip, 120 ms)
 
 ### 3.2 Arc's look 1:1
 Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 × 1032 pt at 56, 38 in the image).
@@ -218,14 +218,14 @@ tooltip, 7 sidebar width, then AppleScript.
 - [x] Sidebar width: the user's Arc is 254 pt (StorableWindows sidebarWidth) → ours 242; the Arc import should carry it.
       Done: Arc's width reaches the page card (card at 254, measured live), ours stops 7 pt earlier, so the first
       import sets 247 (`readArcSidebarWidth`); a later run leaves the width alone
-- [ ] Sidebar scrollbar: thin overlay scrollbar while scrolling → check ours
+- [x] Sidebar scrollbar: Arc's overlay knob (overlayScrollbar.ts): no width taken, shown while scrolling, fades
 - [x] ⌘S like Arc's (the user's recording, 2026-10-27): the traffic lights hide with the sidebar, the card's toolbar
       starts at the window's edge with the sidebar button and moves rigidly with the card, which slides over the
       sidebar (no longer squeezed); the sidebar's own buttons go at once
 - [x] The page meets the toolbar square on every site, with rounded bottom corners: page views are square and two
       tiny views draw the window's frame over the card's bottom corners (main/cornerMasks.ts, src/corner)
 - [x] The selected Favorite: Arc's 2 pt border in the icon's colour and a tinted fill (main/faviconAccents.ts)
-- [ ] Dragging tabs in the sidebar does not work for the user with a real mouse ("could not even grab it"; e2e only
+- [x] (Fixed by pointer-event dragging, confirmed by the user 2026-10-27) Dragging tabs in the sidebar does not work for the user with a real mouse ("could not even grab it"; e2e only
       simulates drag events). Ruled out: window drag regions (rows clear in ELECTRON_DEBUG_DRAGGABLE_REGIONS). Tried:
       a press no longer takes the tooltip's / folder list's view out of the window mid-press. To confirm with the
       user: does a drag work when pressed within half a second of reaching a row (before the tooltip shows)? The
