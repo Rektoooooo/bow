@@ -496,13 +496,62 @@ button:disabled {
     var(--tile-selected) padding-box;
 }
 
-.tile-audio-dot {
+/* A page that changed while you were elsewhere (a new message count): a dot under the icon, like Arc's. */
+.tile-unread-dot {
   position: absolute;
   bottom: 5px;
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--ink);
+}
+
+/*
+  Sound playing in a Favorite you are not on: three small bars bouncing under the icon (our design; the user chose an
+  equaliser over a dot or a speaker badge). Each bar has its own length of bounce so they never move in step.
+*/
+.tile-equalizer {
+  position: absolute;
+  bottom: 4px;
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 7px;
+}
+
+.tile-equalizer-bar {
+  width: 2px;
+  height: 100%;
+  border-radius: 1px;
+  background: var(--ink);
+  transform-origin: bottom;
+  animation: equalizer-bounce 0.9s ease-in-out infinite alternate;
+}
+
+.tile-equalizer-bar:nth-child(2) {
+  animation-duration: 0.6s;
+  animation-delay: -0.3s;
+}
+
+.tile-equalizer-bar:nth-child(3) {
+  animation-duration: 0.75s;
+  animation-delay: -0.5s;
+}
+
+@keyframes equalizer-bounce {
+  from {
+    transform: scaleY(0.3);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile-equalizer-bar {
+    animation: none;
+    transform: scaleY(0.7);
+  }
 }
 
 /* The space after the tiles: a drop target that only takes room while something is dragged. */
@@ -1074,10 +1123,6 @@ button:disabled {
   background: var(--ink);
 }
 
-.tile-unread-dot {
-  width: 6px;
-  height: 6px;
-}
 
 /* ---------- Sidebar resizer (its right edge) ---------- */
 

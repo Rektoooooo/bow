@@ -36,6 +36,9 @@ export interface RowContext {
   onRenameFinished: () => void;
 }
 
+/** Bars in a Favorite's equaliser (sound playing in the background). Our choice. */
+const EQUALIZER_BAR_COUNT = 3;
+
 /**
  * Indent per folder level, in pixels. Measured on the user's Arc: a child row, its highlight included, starts about
  * 16 pt further right (the highlight of a selected child begins at 22.5 pt, a top-level one at 7).
@@ -517,6 +520,20 @@ export function renderItemRows(itemIds: ItemId[], location: ItemLocation, depth:
 }
 
 /**
+ * The three bars under a Favorite whose page plays sound in the background. Keyed, so redraws keep the same element
+ * and its bars keep moving instead of starting over.
+ */
+function createEqualizer(): HTMLElement {
+  const equalizer = createElement("span", "tile-equalizer");
+  equalizer.dataset.key = "equalizer";
+  equalizer.setAttribute("aria-label", "Playing sound");
+  for (let barIndex = 0; barIndex < EQUALIZER_BAR_COUNT; barIndex += 1) {
+    equalizer.append(createElement("span", "tile-equalizer-bar"));
+  }
+  return equalizer;
+}
+
+/**
  * Builds one Favorites tile: a large favicon. Selected tiles are highlighted; tiles whose page is not loaded are dimmed.
  */
 export function renderFavoriteTile(tab: TabItem, location: ItemLocation, index: number, context: RowContext): HTMLElement {
@@ -542,10 +559,14 @@ export function renderFavoriteTile(tab: TabItem, location: ItemLocation, index: 
   }
   tile.append(isNoteUrl(tab.url) ? createIcon("note", "icon note-icon") : createFavicon(tab.faviconUrl, tab.url, "favicon favicon-large"));
 
-  const isAudible = context.runtime.tabs[tab.id]?.isAudible === true;
-  const isUnread = tab.isUnread === true && tab.id !== context.selectedTabId;
-  if (isAudible || isUnread) {
-    tile.append(createElement("span", isUnread ? "tile-audio-dot tile-unread-dot" : "tile-audio-dot"));
+  // Sound playing somewhere else shows a small equaliser; on the tab you are looking at it would only distract (the
+  // user's choice, 2026-10-27). The dot is only for a page that changed while you were elsewhere.
+  const isPlayingElsewhere = context.runtime.tabs[tab.id]?.isAudible === true && !isSelected;
+  const isUnread = tab.isUnread === true && !isSelected;
+  if (isPlayingElsewhere) {
+    tile.append(createEqualizer());
+  } else if (isUnread) {
+    tile.append(createElement("span", "tile-unread-dot"));
   }
 
   markDraggable(tile, tab.id);
