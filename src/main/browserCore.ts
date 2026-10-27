@@ -271,6 +271,7 @@ export function setLibraryWindow(windowId: WindowId | null): void {
   }
   const previousWindowId = libraryWindowId;
   libraryWindowId = windowId;
+  updateAllWindowButtons();
   if (previousWindowId !== null) {
     relayoutWindow(previousWindowId, true);
   }
@@ -296,6 +297,7 @@ export function setSidebarPeek(windowId: WindowId, isPeeking: boolean): void {
   } else {
     peekingWindowIds.delete(windowId);
   }
+  updateAllWindowButtons();
   // The page slides aside (and back) together with the sidebar sliding in.
   relayoutWindow(windowId, true);
   scheduleRuntimePush();
@@ -402,6 +404,8 @@ export function applyChange(change: (state: BrowserState) => BrowserState): void
   }
   rememberSelectedTab();
   saveState(stateFilePath, currentState);
+  // At once, not with the runtime push 50 ms later: the lights must go and come with the sidebar's own buttons.
+  updateAllWindowButtons();
   syncViews();
   for (const listener of stateChangeListeners) {
     listener(currentState);
@@ -508,6 +512,15 @@ export function scheduleRuntimePush(): void {
 
 /** Whether each window shows its traffic lights now, so they are only touched when that changes. */
 const windowButtonsShown = new WeakMap<BrowserWindow, boolean>();
+
+/**
+ * Shows or hides every main window's traffic lights to match its sidebar right now.
+ */
+function updateAllWindowButtons(): void {
+  for (const { windowId, window } of listMainWindows()) {
+    updateWindowButtons(windowId, window);
+  }
+}
 
 /**
  * Arc hides the traffic lights while the sidebar is hidden (its toolbar then starts at the window's left edge, with

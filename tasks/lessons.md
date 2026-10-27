@@ -99,5 +99,7 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   removed that check). Pin exact versions.
 
 ## This Mac
+- Never `pkill -f` with a pattern that also appears in the command line running it: it kills its own shell (happened
+  twice on 2026-10-27). Find the pid with `pgrep` first and `kill` that pid.
 - Two macOS accounts; facts differ per account (Homebrew owner, Node location, gh accounts). Check `whoami` and the
   "This Mac" section of `CLAUDE.md` before installing anything.

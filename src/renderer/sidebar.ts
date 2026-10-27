@@ -429,7 +429,8 @@ function getLuminance(hex: string): number {
 
 /**
  * Tints the card's toolbar with the selected page's color, like Arc, with text and icons that stay readable on it.
- * Without a known color the card takes the theme's default.
+ * Without a known color the card takes the theme's default. Dark Spaces keep Arc's grey bar whatever the page's
+ * color (the user's Arc on apple.com, 2026-10-27: grey over a page whose top we had sampled as white).
  */
 function applyToolbarTint(selectedTabId: ItemId | null): void {
   const card = document.getElementById("card");
@@ -445,7 +446,9 @@ function applyToolbarTint(selectedTabId: ItemId | null): void {
   }
   card.style.setProperty("--page-top-color", color);
   const nearBlackColor = currentRuntime.isWindowActive ? NEAR_BLACK_TOOLBAR_COLOR_ACTIVE : NEAR_BLACK_TOOLBAR_COLOR;
-  const shownColor = getLuminance(color) < NEAR_BLACK_LUMINANCE ? nearBlackColor : color;
+  const isDarkSpace = document.documentElement.dataset.appearance === "dark";
+  const isNearBlack = getLuminance(color) < NEAR_BLACK_LUMINANCE;
+  const shownColor = isDarkSpace || isNearBlack ? nearBlackColor : color;
   card.style.setProperty("--card-bg", shownColor);
   card.dataset.toolbarTone = getLuminance(shownColor) > LIGHT_TOOLBAR_LUMINANCE ? "light" : "dark";
 }
