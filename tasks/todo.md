@@ -192,8 +192,8 @@ differs from it), and new windows start from it.
   last window and the next start opening it. Suites: `npm test` 301, `check-app` 47, `check-overlay` 68,
   `check-extensions` 20, `permission-check`, `check-motion` 6, `check-live-folders` 21, `check-performance` 4,
   `check-windows` 30, `check-package` 12.
-- **Known limits:** in `.handoffs/2026-10-27-multiple-windows.md` (⌘S and sidebar width are global, one note editor
-  per window, extensions keep a tab's first window, no drag between windows).
+- **Known limits:** in `.handoffs/2026-10-27-multiple-windows.md` (extensions keep a tab's first window). The other
+  limits listed at first (⌘S and width global, two note editors, no drag between windows) were fixed in 3.6.
 
 ## Review (2026-10-26, end of the Arc-parity session)
 - **Works and verified:** everything in README "What works". Suites: `npm test` 166, `check-app` 36,
@@ -212,7 +212,7 @@ differs from it), and new windows start from it.
 - [x] Multiple main windows (⌘N opens a second window, like Arc): built 2026-10-27, see 3.5 and
       `.handoffs/2026-10-27-multiple-windows.md`. (It had been deferred because every StorableWindows snapshot in the
       user's Arc backup holds 0 or 1 window; the user asked for it.)
-- [ ] Multiple windows follow-ups: see 3.6
+- [x] Multiple windows follow-ups: see 3.6
 - [ ] Sign and notarize the app (needs a Developer ID) so it runs on other Macs
 - [ ] Adding a Web Store extension to a second profile re-downloads into the folder the first profile has loaded;
       reuse the existing copy instead (rare)
