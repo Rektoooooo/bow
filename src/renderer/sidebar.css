@@ -1600,6 +1600,56 @@ body.sidebar-hidden .toolbar {
   opacity: 1;
 }
 
+/* A live capture's badge (easelEditor.ts): a small dark pill at the picture's top left; it pulses while updating. */
+.easel-live {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 7px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font: 600 11px/1.2 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
+.easel-live::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #30a46c;
+}
+
+.easel-live:hover {
+  background: rgba(0, 0, 0, 0.78);
+}
+
+.easel-live.is-updating::before {
+  background: #f5a524;
+  animation: easel-live-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes easel-live-pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .easel-live.is-updating::before {
+    animation: none;
+  }
+}
+
 .easel-toolbar {
   position: absolute;
   top: 12px;

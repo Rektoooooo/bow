@@ -8,11 +8,13 @@
  *   Pictures from overlayController.ts (Screenshot and Capture), and <userData>/Captures/captures.json.
  *
  * Data flow:
- *   Screenshot / Capture → saveCapture(image, title, url) → PNG + thumbnail + index
+ *   Screenshot / Capture → saveCapture(image, title, url, now, source) → PNG + thumbnail + index (source: where it
+ *   came from, for live captures on easels; liveCaptures.ts)
  *   Library › Media → listCaptures() (thumbnails as data: URLs) → a button → runCaptureCommand(id, command)
  */
 import { clipboard, ClipboardItem, shell } from "electron";
 import type { NativeImage } from "electron";
+import type { CaptureSource } from "../shared/easels";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -27,6 +29,8 @@ export interface CaptureRecord {
   createdAt: number;
   width: number;
   height: number;
+  /** Where it came from, so an easel can keep it live (liveCaptures.ts). Optional: older captures have none. */
+  source?: CaptureSource;
 }
 
 /** What the Library's buttons can do with a picture. */
@@ -93,7 +97,7 @@ function removeFiles(record: CaptureRecord): void {
 /**
  * Keeps a picture: the PNG, its thumbnail and a line in the index. Returns the PNG's path.
  */
-export function saveCapture(image: NativeImage, title: string, url: string, now: number): string | null {
+export function saveCapture(image: NativeImage, title: string, url: string, now: number, source: CaptureSource | null): string | null {
   if (capturesFolder === null || image.isEmpty()) {
     return null;
   }
@@ -101,6 +105,9 @@ export function saveCapture(image: NativeImage, title: string, url: string, now:
   const id = `capture-${now}-${Math.random().toString(36).slice(2, 8)}`;
   const size = image.getSize();
   const record: CaptureRecord = { id: id, fileName: `${id}.png`, thumbnailFileName: `${id}-thumbnail.jpg`, title: title, url: url, createdAt: now, width: size.width, height: size.height };
+  if (source !== null) {
+    record.source = source;
+  }
   const thumbnail = image.resize({ width: Math.min(THUMBNAIL_WIDTH_PX, size.width), quality: "good" });
   fs.writeFileSync(path.join(capturesFolder, record.fileName), image.toPNG());
   fs.writeFileSync(path.join(capturesFolder, record.thumbnailFileName), thumbnail.toJPEG(THUMBNAIL_JPEG_QUALITY));

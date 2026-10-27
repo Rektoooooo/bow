@@ -3,17 +3,20 @@
  *   Arc's Easels: a board you fill with text, drawings, pictures and captures of pages. When an easel tab is selected
  *   this editor fills the page card. Two fingers move the board, pinching (or ⌘ and the wheel) zooms; the tools are
  *   Select (move, resize, Delete), Text, Pen (five colors), Picture (pick a file, paste or drop one) and Capture
- *   (a screenshot or capture from the Library). Changes are saved a moment after they happen.
+ *   (a screenshot or capture from the Library). A capture of a web page is live, like Arc's: it is taken again when
+ *   the board opens (if it is older than LIVE_CAPTURE_STALE_MS) or when its "Live" badge is clicked. Changes are saved
+ *   a moment after they happen.
  *
  * Data source:
- *   The board's JSON (browserApi.readEasel), the Library's captures (browserApi.listCaptures / readCapture).
+ *   The board's JSON (browserApi.readEasel), the Library's captures (browserApi.listCaptures / readCapture), live
+ *   captures taken again (browserApi.retakeCapture).
  *
  * Data flow:
  *   sidebar.ts (an easel tab is selected) → showEaselEditor(easelId) → readEasel → board drawn in a moving "world"
  *   pointer and keys → board changes → drawn again → a moment later → browserApi.saveEasel(easelId, json)
  */
 import { createEmptyBoard } from "../shared/easels.js";
-import type { EaselBoard, EaselElement, EaselImage, EaselStroke, EaselText } from "../shared/easels.js";
+import type { CaptureSource, EaselBoard, EaselElement, EaselImage, EaselStroke, EaselText } from "../shared/easels.js";
 import { createElement } from "./dom.js";
 import { createIcon } from "./icons.js";
 
@@ -48,6 +51,9 @@ const PINCH_ZOOM_SPEED = 0.01;
 /** Pen points closer than this (in screen pixels) are skipped, which keeps strokes small and smooth. */
 const MIN_POINT_DISTANCE_PX = 2;
 
+/** A live capture older than this is taken again when its board opens. Our choice: fresh, without a reload per glance. */
+const LIVE_CAPTURE_STALE_MS = 5 * 60 * 1000;
+
 /** One open board and everything the editor needs about it. */
 interface OpenBoard {
   easelId: string;
@@ -59,6 +65,8 @@ interface OpenBoard {
   strokes: SVGSVGElement;
   viewport: HTMLElement;
   zoomLabel: HTMLElement;
+  /** Live captures being taken again right now: their badge says so. */
+  refreshingIds: Set<string>;
 }
 
 let openBoard: OpenBoard | null = null;
@@ -182,7 +190,64 @@ function drawImage(current: OpenBoard, image: EaselImage): void {
   if (image.sourceUrl !== null) {
     frame.title = image.sourceUrl;
   }
+  if (image.live !== undefined) {
+    frame.append(createLiveBadge(current, image));
+  }
   current.world.append(frame);
+}
+
+/**
+ * A live capture's badge: "Live", or "Updating…" while it is taken again. A click takes it again now.
+ */
+function createLiveBadge(current: OpenBoard, image: EaselImage): HTMLElement {
+  const isRefreshing = current.refreshingIds.has(image.id);
+  const badge = createElement("button", "easel-live", isRefreshing ? "Updating…" : "Live");
+  badge.classList.toggle("is-updating", isRefreshing);
+  badge.title = isRefreshing ? "Taking this capture again" : "A live capture: click to take it again now";
+  badge.dataset.liveId = image.id;
+  // The badge sits on the picture: pressing it must not start moving the picture.
+  badge.addEventListener("pointerdown", (event) => event.stopPropagation());
+  badge.addEventListener("click", (event) => {
+    event.stopPropagation();
+    refreshLiveCapture(current, image.id).catch(() => undefined);
+  });
+  return badge;
+}
+
+/**
+ * Takes a live capture again and puts the new picture in its place (same box on the board).
+ */
+async function refreshLiveCapture(current: OpenBoard, imageId: string): Promise<void> {
+  const image = current.board.elements.find((element): element is EaselImage => element.kind === "image" && element.id === imageId);
+  if (image === undefined || image.live === undefined || current.refreshingIds.has(imageId)) {
+    return;
+  }
+  current.refreshingIds.add(imageId);
+  drawBoard(current);
+  const src = await window.browserApi.retakeCapture(image.live.source).catch(() => null);
+  current.refreshingIds.delete(imageId);
+  if (src !== null) {
+    image.src = src;
+    image.live = { source: image.live.source, refreshedAt: Date.now() };
+    scheduleSave(current);
+  }
+  if (openBoard === current) {
+    drawBoard(current);
+  }
+}
+
+/**
+ * Takes the board's live captures again when they are older than LIVE_CAPTURE_STALE_MS (one after another; the main
+ * process loads one page at a time anyway).
+ */
+async function refreshStaleLiveCaptures(current: OpenBoard): Promise<void> {
+  const now = Date.now();
+  for (const element of current.board.elements) {
+    const isStale = element.kind === "image" && element.live !== undefined && now - element.live.refreshedAt > LIVE_CAPTURE_STALE_MS;
+    if (isStale && openBoard === current) {
+      await refreshLiveCapture(current, element.id);
+    }
+  }
 }
 
 /**
@@ -221,13 +286,17 @@ function addElement(current: OpenBoard, element: EaselElement): void {
 /**
  * Places a picture (a data: URL) on the board at a point, no wider than MAX_PICTURE_WIDTH.
  */
-function addPicture(current: OpenBoard, src: string, boardPoint: [number, number], sourceUrl: string | null): void {
+function addPicture(current: OpenBoard, src: string, boardPoint: [number, number], sourceUrl: string | null, source: CaptureSource | null = null): void {
   const probe = new Image();
   probe.onload = () => {
     const scale = Math.min(1, MAX_PICTURE_WIDTH / probe.naturalWidth);
     const width = Math.round(probe.naturalWidth * scale);
     const height = Math.round(probe.naturalHeight * scale);
-    addElement(current, { kind: "image", id: createElementId("image"), x: boardPoint[0], y: boardPoint[1], width: width, height: height, src: src, sourceUrl: sourceUrl });
+    const picture: EaselImage = { kind: "image", id: createElementId("image"), x: boardPoint[0], y: boardPoint[1], width: width, height: height, src: src, sourceUrl: sourceUrl };
+    if (source !== null) {
+      picture.live = { source: source, refreshedAt: Date.now() };
+    }
+    addElement(current, picture);
   };
   probe.src = src;
 }
@@ -434,7 +503,7 @@ async function showCapturePicker(current: OpenBoard, anchor: HTMLElement): Promi
       picker.remove();
       const src = await window.browserApi.readCapture(capture.id);
       if (src !== null) {
-        addPicture(current, src, getViewCenter(current), capture.url);
+        addPicture(current, src, getViewCenter(current), capture.url, capture.source);
       }
     });
     picker.append(choice);
@@ -496,7 +565,7 @@ function buildEditor(easelId: string): HTMLElement {
   strokes.classList.add("easel-strokes");
   world.append(strokes);
   viewport.append(world);
-  const current: OpenBoard = { easelId: easelId, board: createEmptyBoard(), tool: "select", color: PEN_COLORS[0] as string, selectedId: null, world: world, strokes: strokes, viewport: viewport, zoomLabel: createElement("span", "easel-zoom", "100%") };
+  const current: OpenBoard = { easelId: easelId, board: createEmptyBoard(), tool: "select", color: PEN_COLORS[0] as string, selectedId: null, world: world, strokes: strokes, viewport: viewport, zoomLabel: createElement("span", "easel-zoom", "100%"), refreshingIds: new Set() };
   const fileInput = document.createElement("input");
   fileInput.type = "file";
   fileInput.accept = "image/*";
@@ -538,6 +607,7 @@ function buildEditor(easelId: string): HTMLElement {
       current.board = parseBoard(json);
       applyView(current);
       drawBoard(current);
+      return refreshStaleLiveCaptures(current);
     })
     .catch(() => undefined);
   return editor;

@@ -11,6 +11,7 @@
  * Data flow:
  *   tabViews.ts needs a page for a tab → getProfileSession(profileId) → session with permission rules installed
  *   a page asks for the camera, … → permission handler → the decider (permissionPrompts.ts) → saved answer or prompt
+ *   a page shares the screen (getDisplayMedia) → macOS's sharing picker → what the user picks, or nothing
  */
 import { app, session } from "electron";
 import type { Session, WebContents } from "electron";
@@ -62,7 +63,8 @@ const sessionCreatedListeners: ((profileSession: Session) => void)[] = [];
 
 /**
  * Installs the permission rules on a session: the permissions in ALLOWED_WEB_PERMISSIONS are granted, the ones the
- * user decides on go to the decider (only in web page sessions), everything else is refused.
+ * user decides on go to the decider (only in web page sessions), screen sharing goes to macOS's sharing picker (only
+ * in web page sessions), everything else is refused.
  */
 export function restrictWebPermissions(targetSession: Session): void {
   if (configuredSessions.has(targetSession)) {
@@ -85,6 +87,14 @@ export function restrictWebPermissions(targetSession: Session): void {
       return;
     }
     const mediaTypes = "mediaTypes" in details ? (details.mediaTypes ?? []) : [];
+    // Sharing the screen (getDisplayMedia) asks for "media" with neither camera nor microphone in it. Letting it on
+    // shares nothing yet: the system's sharing picker comes next (setDisplayMediaRequestHandler below), and only what
+    // the user picks there is shared. Our own pages never share.
+    const isScreenShare = permission === "media" && mediaTypes.length === 0;
+    if (isScreenShare) {
+      callback(sessionProfileIds.has(targetSession));
+      return;
+    }
     const kinds = toPermissionKinds(permission, mediaTypes);
     if (kinds === null || origin === null || profileId === undefined || permissionDecider === null) {
       callback(false);
@@ -104,6 +114,9 @@ export function restrictWebPermissions(targetSession: Session): void {
     }
     return permissionDecider.isAllowed(profileId, origin, kinds);
   });
+  // macOS's own sharing picker (macOS 15 and later), like Safari's and Chrome's there; it needs no screen recording
+  // permission for the app. Where the system has none, sharing is refused: we draw no picker of our own.
+  targetSession.setDisplayMediaRequestHandler((_request, callback) => callback({}), { useSystemPicker: true });
   configuredSessions.add(targetSession);
 }
 

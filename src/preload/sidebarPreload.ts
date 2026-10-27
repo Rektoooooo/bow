@@ -35,6 +35,7 @@ const CHANNELS: typeof IPC_CHANNELS = {
   saveEasel: "browser:save-easel",
   listCaptures: "browser:list-captures",
   readCapture: "browser:read-capture",
+  retakeCapture: "browser:retake-capture",
 };
 
 /**
@@ -67,6 +68,7 @@ function createBrowserApi(): BrowserApi {
     saveEasel: (easelId, json) => ipcRenderer.invoke(CHANNELS.saveEasel, easelId, json),
     listCaptures: () => ipcRenderer.invoke(CHANNELS.listCaptures),
     readCapture: (captureId) => ipcRenderer.invoke(CHANNELS.readCapture, captureId),
+    retakeCapture: (source) => ipcRenderer.invoke(CHANNELS.retakeCapture, source),
   };
 }
 

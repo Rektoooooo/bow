@@ -26,4 +26,5 @@ export const IPC_CHANNELS = {
   saveEasel: "browser:save-easel",
   listCaptures: "browser:list-captures",
   readCapture: "browser:read-capture",
+  retakeCapture: "browser:retake-capture",
 } as const;

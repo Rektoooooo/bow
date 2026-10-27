@@ -13,6 +13,7 @@
  *   store.ts loads a BrowserState → state.ts / spaces.ts / autoArchive.ts return changed copies → sidebar.ts draws it
  */
 import type { SymbolImage } from "./symbols";
+import type { CaptureSource } from "./easels";
 
 import type { BrowserAction, SidebarCommand } from "./actions";
 
@@ -336,7 +337,12 @@ export interface BrowserApi {
   /** An easel's board (JSON) and saving it (shared/easels.ts). */
   readEasel(easelId: string): Promise<string>;
   saveEasel(easelId: string, json: string): Promise<void>;
-  /** The Library's captures, for putting one on an easel, and one capture as a PNG data: URL. */
-  listCaptures(): Promise<{ id: string; title: string; url: string; thumbnailUrl: string | null }[]>;
+  /**
+   * The Library's captures, for putting one on an easel (with where each came from, for a live capture), and one
+   * capture as a PNG data: URL.
+   */
+  listCaptures(): Promise<{ id: string; title: string; url: string; thumbnailUrl: string | null; source: CaptureSource | null }[]>;
   readCapture(captureId: string): Promise<string | null>;
+  /** Takes a live capture again (main/liveCaptures.ts): a PNG data: URL, or null when the page could not load. */
+  retakeCapture(source: CaptureSource): Promise<string | null>;
 }

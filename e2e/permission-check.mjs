@@ -1,7 +1,8 @@
 // Checks the permission rules:
 // - a website in a tab runs in a profile partition, gets nothing it was not allowed, and asks with a prompt;
 // - Block is remembered (no second prompt), Reset forgets it, Allow grants it, Escape refuses once and saves nothing;
-// - our own pages are refused without a prompt and cannot be navigated away.
+// - our own pages are refused without a prompt and cannot be navigated away;
+// - screen sharing goes to macOS's sharing picker for sites (it shows on screen until the app quits), never for ours.
 // Uses notifications: camera and microphone requests can wait on a macOS system dialog, which a test cannot answer.
 // usage: npm run build && node e2e/permission-check.mjs
 import { _electron } from "playwright-core";
@@ -154,6 +155,26 @@ await page.evaluate(() => {
 });
 await sleep(1500);
 check("the sidebar page cannot be navigated away", page.url() === sidebarUrlBefore);
+
+// Screen sharing: a site's request opens macOS's sharing picker (the promise waits for the user's choice there);
+// our own pages are refused. The picker shows on screen until the app quits just below.
+const shareScript = `new Promise((resolve) => {
+  const timer = setTimeout(() => resolve("waiting for the picker"), 2500);
+  navigator.mediaDevices.getDisplayMedia({ video: true }).then(
+    () => { clearTimeout(timer); resolve("shared without asking"); },
+    (error) => { clearTimeout(timer); resolve("refused: " + error.name); },
+  );
+})`;
+const sidebarShare = await app.evaluate(({ BrowserWindow }, code) => {
+  const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  return win.webContents.executeJavaScript(code, true);
+}, shareScript);
+check("our own pages cannot share the screen", sidebarShare.startsWith("refused"), sidebarShare);
+const siteShare = await app.evaluate(({ webContents }, code) => {
+  const tab = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith("https://example.com"));
+  return tab.executeJavaScript(code, true);
+}, shareScript);
+check("a site sharing the screen gets macOS's sharing picker, nothing shared yet", siteShare === "waiting for the picker", siteShare);
 
 // Quitting while a prompt waits must not stop on an error (the closing page settles the prompt as the window goes).
 await askForNotifications();

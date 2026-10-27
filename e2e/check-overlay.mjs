@@ -594,6 +594,48 @@ await overlay.press("body", "Escape");
 await sidebar.waitForTimeout(300);
 await app.evaluate(({ clipboard }, text) => clipboard.writeText(text), clipboardTextBefore);
 
+// Live captures, like Arc's Easels: the capture remembers where it came from; put on an easel it is live, and its
+// "Live" badge takes it again from the page (a hidden window, the same size, scroll and region).
+const libraryCaptures = await sidebar.evaluate(() => window.browserApi.listCaptures());
+const captureSource = libraryCaptures[0]?.source ?? null;
+check("a capture remembers its page, view, scroll and region", captureSource?.url.startsWith("https://") && captureSource.viewport.width > 0 && captureSource.region.width === 100 && captureSource.region.height === 50, JSON.stringify(captureSource));
+const tabBeforeEasel = selectedTab(await getState());
+await dispatch({ type: "createEasel" });
+await sidebar.waitForSelector(".easel-viewport", { timeout: 5000 });
+await sidebar.click(".easel-button[title^='Add a capture']");
+await sidebar.waitForSelector(".easel-capture-choice", { timeout: 5000 });
+await sidebar.click(".easel-capture-choice");
+const liveBadge = await sidebar.waitForSelector(".easel-live", { timeout: 5000 }).catch(() => null);
+check("a capture placed on an easel is live", liveBadge !== null && (await liveBadge.textContent()) === "Live");
+const easelState = await getState();
+const liveEaselFile = path.join(userDataDir, "Easels", `${selectedTab(easelState).url.slice("sidebar-easel:".length)}.json`);
+const readLiveImage = () => {
+  try {
+    return JSON.parse(fs.readFileSync(liveEaselFile, "utf8")).elements.find((element) => element.kind === "image") ?? null;
+  } catch {
+    return null;
+  }
+};
+await sidebar.waitForTimeout(1200);
+const savedBefore = readLiveImage();
+const windowsBeforeRetake = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length);
+await sidebar.click(".easel-live");
+const updating = await sidebar.$eval(".easel-live", (badge) => badge.textContent).catch(() => null);
+let savedAfter = savedBefore;
+for (let attempt = 0; attempt < 60 && savedAfter?.live?.refreshedAt === savedBefore?.live?.refreshedAt; attempt++) {
+  await sidebar.waitForTimeout(500);
+  savedAfter = readLiveImage();
+}
+const windowsAfterRetake = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length);
+check(
+  "its Live badge takes it again from the page and saves it",
+  updating === "Updating…" && savedAfter?.live?.refreshedAt > savedBefore?.live?.refreshedAt && savedAfter.src.startsWith("data:image/png"),
+  `${updating} ${savedBefore?.live?.refreshedAt} → ${savedAfter?.live?.refreshedAt}`,
+);
+check("and the hidden window it used is gone", windowsAfterRetake === windowsBeforeRetake, `${windowsBeforeRetake} → ${windowsAfterRetake} windows`);
+await dispatch({ type: "selectTab", tabId: tabBeforeEasel.id });
+await sidebar.waitForTimeout(300);
+
 // Developer Mode, Arc's per-site switch in the Control Center: the toolbar turns into the striped developer bar with
 // the full address, back/forward/reload move to the sidebar's top strip, the tab gets its dashed outline, the page
 // moves down under the taller bar, and the Network button opens the developer tools on that panel.

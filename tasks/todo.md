@@ -124,7 +124,7 @@ Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 �
 - [x] Tab hover previews · [x] Recent-tab switcher (⌃Tab, with page pictures) · [x] Inline URL autocomplete (also
       well-known sites) · [x] Tidy titles (our own rules)
 - [x] Capture (Control Center) · [x] Library Media · [x] Library Spaces/Boosts · [x] Notes · [x] Easels (text, pen,
-      pictures, captures; no live-refreshing captures, no sharing) · [x] Boost colors/fonts/JS
+      pictures, live captures taken again from their page; no sharing: server feature) · [x] Boost colors/fonts/JS
 - [x] Sound effects (our own synthesized) · [x] Alternate app icons (Dock while running; Finder icon needs a Dock
       tile plug-in Electron cannot ship) · [x] Ad & tracker blocking (own engine, EasyList/EasyPrivacy downloaded)
 - [x] Translate page (Google Translate, labelled) · [x] Handoff (unverified: needs signing and a second device)
@@ -157,7 +157,8 @@ Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 �
 
 ## Later
 - [ ] Ghidra pass when RAM allows (Command Bar ranking, Peek triggers, sync merge, Easel captures)
-- [ ] Easels, Notes, multiple main windows, tab hover previews, built-in ad blocking, screen sharing
+- [x] Easels, Notes, tab hover previews, built-in ad blocking, screen sharing (macOS's sharing picker)
+- [ ] Multiple main windows (⌘N opens a second window, like Arc)
 - [ ] Sign and notarize the app (needs a Developer ID) so it runs on other Macs
 - [ ] Adding a Web Store extension to a second profile re-downloads into the folder the first profile has loaded;
       reuse the existing copy instead (rare)

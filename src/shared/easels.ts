@@ -42,6 +42,19 @@ export interface EaselStroke {
   width: number;
 }
 
+/**
+ * Where a capture came from, so it can be taken again later: the page, the size of its view, how far it was scrolled,
+ * its zoom and the captured part of the view (all in the view's points). Easels keep captures "live" with it, like
+ * Arc's live captures.
+ */
+export interface CaptureSource {
+  url: string;
+  viewport: { width: number; height: number };
+  scroll: { x: number; y: number };
+  zoomFactor: number;
+  region: { x: number; y: number; width: number; height: number };
+}
+
 /** A picture or a capture of a page, kept inside the board as a data: URL. */
 export interface EaselImage {
   kind: "image";
@@ -53,6 +66,8 @@ export interface EaselImage {
   src: string;
   /** For a capture: the page it shows, so a click can open it. */
   sourceUrl: string | null;
+  /** For a live capture: where to take it again, and when it last was. Optional: plain pictures have none. */
+  live?: { source: CaptureSource; refreshedAt: number };
 }
 
 export type EaselElement = EaselText | EaselStroke | EaselImage;
@@ -94,6 +109,45 @@ export function isEaselId(value: unknown): value is string {
  */
 export function createEaselUrl(easelId: string): string {
   return `${EASEL_URL_PREFIX}${easelId}`;
+}
+
+/** The largest view a capture may be taken again in, in points. Our choice: bigger than any screen. */
+const MAX_CAPTURE_VIEW_PX = 8000;
+
+/** The page zoom range Chromium allows. */
+const MIN_ZOOM_FACTOR = 0.25;
+const MAX_ZOOM_FACTOR = 5;
+
+/**
+ * True for a whole number from 0 up to a limit.
+ */
+function isWholeNumberUpTo(value: unknown, limit: number): boolean {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= limit;
+}
+
+/**
+ * True for a well-formed capture source: a web address and sizes in range. Checked again in the main process before
+ * a capture is taken again, because a board's file is data the page could have been handed.
+ */
+export function isCaptureSource(value: unknown): value is CaptureSource {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const source = value as Record<string, unknown>;
+  const viewport = source.viewport as Record<string, unknown> | null | undefined;
+  const scroll = source.scroll as Record<string, unknown> | null | undefined;
+  const region = source.region as Record<string, unknown> | null | undefined;
+  if (typeof source.url !== "string" || !/^https?:\/\//.test(source.url) || typeof viewport !== "object" || viewport === null) {
+    return false;
+  }
+  if (typeof scroll !== "object" || scroll === null || typeof region !== "object" || region === null) {
+    return false;
+  }
+  const isViewOk = isWholeNumberUpTo(viewport.width, MAX_CAPTURE_VIEW_PX) && isWholeNumberUpTo(viewport.height, MAX_CAPTURE_VIEW_PX);
+  const isScrollOk = typeof scroll.x === "number" && typeof scroll.y === "number" && scroll.x >= 0 && scroll.y >= 0;
+  const isZoomOk = typeof source.zoomFactor === "number" && source.zoomFactor >= MIN_ZOOM_FACTOR && source.zoomFactor <= MAX_ZOOM_FACTOR;
+  const isRegionOk = [region.x, region.y, region.width, region.height].every((part) => isWholeNumberUpTo(part, MAX_CAPTURE_VIEW_PX));
+  return isViewOk && isScrollOk && isZoomOk && isRegionOk;
 }
 
 /**

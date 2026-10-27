@@ -18,6 +18,7 @@ import { OVERLAY_CHANNELS } from "../shared/overlay";
 import type { CommandBarLine, CommandBarMode, LibraryData, LibrarySection, OverlayPanel, OverlayRect, SiteCommand, SiteInfo, SwitcherTab } from "../shared/overlay";
 import { getSnapshot } from "./tabSnapshots";
 import { copyPngToClipboard, listCaptures, runCaptureCommand, saveCapture } from "./captures";
+import { describeCaptureSource } from "./liveCaptures";
 import type { CaptureCommand } from "./captures";
 import type { BrowserState, ItemId, SitePermissionKind } from "../shared/types";
 import { applyChange, getLayoutOptions, getRecentTabIds, getState, getWindow, sendSidebarCommand, setNewTabPending } from "./browserCore";
@@ -692,9 +693,10 @@ function handleChoose(resultId: string | null, typedText: string, mode: CommandB
  * screenshot and capture.
  */
 async function capturePage(contents: WebContents, region?: Rectangle): Promise<void> {
+  const source = await describeCaptureSource(contents, region);
   const image = await contents.capturePage(region);
   await copyPngToClipboard(image.toPNG());
-  saveCapture(image, contents.getTitle(), contents.getURL(), Date.now());
+  saveCapture(image, contents.getTitle(), contents.getURL(), Date.now(), source);
   refreshOpenPanel();
   if (getState().settings.areSoundEffectsOn !== false) {
     sendSidebarCommand({ kind: "playSound", sound: "capture" });

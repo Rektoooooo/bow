@@ -55,7 +55,8 @@ import { createOverlayView, getOverlayContents } from "./overlay";
 import { openWelcome, refreshOpenPanel, registerOverlayIpc, relayoutOverlay, setCommandActionRegistry } from "./overlayController";
 import { startHandoff } from "./handoff";
 import { noticeVisitedPage, startLiveFolderRefreshing } from "./liveFolderRefresher";
-import { onProfileSessionCreated, restrictWebPermissions, useChromeUserAgent } from "./profiles";
+import { getProfileSession, onProfileSessionCreated, restrictWebPermissions, useChromeUserAgent } from "./profiles";
+import { retakeCapture } from "./liveCaptures";
 import { moveTabsToArchive, setNoteTitle, updateTabFavicon, updateTabPage } from "./state";
 import { getStateFilePath } from "./store";
 import { loadWindowBounds, rememberWindowBounds } from "./windowState";
@@ -68,7 +69,7 @@ import { initializeNotesStore, readNote, writeNote } from "./notesStore";
 import { createNoteUrl } from "../shared/notes";
 import { applyCosmeticFilters, initializeAdBlocking, installAdBlocker } from "./adBlock";
 import { applyAppIcon } from "./appIcon";
-import { findRootLocation, findTab } from "./tree";
+import { findRootLocation, findTab, getActiveSpace } from "./tree";
 import { isSameSite } from "./urls";
 import type { TabViewEvents } from "./tabViews";
 
@@ -327,8 +328,11 @@ async function handleAppReady(): Promise<void> {
     saveEasel: (easelId, json) => {
       writeEasel(easelId, json);
     },
-    listCaptures: () => listCaptures(EASEL_CAPTURE_CHOICES).map((record) => ({ id: record.id, title: record.title, url: record.url, thumbnailUrl: record.thumbnailUrl })),
+    listCaptures: () =>
+      listCaptures(EASEL_CAPTURE_CHOICES).map((record) => ({ id: record.id, title: record.title, url: record.url, thumbnailUrl: record.thumbnailUrl, source: record.source ?? null })),
     readCapture: (captureId) => readCaptureAsDataUrl(captureId),
+    // The easel on screen belongs to the active Space: its profile's sign-ins see the page as the user does.
+    retakeCapture: (source) => retakeCapture(source, getProfileSession(getActiveSpace(getState()).profileId)),
   });
   registerOverlayIpc();
   registerLittleWindowIpc();

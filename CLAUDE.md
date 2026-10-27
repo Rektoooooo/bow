@@ -72,7 +72,8 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   extension library's preload runs in an isolated world (page scripts see nothing new); website permissions are
   installed per session in `profiles.ts`: `fullscreen` and `clipboard-sanitized-write` are allowed, camera,
   microphone, location, notifications and clipboard reading go to a prompt (`permissionPrompts.ts`, answers in
-  `BrowserState.sitePermissions` per profile and origin; private windows never save), everything else and anything
+  `BrowserState.sitePermissions` per profile and origin; private windows never save), screen sharing goes to
+  macOS's sharing picker (`setDisplayMediaRequestHandler` with `useSystemPicker`), everything else and anything
   from our own pages is refused. Our pages block `will-navigate` and `window.open`. `e2e/permission-check.mjs`
   proves it. Keep it passing.
 - Build output: `dist/node` (main + preloads, CommonJS) and `dist/web` (sidebar, overlay and Little Window pages,

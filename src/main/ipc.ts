@@ -13,7 +13,8 @@
 import { APP_ICON_VARIANTS } from "../shared/appIconDrawing";
 import { BOOST_FONTS } from "../shared/boostFonts";
 import { isNoteId } from "../shared/notes";
-import { isEaselId } from "../shared/easels";
+import { isCaptureSource, isEaselId } from "../shared/easels";
+import type { CaptureSource } from "../shared/easels";
 import { MAX_EASEL_LENGTH } from "./easelsStore";
 import { MAX_NOTE_LENGTH } from "./notesStore";
 import { MAX_HUE_SHIFT } from "./boosts";
@@ -36,8 +37,9 @@ export interface IpcHandlers {
   saveNote(noteId: string, html: string, title: string): void;
   readEasel(easelId: string): string;
   saveEasel(easelId: string, json: string): void;
-  listCaptures(): { id: string; title: string; url: string; thumbnailUrl: string | null }[];
+  listCaptures(): { id: string; title: string; url: string; thumbnailUrl: string | null; source: CaptureSource | null }[];
   readCapture(captureId: string): string | null;
+  retakeCapture(source: CaptureSource): Promise<string | null>;
 }
 
 /** Longest text we accept from the sidebar (typed addresses, names). Longer input is refused. */
@@ -373,6 +375,12 @@ export function registerIpcHandlers(handlers: IpcHandlers): void {
       return null;
     }
     return handlers.readCapture(captureId as string);
+  });
+  ipcMain.handle(IPC_CHANNELS.retakeCapture, (event, source: unknown) => {
+    if (!handlers.isTrustedSender(event.sender) || !isCaptureSource(source)) {
+      return null;
+    }
+    return handlers.retakeCapture(source);
   });
   ipcMain.handle(IPC_CHANNELS.dispatch, (event, value: unknown) => {
     if (!handlers.isTrustedSender(event.sender)) {

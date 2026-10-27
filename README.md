@@ -91,7 +91,8 @@ in Arc). Running it twice adds nothing twice.
 - **Show full URLs** (Library › Settings, View › Toggle Full URLs, or the Command Bar): the toolbar shows the whole
   address instead of site and path, like Arc's preference of the same name.
 - **Notes** and **Easels**: rich-text notes and boards (text, drawing, pictures, captures) that sit in the sidebar
-  like tabs (File › New Note / New Easel).
+  like tabs (File › New Note / New Easel). A capture placed on an easel is live, like Arc's: it is taken again
+  from its page (same size, scroll and region) when the easel opens, or when you click its **Live** badge.
 - **Ad and tracker blocking** with EasyList and EasyPrivacy (off until you turn it on in Library › Settings), allowed
   per site in the Control Center.
 - **Air Traffic Control**: rules such as "address contains github.com → Work" send links from other apps to a Space
@@ -99,7 +100,8 @@ in Arc). Running it twice adds nothing twice.
 - **Permission prompts**: a site that wants your camera, microphone, location, notifications or clipboard asks
   first ("meet.google.com wants to use your camera and microphone", Block / Allow). The answer is remembered per
   profile and site; the site controls list it with a Reset. Private windows ask every time and remember nothing.
-  Links to apps (mailto:, zoommtg:, steam:, …) ask every time and name the app macOS would open.
+  Links to apps (mailto:, zoommtg:, steam:, …) ask every time and name the app macOS would open. Sharing your
+  screen (Meet, Zoom, Slack in the browser) opens macOS's own sharing picker, where you choose what to share.
 - The **Control Center** (Arc's site controls): Share, Boost, Screenshot, Capture (drag over part of the page), the
   profile's extensions, per-site settings, and more behind "…" (Translate Page, zoom, clear site data, developer
   tools). Find in page,
@@ -168,7 +170,7 @@ Three ideas keep it simple:
   extensions: there the extension library's preload runs in an isolated world, so page scripts see nothing new.
   Our own pages only accept their own messages, and every message field is checked.
 - Websites get nothing they were not allowed: camera, microphone, location, notifications and clipboard reading
-  need the user's Allow (remembered per profile and site), everything else is refused, except full screen and
-  clipboard writes. Our own pages are refused without asking. `e2e/permission-check.mjs` proves it.
+  need the user's Allow (remembered per profile and site), screen sharing goes through macOS's sharing picker,
+  everything else is refused, except full screen and clipboard writes. Our own pages are refused without asking. `e2e/permission-check.mjs` proves it.
 - Our pages cannot navigate away or open windows, and only load their own scripts.
 - Import from Arc only reads Arc's files (its history database through a temporary copy) and never changes them.
