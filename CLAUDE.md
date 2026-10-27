@@ -1,4 +1,4 @@
-# CLAUDE.md — Sidebar Browser
+# CLAUDE.md — Bow (formerly Sidebar Browser)
 
 An Arc-style desktop browser in Electron + TypeScript, built after studying Arc 1.170.0 with REA.
 Public repo: https://github.com/Rektoooooo/sidebar-browser
@@ -26,14 +26,15 @@ npm run e2e          # build + drive the real app: check-app, check-overlay, che
                      # check-windows (⌘N, a Space and selection per window, restart restores every window)
 node e2e/window-shot.mjs   # README screenshots from sample data → docs/screenshot-*.png
 node e2e/arc-compare.mjs   # side-by-side crops with the user's Arc screenshots (reference/, local only) → e2e/output
-npm run package      # release/Sidebar Browser-darwin-arm64/Sidebar Browser.app (ad-hoc signed, git-ignored)
+npm run package      # release/Bow-darwin-arm64/Bow.app (ad-hoc signed, git-ignored)
 node e2e/check-package.mjs # checks that packaged app (Info.plist, menu, links from other apps)
 tools/make-icon.sh   # redraws build/icon.icns from tools/make-icon.cjs (our own icon design)
 ```
 
 `npm run e2e` opens real windows on screen for a few minutes and uses throwaway `--user-data-dir` folders under
-`e2e/output/`, so the real state in `~/Library/Application Support/Sidebar Browser/` is never touched (the folder
-is named after `productName`; `npm start` and the packaged app share it).
+`e2e/output/`, so the real state in `~/Library/Application Support/Sidebar Browser/` is never touched (the app was
+renamed Bow on 2026-10-27; `main.ts keepDataFolder` keeps the folder's first name, and the bundle id stays
+`io.github.rektoooooo.sidebar-browser`; `npm start` and the packaged app share the folder).
 Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electron; see `tasks/lessons.md`.
 
 ## Architecture rules (keep them)

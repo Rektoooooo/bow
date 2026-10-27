@@ -1,6 +1,6 @@
 {
   "name": "sidebar-browser",
-  "productName": "Sidebar Browser",
+  "productName": "Bow",
   "version": "0.1.0",
   "description": "A desktop browser with a vertical sidebar, Spaces and auto-archive of unused tabs.",
   "private": true,

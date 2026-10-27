@@ -45,12 +45,12 @@ export async function setAsDefaultBrowser(): Promise<void> {
   if (!app.isPackaged) {
     await showMessage(
       "Only the packaged app can be the default browser",
-      "Build it with `npm run package`, move release/Sidebar Browser-darwin-arm64/Sidebar Browser.app to Applications, open it from there and choose this again.",
+      "Build it with `npm run package`, move release/Bow-darwin-arm64/Bow.app to Applications, open it from there and choose this again.",
     );
     return;
   }
   if (isDefaultBrowser()) {
-    await showMessage("Sidebar Browser is already your default browser", "Links from other apps open here.");
+    await showMessage("Bow is already your default browser", "Links from other apps open here.");
     return;
   }
   for (const scheme of WEB_SCHEMES) {

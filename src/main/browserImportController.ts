@@ -107,7 +107,7 @@ async function explainFullDiskAccess(): Promise<void> {
     type: "info",
     message: "Safari's bookmarks need your permission",
     detail:
-      "macOS keeps Safari's files private. Turn on Sidebar Browser in System Settings › Privacy & Security › Full Disk Access, then import again.",
+      "macOS keeps Safari's files private. Turn on Bow in System Settings › Privacy & Security › Full Disk Access, then import again.",
     buttons: ["Open System Settings", "Cancel"],
     defaultId: 0,
     cancelId: 1,

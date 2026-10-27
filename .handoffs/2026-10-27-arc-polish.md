@@ -65,6 +65,15 @@ approved fixes Peek (3), tab tooltip (6) and sidebar width (7). The user was awa
   while the theme cross-fades. They glide with the page (`moveView`), are raised when page views are added, update on
   focus / blur, and close with the window. Inner corners of split panes are square now (they face the card's own
   colour, not the frame). The Peek's page still has a uniform radius.
+- The app is called **Bow** now (the user's pick of three, 2026-10-27; a bow is another word for an arc, and no
+  browser uses the name; "Crescent" was too close to Crest, an existing open-source Arc remake). New icon: a thick
+  gradient bow on a soft tile (`shared/appIconDrawing.ts`, five colour variants; the choices in Settings show the
+  icon itself). `productName` is Bow, so the app, its menus and `release/Bow-darwin-arm64/Bow.app` say Bow; the
+  bundle id stays `io.github.rektoooooo.sidebar-browser` (default browser, permissions) and `main.ts keepDataFolder`
+  keeps `~/Library/Application Support/Sidebar Browser` unless a run passes `--user-data-dir`. Cookies are not
+  encrypted with a Keychain key in Electron by default (no "… Safe Storage" item existed), so the rename keeps
+  every sign-in. The GitHub repository keeps its name (renaming it is the user's call). README says Bow is not
+  affiliated with The Browser Company.
 
 ## How it was measured (keep doing it this way)
 

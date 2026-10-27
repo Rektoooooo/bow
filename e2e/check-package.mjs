@@ -1,4 +1,4 @@
-// Checks the packaged app (npm run package first): it starts, knows it is "Sidebar Browser", declares http and https
+// Checks the packaged app (npm run package first): it starts, knows it is "Bow", declares http and https
 // so macOS can make it the default browser, offers "Set as Default Browser…", opens a link from another app in a
 // Little Window, and runs a Chrome extension (so the extension library and its preload made it into the package).
 // usage: npm run package && node e2e/check-package.mjs
@@ -11,8 +11,8 @@ import * as path from "node:path";
 const appDir = path.resolve(import.meta.dirname, "..");
 const outDir = process.env.E2E_OUTPUT_DIR || path.join(appDir, "e2e", "output");
 const architecture = process.arch === "arm64" ? "arm64" : "x64";
-const bundlePath = path.join(appDir, "release", `Sidebar Browser-darwin-${architecture}`, "Sidebar Browser.app");
-const executablePath = path.join(bundlePath, "Contents", "MacOS", "Sidebar Browser");
+const bundlePath = path.join(appDir, "release", `Bow-darwin-${architecture}`, "Bow.app");
+const executablePath = path.join(bundlePath, "Contents", "MacOS", "Bow");
 const userDataDir = path.join(outDir, "user-data-package");
 fs.rmSync(userDataDir, { recursive: true, force: true });
 fs.mkdirSync(userDataDir, { recursive: true });
@@ -31,7 +31,9 @@ function check(name, ok, detail = "") {
 const infoPlist = JSON.parse(execFileSync("plutil", ["-convert", "json", "-o", "-", path.join(bundlePath, "Contents", "Info.plist")]).toString());
 const schemes = (infoPlist.CFBundleURLTypes ?? []).flatMap((type) => type.CFBundleURLSchemes ?? []);
 check("Info.plist declares http and https", schemes.includes("http") && schemes.includes("https"), schemes.join(", "));
-check("Info.plist names the app", infoPlist.CFBundleName === "Sidebar Browser", infoPlist.CFBundleName);
+check("Info.plist names the app", infoPlist.CFBundleName === "Bow", infoPlist.CFBundleName);
+// macOS ties the default-browser choice and website permissions to the bundle id, so it kept the first name.
+check("the bundle id stays the same after the rename", infoPlist.CFBundleIdentifier === "io.github.rektoooooo.sidebar-browser", infoPlist.CFBundleIdentifier);
 const usageTexts = [infoPlist.NSCameraUsageDescription, infoPlist.NSMicrophoneUsageDescription, infoPlist.NSLocationWhenInUseUsageDescription];
 check("Info.plist explains camera, microphone and location use", usageTexts.every((text) => typeof text === "string" && text.startsWith("Websites you allow")), usageTexts.join(" | "));
 check("the app icon is ours", fs.readFileSync(path.join(bundlePath, "Contents", "Resources", infoPlist.CFBundleIconFile)).equals(fs.readFileSync(path.join(appDir, "build", "icon.icns"))));
@@ -49,11 +51,12 @@ page?.on("pageerror", (error) => consoleErrors.push(error.message));
 await page?.waitForSelector(".sidebar", { timeout: 15000 });
 
 const appInfo = await app.evaluate(({ app }) => ({ name: app.getName(), isPackaged: app.isPackaged, userData: app.getPath("userData") }));
-check("runs as the packaged Sidebar Browser", appInfo.isPackaged && appInfo.name === "Sidebar Browser", `${appInfo.name}, packaged ${appInfo.isPackaged}`);
+check("runs as the packaged Bow", appInfo.isPackaged && appInfo.name === "Bow", `${appInfo.name}, packaged ${appInfo.isPackaged}`);
 check("uses the user data folder it was given", appInfo.userData === userDataDir);
 
 const appMenuLabels = await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items[0].submenu.items.map((item) => item.label));
 check("the app menu offers Set as Default Browser…", appMenuLabels.includes("Set as Default Browser…"));
+check("the app menu says Bow", appMenuLabels.includes("About Bow") && appMenuLabels.includes("Quit Bow"), appMenuLabels.join(", "));
 
 const windowCount = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length);
 const windowsBefore = await windowCount();

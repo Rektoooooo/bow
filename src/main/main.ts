@@ -79,6 +79,9 @@ import { findRootLocation, findTab, getActiveSpace } from "./tree";
 import { isSameSite } from "./urls";
 import type { TabViewEvents } from "./tabViews";
 
+/** The data folder's name in ~/Library/Application Support: the app's name before it became Bow. */
+const DATA_FOLDER_NAME = "Sidebar Browser";
+
 /** Command-line flag that skips the first-start tour (the end-to-end checks start with empty data folders). */
 const SKIP_WELCOME_FLAG = "--skip-welcome";
 
@@ -345,10 +348,24 @@ async function handleAppReady(): Promise<void> {
 }
 
 /**
+ * The data folder keeps the app's first name. Electron names it after the app, so the rename to Bow (2026-10-27)
+ * would otherwise have started everyone with an empty browser. A run given its own folder (--user-data-dir, the
+ * tests' throwaway profiles) keeps that one.
+ */
+function keepDataFolder(): void {
+  if (app.commandLine.hasSwitch("user-data-dir")) {
+    return;
+  }
+  app.setPath("userData", path.join(app.getPath("appData"), DATA_FOLDER_NAME));
+}
+
+/**
  * Entry point: one instance only (a second launch with a link opens it in a Little Window, like Arc),
  * then start once Electron is ready. Quits when the last main window closes (mainWindows.ts).
  */
 function startApp(): void {
+  // Before anything reads the data folder (the single-instance lock lives in it).
+  keepDataFolder();
   useChromeUserAgent();
   const isFirstInstance = app.requestSingleInstanceLock();
   if (!isFirstInstance) {

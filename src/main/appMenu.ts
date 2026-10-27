@@ -203,7 +203,7 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
       ],
     },
     { role: "windowMenu" },
-    { role: "help", submenu: [{ label: "Sidebar Browser on GitHub", click: () => commands.openUrlInNewTab(PROJECT_URL) }] },
+    { role: "help", submenu: [{ label: "Bow on GitHub", click: () => commands.openUrlInNewTab(PROJECT_URL) }] },
   ];
 }
 

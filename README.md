@@ -1,11 +1,15 @@
-# Sidebar Browser
+# Bow
 
-A desktop browser built with Electron and TypeScript that works like Arc: tabs in a vertical sidebar, Spaces,
+<img src="build/icon-1024.png" alt="Bow's icon: a gradient bow on a light tile" width="128">
+
+An open-source browser in the spirit of Arc, built with Electron and TypeScript: tabs in a vertical sidebar, Spaces,
 Favorites, pinned folders, the page shown as an inset card, a Command Bar, Peek, Split View, Little Windows and
 auto-archive for tabs you stop using. It can import your Arc sidebar, archive and history.
 
 Arc is being shut down. Before it goes, we studied how it behaves (from its app bundle and the files it writes;
 see [docs/research](docs/research)) and rebuilt that behavior in our own code. No Arc code, icons or assets are used.
+Bow is not affiliated with or endorsed by The Browser Company; Arc is their product and trademark. (A bow is another
+word for an arc.)
 
 ![Dark mode: Favorites tiles, a Space with a pinned folder, Today tabs, and a Wikipedia page in the inset card](docs/screenshot-dark.png)
 
@@ -22,10 +26,10 @@ npm run e2e    # drives the real app with Playwright (opens windows briefly; thr
 To use it as your everyday browser, build the app and make it the default:
 
 ```bash
-npm run package   # → release/Sidebar Browser-darwin-arm64/Sidebar Browser.app
+npm run package   # → release/Bow-darwin-arm64/Bow.app
 ```
 
-Move **Sidebar Browser.app** to Applications, open it, and choose **Sidebar Browser › Set as Default Browser…**
+Move **Bow.app** to Applications, open it, and choose **Bow › Set as Default Browser…**
 (or type "default" in the Command Bar). macOS asks you to confirm. Links from other apps then open in a Little
 Window, or in a Space when an Air Traffic Control rule matches. The app is signed ad hoc for this Mac, not
 notarized, so copy the built app rather than downloading it elsewhere.

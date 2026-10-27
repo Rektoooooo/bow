@@ -7,11 +7,11 @@ import { describe, expect, it } from "vitest";
 import { APP_ICON_VARIANTS, buildAppIconSvg, findAppIconVariant } from "../src/shared/appIconDrawing";
 
 describe("app icon variants", () => {
-  it("draw the same icon in each variant's colors", () => {
+  it("draw the same bow in each variant's colors", () => {
     for (const variant of APP_ICON_VARIANTS) {
       const svg = buildAppIconSvg(variant);
-      expect(svg).toContain(variant.gradient[0]);
-      expect(svg).toContain(variant.accent);
+      expect(svg).toContain(variant.tile[0]);
+      expect(svg).toContain(variant.bow[1]);
     }
   });
 

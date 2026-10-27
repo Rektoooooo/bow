@@ -14,7 +14,7 @@
  */
 import type { ExtensionLine, HistoryLine, LibraryBoost, LibraryData, LibrarySection, LibrarySpace, MediaLine } from "../shared/overlay";
 import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS } from "../shared/settings.js";
-import { APP_ICON_VARIANTS } from "../shared/appIconDrawing.js";
+import { APP_ICON_VARIANTS, buildAppIconSvg } from "../shared/appIconDrawing.js";
 import { isSearchEngineId, SEARCH_ENGINE_IDS, SEARCH_ENGINES } from "../shared/searchEngines.js";
 import type { ArchiveReason, ArchivedTab } from "../shared/types";
 import { createElement, createFavicon, createIconButton, createTextButton, dispatch, getDisplayHost } from "../renderer/dom.js";
@@ -586,8 +586,9 @@ function createAppIconChoices(data: LibraryData): HTMLElement {
     choice.title = variant.label;
     choice.setAttribute("aria-label", `${variant.label} app icon`);
     choice.classList.toggle("is-active", variant.id === data.appIcon);
-    const [firstColor, middleColor, lastColor] = variant.gradient;
-    choice.style.background = `linear-gradient(135deg, ${firstColor}, ${middleColor} 50%, ${lastColor})`;
+    // The choice shows the icon itself (overlay.css crops the drawing's margin around the tile).
+    const iconDrawing = encodeURIComponent(buildAppIconSvg(variant));
+    choice.style.backgroundImage = `url("data:image/svg+xml;utf8,${iconDrawing}")`;
     iconChoices.append(choice);
   }
   return iconChoices;

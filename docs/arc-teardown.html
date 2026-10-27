@@ -340,7 +340,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         </table>
       </div>
       <h3 class="sub-h">Rebuild it</h3>
-      <p class="intro">A design for your browser that follows Arc's structure, with Arc's measured values. Sidebar Browser implements exactly this (<code>src/main/autoArchive.ts</code>).</p>
+      <p class="intro">A design for your browser that follows Arc's structure, with Arc's measured values. Bow implements exactly this (<code>src/main/autoArchive.ts</code>).</p>
       <ul class="design">
         <li><b>Track use.</b> Store <code>lastActiveAt</code> per unpinned tab. Set it when a tab is selected or left, and refresh visible tabs on a one-minute tick.</li>
         <li><b>Sweep.</b> Every few minutes, archive unpinned tabs older than the Space's threshold. Skip visible, audible and picture-in-picture tabs.</li>
@@ -504,7 +504,7 @@ const FEATURES = [
   ["acct","Updates, flags & crash reports","","Auto-updates, remote feature flags and crash reporting.","Sparkle for updates. The rest is optional.","Sparkle, LaunchDarkly, Sentry, Datadog","static"]
 ];
 
-// What Sidebar Browser (this repo) has rebuilt so far. "partly": the core works, some of Arc's version is missing.
+// What Bow (this repo) has rebuilt so far. "partly": the core works, some of Arc's version is missing.
 const BUILT = {
   "Vertical sidebar":"built", "Inset web card":"built", "Split View":"built", "Space themes & grain":"built",
   "Glow loading indicator":"built", "Link status text":"built", "Crashed-tab page":"built", "Tab hover tooltip":"built",
@@ -554,7 +554,7 @@ function render(){
   }
   const builtCount = Object.values(BUILT).filter(v => v === "built").length;
   const partlyCount = Object.values(BUILT).filter(v => v === "partly").length;
-  document.getElementById("built-summary").textContent = `Sidebar Browser has rebuilt ${builtCount} of these ${FEATURES.length} features, and ${partlyCount} more in part.`;
+  document.getElementById("built-summary").textContent = `Bow has rebuilt ${builtCount} of these ${FEATURES.length} features, and ${partlyCount} more in part.`;
   const filters = document.getElementById("filters");
   for (const [id, label] of DEPTHS){
     const count = id === "all" ? FEATURES.length : FEATURES.filter(f => f[6] === id).length;

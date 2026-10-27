@@ -473,7 +473,7 @@ function updateEmptyCard(selectedTabId: ItemId | null): void {
 function updateDocumentTitle(state: BrowserState, selectedTabId: ItemId | null): void {
   const selectedItem = selectedTabId === null ? undefined : state.items[selectedTabId];
   const selectedTab = selectedItem !== undefined && selectedItem.kind === "tab" ? (selectedItem as TabItem) : null;
-  document.title = selectedTab === null ? "Sidebar Browser" : selectedTab.customTitle ?? selectedTab.title;
+  document.title = selectedTab === null ? "Bow" : selectedTab.customTitle ?? selectedTab.title;
 }
 
 /**

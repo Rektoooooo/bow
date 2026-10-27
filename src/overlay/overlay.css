@@ -1347,12 +1347,16 @@ body.dark .tab-tooltip-hint {
   gap: 8px;
 }
 
+/* The drawing's tile is 824 of its 1024 px: 124 % fills the choice with the tile. */
 .app-icon-choice {
   width: 26px;
   height: 26px;
   padding: 0;
   border: 0;
   border-radius: 7px;
+  background-color: transparent;
+  background-size: 124%;
+  background-position: center;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
   transition: box-shadow var(--motion-fast) var(--motion-ease), transform var(--motion-fast) var(--motion-ease);
 }
