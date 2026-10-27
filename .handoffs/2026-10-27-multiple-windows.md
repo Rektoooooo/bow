@@ -117,6 +117,13 @@ tasks/todo.md 3.7 with the user's order. Fix 1 is done: Arc draws its whole side
 method that works: render ours, `screencapture -l` our window, convert to sRGB, compare with Arc measured the same way
 (scratch scripts were throwaway; the values and their sources are in sidebar.css and themePalette.ts).
 
+Fix 2 (theme editor and icon picker as Arc's popovers): `overlay/themeEditor.ts` (pad maths in
+`shared/themePad.ts`: black in the middle, hue around, strength outward; Arc's exact mapping is unknown, slider =
+intensity and dial = grain inferred from the user's black Space), `overlay/spaceIconPicker.ts`, Space icons as
+"icon:<name>" in Space.icon (`shared/spaceIcons.ts`: 55 SF Symbols of our choosing plus our own planet; text-only
+places use an emoji). The Arc import maps Arc's icon names (planet, star, …) to these. The user's existing Main
+Space keeps the 🪐 emoji it was imported with until they pick the icon (or re-import).
+
 ## Known limits (our choices or not done)
 
 - Extensions: a tab belongs to the window it was first shown in for `chrome.tabs` / `chrome.windows` (the library

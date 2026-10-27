@@ -32,6 +32,7 @@ import { createNavigationButtons, renderToolbar } from "./toolbar.js";
 import { playSound } from "./sounds.js";
 import { installTabPreviewHover } from "./tabPreviewHover.js";
 import { showNoteEditor } from "./noteEditor.js";
+import { createSpaceIcon } from "./spaceIcon.js";
 import { showEaselEditor } from "./easelEditor.js";
 import { getEaselId } from "../shared/easels.js";
 import { getNoteId } from "../shared/notes.js";
@@ -65,7 +66,6 @@ let reportedEditorTabId: ItemId | null = null;
 /** The sidebar item, Space name or Space icon being edited inline, or null. */
 let renamingItemId: ItemId | null = null;
 let renamingSpaceId: SpaceId | null = null;
-let editingIconSpaceId: SpaceId | null = null;
 
 /** True while a row is being dragged: redraws wait until the drop, so the dragged row is not replaced mid-drag. */
 let isDragging = false;
@@ -175,13 +175,13 @@ function renderFavorites(state: BrowserState, space: Space, context: RowContext,
 }
 
 /**
- * Builds the inline field used to rename a Space or change its emoji.
+ * Builds the inline field used to rename a Space.
  */
-function createSpaceEditInput(space: Space, field: "name" | "icon"): HTMLInputElement {
+function createSpaceNameInput(space: Space): HTMLInputElement {
   const input = document.createElement("input");
-  input.className = field === "name" ? "rename-input" : "rename-input icon-input";
-  input.value = field === "name" ? space.name : space.icon;
-  input.setAttribute("aria-label", field === "name" ? "Space name" : "Space icon");
+  input.className = "rename-input";
+  input.value = space.name;
+  input.setAttribute("aria-label", "Space name");
   let isFinished = false;
 
   const finish = (shouldSave: boolean): void => {
@@ -189,14 +189,10 @@ function createSpaceEditInput(space: Space, field: "name" | "icon"): HTMLInputEl
       return;
     }
     isFinished = true;
-    if (shouldSave && field === "name") {
+    if (shouldSave) {
       dispatch({ type: "renameSpace", spaceId: space.id, name: input.value });
     }
-    if (shouldSave && field === "icon") {
-      dispatch({ type: "setSpaceIcon", spaceId: space.id, icon: input.value });
-    }
     renamingSpaceId = null;
-    editingIconSpaceId = null;
     renderAll();
   };
 
@@ -233,13 +229,10 @@ function renderSpaceTitle(space: Space): HTMLElement {
   row.setAttribute("aria-expanded", String(space.isPinnedOpen));
   row.tabIndex = 0;
 
-  const icon = createElement("span", "space-title-icon", space.icon);
-  if (editingIconSpaceId === space.id) {
-    icon.replaceChildren(createSpaceEditInput(space, "icon"));
-  }
+  const icon = createSpaceIcon(space.icon, "space-title-icon");
   const name = createElement("span", "space-title-name", space.name);
   if (renamingSpaceId === space.id) {
-    name.replaceChildren(createSpaceEditInput(space, "name"));
+    name.replaceChildren(createSpaceNameInput(space));
   }
   const moreButton = createActionButton("more", "Space menu", "row-action space-more", "space-menu", { spaceId: space.id });
   row.append(icon, name, moreButton);
@@ -354,7 +347,7 @@ function renderSpaceButton(space: Space, isActive: boolean): HTMLElement {
   button.title = space.name;
   button.setAttribute("aria-label", space.name);
   button.setAttribute("aria-pressed", String(isActive));
-  button.append(createElement("span", "space-button-icon", space.icon));
+  button.append(createSpaceIcon(space.icon, "space-button-icon"));
   button.append(createElement("span", "space-button-dot"));
   return button;
 }
@@ -690,9 +683,22 @@ function handleSidebarCommand(command: SidebarCommand): void {
     renamingSpaceId = command.spaceId;
   }
   if (command.kind === "beginSpaceIconEdit") {
-    editingIconSpaceId = command.spaceId;
+    openSpaceIconPicker(command.spaceId);
+    return;
   }
   renderAll();
+}
+
+/**
+ * Opens the icon picker above the Space's button in the bottom bar (or, when the switcher is not drawn, the Space
+ * title), like Arc's popover pointing at the Space.
+ */
+function openSpaceIconPicker(spaceId: SpaceId): void {
+  const spaceButton = document.querySelector<HTMLElement>(`.space-button[data-space-id="${CSS.escape(spaceId)}"]`);
+  const anchorElement = spaceButton ?? document.querySelector<HTMLElement>(".space-title-icon");
+  const box = anchorElement?.getBoundingClientRect();
+  const anchor = box === undefined ? { x: 0, y: window.innerHeight, width: 0, height: 0 } : { x: Math.round(box.left), y: Math.round(box.top), width: Math.round(box.width), height: Math.round(box.height) };
+  dispatch({ type: "openSpaceIconPicker", spaceId: spaceId, anchor: anchor });
 }
 
 /**

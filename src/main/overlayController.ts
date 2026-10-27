@@ -375,6 +375,17 @@ export function openThemeEditor(spaceId: string): void {
   openPanel({ kind: "theme", spaceId: space.id, spaceName: space.name, spaceIcon: space.icon, theme: space.theme, sidebarWidth: sidebarWidth, presets: presets });
 }
 
+/**
+ * Opens the icon picker for a Space, pointing at its button in the sidebar.
+ */
+export function openSpaceIconPicker(spaceId: string, anchor: OverlayRect): void {
+  const space = getState().spaces.find((candidate) => candidate.id === spaceId);
+  if (space === undefined) {
+    return;
+  }
+  openPanel({ kind: "spaceIcon", spaceId: space.id, icon: space.icon, anchor: anchor });
+}
+
 /** The tab preview card: its size, and its distance from the sidebar's row. Our choice. */
 const PREVIEW_WIDTH_PX = 290;
 const PREVIEW_HEIGHT_PX = 250;

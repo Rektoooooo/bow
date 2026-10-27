@@ -476,21 +476,86 @@ await app.evaluate(({ webContents }) => {
 await sidebar.waitForTimeout(2500);
 check("Reload on the crash page opens the page again", app.windows().some((page) => page.url().startsWith("https://example.com/boost")));
 
-// Theme editor: light appearance, a second color (gradient) and grain apply to the Space.
+// Theme editor, Arc's popover: 14 pt right of the sidebar and above the window's bottom. Light appearance, a second
+// color dragged to the pad's top (red), the intensity slider to its start and the grain dial to a quarter turn.
 state = await getState();
 await dispatch({ type: "openThemeEditor", spaceId: state.activeSpaceId });
 await overlay.waitForSelector(".theme-editor", { timeout: 5000 });
-await overlay.click(".theme-segment:has-text('Light')");
-await overlay.click(".theme-colors .theme-round-button[aria-label^='Add a color']");
-await overlay.evaluate(() => {
-  const slider = document.querySelector(".theme-grain:not(.theme-intensity) input");
-  slider.value = "0.5";
-  slider.dispatchEvent(new Event("input", { bubbles: true }));
+await overlay.waitForTimeout(300);
+const popoverPlace = await overlay.evaluate(() => {
+  const box = document.querySelector(".theme-editor").getBoundingClientRect();
+  return { left: Math.round(box.left), fromBottom: Math.round(window.innerHeight - box.bottom), width: Math.round(box.width), height: Math.round(box.height) };
 });
+const sidebarEdge = Math.round(state.settings.sidebarWidth ?? 242);
+check("the theme editor is Arc's popover beside the sidebar's bottom", popoverPlace.left === sidebarEdge + 14 && popoverPlace.fromBottom === 14 && popoverPlace.width === 355 && popoverPlace.height === 506, JSON.stringify(popoverPlace));
+await overlay.click(".theme-appearance-button[aria-label='Light']");
+await overlay.click(".theme-count-button[aria-label^='Add a color']");
+const boxOf = (selector) => overlay.evaluate((wanted) => {
+  const box = document.querySelector(wanted).getBoundingClientRect();
+  return { x: box.left, y: box.top, width: box.width, height: box.height };
+}, selector);
+const dragOn = async (from, to) => {
+  await overlay.mouse.move(from.x, from.y);
+  await overlay.mouse.down();
+  await overlay.mouse.move(to.x, to.y, { steps: 5 });
+  await overlay.mouse.up();
+};
+const field = await boxOf(".theme-pad-field");
+const fieldMiddle = { x: field.x + field.width / 2, y: field.y + field.height / 2 };
+const handles = await overlay.$$eval(".theme-handle", (elements) => elements.map((element) => element.getBoundingClientRect()).map((box) => ({ x: box.left + box.width / 2, y: box.top + box.height / 2 })));
+await dragOn(handles.at(-1), { x: fieldMiddle.x, y: fieldMiddle.y - field.height * 0.47 });
+const slider = await boxOf(".theme-intensity");
+await dragOn({ x: slider.x + slider.width - 10, y: slider.y + slider.height / 2 }, { x: slider.x - 20, y: slider.y + slider.height / 2 });
+const dial = await boxOf(".theme-grain-dial");
+await dragOn({ x: dial.x + dial.width / 2, y: dial.y + 4 }, { x: dial.x + dial.width - 2, y: dial.y + dial.height / 2 });
 await overlay.waitForTimeout(500);
 state = await getState();
 const editedTheme = activeSpace(state).theme;
-check("the theme editor changes the Space's appearance, colors and grain", editedTheme.appearance === "light" && editedTheme.colors.length === 2 && editedTheme.grain === 0.5, JSON.stringify(editedTheme));
+const secondColor = editedTheme.colors[1] ?? "#000000";
+const [red, green, blue] = [1, 3, 5].map((start) => parseInt(secondColor.slice(start, start + 2), 16));
+check(
+  "the popover changes the Space's appearance, colors (a handle dragged to red), intensity and grain",
+  editedTheme.appearance === "light" && editedTheme.colors.length === 2 && red > 200 && green < 50 && blue < 50 && editedTheme.intensity < 0.05 && Math.abs(editedTheme.grain - 0.25) < 0.03,
+  JSON.stringify(editedTheme),
+);
+await overlay.press("body", "Escape");
+await sidebar.waitForTimeout(300);
+
+// Icon picker, Arc's popover above the Space's button: the Icon tab sets one of our symbols (the sidebar draws it),
+// the Emoji tab an emoji, the trash our plain mark.
+const spaceButtonBox = await sidebar.evaluate(() => {
+  const box = document.querySelector(".space-button.is-active").getBoundingClientRect();
+  return { x: Math.round(box.left), y: Math.round(box.top), width: Math.round(box.width), height: Math.round(box.height) };
+});
+state = await getState();
+await dispatch({ type: "openSpaceIconPicker", spaceId: state.activeSpaceId, anchor: spaceButtonBox });
+await overlay.waitForSelector(".space-picker .space-picker-cell", { timeout: 5000 });
+// Measured after the popover's opening animation (it grows in).
+await overlay.waitForTimeout(400);
+const pickerBox = await overlay.evaluate(() => {
+  const box = document.querySelector(".space-picker").getBoundingClientRect();
+  return { left: box.left, right: box.right, bottom: box.bottom, width: box.width, height: box.height, cells: document.querySelectorAll(".space-picker-cell").length };
+});
+const buttonMiddle = spaceButtonBox.x + spaceButtonBox.width / 2;
+check(
+  "the icon picker opens above the Space's button, eight icons wide",
+  pickerBox.width === 270 && pickerBox.height === 270 && pickerBox.bottom <= spaceButtonBox.y && pickerBox.left <= buttonMiddle && pickerBox.right >= buttonMiddle && pickerBox.cells === 56,
+  JSON.stringify(pickerBox),
+);
+await overlay.click(".space-picker-tab:has-text('Icon')");
+await overlay.click(".space-picker-cell[aria-label='star']");
+await sidebar.waitForTimeout(500);
+state = await getState();
+const drawnSymbol = await sidebar.evaluate(() => document.querySelector(".space-title-icon .icon-symbol")?.dataset.symbol ?? null);
+check("choosing an icon sets it on the Space, and the sidebar draws the symbol", activeSpace(state).icon === "icon:star" && drawnSymbol === "space:star", `${activeSpace(state).icon} ${drawnSymbol}`);
+await overlay.click(".space-picker-tab:has-text('Emoji')");
+await overlay.click(".space-picker-cell[aria-label='🚀']");
+await sidebar.waitForTimeout(300);
+const emojiIcon = activeSpace(await getState()).icon;
+await overlay.click(".space-picker-trash");
+await sidebar.waitForTimeout(300);
+const clearedIcon = activeSpace(await getState()).icon;
+check("an emoji works too, and the trash goes back to the plain mark", emojiIcon === "🚀" && clearedIcon === "✦", `${emojiIcon} ${clearedIcon}`);
 await overlay.press("body", "Escape");
 await sidebar.waitForTimeout(300);
 

@@ -592,6 +592,11 @@ button:disabled {
   fill: rgba(0, 0, 0, 0.85);
 }
 
+/* Filled in the text color (the planet Space icon's body). */
+.icon-part-solid {
+  fill: currentColor;
+}
+
 :root[data-appearance="light"] .icon-part-dark {
   fill: rgba(255, 255, 255, 0.9);
 }
@@ -728,11 +733,6 @@ button:disabled {
   font: inherit;
   outline: none;
   user-select: text;
-}
-
-.icon-input {
-  width: 30px;
-  text-align: center;
 }
 
 /* Split view: one row, panes side by side. */
@@ -1115,6 +1115,37 @@ button:disabled {
 
 .space-switcher:hover .space-button:not(.is-active) .space-button-icon {
   opacity: 0.6;
+}
+
+/*
+  A Space icon drawn as a symbol (renderer/spaceIcon.ts) instead of an emoji. Arc's planet measures about 14 pt in the
+  Space title, greyed like the Space's name, and 16 pt in the switcher (the user's recording).
+*/
+.space-title-icon.is-symbol {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.space-button.is-active .space-button-icon.is-symbol,
+.space-switcher:hover .space-button-icon.is-symbol {
+  display: grid;
+  place-items: center;
+  color: var(--icon);
+}
+
+.space-icon-symbol {
+  --symbol-scale: 0.85;
+}
+
+.space-icon-drawing {
+  width: 14px;
+  height: 14px;
+}
+
+.space-button-icon .space-icon-drawing {
+  width: 16px;
+  height: 16px;
 }
 
 /* ---------- Main column: the page card (toolbar on top, the web page below) ---------- */

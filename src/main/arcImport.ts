@@ -48,17 +48,20 @@ const FALLBACK_FOLDER_TITLE = "Folder";
 /** Only these addresses can be opened by our tabs. */
 const WEB_URL_PATTERN = /^https?:\/\//i;
 
-/** Arc's built-in Space icon names and the emoji we show for them. Names come from the binary's icon list. */
-const ARC_ICON_TO_EMOJI: Record<string, string> = {
-  planet: "🪐",
-  star: "⭐",
-  heart: "❤️",
-  leaf: "🍃",
-  moon: "🌙",
-  bookmark: "🔖",
-  flag: "🚩",
-  bulb: "💡",
-  folder: "📁",
+/**
+ * Arc's built-in Space icon names and what we show for them: our own icon of the same kind (shared/spaceIcons.ts,
+ * monochrome like Arc's), or an emoji where we have none. Names come from the binary's icon list.
+ */
+const ARC_ICON_TO_SPACE_ICON: Record<string, string> = {
+  planet: "icon:planet",
+  star: "icon:star",
+  heart: "icon:heart",
+  leaf: "icon:leaf",
+  moon: "icon:moon",
+  bookmark: "icon:bookmark",
+  flag: "icon:flag",
+  bulb: "icon:bulb",
+  folder: "icon:folder",
   skull: "💀",
   rss: "📡",
 };
@@ -312,7 +315,7 @@ function readArcTheme(customInfo: unknown): SpaceTheme {
   };
 }
 
-/** Picks the Space emoji: the user's own emoji, a mapped built-in icon, or our default. */
+/** Picks the Space icon: the user's own emoji, a mapped built-in icon, or our default. */
 function readArcIcon(customInfo: unknown): string {
   const iconType = readObject(customInfo, "iconType");
   const ownEmoji = readString(iconType, "emoji");
@@ -323,7 +326,7 @@ function readArcIcon(customInfo: unknown): string {
   if (iconName === null) {
     return DEFAULT_SPACE_ICON;
   }
-  return ARC_ICON_TO_EMOJI[iconName] ?? DEFAULT_SPACE_ICON;
+  return ARC_ICON_TO_SPACE_ICON[iconName] ?? DEFAULT_SPACE_ICON;
 }
 
 /**

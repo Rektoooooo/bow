@@ -42,7 +42,17 @@ import { answerPermissionPrompt } from "./permissionPrompts";
 import { removePermissionAnswer } from "./sitePermissions";
 import { showMenuRequest } from "./menus";
 import type { MenuHost } from "./menus";
-import { hideTabPreview, openBoostEditor, openCommandBar, openLibrary, openSiteControls, openThemeEditor, runSiteCommand, showTabPreview } from "./overlayController";
+import {
+  hideTabPreview,
+  openBoostEditor,
+  openCommandBar,
+  openLibrary,
+  openSiteControls,
+  openSpaceIconPicker,
+  openThemeEditor,
+  runSiteCommand,
+  showTabPreview,
+} from "./overlayController";
 import { setDeveloperMode } from "../shared/developerMode";
 import { openDeveloperTool, translatePage } from "./pageCommands";
 import { setAsDefaultBrowser } from "./defaultBrowser";
@@ -310,6 +320,8 @@ export function runAction(action: BrowserAction): void {
       return openSiteControls();
     case "openThemeEditor":
       return openThemeEditor(action.spaceId);
+    case "openSpaceIconPicker":
+      return openSpaceIconPicker(action.spaceId, action.anchor);
     case "showMenu":
       return showMenuRequest(menuHost, action.request);
     case "setExtensionEnabled":

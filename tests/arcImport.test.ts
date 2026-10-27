@@ -207,7 +207,7 @@ describe("importing Spaces", () => {
     const alpha = imported.spaces[2];
     const beta = imported.spaces[3];
     expect(alpha.name).toBe("Alpha");
-    expect(alpha.icon).toBe("🪐");
+    expect(alpha.icon).toBe("icon:planet");
     expect(alpha.profileId).toBe(DEFAULT_PROFILE_ID);
     expect(alpha.isPinnedOpen).toBe(true);
     expect(beta.name).toBe("Imported Space");

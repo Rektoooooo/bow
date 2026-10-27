@@ -56,6 +56,13 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   (plus `app.on("session-created")` for profiles made during the check). Main's `net.fetch` can be replaced from
   `app.evaluate` (checked 2026-10-27), which is how check-extensions serves its CRX.
 
+- This checkout can be shared with other sessions that leave uncommitted edits. Stage explicit paths only (never
+  `git add -A` or a file you did not change: one commit swept in another session's CLAUDE.md edit), and when their
+  edits block a pull, integrate in a temporary `git worktree` on origin/main (symlink node_modules), test there and
+  push from it, instead of stashing their work.
+- Rerun a lone `check-performance` failure before suspecting the code: under heavy machine load (load average ~28)
+  a redraw measured 22 ms, then 8 ms twice on the same build.
+
 ## Matching Arc from screenshots
 - Screen captures: Claude Desktop runs our commands through its own "Claude Code" app (com.anthropic.claude-code,
   started via a `disclaimer` helper), so Screen Recording must be granted to that app, not only to Claude. The list

@@ -21,6 +21,7 @@ import { renderBoostEditor } from "./boostEditor.js";
 import { renderPeekFrame } from "./peekFrame.js";
 import { renderPermissionPrompt } from "./permissionPrompt.js";
 import { renderThemeEditor } from "./themeEditor.js";
+import { renderSpaceIconPicker } from "./spaceIconPicker.js";
 import { renderSiteControls } from "./siteControls.js";
 import { renderCapture } from "./capture.js";
 import { handleSwitcherKey, installSwitcherMessages, renderSwitcher } from "./switcher.js";
@@ -477,6 +478,9 @@ function showPanel(message: OverlayShowMessage): void {
   }
   if (message.panel.kind === "peek") {
     renderPeekFrame(host, message.panel);
+  }
+  if (message.panel.kind === "spaceIcon") {
+    renderSpaceIconPicker(host, message.panel);
   }
   if (message.panel.kind === "theme") {
     renderThemeEditor(host, message.panel);

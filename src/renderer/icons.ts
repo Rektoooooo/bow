@@ -22,7 +22,7 @@ import type { SymbolIconName, SymbolImage } from "../shared/symbols";
  */
 interface OwnIconPart {
   path: string;
-  fill: "none" | "soft" | "dark";
+  fill: "none" | "soft" | "dark" | "solid";
 }
 
 interface OwnIcon {
@@ -47,6 +47,15 @@ const OWN_ICONS = {
     parts: [
       { path: "M1.5 12.5V2.6C1.5 1.7 2.2 1 3.1 1H6.2C6.7 1 7.1 1.2 7.4 1.6L8.3 2.9H18.4C19.3 2.9 20 3.6 20 4.5V5.1H7.6L4.7 15.4C2.9 15.4 1.5 14.2 1.5 12.5Z", fill: "soft" },
       { path: "M7.6 5.1H20.4C21 5.1 21.4 5.7 21.2 6.2L18.6 14.6C18.4 15.1 18 15.4 17.5 15.4H5.4C4.9 15.4 4.5 14.9 4.7 14.4Z", fill: "dark" },
+    ],
+  },
+  // A Space icon (shared/spaceIcons.ts): SF Symbols has no ringed planet, so we draw one (our own drawing).
+  planet: {
+    width: 18,
+    height: 18,
+    parts: [
+      { path: "M4 9a5 5 0 1 0 10 0a5 5 0 1 0 -10 0Z", fill: "solid" },
+      { path: "M1.48 12.51A8.3 2.6 -25 1 1 16.52 5.49A8.3 2.6 -25 1 1 1.48 12.51Z", fill: "none" },
     ],
   },
 } satisfies Record<string, OwnIcon>;

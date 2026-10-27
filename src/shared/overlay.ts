@@ -43,6 +43,8 @@ export type OverlayPanel =
   | { kind: "find" }
   | { kind: "boost"; site: string; css: string; hueShift: number; isInverted: boolean; fontId: string; javascript: string; isJavaScriptOn: boolean; zapCount: number }
   | { kind: "theme"; spaceId: string; spaceName: string; spaceIcon: string; theme: SpaceTheme; sidebarWidth: number; presets: { label: string; colors: string[]; appearance: ThemeAppearance }[] }
+  /** Arc's icon picker for a Space, pointing at the Space's button (anchor, in window coordinates). */
+  | { kind: "spaceIcon"; spaceId: string; icon: string; anchor: OverlayRect }
   | { kind: "peek"; frame: { x: number; y: number; width: number; height: number }; url: string; title: string }
   | { kind: "permission"; requestId: string; host: string; kinds: SitePermissionKind[]; appName: string | null }
   | { kind: "capture"; frame: { x: number; y: number; width: number; height: number } }

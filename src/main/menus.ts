@@ -21,6 +21,7 @@ import { findLocation, findRootLocation, findSpace, findSplitOfTab, findTab } fr
 import { SEARCH_URL_PREFIX } from "./urls";
 import { listImportSources } from "./browserImportController";
 import { addMenuIcons } from "./menuIcons";
+import { describeSpaceIconAsText } from "../shared/spaceIcons";
 
 /** What the menus need from main.ts. */
 export interface MenuHost {
@@ -67,7 +68,7 @@ function buildMoveToSpaceMenu(host: MenuHost, itemId: ItemId): MenuItemConstruct
   const currentSpaceId = root !== null && (root.kind === "pinned" || root.kind === "today") ? root.spaceId : null;
   const otherSpaces = state.spaces.filter((space) => space.id !== currentSpaceId);
   const submenu: MenuItemConstructorOptions[] = otherSpaces.map((space) => ({
-    label: `${space.icon}  ${space.name}`,
+    label: `${describeSpaceIconAsText(space.icon)}  ${space.name}`,
     click: () => host.runAction({ type: "moveItemToSpace", itemId: itemId, spaceId: space.id }),
   }));
   return { label: "Move to Space", submenu: submenu, enabled: submenu.length > 0 };
@@ -357,7 +358,7 @@ function buildPlusMenu(host: MenuHost): MenuItemConstructorOptions[] {
       click: () => host.runAction({ type: "createSpace", name: "New Space", icon: "✦", theme: newTheme }),
     },
     { type: "separator" },
-    { label: activeSpace === undefined ? "Space" : `${activeSpace.icon}  ${activeSpace.name}`, enabled: false },
+    { label: activeSpace === undefined ? "Space" : `${describeSpaceIconAsText(activeSpace.icon)}  ${activeSpace.name}`, enabled: false },
     ...(activeSpace === undefined ? [] : buildSpaceMenu(host, activeSpace)),
   ];
 }

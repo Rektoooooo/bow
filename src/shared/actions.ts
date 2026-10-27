@@ -96,6 +96,8 @@ export type BrowserAction =
   | { type: "openLibrary" }
   | { type: "openSiteControls" }
   | { type: "openThemeEditor"; spaceId: SpaceId }
+  /** The icon picker popover, pointing at the Space's button (anchor: where it sits in the window). */
+  | { type: "openSpaceIconPicker"; spaceId: SpaceId; anchor: { x: number; y: number; width: number; height: number } }
   | { type: "showMenu"; request: MenuRequest }
   | { type: "setExtensionEnabled"; profileId: string; extensionId: string; isEnabled: boolean }
   | { type: "removeExtension"; profileId: string; extensionId: string }
@@ -191,6 +193,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "openLibrary",
   "openSiteControls",
   "openThemeEditor",
+  "openSpaceIconPicker",
   "showMenu",
   "setExtensionEnabled",
   "removeExtension",

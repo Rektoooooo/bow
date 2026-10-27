@@ -86,6 +86,15 @@ button:disabled {
 }
 
 /* SF Symbols (icons.ts): a mask tinted with the text color, drawn at the symbol's natural size. */
+/* Our own drawings (renderer/icons.ts), as the sidebar draws them. */
+.icon-part-none {
+  fill: none;
+}
+
+.icon-part-solid {
+  fill: currentColor;
+}
+
 .icon-symbol {
   width: calc(var(--symbol-width, 16px) * var(--symbol-scale, 1));
   height: calc(var(--symbol-height, 16px) * var(--symbol-scale, 1));
@@ -1442,120 +1451,398 @@ body[data-panel="theme"] .backdrop {
   background: transparent;
 }
 
+/*
+  Arc's theme popover, measured on the user's recording (1 px per pt, dark; their GitHub page tinted Arc's
+  translucent popover blue, these are the neutral values): 355 × 506, radius 15; dotted pad 341 × 340 inset 7, radius
+  12; appearance icons 31 × 31, 40 apart, 41 below the pad's top; handle 45 with a 5 pt white ring; − and + 40 apart,
+  30 above the pad's bottom; preset dots 23, 29.5 apart; slider track 15 high with a 26 × 60 white pill and a wave of
+  7 periods; grain dial with 24 dots on a 34 pt radius and a white tick. Colors: popover #25272b, pad #2c2e31, selected
+  icon square #444649, icons #9ea0a4, track #313338, wave #a6a8ac, dial dots #45494d. Light: our choice.
+*/
 .theme-editor {
-  top: 48px;
-  width: 280px;
-  padding: 14px;
+  --theme-popover: #25272b;
+  --theme-pad: #2c2e31;
+  --theme-pad-dot: rgba(255, 255, 255, 0.07);
+  --theme-icon: #9ea0a4;
+  --theme-icon-active: #e4e5e7;
+  --theme-segment: #444649;
+  --theme-track: #313338;
+  --theme-wave: #a6a8ac;
+  --theme-dial-dot: #45494d;
+  --theme-disabled: #46484c;
+  width: 355px;
+  height: 506px;
+  padding: 7px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  border-radius: 15px;
+  background: var(--theme-popover);
 }
 
-.theme-header {
+body:not(.dark) .theme-editor {
+  --theme-popover: #f3f3f5;
+  --theme-pad: #e8e8eb;
+  --theme-pad-dot: rgba(0, 0, 0, 0.07);
+  --theme-icon: #6c6e73;
+  --theme-icon-active: #1d1d1f;
+  --theme-segment: #d5d6da;
+  --theme-track: #dadbdf;
+  --theme-wave: #8a8c91;
+  --theme-dial-dot: #b8babf;
+  --theme-disabled: #c4c5c9;
+}
+
+.theme-pad {
+  position: relative;
+  height: 340px;
+  flex: none;
+  border-radius: 12px;
+  background-color: var(--theme-pad);
+  background-image: radial-gradient(var(--theme-pad-dot) 0.8px, transparent 1px);
+  background-size: 4px 4px;
+  overflow: hidden;
+}
+
+/* The circle of colors: a square in the middle whose sides the circle touches (themePad.ts). */
+.theme-pad-field {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.theme-handle {
+  position: absolute;
+  width: 45px;
+  height: 45px;
+  box-sizing: border-box;
+  border: 5px solid rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+  background: var(--handle-color, #000);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  transform: translate(-50%, -50%);
+  cursor: grab;
+}
+
+.theme-handle.is-selected {
+  border-color: #fff;
+  z-index: 1;
+}
+
+.theme-appearance {
+  position: absolute;
+  top: 26px;
+  left: 50%;
+  display: flex;
+  gap: 9px;
+  transform: translateX(-50%);
+}
+
+.theme-appearance-button,
+.theme-count-button,
+.theme-page-button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--theme-icon);
+}
+
+.theme-appearance-button {
+  --symbol-scale: 1.15;
+  width: 31px;
+  height: 31px;
+  border-radius: 8px;
+}
+
+.theme-appearance-button.is-active {
+  background: var(--theme-segment);
+  color: var(--theme-icon-active);
+}
+
+.theme-count {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  display: flex;
+  gap: 16px;
+  transform: translateX(-50%);
+}
+
+.theme-count-button {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+/* Arc draws − as bright as + even with one color left (nothing happens then). */
+.theme-count-button:disabled {
+  opacity: 1;
+}
+
+.theme-page-button:disabled {
+  opacity: 1;
+  color: var(--theme-disabled);
+}
+
+.theme-count-button:not(:disabled):hover,
+.theme-page-button:not(:disabled):hover {
+  color: var(--theme-icon-active);
+}
+
+.theme-presets {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 4px;
+  height: 34px;
+  margin: 16px 14px 0;
 }
 
-.theme-title {
-  font-weight: 650;
-  white-space: pre;
+.theme-page-button {
+  width: 20px;
+  height: 24px;
 }
 
-.theme-label {
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.theme-colors,
-.theme-presets {
+.theme-preset-dots {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.theme-color {
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border: 1px solid var(--panel-border);
-  border-radius: 12px;
-  background: none;
-}
-
-.theme-color::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-
-.theme-color::-webkit-color-swatch {
-  border: 0;
-  border-radius: 11px;
-}
-
-.theme-round-button {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border: 0;
-  border-radius: 50%;
-  background: var(--field);
-  color: var(--ink);
-  font-size: 15px;
-}
-
-.theme-round-button:hover {
-  background: var(--highlight);
-}
-
-.theme-segmented {
-  display: flex;
-  padding: 2px;
-  border-radius: 9px;
-  background: var(--field);
-}
-
-.theme-segment {
-  flex: 1;
-  border: 0;
-  border-radius: 7px;
-  padding: 5px 0;
-  background: none;
-  color: var(--muted);
-  font-weight: 500;
-}
-
-.theme-segment.is-active {
-  background: var(--panel);
-  color: var(--ink);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-}
-
-.theme-grain {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.theme-grain input {
-  flex: 1;
+  gap: 6.5px;
 }
 
 .theme-preset {
-  width: 30px;
-  height: 30px;
-  border: 1px solid var(--panel-border);
+  width: 23px;
+  height: 23px;
+  padding: 0;
+  border: 0;
   border-radius: 50%;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.2);
 }
 
 .theme-preset:hover {
-  transform: scale(1.08);
+  transform: scale(1.1);
+}
+
+.theme-bottom {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  padding: 0 14px 0 16px;
+}
+
+.theme-intensity {
+  position: relative;
+  flex: 1;
+  height: 60px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.theme-intensity::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 15px;
+  border-radius: 7.5px;
+  background: var(--theme-track);
+  transform: translateY(-50%);
+}
+
+.theme-wave {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  overflow: visible;
+  transform: translateY(-50%);
+}
+
+.theme-wave path {
+  fill: none;
+  stroke: var(--theme-wave);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.theme-intensity-pill {
+  position: absolute;
+  top: 0;
+  width: 26px;
+  height: 60px;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.theme-grain-dial {
+  position: relative;
+  flex: none;
+  width: 76px;
+  height: 76px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.theme-dial-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3.5px;
+  height: 3.5px;
+  margin: -1.75px 0 0 -1.75px;
+  border-radius: 50%;
+  background: var(--theme-dial-dot);
+  transform: rotate(var(--dot-turn)) translateY(-34px);
+}
+
+.theme-dial-center {
+  position: absolute;
+  inset: 18px;
+  border: 1px solid var(--theme-dial-dot);
+  border-radius: 50%;
+}
+
+.theme-dial-tick {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 14px;
+  margin: -7px 0 0 -2px;
+  border-radius: 2px;
+  background: #fff;
+  transform: rotate(var(--tick-turn, 0turn)) translateY(-34px);
+}
+
+/*
+  Arc's icon picker, measured on the user's recording (1 px per pt): 270 × 270, radius 16, an arrow toward the Space's
+  button; Emoji / Icon switch 114 × 23 (track #444, selected macOS blue #2776fc, labels #e8e8e8) with the trash
+  (#c4c4c4) beside it; a grid eight wide of 29 pt cells 31 apart (selected #5a5a5a, hovered #36383b, icons white),
+  background #2c2c2c. Light: our choice.
+*/
+.space-picker {
+  --picker-background: #2c2c2c;
+  --picker-track: #444444;
+  --picker-label: #e8e8e8;
+  --picker-trash: #c4c4c4;
+  --picker-selected: #5a5a5a;
+  --picker-hover: #36383b;
+  --picker-icon: #ffffff;
+  width: 270px;
+  height: 270px;
+  padding: 13px 13px 0;
+  box-sizing: border-box;
+  border-radius: 18px;
+  background: var(--picker-background);
+}
+
+body:not(.dark) .space-picker {
+  --picker-background: #f2f2f2;
+  --picker-track: #dedede;
+  --picker-label: #1d1d1f;
+  --picker-trash: #6b6b6b;
+  --picker-selected: #d2d2d2;
+  --picker-hover: #e4e4e4;
+  --picker-icon: #1d1d1f;
+}
+
+/* The arrow toward the Space's button (about 22 × 11 in the user's Arc). */
+.space-picker::after {
+  content: "";
+  position: absolute;
+  bottom: -11px;
+  left: calc(var(--arrow-left) - 11px);
+  width: 22px;
+  height: 12px;
+  background: var(--picker-background);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+body[data-panel="spaceIcon"] .backdrop {
+  background: transparent;
+}
+
+.space-picker-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  height: 23px;
+}
+
+.space-picker-tabs {
+  display: flex;
+  padding: 0;
+  border-radius: 7px;
+  background: var(--picker-track);
+}
+
+.space-picker-tab {
+  width: 57px;
+  height: 23px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--picker-label);
+  font-size: 13px;
+}
+
+.space-picker-tab.is-active {
+  background: #2776fc;
+  color: #fff;
+}
+
+.space-picker-trash {
+  display: grid;
+  place-items: center;
+  width: 23px;
+  height: 23px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--picker-trash);
+}
+
+.space-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 29px);
+  gap: 2px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.space-picker-cell {
+  --symbol-scale: 0.8;
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--picker-icon);
+  font-size: 16px;
+}
+
+.space-picker-cell:hover {
+  background: var(--picker-hover);
+}
+
+.space-picker-cell.is-selected {
+  background: var(--picker-selected);
+}
+
+.space-picker-icon {
+  display: grid;
+  place-items: center;
+}
+
+.space-picker-icon .space-icon-drawing {
+  width: 16px;
+  height: 16px;
 }
 
 /* ---------- Peek (the page itself is a separate view inside .peek-shadow's rectangle) ---------- */

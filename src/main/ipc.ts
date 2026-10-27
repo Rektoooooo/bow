@@ -276,6 +276,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   openLibrary: {},
   openSiteControls: {},
   openThemeEditor: { spaceId: isText },
+  openSpaceIconPicker: { spaceId: isText, anchor: isAnchor },
   showMenu: { request: isMenuRequest },
   setExtensionEnabled: { profileId: isText, extensionId: isText, isEnabled: isBoolean },
   removeExtension: { profileId: isText, extensionId: isText },

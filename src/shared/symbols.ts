@@ -72,6 +72,12 @@ export const SYMBOL_NAMES = {
   person: "person.crop.circle",
   warning: "exclamationmark.triangle",
   feed: "dot.radiowaves.up.forward",
+  // The theme editor's appearance switch and paging, like Arc's (the user's recording, 2026-10-27).
+  sparkles: "sparkles",
+  sun: "sun.max",
+  moonStars: "moon.stars",
+  chevronLeft: "chevron.left",
+  minus: "minus",
 } as const;
 
 /** An icon drawn from an SF Symbol. */

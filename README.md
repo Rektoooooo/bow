@@ -62,8 +62,10 @@ in Arc). Running it twice adds nothing twice.
   page's own color, and motion that glides (the page moves with the sidebar).
 
 **Spaces and profiles**
-- Create, rename, change the emoji, edit the theme (one to three colors as a gradient, light / dark / automatic,
-  film grain; Space menu › Edit Theme…), reorder, delete. Two-finger swipe on the sidebar or ⌃1–⌃9 switches Spaces.
+- Create, rename, change the icon (Space menu › Change Space Icon…: Arc's popover over the Space's button, with an
+  Emoji tab and an Icon tab of SF Symbols), edit the theme (Space menu › Edit Theme…: Arc's popover beside the
+  sidebar's bottom, a dotted pad with one handle per color (up to three), automatic / light / dark, preset colors,
+  an intensity slider and a grain dial), reorder, delete. Two-finger swipe on the sidebar or ⌃1–⌃9 switches Spaces.
 - Each profile has its own cookies, logins and Favorites (an Electron session partition). Space menu › Profile
   moves a Space to another profile or a new one.
 - Private windows (⇧⌘N) keep nothing: an in-memory session, no history, no archive.

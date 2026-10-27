@@ -190,7 +190,9 @@ tooltip, 7 sidebar width, then AppleScript.
 - [ ] Peek: a card almost the whole page card wide, over the toolbar, with its own toolbar row (back, forward,
       reload, address) inside; close / expand / split stacked vertically outside its right edge; page dimmed behind →
       ours is a smaller card with a header above it
-- [ ] Theme editor and icon picker are popovers above the sidebar's bottom bar (theme: auto/light/dark, grainy colour
+- [x] Theme editor and icon picker are popovers above the sidebar's bottom bar (compared side by side with the
+      recording on the real screen: place, size, colors within a few levels; Arc's pad mapping is unknown, ours is
+      documented in shared/themePad.ts) (theme: auto/light/dark, grainy colour
       field with handle and − / +, preset dots with arrows, wavy slider, dial; icon: Emoji / Icon tabs and a grid) →
       ours are overlay panels
 - [ ] Hovering a closed folder opens a searchable list of its tabs with "1 minute ago" times → missing

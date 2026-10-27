@@ -14,6 +14,7 @@
  */
 import { ipcMain, nativeImage } from "electron";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
+import { SPACE_ICON_CHOICES } from "../shared/spaceIcons";
 import { SYMBOL_NAMES } from "../shared/symbols";
 import type { SymbolImage } from "../shared/symbols";
 
@@ -31,7 +32,9 @@ export function getSymbolImages(): Record<string, SymbolImage> {
     return renderedSymbols;
   }
   const images: Record<string, SymbolImage> = {};
-  for (const [iconName, symbolName] of Object.entries(SYMBOL_NAMES)) {
+  // Space icons (shared/spaceIcons.ts) are keyed "space:<name>"; renderer/spaceIcon.ts draws them.
+  const spaceIconEntries = SPACE_ICON_CHOICES.filter((choice) => choice.symbol !== null).map((choice) => [`space:${choice.name}`, choice.symbol as string]);
+  for (const [iconName, symbolName] of [...Object.entries(SYMBOL_NAMES), ...spaceIconEntries]) {
     const image = nativeImage.createFromNamedImage(symbolName);
     if (image.isEmpty()) {
       console.warn(`macOS has no SF Symbol named ${symbolName}`);

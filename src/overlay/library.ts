@@ -15,6 +15,8 @@ import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS } from "../shared
 import { APP_ICON_VARIANTS } from "../shared/appIconDrawing.js";
 import type { ArchiveReason, ArchivedTab } from "../shared/types";
 import { createElement, createFavicon, createIconButton, createTextButton, dispatch, getDisplayHost } from "../renderer/dom.js";
+import { createSpaceIcon } from "../renderer/spaceIcon.js";
+import { describeSpaceIconAsText } from "../shared/spaceIcons.js";
 
 /** Words shown for each archive reason. */
 const REASON_LABELS: Record<ArchiveReason, string> = {
@@ -119,7 +121,7 @@ function createArchiveLine(entry: ArchivedTab, data: LibraryData, now: number): 
   line.setAttribute("role", "button");
   line.title = `${entry.tab.url}\nClick to restore`;
   const space = data.spaces.find((candidate) => candidate.id === entry.fromSpaceId);
-  const placeLabel = space === undefined ? "Little Window or removed Space" : `${space.icon} ${space.name}`;
+  const placeLabel = space === undefined ? "Little Window or removed Space" : `${describeSpaceIconAsText(space.icon)} ${space.name}`;
   const meta = `${getDisplayHost(entry.tab.url)} · ${REASON_LABELS[entry.reason]} ${formatTimeAgo(entry.archivedAt, now)} · ${placeLabel}`;
 
   const text = createElement("span", "library-line-text");
@@ -341,7 +343,7 @@ function renderMediaSection(body: HTMLElement, data: LibraryData): void {
 function createSpaceLine(space: LibrarySpace): HTMLElement {
   const line = createElement("div", "library-line space-line");
   line.classList.toggle("is-active", space.isActive);
-  const swatch = createElement("span", "space-swatch", space.icon);
+  const swatch = createSpaceIcon(space.icon, "space-swatch");
   if (space.color !== null && /^#[0-9a-fA-F]{6}$/.test(space.color)) {
     swatch.style.background = space.color;
   }
@@ -628,7 +630,7 @@ function renderRoutingSettings(data: LibraryData): HTMLElement {
 
   for (const rule of data.routingRules) {
     const space = data.spaces.find((candidate) => candidate.id === rule.spaceId);
-    const spaceLabel = space === undefined ? "a deleted Space" : `${space.icon} ${space.name}`;
+    const spaceLabel = space === undefined ? "a deleted Space" : `${describeSpaceIconAsText(space.icon)} ${space.name}`;
     const line = createElement("div", "library-line routing-rule");
     const verb = rule.matchType === "contains" ? "contains" : "is";
     line.append(createElement("span", "library-line-title", `If the address ${verb} “${rule.value}” → ${spaceLabel}`));
@@ -648,7 +650,7 @@ function renderRoutingSettings(data: LibraryData): HTMLElement {
   const spaceSelect = document.createElement("select");
   spaceSelect.className = "library-select";
   for (const space of data.spaces) {
-    spaceSelect.append(new Option(`${space.icon} ${space.name}`, space.id));
+    spaceSelect.append(new Option(`${describeSpaceIconAsText(space.icon)} ${space.name}`, space.id));
   }
   const addButton = document.createElement("button");
   addButton.type = "submit";

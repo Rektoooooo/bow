@@ -17,6 +17,7 @@ import type { AppMenuCommands } from "./appMenu";
 import type { CommandBarAction } from "./commandBar";
 import { applyPreset, THEME_PRESETS } from "./themePresets";
 import { findSpace } from "./tree";
+import { describeSpaceIconAsText } from "../shared/spaceIcons";
 
 /** What the actions need to do their work. */
 export interface CommandActionHost {
@@ -87,7 +88,7 @@ export function createCommandActionRegistry(host: CommandActionHost): CommandAct
     const state = host.getState();
     const entries = fixedActions.map((action) => action.entry);
     for (const space of state.spaces) {
-      entries.push({ id: `space:${space.id}`, title: `Switch to ${space.icon} ${space.name}`, keywords: ["space", space.name] });
+      entries.push({ id: `space:${space.id}`, title: `Switch to ${describeSpaceIconAsText(space.icon)} ${space.name}`, keywords: ["space", space.name] });
     }
     for (const option of ARCHIVE_THRESHOLD_OPTIONS) {
       entries.push({ id: `archive-after:${String(option.valueMs)}`, title: `Archive Tabs After ${option.label}`, keywords: ["auto archive", "archive setting"] });
