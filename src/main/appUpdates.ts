@@ -15,9 +15,11 @@
  *   downloads by itself → "update-downloaded" → RuntimeState.updateReadyVersion (the sidebar's notice) and the app
  *   menu's "Restart to Update" → restartToUpdate() → quitAndInstall()
  *   Bow › Check for Updates… → checkForUpdatesNow() → a dialog says what the check found
+ *   startup from the disk image → offerMoveToApplications() → Electron moves Bow and starts it again
  */
 import { app, autoUpdater, dialog } from "electron";
 import { APP_UPDATE_FEED_BASE_URL, APP_UPDATE_FIRST_CHECK_MS, APP_UPDATE_INTERVAL_MS } from "../shared/settings";
+import { isRunningFromDiskImage } from "./appLocation";
 import { getWindow, setUpdateReadyVersion } from "./browserCore";
 
 /** Where updates come from, or why this run never updates. */
@@ -180,6 +182,36 @@ async function showOutcome(outcome: CheckOutcome): Promise<void> {
     return;
   }
   await showMessage("Bow could not check for updates", outcome.message);
+}
+
+/**
+ * Bow opened from its disk image (or macOS's read-only copy of it): offers to move it to Applications, where it keeps
+ * working after the image is ejected and can update itself. A sheet on the window, so the browser is usable behind
+ * it. Electron's move replaces an older Bow there, or switches to it when that one is running.
+ */
+export async function offerMoveToApplications(): Promise<void> {
+  if (!app.isPackaged || !isRunningFromDiskImage(process.execPath)) {
+    return;
+  }
+  console.log(`Bow runs from ${process.execPath}; offering to move it to Applications.`);
+  const window = getWindow();
+  const options = {
+    type: "question" as const,
+    message: "Move Bow to your Applications folder?",
+    detail: "Bow is running from its disk image. In Applications it keeps working after you eject the disk image, and it can update itself.",
+    buttons: ["Move to Applications", "Not Now"],
+    defaultId: 0,
+    cancelId: 1,
+  };
+  const answer = window === null ? await dialog.showMessageBox(options) : await dialog.showMessageBox(window, options);
+  if (answer.response !== 0) {
+    return;
+  }
+  try {
+    app.moveToApplicationsFolder();
+  } catch (error) {
+    await showMessage("Bow could not move itself", error instanceof Error ? error.message : String(error));
+  }
 }
 
 /**

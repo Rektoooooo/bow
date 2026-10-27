@@ -24,7 +24,7 @@ import type { ItemId } from "../shared/types";
 import { menuHost, runAction, runActionFromWindow } from "./actionRunner";
 import { findTabsInUse, markTabsActive } from "./activity";
 import { installAppMenu } from "./appMenu";
-import { startAppUpdates } from "./appUpdates";
+import { offerMoveToApplications, startAppUpdates } from "./appUpdates";
 import { appMenuCommands } from "./appMenuCommands";
 import { findTabsToArchive, pruneArchive } from "./autoArchive";
 import {
@@ -338,6 +338,7 @@ async function handleAppReady(): Promise<void> {
   startExtensionUpdates();
   // Once an update has downloaded, the app menu offers the restart instead of a check.
   startAppUpdates(() => installAppMenu(appMenuCommands));
+  offerMoveToApplications().catch((error) => console.error("Moving to Applications failed:", error));
   startLiveFolderRefreshing();
   startHandoff();
   const firstWindow = getWindow();
