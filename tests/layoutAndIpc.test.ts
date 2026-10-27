@@ -83,6 +83,8 @@ describe("parseAction", () => {
   it("refuses an archive threshold that is not one of the menu choices", () => {
     expect(parseAction({ type: "setArchiveAfter", archiveAfterMs: 0 })).toBeNull();
     expect(parseAction({ type: "setArchiveAfter", archiveAfterMs: null })).not.toBeNull();
+    expect(parseAction({ type: "setSearchEngine", engineId: "google" })).not.toBeNull();
+    expect(parseAction({ type: "setSearchEngine", engineId: "https://evil.example/?q=%s" })).toBeNull();
   });
 
   it("accepts Developer Mode's actions only with known tools, commands and plain site names", () => {

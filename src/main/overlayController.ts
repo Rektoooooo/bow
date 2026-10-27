@@ -58,13 +58,11 @@ import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
 import { findProfileIdOfItem, findTab, getActiveSpace } from "./tree";
 import { getPermissionOrigin, getSitePermissions } from "./sitePermissions";
 import { looksLikeWebAddress, normalizeTypedInput } from "./urls";
+import { buildSuggestUrl, findSearchEngine } from "../shared/searchEngines";
 import { isDeveloperModeOn } from "../shared/developerMode";
 import { listImportSources } from "./browserImportController";
 import { addMenuIcons } from "./menuIcons";
 import { describeAdBlock, getBlockedCount, isAdBlockActiveFor } from "./adBlock";
-
-/** DuckDuckGo's suggestion service; it is also the browser's search engine (urls.ts). */
-const SUGGESTION_URL_PREFIX = "https://duckduckgo.com/ac/?type=list&q=";
 
 /** Most suggestions mixed into the results. */
 const SUGGESTIONS_LIMIT = 4;
@@ -225,6 +223,7 @@ function buildLibraryData(state: BrowserState): LibraryData {
       thumbnailUrl: record.thumbnailUrl,
     })),
     archiveAfterMs: state.settings.archiveAfterMs,
+    searchEngineId: findSearchEngine(state.settings.searchEngine).id,
     appIcon: state.settings.appIcon ?? "classic",
     areTitlesTidy: state.settings.areTitlesTidy !== false,
     showsFullUrls: state.settings.showsFullUrls === true,
@@ -714,7 +713,9 @@ async function fetchSuggestions(query: string): Promise<string[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SUGGESTION_TIMEOUT_MS);
   try {
-    const response = await net.fetch(SUGGESTION_URL_PREFIX + encodeURIComponent(query), { signal: controller.signal });
+    // Typed text only goes to the engine the user chose.
+    const searchEngine = findSearchEngine(getState().settings.searchEngine);
+    const response = await net.fetch(buildSuggestUrl(searchEngine, query), { signal: controller.signal });
     const body: unknown = await response.json();
     // The answer is ["query", ["suggestion 1", "suggestion 2", …]].
     const suggestionList = Array.isArray(body) ? body[1] : null;
@@ -779,7 +780,8 @@ function handleChoose(resultId: string | null, typedText: string, mode: CommandB
   if (result === undefined) {
     const text = typedText.trim();
     if (text !== "") {
-      openAddress(normalizeTypedInput(text), mode);
+      const searchEngine = findSearchEngine(getState().settings.searchEngine);
+      openAddress(normalizeTypedInput(text, searchEngine), mode);
     }
     return;
   }

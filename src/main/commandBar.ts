@@ -22,7 +22,8 @@ import type { CommandBarResultKind } from "../shared/overlay";
 import { DAY_MS } from "../shared/settings";
 import type { BrowserState, ItemId, TabItem } from "../shared/types";
 import type { HistoryEntry } from "./history";
-import { looksLikeWebAddress, normalizeTypedInput, SEARCH_URL_PREFIX } from "./urls";
+import { looksLikeWebAddress, normalizeTypedInput } from "./urls";
+import { buildSearchUrl, findSearchEngine } from "../shared/searchEngines";
 
 /** One line in the Command Bar. */
 export interface CommandBarResult {
@@ -272,14 +273,15 @@ function scoreActions(input: CommandBarInput): ScoredResult[] {
 function scoreTypedAndSuggestions(input: CommandBarInput): ScoredResult[] {
   const query = input.query.trim();
   const scored: ScoredResult[] = [];
-  const typedUrl = normalizeTypedInput(query);
+  const searchEngine = findSearchEngine(input.state.settings.searchEngine);
+  const typedUrl = normalizeTypedInput(query, searchEngine);
   const isAddress = looksLikeWebAddress(query);
   scored.push({
     result: {
       id: `typed:${typedUrl}`,
       kind: isAddress ? "navigate" : "search",
       title: query,
-      subtitle: isAddress ? "Open address" : "Search DuckDuckGo",
+      subtitle: isAddress ? "Open address" : `Search ${searchEngine.name}`,
       url: typedUrl,
       tabId: null,
       actionId: null,
@@ -290,7 +292,7 @@ function scoreTypedAndSuggestions(input: CommandBarInput): ScoredResult[] {
   });
 
   input.suggestions.forEach((suggestion, index) => {
-    const suggestionUrl = SEARCH_URL_PREFIX + encodeURIComponent(suggestion);
+    const suggestionUrl = buildSearchUrl(searchEngine, suggestion);
     scored.push({
       result: { id: `search:${suggestion}`, kind: "search", title: suggestion, subtitle: "Search suggestion", url: suggestionUrl, tabId: null, actionId: null, faviconUrl: null },
       score: SUGGESTION_BASE_SCORE - index,

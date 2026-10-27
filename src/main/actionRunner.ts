@@ -76,6 +76,7 @@ import {
   restoreArchivedTab,
   selectTab,
   setArchiveAfter,
+  setSearchEngine,
   setAdBlock,
   setAdBlockForSite,
   setAppIcon,
@@ -108,6 +109,7 @@ import { closeTabByUser, navigateFocusedPage, openLinkInNewTab, resetTabToHome, 
 import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
 import { createId } from "./tree";
 import { normalizeTypedInput } from "./urls";
+import { findSearchEngine } from "../shared/searchEngines";
 
 /** What menus.ts needs from the rest of the app. */
 export const menuHost: MenuHost = {
@@ -208,7 +210,8 @@ export function runAction(action: BrowserAction): void {
       if (action.typedText.trim() === "") {
         return;
       }
-      const url = normalizeTypedInput(action.typedText);
+      const searchEngine = findSearchEngine(getState().settings.searchEngine);
+      const url = normalizeTypedInput(action.typedText, searchEngine);
       applyChange((state) => openTab(state, url, now));
       return;
     }
@@ -272,6 +275,8 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => moveItemToSpace(state, action.itemId, action.spaceId));
     case "setArchiveAfter":
       return applyChange((state) => setArchiveAfter(state, action.archiveAfterMs));
+    case "setSearchEngine":
+      return applyChange((state) => setSearchEngine(state, action.engineId));
     case "setSidebarVisible":
       return applyChange((state) => setSidebarVisible(state, action.isVisible));
     case "setSidebarPeek":

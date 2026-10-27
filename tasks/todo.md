@@ -134,6 +134,7 @@ Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 �
       while running; Finder icon needs a Dock tile plug-in Electron cannot ship) · [x] Ad & tracker blocking (own
       engine, EasyList/EasyPrivacy downloaded)
 - [x] Translate page (Google Translate, labelled) · [x] Handoff (unverified: needs signing and a second device)
+- [x] Search engine setting (Google, DuckDuckGo, Bing, Brave Search, Kagi; suggestions from the chosen engine)
 - [x] Import from Chrome/Brave/Edge/Vivaldi/Safari (bookmarks + history; no passwords) · [x] First-run welcome
 - [x] Developer Mode (shot 5)
 - [x] Live folders: GitHub pull requests / review requests / assigned issues (read with the profile's GitHub sign-in,

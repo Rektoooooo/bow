@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { rankCommandBarResults, scoreAddressMatch, scoreTextMatch } from "../src/main/commandBar";
 import type { CommandBarInput } from "../src/main/commandBar";
 import { HISTORY_LIMIT, recordVisit, searchHistory, updateHistoryTitle } from "../src/main/history";
-import { addToFavorites, createInitialState, updateTabPage } from "../src/main/state";
+import { addToFavorites, createInitialState, setSearchEngine, updateTabPage } from "../src/main/state";
 import { HOUR_MS } from "../src/shared/settings";
 import type { BrowserState, ItemId } from "../src/shared/types";
 import { ONE_PM, openTabs } from "./builders";
@@ -50,6 +50,17 @@ describe("rankCommandBarResults", () => {
 
     expect(results[0]).toMatchObject({ kind: "search", title: "best pizza" });
     expect(results.some((result) => result.title === "best pizza near me")).toBe(true);
+  });
+
+  it("searches with the engine chosen in Settings, also for suggestions", () => {
+    const { state } = openTabs(["https://news.example/"]);
+    const withGoogle = setSearchEngine(state, "google");
+
+    const results = rankCommandBarResults(makeInput("best pizza", withGoogle, { suggestions: ["best pizza near me"] }), ONE_PM);
+    const suggestion = results.find((result) => result.title === "best pizza near me");
+
+    expect(results[0]).toMatchObject({ subtitle: "Search Google", url: "https://www.google.com/search?q=best%20pizza" });
+    expect(suggestion?.url).toBe("https://www.google.com/search?q=best%20pizza%20near%20me");
   });
 
   it("ranks the page you are on below other matches, and Favorites above plain tabs", () => {

@@ -27,6 +27,7 @@ import { addPageToArchive, openTab } from "./state";
 import { openLinkInNewTab } from "./tabActions";
 import { getActiveSpace } from "./tree";
 import { normalizeTypedInput } from "./urls";
+import { findSearchEngine } from "../shared/searchEngines";
 
 /** Window size, close to Arc's Little Arc. Our choice. */
 const LITTLE_WIDTH_PX = 900;
@@ -242,7 +243,8 @@ export function registerLittleWindowIpc(): void {
     if (little === undefined || typeof typedText !== "string" || typedText.trim() === "" || typedText.length > MAX_TEXT_LENGTH) {
       return;
     }
-    little.pageView.webContents.loadURL(normalizeTypedInput(typedText)).catch(() => undefined);
+    const searchEngine = findSearchEngine(getState().settings.searchEngine);
+    little.pageView.webContents.loadURL(normalizeTypedInput(typedText, searchEngine)).catch(() => undefined);
   });
   ipcMain.handle(LITTLE_CHANNELS.moveToSpace, (event) => {
     const little = findSender(event);

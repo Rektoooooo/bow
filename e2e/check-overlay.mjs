@@ -678,7 +678,19 @@ const boostTitles = await overlay.$$eval(".library-line .library-line-title", (t
 check("Library › Boosts lists the sites with a Boost", boostTitles.includes("example.com"), boostTitles.join(","));
 await overlay.click(".library-tab[data-section='settings']");
 await overlay.waitForTimeout(200);
+// Search engine: chosen in Settings, it searches what you type in the Command Bar.
+await overlay.selectOption(".library-select[aria-label='Search engine']", "google");
+await sidebar.waitForTimeout(300);
+const chosenEngine = (await getState()).settings.searchEngine;
 await overlay.press("body", "Escape");
+await sidebar.waitForTimeout(300);
+await dispatch({ type: "openCommandBar", mode: "newTab" });
+await overlay.fill(".command-input", "lofi beats");
+await overlay.waitForTimeout(400);
+const searchLine = await overlay.textContent(".command-line.is-highlighted .command-line-subtitle").catch(() => null);
+check("Library › Settings picks the search engine, and the Command Bar searches with it", chosenEngine === "google" && searchLine === "Search Google", `${chosenEngine} / ${searchLine}`);
+await overlay.press(".command-input", "Escape");
+await dispatch({ type: "setSearchEngine", engineId: "duckduckgo" });
 await sidebar.waitForTimeout(300);
 await app.evaluate(({ clipboard }, text) => clipboard.writeText(text), clipboardTextBefore);
 

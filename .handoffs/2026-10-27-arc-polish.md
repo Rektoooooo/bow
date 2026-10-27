@@ -49,6 +49,12 @@ approved fixes Peek (3), tab tooltip (6) and sidebar width (7). The user was awa
   and brings the app forward; Close pauses the video, like Chromium's. `check-overlay` drives it at its end.
 - Sound effects removed (the user: "no one does that"): `renderer/sounds.ts`, the Library switch, the action and the
   optional `areSoundEffectsOn` setting are gone; a stray key in an old saved file is ignored, so no version bump.
+- Search engine setting (the user: "what if i wanna use google"): Library › Settings › Search engine, from
+  `shared/searchEngines.ts` (Google, DuckDuckGo, Bing, Brave Search, Kagi). It builds typed searches, the Command
+  Bar's search line ("Search Google") and suggestion links, the page menu's "Search for …", and the suggestions come
+  from the chosen engine's own service (all answer in the OpenSearch shape, checked by hand), so typed text no
+  longer goes to DuckDuckGo when another engine is chosen. Optional `settings.searchEngine`; missing means
+  DuckDuckGo, an unknown id falls back to it, so the saved version stays 4.
 
 ## How it was measured (keep doing it this way)
 

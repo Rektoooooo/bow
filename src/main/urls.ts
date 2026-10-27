@@ -4,15 +4,14 @@
  *   This file turns any of those into a URL a web view can load.
  *
  * Data source:
- *   The text typed into the sidebar's address box.
+ *   The text typed into the sidebar's address box, and the search engine chosen in Settings (shared/searchEngines.ts).
  *
  * Data flow:
  *   sidebar submit → ipc.ts → normalizeTypedInput() → state.openTab(url)
  */
+import { buildSearchUrl } from "../shared/searchEngines";
+import type { SearchEngine } from "../shared/searchEngines";
 import { getSiteKey } from "../shared/siteKey";
-
-/** Search page used when the text is not a web address. Our choice; change it to any engine. */
-export const SEARCH_URL_PREFIX = "https://duckduckgo.com/?q=";
 
 /**
  * Decides whether the typed text looks like a web address (has a dot and no spaces, or a scheme).
@@ -35,16 +34,15 @@ export function looksLikeWebAddress(typedText: string): boolean {
 }
 
 /**
- * Turns typed text into a URL: adds https:// to bare addresses, or builds a search URL.
+ * Turns typed text into a URL: adds https:// to bare addresses, or builds a search URL with the chosen engine.
  * Only http and https come out of this function, so typed text can never open file: or javascript: URLs.
  * Example: "example.com" → "https://example.com"
- * Example: "best pizza" → "https://duckduckgo.com/?q=best%20pizza"
+ * Example: ("best pizza", Google) → "https://www.google.com/search?q=best%20pizza"
  */
-export function normalizeTypedInput(typedText: string): string {
+export function normalizeTypedInput(typedText: string, searchEngine: SearchEngine): string {
   const text = typedText.trim();
   if (!looksLikeWebAddress(text)) {
-    const searchTerms = encodeURIComponent(text);
-    return SEARCH_URL_PREFIX + searchTerms;
+    return buildSearchUrl(searchEngine, text);
   }
 
   const hasWebScheme = text.startsWith("http://") || text.startsWith("https://");

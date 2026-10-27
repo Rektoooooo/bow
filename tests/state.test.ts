@@ -30,11 +30,13 @@ import {
   unpinTab,
   updateTabPage,
   setAdBlock,
+  setSearchEngine,
   setAdBlockForSite,
   setAppIcon,
 } from "../src/main/state";
 import { findLocation, findTab } from "../src/main/tree";
 import { getSiteKey, isSameSite, normalizeTypedInput } from "../src/main/urls";
+import { findSearchEngine } from "../src/shared/searchEngines";
 import { DEFAULT_PROFILE_ID, FAVORITES_LIMIT, HOUR_MS, SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX } from "../src/shared/settings";
 import type { BrowserState, ItemId, TabItem } from "../src/shared/types";
 import { getPinnedIds, getTab, getTodayIds, ONE_PM, openPinnedTabs, openTabs, PERSONAL_SPACE_ID, WORK_SPACE_ID } from "./builders";
@@ -350,11 +352,28 @@ describe("createInitialState", () => {
 
 describe("normalizeTypedInput", () => {
   it("adds https:// to a bare address", () => {
-    expect(normalizeTypedInput("example.com")).toBe("https://example.com");
+    expect(normalizeTypedInput("example.com", findSearchEngine(undefined))).toBe("https://example.com");
   });
 
-  it("turns plain words into a search URL", () => {
-    expect(normalizeTypedInput("best pizza")).toBe("https://duckduckgo.com/?q=best%20pizza");
+  it("turns plain words into a search URL of the chosen engine (DuckDuckGo until one is chosen)", () => {
+    expect(normalizeTypedInput("best pizza", findSearchEngine(undefined))).toBe("https://duckduckgo.com/?q=best%20pizza");
+    expect(normalizeTypedInput("best pizza", findSearchEngine("google"))).toBe("https://www.google.com/search?q=best%20pizza");
+  });
+});
+
+describe("search engine setting", () => {
+  it("is DuckDuckGo until another engine is chosen, and leaves the state alone when nothing changes", () => {
+    const state = createInitialState();
+    const withGoogle = setSearchEngine(state, "google");
+
+    expect(findSearchEngine(state.settings.searchEngine).id).toBe("duckduckgo");
+    expect(withGoogle.settings.searchEngine).toBe("google");
+    expect(setSearchEngine(state, "duckduckgo")).toBe(state);
+    expect(setSearchEngine(withGoogle, "google")).toBe(withGoogle);
+  });
+
+  it("falls back to the default for an engine this version does not know", () => {
+    expect(findSearchEngine("altavista").id).toBe("duckduckgo");
   });
 });
 

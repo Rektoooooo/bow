@@ -10,6 +10,7 @@
  * Data flow:
  *   sidebar.ts → window.browserApi.dispatch(action) → preload → ipc.ts parseAction() → main.ts runAction()
  */
+import type { SearchEngineId } from "./searchEngines";
 import type { GitHubLiveList, ItemId, ItemLocation, RoutingMatchType, SitePermissionKind, SpaceId, SpaceTheme, SplitOrientation } from "./types";
 
 /** Toolbar and keyboard navigation commands for the page on screen. */
@@ -72,6 +73,7 @@ export type BrowserAction =
   | { type: "moveSpace"; spaceId: SpaceId; index: number }
   | { type: "moveItemToSpace"; itemId: ItemId; spaceId: SpaceId }
   | { type: "setArchiveAfter"; archiveAfterMs: number | null }
+  | { type: "setSearchEngine"; engineId: SearchEngineId }
   | { type: "setSidebarVisible"; isVisible: boolean }
   | { type: "setSidebarPeek"; isPeeking: boolean }
   | { type: "setSidebarWidth"; width: number; isFinal: boolean }
@@ -172,6 +174,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "moveSpace",
   "moveItemToSpace",
   "setArchiveAfter",
+  "setSearchEngine",
   "setSidebarVisible",
   "setSidebarPeek",
   "setSidebarWidth",

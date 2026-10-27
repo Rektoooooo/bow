@@ -11,6 +11,7 @@
  *   main.ts openOverlay(panel) → "overlay:show" → overlay.ts draws the panel
  *   overlay.ts → overlayApi.query / choose / siteCommand / find → main.ts
  */
+import type { SearchEngineId } from "./searchEngines";
 import type { SymbolImage } from "./symbols";
 import type { ArchivedTab, ItemId, RoutingRule, SitePermissionKind, SpaceTheme, ThemeAppearance } from "./types";
 
@@ -164,6 +165,7 @@ export interface LibraryData {
   downloads: DownloadRecord[];
   media: MediaLine[];
   archiveAfterMs: number | null;
+  searchEngineId: SearchEngineId;
   appIcon: string;
   areTitlesTidy: boolean;
   showsFullUrls: boolean;

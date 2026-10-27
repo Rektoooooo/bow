@@ -18,7 +18,7 @@ import type { BrowserState, FolderItem, ItemId, Space, TabItem } from "../shared
 import { getSelectedTabId, listVisibleTabIds } from "./state";
 import { applyPreset, GRAIN_CHOICES, THEME_PRESETS } from "./themePresets";
 import { findLocation, findRootLocation, findSpace, findSplitOfTab, findTab } from "./tree";
-import { SEARCH_URL_PREFIX } from "./urls";
+import { buildSearchUrl, findSearchEngine } from "../shared/searchEngines";
 import { listImportSources } from "./browserImportController";
 import { addMenuIcons } from "./menuIcons";
 import { describeSpaceIconAsText } from "../shared/spaceIcons";
@@ -488,9 +488,11 @@ function buildTextItems(host: MenuHost, contents: WebContents, params: ContextMe
     return [];
   }
   const shortText = selectedText.length > SEARCH_LABEL_MAX_LENGTH ? `${selectedText.slice(0, SEARCH_LABEL_MAX_LENGTH - 1)}…` : selectedText;
+  const searchEngine = findSearchEngine(host.getState().settings.searchEngine);
+  const searchUrl = buildSearchUrl(searchEngine, selectedText);
   return [
     { role: "copy" },
-    { label: `Search for “${shortText}”`, click: () => host.openInNewTab(SEARCH_URL_PREFIX + encodeURIComponent(selectedText), false) },
+    { label: `Search for “${shortText}”`, click: () => host.openInNewTab(searchUrl, false) },
     { type: "separator" },
   ];
 }

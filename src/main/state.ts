@@ -17,6 +17,8 @@
 import { ARCHIVE_LIMIT, DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_LIMIT, FIRST_WINDOW_ID, LIVE_FOLDER_HIDDEN_LIMIT, SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX } from "../shared/settings";
 import type { ArchiveReason, ArchivedTab, BrowserState, FolderItem, ItemId, ItemLocation, LiveFolderData, Space, SpaceId, TabItem } from "../shared/types";
 import { createNoteUrl, NEW_NOTE_TITLE } from "../shared/notes";
+import { DEFAULT_SEARCH_ENGINE_ID } from "../shared/searchEngines";
+import type { SearchEngineId } from "../shared/searchEngines";
 import { createEaselUrl, NEW_EASEL_TITLE } from "../shared/easels";
 import {
   collectTabIds,
@@ -786,6 +788,17 @@ export function setArchiveAfter(state: BrowserState, archiveAfterMs: number | nu
     return state;
   }
   return { ...state, settings: { ...state.settings, archiveAfterMs: archiveAfterMs } };
+}
+
+/**
+ * Changes the engine that searches typed words.
+ */
+export function setSearchEngine(state: BrowserState, engineId: SearchEngineId): BrowserState {
+  const currentId = state.settings.searchEngine ?? DEFAULT_SEARCH_ENGINE_ID;
+  if (currentId === engineId) {
+    return state;
+  }
+  return { ...state, settings: { ...state.settings, searchEngine: engineId } };
 }
 
 /**

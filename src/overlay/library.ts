@@ -15,6 +15,7 @@
 import type { ExtensionLine, HistoryLine, LibraryBoost, LibraryData, LibrarySection, LibrarySpace, MediaLine } from "../shared/overlay";
 import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS } from "../shared/settings.js";
 import { APP_ICON_VARIANTS } from "../shared/appIconDrawing.js";
+import { isSearchEngineId, SEARCH_ENGINE_IDS, SEARCH_ENGINES } from "../shared/searchEngines.js";
 import type { ArchiveReason, ArchivedTab } from "../shared/types";
 import { createElement, createFavicon, createIconButton, createTextButton, dispatch, getDisplayHost } from "../renderer/dom.js";
 import { createIcon } from "../renderer/icons.js";
@@ -553,6 +554,29 @@ function createArchiveSelect(data: LibraryData): HTMLElement {
 }
 
 /**
+ * The choice of search engine for typed words.
+ */
+function createSearchEngineSelect(data: LibraryData): HTMLElement {
+  const select = document.createElement("select");
+  select.className = "library-select";
+  select.setAttribute("aria-label", "Search engine");
+  for (const engineId of SEARCH_ENGINE_IDS) {
+    const optionElement = document.createElement("option");
+    optionElement.value = engineId;
+    optionElement.textContent = SEARCH_ENGINES[engineId].name;
+    optionElement.selected = engineId === data.searchEngineId;
+    select.append(optionElement);
+  }
+  select.addEventListener("change", () => {
+    const chosenId = select.value;
+    if (isSearchEngineId(chosenId)) {
+      dispatch({ type: "setSearchEngine", engineId: chosenId });
+    }
+  });
+  return select;
+}
+
+/**
  * The app icon choices, each a swatch of its colors.
  */
 function createAppIconChoices(data: LibraryData): HTMLElement {
@@ -598,6 +622,7 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
     ),
   ]);
   const browsing = createSettingGroup("Browsing", [
+    createSettingRow("Search engine", "Searches what you type in the address field and the Command Bar, and suggests as you type.", createSearchEngineSelect(data)),
     createSettingRow("Block ads and trackers", describeAdBlockStatus(data.adBlock), createSwitch(data.adBlock.isOn, "Block ads and trackers", (isOn) => dispatch({ type: "setAdBlock", isOn: isOn }))),
   ]);
   const appearance = createSettingGroup("Appearance", [

@@ -24,6 +24,7 @@ import type { BrowserAction } from "../shared/actions";
 import { BROWSER_ACTION_TYPES } from "../shared/actions";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
 import { ARCHIVE_THRESHOLD_OPTIONS } from "../shared/settings";
+import { isSearchEngineId } from "../shared/searchEngines";
 import type { BrowserState, RuntimeState } from "../shared/types";
 
 /** What main.ts must provide so the handlers have something to call. */
@@ -256,6 +257,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   moveSpace: { spaceId: isText, index: isWholeNumber },
   moveItemToSpace: { itemId: isText, spaceId: isText },
   setArchiveAfter: { archiveAfterMs: isAllowedArchiveAfter },
+  setSearchEngine: { engineId: isSearchEngineId },
   setSidebarVisible: { isVisible: isBoolean },
   setSidebarPeek: { isPeeking: isBoolean },
   setSidebarWidth: { width: isWholeNumber, isFinal: isBoolean },

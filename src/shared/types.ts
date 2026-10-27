@@ -14,6 +14,7 @@
  */
 import type { SymbolImage } from "./symbols";
 import type { CaptureSource } from "./easels";
+import type { SearchEngineId } from "./searchEngines";
 
 import type { BrowserAction, SidebarCommand } from "./actions";
 
@@ -167,6 +168,8 @@ export interface BrowserSettings {
    * missing means SIDEBAR_WIDTH_PX.
    */
   sidebarWidth?: number;
+  /** The engine that searches typed words (shared/searchEngines.ts). Optional: missing means DuckDuckGo. */
+  searchEngine?: SearchEngineId;
   /** Blocks ads and trackers (main/adBlock.ts). Optional: missing means off until the user turns it on. */
   isAdBlockOn?: boolean;
   /** The app icon variant shown in the Dock (shared/appIconDrawing.ts). Optional: missing means "classic". */
