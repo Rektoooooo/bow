@@ -183,6 +183,11 @@ export interface BrowserSettings {
   showsFullUrls?: boolean;
   /** The first-start tour was finished or skipped (overlay/welcome.ts). Optional: missing means not yet. */
   hasSeenWelcome?: boolean;
+  /**
+   * How long a page may go unused before it sleeps (main/tabSleep.ts); null means never. Optional: missing means
+   * DEFAULT_TAB_SLEEP_AFTER_MS.
+   */
+  tabSleepAfterMs?: number | null;
 }
 
 /** How a link-routing rule compares an address. */

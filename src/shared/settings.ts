@@ -35,6 +35,25 @@ export const ARCHIVE_THRESHOLD_OPTIONS: ArchiveThresholdOption[] = [
 /** Default for a fresh install. Same as Arc: 12 hours (help center + measured idle times at archive). */
 export const DEFAULT_ARCHIVE_AFTER_MS = 12 * HOUR_MS;
 
+/**
+ * The "Sleep unused tabs after" menu (main/tabSleep.ts): a page left alone this long closes its renderer and wakes
+ * where it was when the tab is shown again. Our choice of steps; null means pages never sleep.
+ */
+export const TAB_SLEEP_OPTIONS: ArchiveThresholdOption[] = [
+  { label: "15 minutes", valueMs: 15 * MINUTE_MS },
+  { label: "30 minutes", valueMs: 30 * MINUTE_MS },
+  { label: "1 hour", valueMs: 1 * HOUR_MS },
+  { label: "2 hours", valueMs: 2 * HOUR_MS },
+  { label: "Never", valueMs: null },
+];
+
+/**
+ * Pages sleep after this by default. Our choice: measured 2026-10-27, each awake page costs about 80 MB, and twenty
+ * pages looked at once kept 1.6 GB until they were closed. Edge's sleeping tabs default to 2 hours; 30 minutes keeps
+ * a long session's memory near what is on screen.
+ */
+export const DEFAULT_TAB_SLEEP_AFTER_MS = 30 * MINUTE_MS;
+
 /** How often visible, audible and picture-in-picture tabs get their last-active time refreshed. Arc refreshes the visible tab every 60 s (measured). */
 export const IN_USE_REFRESH_INTERVAL_MS = 1 * MINUTE_MS;
 

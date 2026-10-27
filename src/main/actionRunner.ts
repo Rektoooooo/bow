@@ -61,6 +61,7 @@ import {
 import { setDeveloperMode } from "../shared/developerMode";
 import { openDeveloperTool, translatePage } from "./pageCommands";
 import { setAsDefaultBrowser } from "./defaultBrowser";
+import { setTabSleepAfter } from "./tabSleep";
 import { restartToUpdate } from "./appUpdates";
 import { createFeedLiveFolderFromPage, createGitHubLiveFolder, openLiveFolderSource, refreshLiveFolder } from "./liveFolderRefresher";
 import { showHiddenLiveFolderItems } from "./liveFolders";
@@ -281,6 +282,8 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => moveItemToSpace(state, action.itemId, action.spaceId));
     case "setArchiveAfter":
       return applyChange((state) => setArchiveAfter(state, action.archiveAfterMs));
+    case "setTabSleepAfter":
+      return applyChange((state) => setTabSleepAfter(state, action.tabSleepAfterMs));
     case "setSearchEngine":
       return applyChange((state) => setSearchEngine(state, action.engineId));
     case "setSidebarVisible":

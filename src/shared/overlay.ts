@@ -180,6 +180,8 @@ export interface LibraryData {
   downloads: DownloadRecord[];
   media: MediaLine[];
   archiveAfterMs: number | null;
+  /** "Sleep unused tabs after" (main/tabSleep.ts); null means never. */
+  tabSleepAfterMs: number | null;
   searchEngineId: SearchEngineId;
   appIcon: string;
   areTitlesTidy: boolean;

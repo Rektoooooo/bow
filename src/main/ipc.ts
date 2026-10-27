@@ -23,7 +23,7 @@ import type { WebContents } from "electron";
 import type { BrowserAction } from "../shared/actions";
 import { BROWSER_ACTION_TYPES } from "../shared/actions";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
-import { ARCHIVE_THRESHOLD_OPTIONS } from "../shared/settings";
+import { ARCHIVE_THRESHOLD_OPTIONS, TAB_SLEEP_OPTIONS } from "../shared/settings";
 import { isSearchEngineId } from "../shared/searchEngines";
 import type { BrowserState, RuntimeState } from "../shared/types";
 
@@ -74,6 +74,10 @@ function isScreenCoordinate(value: unknown): boolean {
  */
 function isAllowedArchiveAfter(value: unknown): boolean {
   return ARCHIVE_THRESHOLD_OPTIONS.some((option) => option.valueMs === value);
+}
+
+function isAllowedTabSleepAfter(value: unknown): boolean {
+  return TAB_SLEEP_OPTIONS.some((option) => option.valueMs === value);
 }
 
 function isOrientation(value: unknown): boolean {
@@ -265,6 +269,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   moveSpace: { spaceId: isText, index: isWholeNumber },
   moveItemToSpace: { itemId: isText, spaceId: isText },
   setArchiveAfter: { archiveAfterMs: isAllowedArchiveAfter },
+  setTabSleepAfter: { tabSleepAfterMs: isAllowedTabSleepAfter },
   setSearchEngine: { engineId: isSearchEngineId },
   setSidebarVisible: { isVisible: isBoolean },
   setSidebarPeek: { isPeeking: isBoolean },

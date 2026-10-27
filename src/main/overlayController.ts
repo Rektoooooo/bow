@@ -63,6 +63,7 @@ import { closePeek, isPeekOpen, navigatePeek, openPeekAsTab, openPeekInSplit } f
 import { toggleDevTools, translatePage, zoomPage } from "./pageCommands";
 import { splitTabs } from "./split";
 import { getSelectedTabId, openTab, selectTab } from "./state";
+import { readTabSleepAfter } from "./tabSleep";
 import { loadUrlInTab, openLinkInNewTab, setMuted } from "./tabActions";
 import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
 import { findProfileIdOfItem, findTab, getActiveSpace } from "./tree";
@@ -266,6 +267,7 @@ function buildLibraryData(state: BrowserState): LibraryData {
       thumbnailUrl: record.thumbnailUrl,
     })),
     archiveAfterMs: state.settings.archiveAfterMs,
+    tabSleepAfterMs: readTabSleepAfter(state.settings),
     searchEngineId: findSearchEngine(state.settings.searchEngine).id,
     appIcon: state.settings.appIcon ?? DEFAULT_APP_ICON_ID,
     areTitlesTidy: state.settings.areTitlesTidy !== false,

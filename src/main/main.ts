@@ -69,7 +69,8 @@ import { linkNativeMessagingHosts, listOtherBrowserHostFolders } from "./nativeM
 import { moveTabsToArchive, setNoteTitle, updateTabFavicon, updateTabPage } from "./state";
 import { getStateFilePath } from "./store";
 import { openLinkInNewTab } from "./tabActions";
-import { getShownTabIds, getTabViews, refreshShownSnapshots } from "./tabViews";
+import { getShownTabIds, getTabViews, refreshShownSnapshots, sleepTabView } from "./tabViews";
+import { findTabsToSleep } from "./tabSleep";
 import { SNAPSHOT_REFRESH_MS } from "./tabSnapshots";
 import { listCaptures, loadCaptures, readCaptureAsDataUrl } from "./captures";
 import { initializeEaselsStore, readEasel, writeEasel } from "./easelsStore";
@@ -181,6 +182,26 @@ async function runArchiveSweep(): Promise<void> {
 }
 
 /**
+ * Puts pages left alone for longer than "Sleep unused tabs after" to sleep (tabSleep.ts), freeing their memory.
+ * The sidebar hears about it with the next runtime push (a sleeping tab has no page facts).
+ */
+function sleepIdleTabs(inUseTabIds: ItemId[], now: number): void {
+  const awakeTabIds = Array.from(getTabViews().keys());
+  const tabIdsToSleep = findTabsToSleep(getState(), awakeTabIds, inUseTabIds, now);
+  let sleptCount = 0;
+  for (const tabId of tabIdsToSleep) {
+    if (sleepTabView(tabId)) {
+      sleptCount += 1;
+    }
+  }
+  if (sleptCount === 0) {
+    return;
+  }
+  console.log(`${sleptCount} page(s) went to sleep.`);
+  scheduleRuntimePush();
+}
+
+/**
  * Trims the archive to the newest ARCHIVE_LIMIT entries.
  */
 function pruneOldArchiveEntries(): void {
@@ -200,7 +221,9 @@ function logTimerError(error: unknown): void {
  */
 function startAutoArchiveTimers(): void {
   setInterval(() => {
-    refreshTabsInUse().catch(logTimerError);
+    refreshTabsInUse()
+      .then((inUseTabIds) => sleepIdleTabs(inUseTabIds, Date.now()))
+      .catch(logTimerError);
   }, IN_USE_REFRESH_INTERVAL_MS);
 
   setInterval(() => {

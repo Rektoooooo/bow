@@ -22,11 +22,13 @@
  * We change the state, then one function compares state with the views and fixes the difference.
  *
  * Views are created lazily: a tab gets a web view the first time it is shown. Tabs restored from disk
- * stay unloaded until you click them, which keeps memory low when you have many tabs.
+ * stay unloaded until you click them, which keeps memory low when you have many tabs. Pages left alone go to sleep
+ * (tabSleep.ts decides which): sleepTabView() closes the page but keeps its back/forward list with Chromium's page
+ * state, and the next createTabView() for that tab restores it, scroll position and form values included.
  */
 import { WebContentsView } from "electron";
 import * as path from "node:path";
-import type { BrowserWindow, ContextMenuParams, HandlerDetails, Rectangle, WebContents } from "electron";
+import type { BrowserWindow, ContextMenuParams, HandlerDetails, NavigationEntry, Rectangle, WebContents } from "electron";
 import { LAYOUT_MOTION_MS } from "../shared/settings";
 import type { BrowserState, ItemId, TabItem, TabRuntimeInfo, WindowId } from "../shared/types";
 import { computeCardBounds, computePaneBounds } from "./layout";
@@ -88,6 +90,15 @@ interface ShownInWindow {
 
 /** One web view per loaded tab, keyed by tab id. Lives only in memory. */
 const tabViews = new Map<ItemId, WebContentsView>();
+
+/** A sleeping page's back/forward list, restored when its tab is shown again. */
+interface SleepingHistory {
+  entries: NavigationEntry[];
+  activeIndex: number;
+}
+
+/** Tabs whose page sleeps, with what it needs to wake where it was. */
+const sleepingHistories = new Map<ItemId, SleepingHistory>();
 
 /** The profile whose session each loaded tab's page runs in. A tab moved to another profile must reload there. */
 const viewProfileIds = new Map<ItemId, string>();
@@ -444,10 +455,45 @@ export function createTabView(state: BrowserState, tab: TabItem, events: TabView
   });
   watchTabView(tab.id, view, events);
   view.webContents.setAudioMuted(tab.isMuted);
-  view.webContents.loadURL(tab.url).catch(ignoreLoadFailure);
+  const sleepingHistory = sleepingHistories.get(tab.id);
+  sleepingHistories.delete(tab.id);
+  // A page that slept wakes with its back/forward list, scroll and form values; unless the tab's address changed
+  // meanwhile (Reset to its pinned address), then that address loads.
+  const activeEntry = sleepingHistory?.entries[sleepingHistory.activeIndex];
+  if (sleepingHistory !== undefined && activeEntry?.url === tab.url) {
+    view.webContents.navigationHistory.restore({ entries: sleepingHistory.entries, index: sleepingHistory.activeIndex }).catch(ignoreLoadFailure);
+  } else {
+    view.webContents.loadURL(tab.url).catch(ignoreLoadFailure);
+  }
   tabViews.set(tab.id, view);
   viewProfileIds.set(tab.id, profileId);
   return view;
+}
+
+/**
+ * Puts a page to sleep: keeps its back/forward list (with scroll and form state) and closes it, which ends its
+ * renderer process. A page on screen in any window, or with developer tools open, stays awake. Returns whether it
+ * slept. The tab's snapshot stays for the tab switcher.
+ */
+export function sleepTabView(tabId: ItemId): boolean {
+  const view = tabViews.get(tabId);
+  if (view === undefined || view.webContents.isDestroyed() || findWindowShowingTab(tabId) !== null || view.webContents.isDevToolsOpened()) {
+    return false;
+  }
+  const history = view.webContents.navigationHistory;
+  sleepingHistories.set(tabId, { entries: history.getAllEntries(), activeIndex: history.getActiveIndex() });
+  view.webContents.close();
+  tabViews.delete(tabId);
+  viewProfileIds.delete(tabId);
+  requestedMoves.delete(tabId);
+  return true;
+}
+
+/**
+ * The tabs whose page sleeps now.
+ */
+export function getSleepingTabIds(): ItemId[] {
+  return Array.from(sleepingHistories.keys());
 }
 
 /**
@@ -499,6 +545,7 @@ export function destroyTabView(tabId: ItemId): void {
   }
   view.webContents.close();
   tabViews.delete(tabId);
+  sleepingHistories.delete(tabId);
   forgetSnapshot(tabId);
   viewProfileIds.delete(tabId);
   requestedMoves.delete(tabId);
@@ -617,6 +664,13 @@ function destroyLeftoverViews(state: BrowserState): void {
     const changedProfile = recordedProfileId !== undefined && recordedProfileId !== expectedProfileId;
     if (findTab(state, tabId) === undefined || changedProfile) {
       destroyTabView(tabId);
+    }
+  }
+  // A sleeping page of a tab that left the sidebar (closed, archived) is not restored.
+  for (const tabId of Array.from(sleepingHistories.keys())) {
+    if (findTab(state, tabId) === undefined) {
+      sleepingHistories.delete(tabId);
+      forgetSnapshot(tabId);
     }
   }
 }

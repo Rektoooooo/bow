@@ -74,6 +74,7 @@ export type BrowserAction =
   | { type: "moveSpace"; spaceId: SpaceId; index: number }
   | { type: "moveItemToSpace"; itemId: ItemId; spaceId: SpaceId }
   | { type: "setArchiveAfter"; archiveAfterMs: number | null }
+  | { type: "setTabSleepAfter"; tabSleepAfterMs: number | null }
   | { type: "setSearchEngine"; engineId: SearchEngineId }
   | { type: "setSidebarVisible"; isVisible: boolean }
   | { type: "setSidebarPeek"; isPeeking: boolean }
@@ -179,6 +180,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "moveSpace",
   "moveItemToSpace",
   "setArchiveAfter",
+  "setTabSleepAfter",
   "setSearchEngine",
   "setSidebarVisible",
   "setSidebarPeek",

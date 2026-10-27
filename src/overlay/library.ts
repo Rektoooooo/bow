@@ -14,7 +14,7 @@
  */
 import type { ExtensionLine, HistoryLine, LibraryBoost, LibraryData, LibrarySection, LibrarySpace, LibrarySpaceItem, MediaLine } from "../shared/overlay";
 import { computeFramePalette } from "../shared/themePalette.js";
-import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS } from "../shared/settings.js";
+import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS, TAB_SLEEP_OPTIONS } from "../shared/settings.js";
 import { APP_ICON_VARIANTS, buildAppIconSvg } from "../shared/appIconDrawing.js";
 import { isSearchEngineId, SEARCH_ENGINE_IDS, SEARCH_ENGINES } from "../shared/searchEngines.js";
 import type { ArchiveReason, ArchivedTab } from "../shared/types";
@@ -602,6 +602,29 @@ function createArchiveSelect(data: LibraryData): HTMLElement {
 }
 
 /**
+ * The choice of how long a page may go unused before it sleeps.
+ */
+function createTabSleepSelect(data: LibraryData): HTMLElement {
+  const select = document.createElement("select");
+  select.className = "library-select";
+  select.setAttribute("aria-label", "Sleep unused tabs after");
+  for (const option of TAB_SLEEP_OPTIONS) {
+    const optionElement = document.createElement("option");
+    optionElement.textContent = option.label;
+    optionElement.selected = option.valueMs === data.tabSleepAfterMs;
+    select.append(optionElement);
+  }
+  select.addEventListener("change", () => {
+    // Options were added in the order of TAB_SLEEP_OPTIONS, so the index finds the choice.
+    const chosen = TAB_SLEEP_OPTIONS[select.selectedIndex];
+    if (chosen !== undefined) {
+      dispatch({ type: "setTabSleepAfter", tabSleepAfterMs: chosen.valueMs });
+    }
+  });
+  return select;
+}
+
+/**
  * The choice of search engine for typed words.
  */
 function createSearchEngineSelect(data: LibraryData): HTMLElement {
@@ -664,6 +687,11 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
       "Archive Today tabs after",
       "Unused Today tabs move to the Archive, like Arc (default 12 hours). Pinned tabs and Favorites never do; time with the browser closed does not count. The Archive keeps your newest 250 tabs.",
       createArchiveSelect(data),
+    ),
+    createSettingRow(
+      "Sleep unused tabs after",
+      "A page you have not used for this long closes to free memory and wakes where you left it when you go back. Favorites, pages playing sound and pages on screen stay awake.",
+      createTabSleepSelect(data),
     ),
     createSettingRow(
       "Tidy titles for pinned tabs",

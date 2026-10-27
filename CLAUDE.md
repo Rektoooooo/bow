@@ -23,7 +23,8 @@ npm test             # Vitest unit tests (pure state rules, ranking, importers)
 npm run e2e          # build + drive the real app: check-app, check-overlay, check-extensions, permission-check,
                      # check-motion (layout changes glide instead of jumping), check-live-folders (local feed + fake
                      # GitHub via --github-origin), check-performance (331-tab sidebar redraws within a frame),
-                     # check-windows (⌘N, a Space and selection per window, restart restores every window)
+                     # check-windows (⌘N, a Space and selection per window, restart restores every window),
+                     # check-tab-sleep (a page off screen sleeps, its renderer ends, it wakes scrolled where it was)
 node e2e/window-shot.mjs   # README screenshots from sample data → docs/screenshot-*.png
 node e2e/arc-compare.mjs   # side-by-side crops with the user's Arc screenshots (reference/, local only) → e2e/output
 npm run package      # release/Bow-darwin-arm64/Bow.app (ad-hoc signed, git-ignored)
@@ -66,7 +67,11 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   field (`parseAction`) and only from our own pages; `actionRunner.ts` runs it. Menu items live in `appMenu.ts`
   (accelerators = Arc's shortcuts) and `appMenuCommands.ts`; the Command Bar's actions reuse them.
 - **Reconcile.** `syncTabViews()` (`tabViews.ts`) makes the web views match the state. Views are lazy: a tab gets a
-  `WebContentsView` the first time it is shown, in its profile's session partition (`profiles.ts`).
+  `WebContentsView` the first time it is shown, in its profile's session partition (`profiles.ts`). Pages unused for
+  "Sleep unused tabs after" (default 30 min; `tabSleep.ts` decides, Favorites and pages in use never) sleep:
+  `sleepTabView()` keeps the back/forward list with Chromium's page state and closes the page; the next view for that
+  tab restores it (`navigationHistory.restore`). Saves are throttled (`STATE_SAVE_DELAY_MS`, flushed at `will-quit`)
+  and the state push to the sidebars is coalesced per event-loop turn (a sidebar command flushes it first).
 - **Floating UI** lives in one transparent overlay view (`overlay.ts` / `overlayController.ts`, pages in
   `src/overlay`): Command Bar, Library, site controls, Find, the Peek frame. Peek's page is its own view above it
   (`peek.ts`). Little Windows are separate windows (`littleWindow.ts`, bar page in `src/little`).
