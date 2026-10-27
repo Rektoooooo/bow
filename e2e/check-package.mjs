@@ -58,7 +58,8 @@ const appMenuLabels = await app.evaluate(({ Menu }) => Menu.getApplicationMenu()
 check("the app menu offers Set as Default Browser…", appMenuLabels.includes("Set as Default Browser…"));
 check("the app menu says Bow", appMenuLabels.includes("About Bow") && appMenuLabels.includes("Quit Bow"), appMenuLabels.join(", "));
 
-const windowCount = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length);
+// The hidden window that draws the Dock icon (a data: page, in dark mode right at startup) is not one of the app's.
+const windowCount = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((window) => !window.webContents.getURL().startsWith("data:")).length);
 const windowsBefore = await windowCount();
 await app.evaluate(({ app }) => app.emit("open-url", { preventDefault() {} }, "javascript:alert(1)"));
 await new Promise((resolve) => setTimeout(resolve, 500));

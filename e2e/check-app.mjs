@@ -372,12 +372,12 @@ await page.waitForSelector(".easel-text", { timeout: 5000 }).catch(() => undefin
 const reopenedBoard = await page.evaluate(() => ({ text: document.querySelector(".easel-text")?.textContent ?? "", strokes: document.querySelectorAll(".easel-strokes path").length }));
 check("switching away and back keeps the board", reopenedBoard.text === "Board idea" && reopenedBoard.strokes === 1, JSON.stringify(reopenedBoard));
 
-// Another app icon: our own drawing in other colors, drawn for the Dock (errors would show in the main log below).
-await dispatch(page, { type: "setAppIcon", variantId: "mint" });
+// Another app icon: our own drawing in another look, drawn for the Dock (errors would show in the main log below).
+await dispatch(page, { type: "setAppIcon", variantId: "pixel" });
 await page.waitForTimeout(1500);
 state = await getState(page);
-check("choosing another app icon is saved and drawn for the Dock", state.settings.appIcon === "mint", String(state.settings.appIcon));
-await dispatch(page, { type: "setAppIcon", variantId: "classic" });
+check("choosing another app icon is saved and drawn for the Dock", state.settings.appIcon === "pixel", String(state.settings.appIcon));
+await dispatch(page, { type: "setAppIcon", variantId: "glass" });
 await page.waitForTimeout(1000);
 
 // A site without /favicon.ico answers 404; Chromium logs that as a console error, but it is expected, not a bug.

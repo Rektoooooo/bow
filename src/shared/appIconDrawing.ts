@@ -149,13 +149,14 @@ function drawColorLight(variant: AppIconVariant): string {
 }
 
 /**
- * Frosted glass: soft colour light on the tile, and a glass bow over it. Through the bow the light looks sharper and
- * more saturated (like light bent by glass); the bow is milky, catches a bright highlight along its top and has a
- * fine bright rim; the tile itself has a gentle sheen and edge. Fainter frost and light on a dark tile.
+ * Frosted glass: soft colour light on the tile, and a glass bow over it. The bow is mostly white frost with a glance of
+ * the light behind it (a little more saturated, like light bent by glass), catches a bright highlight along its top
+ * and has a fine bright rim; the tile itself has a gentle sheen and edge. Fainter frost and light on a dark tile.
  */
 function drawGlassBow(variant: AppIconVariant): string {
   const path = describeHalfCircle(BOW_RADIUS);
-  const frostOpacity = variant.isDark ? 0.16 : 0.36;
+  // Mostly white frost with only a glance of the colour behind it (the user, 2026-10-27).
+  const frostOpacity = variant.isDark ? 0.34 : 0.72;
   const lightOpacity = variant.isDark ? 0.8 : 0.72;
   const sheenOpacity = variant.isDark ? 0.12 : 0.5;
   const rimOpacity = variant.isDark ? 0.55 : 0.9;
@@ -168,7 +169,7 @@ function drawGlassBow(variant: AppIconVariant): string {
     </filter>
     <filter id="refraction" filterUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
       <feGaussianBlur stdDeviation="58"/>
-      <feColorMatrix type="saturate" values="1.45"/>
+      <feColorMatrix type="saturate" values="1.25"/>
     </filter>
     <filter id="glass-shadow" filterUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
       <feGaussianBlur in="SourceAlpha" stdDeviation="18"/>
