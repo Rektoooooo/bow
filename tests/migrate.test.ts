@@ -4,7 +4,8 @@
  */
 import { describe, expect, it } from "vitest";
 import { upgradeToCurrentVersion } from "../src/main/migrate";
-import { DEFAULT_PROFILE_ID } from "../src/shared/settings";
+import { createInitialState } from "../src/main/state";
+import { DEFAULT_PROFILE_ID, FIRST_WINDOW_ID } from "../src/shared/settings";
 
 /** A file exactly as milestone 1 saved it: one pinned and one Today tab in Personal, one archived tab. */
 const VERSION_1_FILE = {
@@ -30,10 +31,10 @@ const VERSION_1_FILE = {
 };
 
 describe("upgradeToCurrentVersion", () => {
-  it("turns a version 1 file into version 2 without losing tabs, selection, archive or settings", () => {
+  it("turns a version 1 file into the current version without losing tabs, selection, archive or settings", () => {
     const state = upgradeToCurrentVersion(VERSION_1_FILE);
 
-    expect(state?.version).toBe(2);
+    expect(state?.version).toBe(3);
     expect(state?.spaces[0]?.pinnedIds).toEqual(["tab-pinned"]);
     expect(state?.spaces[0]?.todayIds).toEqual(["tab-today"]);
     expect(state?.spaces[0]?.theme.colors).toEqual(["#e9d8d4"]);
@@ -44,7 +45,23 @@ describe("upgradeToCurrentVersion", () => {
     expect(state?.settings.archiveAfterMs).toBe(3600000);
   });
 
-  it("returns a version 2 file unchanged", () => {
+  it("upgrades a version 1 file all the way, with its one window as the first window", () => {
+    const state = upgradeToCurrentVersion(VERSION_1_FILE);
+
+    expect(state?.version).toBe(3);
+    expect(state?.focusedWindowId).toBe(FIRST_WINDOW_ID);
+    expect(state?.otherWindows).toEqual([]);
+  });
+
+  it("turns a version 2 file into version 3: one window, same Space and selection", () => {
+    const version2File = { ...createInitialState(), version: 2, focusedWindowId: undefined, otherWindows: undefined, activeSpaceId: "space-work", selectedTabIdBySpace: { "space-personal": null, "space-work": null } };
+
+    const state = upgradeToCurrentVersion(JSON.parse(JSON.stringify(version2File)));
+
+    expect(state).toMatchObject({ version: 3, focusedWindowId: FIRST_WINDOW_ID, otherWindows: [], activeSpaceId: "space-work" });
+  });
+
+  it("returns a current file unchanged", () => {
     const upgraded = upgradeToCurrentVersion(VERSION_1_FILE);
 
     expect(upgradeToCurrentVersion(upgraded)).toBe(upgraded);
@@ -52,7 +69,8 @@ describe("upgradeToCurrentVersion", () => {
 
   it("refuses files it does not understand", () => {
     expect(upgradeToCurrentVersion(null)).toBeNull();
-    expect(upgradeToCurrentVersion({ version: 3, spaces: [] })).toBeNull();
+    expect(upgradeToCurrentVersion({ version: 4, spaces: [] })).toBeNull();
+    expect(upgradeToCurrentVersion({ ...createInitialState(), otherWindows: undefined })).toBeNull();
     expect(upgradeToCurrentVersion({ version: 1, spaces: [], tabs: [], archive: [], activeSpaceId: "x" })).toBeNull();
   });
 });

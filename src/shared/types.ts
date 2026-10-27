@@ -26,6 +26,9 @@ export type SpaceId = string;
 /** A profile's unique id, for example "profile-default". Each profile has its own cookies and logins. */
 export type ProfileId = string;
 
+/** Identifies a main browser window. Kept across restarts, so each window gets its own Space and place back. */
+export type WindowId = string;
+
 /** One web page in the sidebar. */
 export interface TabItem {
   kind: "tab";
@@ -245,18 +248,36 @@ export interface SitePermission {
   isAllowed: boolean;
 }
 
+/**
+ * What a main window shows while another window has the focus: its own Space and its own selected tab per Space.
+ * The focused window's values are BrowserState.activeSpaceId and selectedTabIdBySpace (main/windows.ts).
+ */
+export interface WindowSelection {
+  id: WindowId;
+  activeSpaceId: SpaceId;
+  selectedTabIdBySpace: Record<SpaceId, ItemId | null>;
+}
+
 /** Everything the browser saves to disk. */
 export interface BrowserState {
   /** Raise this number when the saved shape changes, and add an upgrade step to migrate.ts. */
-  version: 2;
+  version: 3;
   /** Every sidebar item, by id. Where an item sits is decided by the lists that contain its id. */
   items: Record<ItemId, SidebarItem>;
   profiles: Profile[];
   /** Spaces in switcher order. */
   spaces: Space[];
+  /** The focused main window's Space. */
   activeSpaceId: SpaceId;
-  /** Which tab is selected in each Space (a tab inside a split view shows the whole split). Null when none. */
+  /**
+   * Which tab the focused main window selected in each Space (a tab inside a split view shows the whole split).
+   * Null when none.
+   */
   selectedTabIdBySpace: Record<SpaceId, ItemId | null>;
+  /** The main window whose choices are activeSpaceId and selectedTabIdBySpace: the last one focused. */
+  focusedWindowId: WindowId;
+  /** The other open main windows' choices, most recently focused first. One swaps in when its window gets the focus. */
+  otherWindows: WindowSelection[];
   /** Newest first. */
   archive: ArchivedTab[];
   settings: BrowserSettings;

@@ -138,6 +138,22 @@ Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 �
 - Not doing (documented): Arc Max (user's choice), sync/sharing/accounts (user's choice), AppleScript (needs
   native Cocoa scripting code), auto-updates (needs published releases: ask first)
 
+### 3.5 Multiple main windows (⌘N, like Arc) — started 2026-10-27
+Design: the focused window's choices stay at the top of BrowserState (`activeSpaceId`, `selectedTabIdBySpace`), the
+other windows' are parked in `otherWindows` and swapped in on focus; every pure function keeps working on "the
+focused window", and each window's sidebar gets the state projected for it. Bounds stay in window-state.json (keyed
+by window id), because they change on every drag.
+- [x] Step 1: saved shape v3 (`focusedWindowId`, `otherWindows`), pure `windows.ts` (project, focus, open, close,
+      repair after every change), migrate v2 → v3 (+ v1 chain), live folders keep every window's selection; tests
+- [ ] Step 2: main process: window registry in browserCore (focused = last focused main window, never
+      `getFocusedWindow()`), per-window pushes and runtime (sidebar peek, New Tab highlight, tabs shown elsewhere),
+      tabViews per window (release before claim; a tab stays with the window that shows it), overlay / Peek /
+      status bubble follow the focused window and leave a closing window, actions from a background window's
+      sidebar focus it first, File › New Window ⌘N and Close Window ⇧⌘W, quit with the last main window (⌘Q keeps
+      every window for the next start), bounds per window, extensions see each tab's window
+- [ ] Step 3: placeholder card "Open in another window" with Move to This Window; e2e/check-windows.mjs in
+      `npm run e2e`; README, teardown page, handoff
+
 ### 3.4 Verification
 - [x] e2e/arc-compare.mjs (side-by-side with the reference; positions match within about a point)
 - [x] Motion checks for ⌘S, peek and resize (e2e/check-motion.mjs, part of `npm run e2e`)

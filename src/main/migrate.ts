@@ -2,15 +2,15 @@
  * WHY this file exists:
  *   The saved file's shape changes as the browser grows. Old files must still open, so each shape change gets one
  *   upgrade step here. Version 1 (milestone 1) kept one flat tab list with isPinned flags; version 2 keeps Arc-style
- *   item lists with folders, Favorites, split views and profiles.
+ *   item lists with folders, Favorites, split views and profiles; version 3 adds the list of open main windows.
  *
  * Data source:
  *   The parsed JSON of browser-state.json, as read by store.ts. It is untrusted: fields may be missing.
  *
  * Data flow:
- *   store.ts loadState() → upgradeToCurrentVersion(parsed) → BrowserState (version 2) or null when unreadable
+ *   store.ts loadState() → upgradeToCurrentVersion(parsed) → version 1 → 2 → 3 → BrowserState, or null when unreadable
  */
-import { DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID } from "../shared/settings";
+import { DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FIRST_WINDOW_ID } from "../shared/settings";
 import type { ArchiveReason, ArchivedTab, BrowserState, ItemId, SidebarItem, Space, TabItem } from "../shared/types";
 
 /** A tab as version 1 saved it. */
@@ -43,6 +43,9 @@ interface BrowserStateV1 {
   settings: { archiveAfterMs: number | null };
 }
 
+/** The whole version 2 file: one window, so no window list yet. */
+type BrowserStateV2 = Omit<BrowserState, "version" | "focusedWindowId" | "otherWindows"> & { version: 2 };
+
 /**
  * Turns a version 1 tab into a version 2 tab item.
  */
@@ -64,7 +67,7 @@ function upgradeTab(tab: TabV1): TabItem {
  * Upgrades a version 1 file. The order of the old flat tab list becomes the order of each Space's Pinned and Today lists.
  * Example: v1 tabs [pinned A (Personal), today B (Personal)] → Personal pinnedIds [A], todayIds [B]
  */
-export function upgradeFromVersion1(oldState: BrowserStateV1): BrowserState {
+export function upgradeFromVersion1(oldState: BrowserStateV1): BrowserStateV2 {
   const items: Record<ItemId, SidebarItem> = {};
   for (const oldTab of oldState.tabs) {
     items[oldTab.id] = upgradeTab(oldTab);
@@ -107,6 +110,14 @@ export function upgradeFromVersion1(oldState: BrowserStateV1): BrowserState {
 }
 
 /**
+ * Upgrades a version 2 file: its one window becomes the first (focused) window, with no others open.
+ * Example: v2 with activeSpaceId "space-work" → v3 with focusedWindowId "window-1", otherWindows [], same Space
+ */
+export function upgradeFromVersion2(oldState: BrowserStateV2): BrowserState {
+  return { ...oldState, version: 3, focusedWindowId: FIRST_WINDOW_ID, otherWindows: [] };
+}
+
+/**
  * Checks the parts of a version 2 file that the app cannot run without.
  * It does not check every field; it catches files that are clearly not ours.
  */
@@ -115,6 +126,14 @@ function looksLikeVersion2(value: Record<string, unknown>): boolean {
   const hasLists = Array.isArray(value.spaces) && Array.isArray(value.profiles) && Array.isArray(value.archive);
   const hasActiveSpace = typeof value.activeSpaceId === "string";
   return hasItems && hasLists && hasActiveSpace && (value.spaces as unknown[]).length > 0;
+}
+
+/**
+ * Checks a version 3 file: a version 2 file plus the window list.
+ */
+function looksLikeVersion3(value: Record<string, unknown>): boolean {
+  const hasWindows = typeof value.focusedWindowId === "string" && Array.isArray(value.otherWindows);
+  return hasWindows && looksLikeVersion2(value);
 }
 
 /**
@@ -135,11 +154,15 @@ export function upgradeToCurrentVersion(parsedValue: unknown): BrowserState | nu
   }
   const value = parsedValue as Record<string, unknown>;
 
-  if (value.version === 2 && looksLikeVersion2(value)) {
+  if (value.version === 3 && looksLikeVersion3(value)) {
     return value as unknown as BrowserState;
   }
+  if (value.version === 2 && looksLikeVersion2(value)) {
+    return upgradeFromVersion2(value as unknown as BrowserStateV2);
+  }
   if (value.version === 1 && looksLikeVersion1(value)) {
-    return upgradeFromVersion1(value as unknown as BrowserStateV1);
+    const version2State = upgradeFromVersion1(value as unknown as BrowserStateV1);
+    return upgradeFromVersion2(version2State);
   }
   return null;
 }

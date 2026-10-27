@@ -59,6 +59,9 @@ export const SPLIT_PANES_LIMIT = 4;
 /** The profile every new install starts with. Its pages use the session partition "persist:profile-default". */
 export const DEFAULT_PROFILE_ID = "profile-default";
 
+/** The id of the first main window (and of the one window files saved before version 3 had). Our choice. */
+export const FIRST_WINDOW_ID = "window-1";
+
 /**
  * Default sidebar width in pixels, from the window edge to the right edge of the sidebar's content (the sidebar page
  * sets --sidebar-width from the saved width). Measured on the user's Arc (1 px per pt): rows span 7…241.5 pt and the page card starts at 248.5 pt, so 7 pt

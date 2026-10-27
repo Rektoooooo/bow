@@ -14,7 +14,7 @@
  *   - When nothing changes, return the same state object, so main.ts can skip saving.
  *   - `now` is always a parameter; nothing here reads the clock.
  */
-import { ARCHIVE_LIMIT, DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_LIMIT, LIVE_FOLDER_HIDDEN_LIMIT, SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX } from "../shared/settings";
+import { ARCHIVE_LIMIT, DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_LIMIT, FIRST_WINDOW_ID, LIVE_FOLDER_HIDDEN_LIMIT, SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX } from "../shared/settings";
 import type { ArchiveReason, ArchivedTab, BrowserState, FolderItem, ItemId, ItemLocation, LiveFolderData, Space, SpaceId, TabItem } from "../shared/types";
 import { createNoteUrl, NEW_NOTE_TITLE } from "../shared/notes";
 import { createEaselUrl, NEW_EASEL_TITLE } from "../shared/easels";
@@ -64,7 +64,7 @@ export function createInitialState(): BrowserState {
   };
 
   return {
-    version: 2,
+    version: 3,
     items: {},
     profiles: [{ id: DEFAULT_PROFILE_ID, name: "Default", favoriteIds: [] }],
     spaces: [personalSpace, workSpace],
@@ -73,6 +73,8 @@ export function createInitialState(): BrowserState {
       [personalSpace.id]: null,
       [workSpace.id]: null,
     },
+    focusedWindowId: FIRST_WINDOW_ID,
+    otherWindows: [],
     archive: [],
     settings: { archiveAfterMs: DEFAULT_ARCHIVE_AFTER_MS, isSidebarVisible: true },
   };

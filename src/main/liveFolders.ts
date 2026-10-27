@@ -19,6 +19,7 @@ import { LIVE_FOLDER_ITEM_LIMIT } from "../shared/settings";
 import type { BrowserState, FolderItem, ItemId, LiveFolderSource, ProfileId, SidebarItem, TabItem } from "../shared/types";
 import { repairSelections } from "./state";
 import { collectTabIds, createId, deleteItems, findProfileIdOfItem } from "./tree";
+import { collectSelectedTabIdsOfAllWindows } from "./windows";
 
 /** One item a source lists: its address and title. */
 export interface LiveFolderEntry {
@@ -153,7 +154,8 @@ export function applyLiveFolderEntries(state: BrowserState, folderId: ItemId, en
     newChildIds.push(tab.id);
   }
 
-  const selectedTabIds = new Set(Object.values(state.selectedTabIdBySpace));
+  // Tabs a window shows stay, in every window (windows.ts).
+  const selectedTabIds = collectSelectedTabIdsOfAllWindows(state);
   const removedIds: ItemId[] = [];
   for (const childId of folder.childIds) {
     if (newChildIds.includes(childId)) {
