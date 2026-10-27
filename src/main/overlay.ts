@@ -63,7 +63,7 @@ export function createOverlayView(): void {
 
 /**
  * Shows a panel: places the overlay, puts it on top, tells the page what to draw and gives it the keyboard (except
- * for panels that must not take it, like a tab preview).
+ * for panels that must not take it, like a tab tooltip).
  */
 export async function showOverlay(window: BrowserWindow, bounds: Bounds, message: OverlayShowMessage, takesKeyboard: boolean = true): Promise<void> {
   await overlayReady;
@@ -86,9 +86,9 @@ export async function showOverlay(window: BrowserWindow, bounds: Bounds, message
 }
 
 /**
- * Takes the overlay out of its window: the panel animates out first, then the view goes.
+ * Takes the overlay out of its window: the panel animates out first, then the view goes (at once when isImmediate).
  */
-export function hideOverlay(): void {
+export function hideOverlay(isImmediate: boolean = false): void {
   const window = overlayWindow;
   if (overlayView === null || window === null || !isShown) {
     return;
@@ -96,6 +96,10 @@ export function hideOverlay(): void {
   isShown = false;
   const view = overlayView;
   view.webContents.send(OVERLAY_CHANNELS.closing);
+  if (isImmediate) {
+    window.contentView.removeChildView(view);
+    return;
+  }
   removalTimer = setTimeout(() => {
     removalTimer = null;
     if (!window.isDestroyed()) {

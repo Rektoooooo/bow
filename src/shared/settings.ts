@@ -128,3 +128,30 @@ export const LIVE_FOLDER_ITEM_LIMIT = 30;
 
 /** A live folder remembers at most this many removed addresses (the newest). Our choice, keeps the saved file small. */
 export const LIVE_FOLDER_HIDDEN_LIMIT = 200;
+
+/*
+ * Arc's tab tooltip (the user's recording, 2026-10-27): resting the pointer on a tab row shows a small black box beside
+ * the pointer with the tab's title, and "Double-click to rename" under it on the selected tab. Measured: 29 pt tall
+ * with one line, 44 pt with two, 10 pt of padding inside a 1 pt rim on each side, 11–13 pt right of and 6–12 pt below
+ * the pointer.
+ */
+export const TAB_TOOLTIP_OFFSET_X_PX = 12;
+export const TAB_TOOLTIP_OFFSET_Y_PX = 9;
+export const TAB_TOOLTIP_ONE_LINE_HEIGHT_PX = 29;
+export const TAB_TOOLTIP_TWO_LINE_HEIGHT_PX = 44;
+
+/** Padding plus rim on each side of the tooltip's text. */
+export const TAB_TOOLTIP_SIDE_PX = 11;
+
+/** The widest tooltip; a longer title ends in "…". Our choice. */
+export const TAB_TOOLTIP_MAX_WIDTH_PX = 320;
+
+/** The fonts overlay.css draws the two lines in (.tab-tooltip-title / -hint); the sidebar sizes the box with them. */
+export const TAB_TOOLTIP_TITLE_FONT = "600 13.5px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
+export const TAB_TOOLTIP_HINT_FONT = "400 12.5px -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
+
+/** The second line, on the selected tab only (Arc's other tabs show the title alone). */
+export const TAB_TOOLTIP_RENAME_HINT = "Double-click to rename";
+
+/** How long the pointer rests on a row before its tooltip shows. Our choice; Arc's appeared within about 0.9 s. */
+export const TAB_TOOLTIP_DELAY_MS = 600;

@@ -990,61 +990,53 @@ body.dark {
   font-weight: 600;
 }
 
-/* ---------- Tab preview (hovering a tab in the sidebar) ----------
-   The overlay is exactly the card's size here (overlayController.ts PREVIEW_WIDTH_PX × PREVIEW_HEIGHT_PX). */
+/* ---------- Tab tooltip (resting on a tab in the sidebar) ----------
+   Arc's, measured in the user's recording: black with a faint rim (about 23 on black), the title 77 % white and
+   101 pt wide for a 16-letter title, the hint 46 % and 121 pt, 10 pt corners. The overlay is exactly the box's size (the sidebar measured the text in the fonts named in
+   settings.ts TAB_TOOLTIP_TITLE_FONT / TAB_TOOLTIP_HINT_FONT, which must stay the same as here). No fade in: a
+   tooltip that waited for the pointer to rest shows at once. */
 
-.tab-preview {
+.tab-tooltip {
   inset: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px;
-  border-radius: 12px;
+  justify-content: center;
+  padding: 0 10px;
+  border-color: rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  background: #ffffff;
   box-shadow: none;
+  animation: none;
 }
 
-.tab-preview-picture {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  border-radius: 7px;
-  background: var(--tile);
+body.dark .tab-tooltip {
+  border-color: rgba(255, 255, 255, 0.09);
+  background: #000000;
 }
 
-.tab-preview-picture img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top;
-}
-
-.tab-preview-caption {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 4px 2px;
-}
-
-.tab-preview-title-line {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-}
-
-.tab-preview-title {
+.tab-tooltip-title,
+.tab-tooltip-hint {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
 }
 
-.tab-preview-address {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted);
-  font-size: 12px;
+.tab-tooltip-title {
+  color: rgba(0, 0, 0, 0.85);
+  font: 600 13.5px/16px -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+.tab-tooltip-hint {
+  color: rgba(0, 0, 0, 0.5);
+  font: 400 12.5px/15px -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+body.dark .tab-tooltip-title {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+body.dark .tab-tooltip-hint {
+  color: rgba(255, 255, 255, 0.42);
 }
 
 /* ---------- Welcome (first start) ---------- */

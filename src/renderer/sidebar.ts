@@ -30,7 +30,7 @@ import { createIcon, installSymbols } from "./icons.js";
 import { applySpaceTheme, onSystemAppearanceChange } from "./theme.js";
 import { createNavigationButtons, renderToolbar } from "./toolbar.js";
 import { playSound } from "./sounds.js";
-import { installTabPreviewHover } from "./tabPreviewHover.js";
+import { installTabTooltipHover } from "./tabTooltipHover.js";
 import { showNoteEditor } from "./noteEditor.js";
 import { createSpaceIcon } from "./spaceIcon.js";
 import { showEaselEditor } from "./easelEditor.js";
@@ -775,7 +775,7 @@ async function startSidebar(): Promise<void> {
   const toolbar = document.getElementById("toolbar");
   if (sidebar !== null) {
     installSidebarEvents(sidebar, callbacks);
-    installTabPreviewHover(sidebar);
+    installTabTooltipHover(sidebar);
     installDragAndDrop(sidebar);
     sidebar.addEventListener("wheel", handleSidebarWheel, { passive: true });
   }

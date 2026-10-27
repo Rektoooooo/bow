@@ -813,18 +813,38 @@ const highlightedLines = await overlay.$$eval(".command-line.is-highlighted", (l
 check("a well-known site completes before it was ever visited, and Return would open it", popularCompletion === "netflix.com" && highlightedLines === 0, `${popularCompletion} highlighted=${highlightedLines}`);
 await overlay.press(".command-input", "Escape");
 
-// Tab previews: resting the pointer on a tab that is not on screen shows a card with a picture of its page next to
-// the sidebar; moving away hides it. The card never takes the keyboard.
+// Tab tooltips (Arc's): resting the pointer on a tab shows its title beside the pointer, with "Double-click to rename"
+// on the selected tab only; moving on hides it. The tooltip never takes the keyboard.
 await sidebar.waitForTimeout(500);
 const otherTabRow = sidebar.locator(".tab-row:not(.is-selected)").first();
-await otherTabRow.hover();
-await overlay.waitForSelector(".tab-preview img", { timeout: 4000 }).catch(() => undefined);
-const previewShown = (await overlay.$(".tab-preview img")) !== null && (await overlayIsShown());
+const otherRowBox = await otherTabRow.boundingBox();
+const otherTitle = (await otherTabRow.locator(".row-title").textContent()).replace(/^\/ /, "").trim();
+await sidebar.mouse.move(otherRowBox.x + 40, otherRowBox.y + otherRowBox.height / 2);
+await sidebar.mouse.move(otherRowBox.x + 42, otherRowBox.y + otherRowBox.height / 2);
+await overlay.waitForSelector(".tab-tooltip", { timeout: 4000 }).catch(() => undefined);
+const tooltipTitle = await overlay.$eval(".tab-tooltip-title", (title) => title.textContent).catch(() => null);
+const tooltipHasHint = (await overlay.$(".tab-tooltip-hint")) !== null;
+const tooltipBounds = await app.evaluate(({ BrowserWindow }) => {
+  const window = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  const overlayView = window?.contentView.children.find((child) => child.webContents?.getURL().endsWith("/overlay/overlay.html"));
+  return overlayView === undefined ? null : overlayView.getBounds();
+});
 const keyboardOwner = await app.evaluate(({ webContents }) => webContents.getFocusedWebContents()?.getURL() ?? "");
-check("resting on a tab shows its preview card, without taking the keyboard", previewShown && !keyboardOwner.endsWith("/overlay/overlay.html"), keyboardOwner.slice(-40));
+const besidePointer = tooltipBounds !== null && tooltipBounds.x > otherRowBox.x + 42 && tooltipBounds.y > otherRowBox.y + otherRowBox.height / 2 && tooltipBounds.height === 29;
+check("resting on a tab shows its title beside the pointer (no rename hint off the selected tab), without taking the keyboard", tooltipTitle === otherTitle && !tooltipHasHint && besidePointer && !keyboardOwner.endsWith("/overlay/overlay.html"), `${tooltipTitle} / ${otherTitle} hint=${tooltipHasHint} ${JSON.stringify(tooltipBounds)}`);
+await sidebar.mouse.move(otherRowBox.x + 90, otherRowBox.y + otherRowBox.height / 2);
+await sidebar.waitForTimeout(200);
+check("moving on hides the tooltip at once", !(await overlayIsShown()));
+const selectedTabRow = sidebar.locator(".tab-row.is-selected").first();
+const selectedRowBox = await selectedTabRow.boundingBox();
+await sidebar.mouse.move(selectedRowBox.x + 40, selectedRowBox.y + selectedRowBox.height / 2);
+await sidebar.mouse.move(selectedRowBox.x + 42, selectedRowBox.y + selectedRowBox.height / 2);
+await overlay.waitForSelector(".tab-tooltip-hint", { timeout: 4000 }).catch(() => undefined);
+const hintText = await overlay.$eval(".tab-tooltip-hint", (hint) => hint.textContent).catch(() => null);
+check("the selected tab's tooltip adds \"Double-click to rename\"", hintText === "Double-click to rename", String(hintText));
 await sidebar.mouse.move(60, 20);
-await sidebar.waitForTimeout(500);
-check("moving away hides the preview", !(await overlayIsShown()));
+await sidebar.waitForTimeout(300);
+check("moving away hides it", !(await overlayIsShown()));
 
 await app.close();
 const failed = results.filter((result) => !result.ok).length;

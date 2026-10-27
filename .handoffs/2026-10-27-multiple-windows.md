@@ -85,7 +85,7 @@ differs from it); every snapshot fits "the sidebar of the last window closed", a
   `isOnScreen`, media, snapshots). `destroyTabView(tabId)` finds the window itself.
 - **IPC:** `getState` / `getRuntimeState` / `dispatch` answer per sending window; any main window's sidebar is
   trusted. `actionRunner.runActionFromWindow`: an action from a background window's sidebar focuses it first;
-  pointer actions (sidebar peek, previews) never bring a window forward (the peek is per window, previews only in
+  pointer actions (sidebar peek, tab tooltips) never bring a window forward (the peek is per window, tooltips only in
   the focused one).
 - Facts checked with a throwaway Electron script (Electron 44): `addChildView` into another window moves the view
   (it leaves the old parent), and closing a window does not destroy its child views' pages.

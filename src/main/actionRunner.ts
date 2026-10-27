@@ -43,7 +43,7 @@ import { removePermissionAnswer } from "./sitePermissions";
 import { showMenuRequest } from "./menus";
 import type { MenuHost } from "./menus";
 import {
-  hideTabPreview,
+  hideTabTooltip,
   openBoostEditor,
   openCommandBar,
   openLibrary,
@@ -51,7 +51,7 @@ import {
   openSpaceIconPicker,
   openThemeEditor,
   runSiteCommand,
-  showTabPreview,
+  showTabTooltip,
 } from "./overlayController";
 import { setDeveloperMode } from "../shared/developerMode";
 import { openDeveloperTool, translatePage } from "./pageCommands";
@@ -155,16 +155,16 @@ function reapplyCosmeticFiltersToAllPages(): void {
 }
 
 /**
- * Actions that come from the pointer moving (the edge of a hidden sidebar, a tab row's preview). The pointer also moves
+ * Actions that come from the pointer moving (the edge of a hidden sidebar, a tab row's tooltip). The pointer also moves
  * over background windows, so these never bring a window forward.
  */
-const POINTER_ACTION_TYPES: BrowserAction["type"][] = ["setSidebarPeek", "showTabPreview", "hideTabPreview"];
+const POINTER_ACTION_TYPES: BrowserAction["type"][] = ["setSidebarPeek", "showTabTooltip", "hideTabTooltip"];
 
 /**
  * Runs an action from a page: the sidebar of a main window (windowId), or the overlay (null, it is always in the
  * focused window). An action from a background window's sidebar (a drop, a click that arrived before the window's
  * focus event) gives that window the focus first, so it acts there. Pointer actions stay where they are: the sidebar
- * peek is per window, and previews only show in the focused window.
+ * peek is per window, and tooltips only show in the focused window.
  */
 export function runActionFromWindow(action: BrowserAction, windowId: WindowId | null): void {
   const isFromBackgroundWindow = windowId !== null && windowId !== getState().focusedWindowId;
@@ -392,10 +392,10 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => setTidyTitles(state, action.isOn));
     case "setShowFullUrls":
       return applyChange((state) => setShowFullUrls(state, action.isOn));
-    case "showTabPreview":
-      return showTabPreview(action.tabId, action.anchor);
-    case "hideTabPreview":
-      return hideTabPreview();
+    case "showTabTooltip":
+      return showTabTooltip(action.title, action.showsRenameHint, action.frame);
+    case "hideTabTooltip":
+      return hideTabTooltip();
     case "setAppIcon":
       applyChange((state) => setAppIcon(state, action.variantId));
       applyAppIcon(action.variantId).catch((error) => console.error("Changing the app icon failed:", error));

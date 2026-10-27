@@ -116,8 +116,8 @@ export type BrowserAction =
   | { type: "setAdBlock"; isOn: boolean }
   | { type: "setAdBlockForSite"; site: string; isOn: boolean }
   | { type: "setAppIcon"; variantId: string }
-  | { type: "showTabPreview"; tabId: ItemId; anchor: { x: number; y: number; width: number; height: number } }
-  | { type: "hideTabPreview" }
+  | { type: "showTabTooltip"; title: string; showsRenameHint: boolean; frame: { x: number; y: number; width: number; height: number } }
+  | { type: "hideTabTooltip" }
   | { type: "setTidyTitles"; isOn: boolean }
   | { type: "setShowFullUrls"; isOn: boolean }
   | { type: "createNote" }
@@ -212,8 +212,8 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setAdBlock",
   "setAdBlockForSite",
   "setAppIcon",
-  "showTabPreview",
-  "hideTabPreview",
+  "showTabTooltip",
+  "hideTabTooltip",
   "setTidyTitles",
   "setShowFullUrls",
   "createNote",

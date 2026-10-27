@@ -125,7 +125,7 @@ Reference scale corrected: the screenshots are 1 px per pt (the window is 1888 �
       Arc (drawn by macOS; `UIDesignRequiresCompatibility` does not help, it brings back the old 12 pt buttons)
 
 ### 3.3 Remaining Arc features
-- [x] Tab hover previews · [x] Recent-tab switcher (⌃Tab, with page pictures) · [x] Inline URL autocomplete (also
+- [x] Tab hover tooltip (was a preview card until 3.7) · [x] Recent-tab switcher (⌃Tab, with page pictures) · [x] Inline URL autocomplete (also
       well-known sites) · [x] Tidy titles (our own rules)
 - [x] Capture (Control Center) · [x] Library Media · [x] Library Spaces/Boosts · [x] Notes · [x] Easels (text, pen,
       pictures, live captures taken again from their page; no sharing: server feature) · [x] Boost colors/fonts/JS
@@ -196,8 +196,10 @@ tooltip, 7 sidebar width, then AppleScript.
       field with handle and − / +, preset dots with arrows, wavy slider, dial; icon: Emoji / Icon tabs and a grid) →
       ours are overlay panels
 - [ ] Hovering a closed folder opens a searchable list of its tabs with "1 minute ago" times → missing
-- [ ] Hovering a tab row: × button and a small tooltip "Title / Double-click to rename" (no page preview seen after
-      3 s) → ours shows a page preview card
+- [x] Hovering a tab row: × button and a small tooltip "Title / Double-click to rename" (no page preview seen after
+      3 s) → ours showed a page preview card. Done: Arc's black tooltip beside the pointer (measured 29 / 44 pt tall,
+      10 pt padding), the rename hint only on the selected tab (Arc's other tabs show the title alone), hidden as soon
+      as the pointer moves
 - [ ] Sidebar width: the user's Arc is 254 pt (StorableWindows sidebarWidth) → ours 242; the Arc import should carry it
 - [ ] Sidebar scrollbar: thin overlay scrollbar while scrolling → check ours
 - New window: the purple window in the first recording was most likely incognito (⇧⌘N; the user is not sure), so

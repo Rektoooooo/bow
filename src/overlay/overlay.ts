@@ -25,7 +25,7 @@ import { renderSpaceIconPicker } from "./spaceIconPicker.js";
 import { renderSiteControls } from "./siteControls.js";
 import { renderCapture } from "./capture.js";
 import { handleSwitcherKey, installSwitcherMessages, renderSwitcher } from "./switcher.js";
-import { renderTabPreview } from "./tabPreview.js";
+import { renderTabTooltip } from "./tabTooltip.js";
 import { renderWelcome } from "./welcome.js";
 import { buildSiteSearchUrl, findSiteSearch } from "../shared/siteSearch.js";
 import type { SiteSearch } from "../shared/siteSearch.js";
@@ -458,7 +458,7 @@ function showPanel(message: OverlayShowMessage): void {
   document.body.dataset.panel = message.panel.kind;
   // The Find bar's and a permission prompt's overlay is only as big as the card, so it needs no backdrop; Capture
   // draws its own dimming.
-  const hasOwnBackground = ["find", "permission", "capture", "preview"].includes(message.panel.kind);
+  const hasOwnBackground = ["find", "permission", "capture", "tabTooltip"].includes(message.panel.kind);
   backdrop.hidden = hasOwnBackground;
 
   if (message.panel.kind === "commandBar") {
@@ -497,8 +497,8 @@ function showPanel(message: OverlayShowMessage): void {
   if (message.panel.kind === "switcher") {
     renderSwitcher(host, message.panel);
   }
-  if (message.panel.kind === "preview") {
-    renderTabPreview(host, message.panel);
+  if (message.panel.kind === "tabTooltip") {
+    renderTabTooltip(host, message.panel);
   }
   if (message.panel.kind === "welcome") {
     renderWelcome(host, message.panel);

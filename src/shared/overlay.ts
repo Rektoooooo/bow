@@ -49,7 +49,8 @@ export type OverlayPanel =
   | { kind: "permission"; requestId: string; host: string; kinds: SitePermissionKind[]; appName: string | null }
   | { kind: "capture"; frame: { x: number; y: number; width: number; height: number } }
   | { kind: "switcher"; tabs: SwitcherTab[]; index: number }
-  | { kind: "preview"; frame: OverlayRect; tabId: string; title: string; url: string; faviconUrl: string | null; snapshotUrl: string }
+  /** Arc's tab tooltip; the frame (window coordinates) is the box itself, sized by the sidebar. */
+  | { kind: "tabTooltip"; frame: OverlayRect; title: string; showsRenameHint: boolean }
   | { kind: "welcome"; spaceId: string; importSources: { id: string; label: string }[]; presets: { label: string; colors: string[]; appearance: ThemeAppearance }[] };
 
 /** One card of the recent-tab switcher (⌃Tab): most recently used first, the selected tab at index 0. */

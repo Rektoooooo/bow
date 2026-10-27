@@ -443,7 +443,7 @@ const FEATURES = [
   ["layout","Split View","","Two to four tabs side by side, vertical or horizontal. A split is saved as one sidebar item and reopens together.","Several web views in a resizable split container, saved as a group node in the sidebar tree.","ARC_WelcomeToArcFeature split_view.mp4","observe"],
   ["layout","Space themes & grain","","Each Space gets a GPU-rendered gradient with film grain, in light, dark or automatic mode.","A gradient plus noise shader: CSS for Electron, Metal for native. Read the editor's parameter set in the bundle first.","ARC_WindowThemeUI (.metallib), ARC_SpaceStyleEditor","static"],
   ["layout","Glow loading indicator","","Loading shows as a soft animated glow instead of a thin progress bar.","Animate a blurred gradient along the card edge while the page loads.","ARC_GlowProgressLoadingIndicator (.metallib)","observe"],
-  ["layout","Tab hover previews","","Hovering a sidebar tab shows a preview card of the page.","Snapshot each tab when it loses focus and show the cached image in a popover on hover.","Browser/Sidebar/Previews","observe"],
+  ["layout","Tab hover tooltip","","Resting on a sidebar tab shows a small black tooltip beside the pointer with its title; the selected tab adds \"Double-click to rename\". The binary has a Previews module, but the user's Arc showed no page preview, even after 3 s.","A borderless box above the page, sized to the text, hidden as soon as the pointer moves.","Browser/Sidebar/Previews","observe"],
   ["layout","Link status text","","Hovering a link shows its URL in a small label at the bottom of the card.","Listen for the engine's hovered-link event and show a fading label.","Browser/WindowContent/StatusTextView","observe"],
   ["layout","Multiple windows","⌘N","Several full browser windows over one sidebar: the same Spaces, Favorites and tabs, but each window has its own Space, selected tab, sidebar mode and width, collapsed Pinned sections and open folders. A tab open in another window shows a placeholder; tabs drag between windows' sidebars.","Keep each window's Space, selection, sidebar mode and width, collapsed sections and expanded items next to the shared sidebar tree (Arc's StorableWindows.json; new windows take sidebarViewPreferences, the last closed window's). A web view has one parent, so a second window shows a placeholder with a move button.","Windows/BrowserWindow, StorableWindows.json","observe"],
   ["layout","Crashed-tab page","","A friendly page with a reload button when a tab's renderer crashes.","Handle the engine's render-process-gone event and show your own view.","ARC_SadTab","observe"],
@@ -507,7 +507,7 @@ const FEATURES = [
 // What Sidebar Browser (this repo) has rebuilt so far. "partly": the core works, some of Arc's version is missing.
 const BUILT = {
   "Vertical sidebar":"built", "Inset web card":"built", "Split View":"built", "Space themes & grain":"built",
-  "Glow loading indicator":"built", "Link status text":"built", "Crashed-tab page":"built", "Tab hover previews":"built",
+  "Glow loading indicator":"built", "Link status text":"built", "Crashed-tab page":"built", "Tab hover tooltip":"built",
   "Multiple windows":"built",
   "Spaces":"built", "Profiles per Space":"built", "Favorites":"built", "Pinned tabs & folders":"built", "Live folders":"built",
   "Today tabs & auto-archive":"built", "Archive":"built", "Sidebar restore":"built", "Tidy titles":"built",
