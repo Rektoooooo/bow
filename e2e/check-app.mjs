@@ -419,7 +419,7 @@ fs.writeFileSync(path.join(upgradeDir, "browser-state.json"), JSON.stringify(ver
 const upgraded = await launch(upgradeDir);
 await upgraded.page.waitForSelector(".pinned-list .tab-row", { timeout: 30000 });
 state = await getState(upgraded.page);
-check("a milestone 1 (version 1) file opens and is upgraded", state.version === 3 && state.focusedWindowId === "window-1" && state.spaces[0].pinnedIds[0] === "tab-old" && state.settings.archiveAfterMs === 21600000);
+check("a milestone 1 (version 1) file opens and is upgraded", state.version === 4 && state.focusedWindowId === "window-1" && state.spaces[0].pinnedIds[0] === "tab-old" && state.settings.archiveAfterMs === 21600000);
 await upgraded.app.close();
 
 // Chromium prints its own internal log lines ("[pid:date/time:ERROR:base/…]"); only our app's output counts.

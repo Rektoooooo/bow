@@ -48,6 +48,9 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 - Electron 44 facts, checked with a throwaway script: `addChildView` into another window moves the view out of its
   old parent, and closing a window does not destroy its child views' pages.
 
+- A saved-shape version bump also breaks `e2e/check-app.mjs`, which asserts the upgraded file's version: grep
+  `e2e/` for `version ===` with every bump (missed twice on 2026-10-27).
+
 ## Matching Arc from screenshots
 - When a reference screenshot shows a state I don't recognize, ask the user what it shows before deriving a feature
   from it. (Shot 5 was Arc's per-site Developer Mode; I had planned it as a global "Show full URL" option.)

@@ -64,7 +64,7 @@ export function createInitialState(): BrowserState {
   };
 
   return {
-    version: 3,
+    version: 4,
     items: {},
     profiles: [{ id: DEFAULT_PROFILE_ID, name: "Default", favoriteIds: [] }],
     spaces: [personalSpace, workSpace],

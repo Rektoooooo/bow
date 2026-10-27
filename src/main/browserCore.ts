@@ -202,15 +202,16 @@ export function getRecentTabIds(): ItemId[] {
  * toolbar.
  */
 export function getLayoutOptions(windowId: WindowId = currentState.focusedWindowId): CardLayoutOptions {
+  // Each window has its own sidebar (shown or hidden, width): the projected state carries that window's.
   const windowState = getStateForWindow(windowId);
   const isFocused = windowId === currentState.focusedWindowId;
   const draggedWidth = isFocused ? previewSidebarWidth : null;
-  const sidebarWidth = draggedWidth ?? currentState.settings.sidebarWidth ?? SIDEBAR_WIDTH_PX;
+  const sidebarWidth = draggedWidth ?? windowState.settings.sidebarWidth ?? SIDEBAR_WIDTH_PX;
   const selectedTabId = getSelectedTabId(windowState);
   const selectedTab = selectedTabId === null ? undefined : findTab(windowState, selectedTabId);
   const isDeveloperToolbar = selectedTab !== undefined && isDeveloperModeOn(windowState, selectedTab.url);
   return {
-    isSidebarVisible: currentState.settings.isSidebarVisible,
+    isSidebarVisible: windowState.settings.isSidebarVisible,
     isToolbarVisible: true,
     isSidebarPeeking: peekingWindowIds.has(windowId),
     sidebarWidth: sidebarWidth,
@@ -252,7 +253,7 @@ export function previewSidebarWidthWhileDragging(width: number | null): void {
  * aside.
  */
 export function setSidebarPeek(windowId: WindowId, isPeeking: boolean): void {
-  const canPeek = !currentState.settings.isSidebarVisible;
+  const canPeek = !getStateForWindow(windowId).settings.isSidebarVisible;
   const newValue = isPeeking && canPeek;
   const isPeekingNow = peekingWindowIds.has(windowId);
   if (newValue === isPeekingNow || getMainWindow(windowId) === null) {
@@ -339,8 +340,11 @@ export function applyChange(change: (state: BrowserState) => BrowserState): void
   }
 
   currentState = newState;
-  if (currentState.settings.isSidebarVisible) {
-    peekingWindowIds.clear();
+  // A window whose sidebar is shown again has nothing to peek.
+  for (const windowId of Array.from(peekingWindowIds)) {
+    if (getStateForWindow(windowId).settings.isSidebarVisible) {
+      peekingWindowIds.delete(windowId);
+    }
   }
   rememberSelectedTab();
   saveState(stateFilePath, currentState);

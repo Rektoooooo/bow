@@ -154,6 +154,20 @@ by window id), because they change on every drag.
 - [x] Step 3: placeholder card "Open in another window" with Move to This Window; e2e/check-windows.mjs in
       `npm run e2e`; README, teardown page, handoff
 
+### 3.6 Multiple windows, closer to Arc (user: "get as close as possible to Arc", 2026-10-27)
+Evidence: the user's StorableWindows snapshots (Arc backup, read only). Each window has its own `sidebarMode`
+(anchored / noChrome), `sidebarWidth`, `spacesWithCollapsedPinnedSections` and `expandedItems` (open folders); the
+top-level `sidebarViewPreferences` matches the last window that closed (three snapshots have one open window that
+differs from it), and new windows start from it.
+- [x] Piece 1: saved shape v4: per window sidebar shown/hidden (⌘S), width, collapsed Pinned sections and open
+      folders (the focused window's stay in settings / Space.isPinnedOpen / FolderItem.isOpen, parked windows keep
+      their own); `newWindowSidebar` = the last closed window's; sidebar peek and glide per window; migrate v3 → v4
+- [ ] Piece 2: Notes and Easels in two windows get the same "Open in another window" card as pages (Arc's notes are
+      tab content too), so one editor at a time saves the file
+- [ ] Piece 3: drag an item from one window's sidebar into another's (Favorites, Pinned, Today, folders, splits,
+      Space switcher): main carries the dragged item id between windows; a dropped tab is selected there and its
+      page moves along
+
 ### 3.4 Verification
 - [x] e2e/arc-compare.mjs (side-by-side with the reference; positions match within about a point)
 - [x] Motion checks for ⌘S, peek and resize (e2e/check-motion.mjs, part of `npm run e2e`)
@@ -189,8 +203,7 @@ by window id), because they change on every drag.
 - [x] Multiple main windows (⌘N opens a second window, like Arc): built 2026-10-27, see 3.5 and
       `.handoffs/2026-10-27-multiple-windows.md`. (It had been deferred because every StorableWindows snapshot in the
       user's Arc backup holds 0 or 1 window; the user asked for it.)
-- [ ] Multiple windows follow-ups: ⌘S and the sidebar width per window (if Arc does that; unverified), dragging a tab
-      between two windows' sidebars, one editor per note/easel across windows
+- [ ] Multiple windows follow-ups: see 3.6
 - [ ] Sign and notarize the app (needs a Developer ID) so it runs on other Macs
 - [ ] Adding a Web Store extension to a second profile re-downloads into the folder the first profile has loaded;
       reuse the existing copy instead (rare)

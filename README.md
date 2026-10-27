@@ -70,6 +70,9 @@ in Arc). Running it twice adds nothing twice.
 - File › New Window (⌘N) opens another full window, like Arc: the same Spaces, Favorites, Pinned and Today lists,
   but its own Space and its own selected tab in each Space. It opens on the Space you were in, with the Command Bar
   ready for a new tab.
+- Each window has its own sidebar, like Arc: ⌘S, its width, and which Pinned sections and folders are open. A new
+  window starts with the sidebar of the last window you closed (Arc's rule), and the folders of the window it came
+  from.
 - A page is on screen in one window at a time. Selecting a tab another window shows says "Open in another window",
   with **Move to This Window**.
 - Menus, shortcuts, the Command Bar, the Library, Peek and the other panels act in the window in front. ⇧⌘W closes a

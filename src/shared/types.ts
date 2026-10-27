@@ -61,7 +61,7 @@ export interface FolderItem {
   title: string;
   /** Children in sidebar order. */
   childIds: ItemId[];
-  /** True when the folder is expanded in the sidebar. */
+  /** True when the folder is expanded in the focused window's sidebar (other windows: ParkedWindow.openFolderIds). */
   isOpen: boolean;
   /**
    * Set when the folder is a live folder that fills itself (Arc's `automaticLiveFolderData`). Optional: plain folders
@@ -132,7 +132,7 @@ export interface Space {
   pinnedIds: ItemId[];
   /** Today items in sidebar order, newest first (tabs and split views). */
   todayIds: ItemId[];
-  /** True when the Pinned section is expanded. */
+  /** True when the Pinned section is expanded in the focused window (others: ParkedWindow.collapsedPinnedSpaceIds). */
   isPinnedOpen: boolean;
 }
 
@@ -160,9 +160,12 @@ export interface ArchivedTab {
 export interface BrowserSettings {
   /** How long an unpinned tab may go unused before it is archived. Null means never. */
   archiveAfterMs: number | null;
-  /** False after ⌘S hides the sidebar. */
+  /** False after ⌘S hides the focused window's sidebar (each window has its own, like Arc's sidebarMode). */
   isSidebarVisible: boolean;
-  /** The sidebar's width in pixels, set by dragging its edge. Optional: missing means SIDEBAR_WIDTH_PX. */
+  /**
+   * The focused window's sidebar width in pixels, set by dragging its edge (each window has its own). Optional:
+   * missing means SIDEBAR_WIDTH_PX.
+   */
   sidebarWidth?: number;
   /** Short sounds on some actions (renderer/sounds.ts). Optional: missing means on, like Arc. */
   areSoundEffectsOn?: boolean;
@@ -248,20 +251,33 @@ export interface SitePermission {
   isAllowed: boolean;
 }
 
+/** A window's sidebar: shown or hidden (⌘S) and its width. Arc keeps these per window (sidebarMode, sidebarWidth). */
+export interface WindowSidebar {
+  isSidebarVisible: boolean;
+  /** Missing means SIDEBAR_WIDTH_PX. */
+  sidebarWidth?: number;
+}
+
 /**
- * What a main window shows while another window has the focus: its own Space and its own selected tab per Space.
- * The focused window's values are BrowserState.activeSpaceId and selectedTabIdBySpace (main/windows.ts).
+ * A main window's own choices while another window has the focus, like Arc's StorableWindows entries: its Space, its
+ * selected tab per Space, its sidebar, and which Pinned sections and folders it shows collapsed or open. The focused
+ * window's choices live where everything reads them (activeSpaceId, selectedTabIdBySpace, settings.isSidebarVisible
+ * and sidebarWidth, Space.isPinnedOpen, FolderItem.isOpen); main/windows.ts swaps them on focus.
  */
-export interface WindowSelection {
+export interface ParkedWindow extends WindowSidebar {
   id: WindowId;
   activeSpaceId: SpaceId;
   selectedTabIdBySpace: Record<SpaceId, ItemId | null>;
+  /** Spaces whose Pinned section this window shows collapsed (Arc's spacesWithCollapsedPinnedSections). */
+  collapsedPinnedSpaceIds: SpaceId[];
+  /** Folders this window shows open (Arc's expandedItems). */
+  openFolderIds: ItemId[];
 }
 
 /** Everything the browser saves to disk. */
 export interface BrowserState {
   /** Raise this number when the saved shape changes, and add an upgrade step to migrate.ts. */
-  version: 3;
+  version: 4;
   /** Every sidebar item, by id. Where an item sits is decided by the lists that contain its id. */
   items: Record<ItemId, SidebarItem>;
   profiles: Profile[];
@@ -277,7 +293,12 @@ export interface BrowserState {
   /** The main window whose choices are activeSpaceId and selectedTabIdBySpace: the last one focused. */
   focusedWindowId: WindowId;
   /** The other open main windows' choices, most recently focused first. One swaps in when its window gets the focus. */
-  otherWindows: WindowSelection[];
+  otherWindows: ParkedWindow[];
+  /**
+   * The sidebar a new window starts with: the one of the last window closed (Arc's sidebarViewPreferences). Optional:
+   * missing means shown, at the default width.
+   */
+  newWindowSidebar?: WindowSidebar;
   /** Newest first. */
   archive: ArchivedTab[];
   settings: BrowserSettings;

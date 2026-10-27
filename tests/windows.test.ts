@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { deleteSpace, switchSpace } from "../src/main/spaces";
-import { closeTab, createInitialState, getSelectedTabId, selectTab } from "../src/main/state";
+import { closeTab, createFolder, createInitialState, deleteItem, getSelectedTabId, selectTab, setPinnedSectionOpen, setSidebarVisible, setSidebarWidth, toggleFolder } from "../src/main/state";
 import { closeWindow, collectSelectedTabIdsOfAllWindows, focusWindow, listWindowIds, openWindow, projectStateForWindow, repairOtherWindows } from "../src/main/windows";
 import { FIRST_WINDOW_ID, HOUR_MS } from "../src/shared/settings";
 import { ONE_PM, openTabs, PERSONAL_SPACE_ID, WORK_SPACE_ID } from "./builders";
@@ -29,7 +29,7 @@ describe("opening a window", () => {
     expect(state.focusedWindowId).toBe(SECOND_WINDOW_ID);
     expect(state.activeSpaceId).toBe(PERSONAL_SPACE_ID);
     expect(getSelectedTabId(state)).toBeNull();
-    expect(state.otherWindows).toEqual([
+    expect(state.otherWindows).toMatchObject([
       { id: FIRST_WINDOW_ID, activeSpaceId: PERSONAL_SPACE_ID, selectedTabIdBySpace: { [PERSONAL_SPACE_ID]: tabIds[1], [WORK_SPACE_ID]: null } },
     ]);
     expect(listWindowIds(state)).toEqual([SECOND_WINDOW_ID, FIRST_WINDOW_ID]);
@@ -108,10 +108,14 @@ describe("closing a window", () => {
     expect(closed.otherWindows).toEqual([]);
   });
 
-  it("keeps the last window, so the next start opens it again", () => {
+  it("keeps the last window, so the next start opens it again, and remembers its sidebar for new windows", () => {
     const state = createInitialState();
 
-    expect(closeWindow(state, FIRST_WINDOW_ID)).toBe(state);
+    const closed = closeWindow(state, FIRST_WINDOW_ID);
+
+    expect(listWindowIds(closed)).toEqual([FIRST_WINDOW_ID]);
+    expect(closed.newWindowSidebar).toEqual({ isSidebarVisible: true, sidebarWidth: undefined });
+    expect(closeWindow(closed, FIRST_WINDOW_ID)).toBe(closed);
   });
 });
 
@@ -152,5 +156,68 @@ describe("selected tabs of all windows", () => {
     const selected = collectSelectedTabIdsOfAllWindows(secondSelectsA);
 
     expect([...selected].sort()).toEqual([tabIds[0], tabIds[1]].sort());
+  });
+});
+
+describe("each window's own sidebar, Pinned sections and folders (Arc's StorableWindows)", () => {
+  it("hides the sidebar (⌘S) and sets its width in the focused window only", () => {
+    const { state } = buildTwoWindows();
+    const secondHidden = setSidebarWidth(setSidebarVisible(state, false), 300);
+
+    const firstFocused = focusWindow(secondHidden, FIRST_WINDOW_ID);
+
+    expect(firstFocused.settings.isSidebarVisible).toBe(true);
+    expect(firstFocused.settings.sidebarWidth).toBeUndefined();
+    expect(projectStateForWindow(firstFocused, SECOND_WINDOW_ID).settings).toMatchObject({ isSidebarVisible: false, sidebarWidth: 300 });
+    expect(focusWindow(firstFocused, SECOND_WINDOW_ID).settings).toMatchObject({ isSidebarVisible: false, sidebarWidth: 300 });
+  });
+
+  it("collapses a Pinned section and closes a folder in the focused window only", () => {
+    const withFolder = createFolder(openTabs(["https://a.example"]).state, "Folder", ONE_PM);
+    const folderId = Object.values(withFolder.items).find((item) => item.kind === "folder")?.id as string;
+    const twoWindows = openWindow(withFolder, SECOND_WINDOW_ID);
+    const changedInSecond = toggleFolder(setPinnedSectionOpen(twoWindows, PERSONAL_SPACE_ID, false), folderId);
+
+    const firstWindowView = projectStateForWindow(changedInSecond, FIRST_WINDOW_ID);
+    const firstFocused = focusWindow(changedInSecond, FIRST_WINDOW_ID);
+
+    expect(firstWindowView.spaces[0]?.isPinnedOpen).toBe(true);
+    expect(firstWindowView.items[folderId]).toMatchObject({ isOpen: true });
+    expect(firstFocused.items[folderId]).toMatchObject({ isOpen: true });
+    expect(firstFocused.otherWindows[0]).toMatchObject({ id: SECOND_WINDOW_ID, collapsedPinnedSpaceIds: [PERSONAL_SPACE_ID], openFolderIds: [] });
+    expect(changedInSecond.otherWindows[0]).toMatchObject({ collapsedPinnedSpaceIds: [], openFolderIds: [folderId] });
+  });
+
+  it("opens a new window with the sidebar of the last window closed, like Arc's sidebarViewPreferences", () => {
+    const { state } = buildTwoWindows();
+    const secondHidden = setSidebarWidth(setSidebarVisible(state, false), 320);
+    const secondClosed = closeWindow(secondHidden, SECOND_WINDOW_ID);
+
+    const thirdWindow = openWindow(secondClosed, "window-third");
+
+    expect(secondClosed.newWindowSidebar).toEqual({ isSidebarVisible: false, sidebarWidth: 320 });
+    expect(thirdWindow.settings).toMatchObject({ isSidebarVisible: false, sidebarWidth: 320 });
+    expect(projectStateForWindow(thirdWindow, FIRST_WINDOW_ID).settings.isSidebarVisible).toBe(true);
+  });
+
+  it("opens a new window with the sidebar shown when no window was closed yet, whatever the focused one shows", () => {
+    const hiddenFirst = setSidebarVisible(createInitialState(), false);
+
+    const secondWindow = openWindow(hiddenFirst, SECOND_WINDOW_ID);
+
+    expect(secondWindow.settings.isSidebarVisible).toBe(true);
+    expect(secondWindow.otherWindows[0]).toMatchObject({ id: FIRST_WINDOW_ID, isSidebarVisible: false });
+  });
+
+  it("forgets deleted folders and Spaces in parked windows", () => {
+    const withFolder = createFolder(openTabs(["https://a.example"]).state, "Folder", ONE_PM);
+    const folderId = Object.values(withFolder.items).find((item) => item.kind === "folder")?.id as string;
+    const collapsedWork = setPinnedSectionOpen(withFolder, WORK_SPACE_ID, false);
+    const twoWindows = openWindow(collapsedWork, SECOND_WINDOW_ID);
+    const deleted = deleteSpace(deleteItem(twoWindows, folderId, TWO_PM), WORK_SPACE_ID, TWO_PM);
+
+    const repaired = repairOtherWindows(deleted);
+
+    expect(repaired.otherWindows[0]).toMatchObject({ collapsedPinnedSpaceIds: [], openFolderIds: [] });
   });
 });

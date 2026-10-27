@@ -34,7 +34,7 @@ describe("upgradeToCurrentVersion", () => {
   it("turns a version 1 file into the current version without losing tabs, selection, archive or settings", () => {
     const state = upgradeToCurrentVersion(VERSION_1_FILE);
 
-    expect(state?.version).toBe(3);
+    expect(state?.version).toBe(4);
     expect(state?.spaces[0]?.pinnedIds).toEqual(["tab-pinned"]);
     expect(state?.spaces[0]?.todayIds).toEqual(["tab-today"]);
     expect(state?.spaces[0]?.theme.colors).toEqual(["#e9d8d4"]);
@@ -48,17 +48,44 @@ describe("upgradeToCurrentVersion", () => {
   it("upgrades a version 1 file all the way, with its one window as the first window", () => {
     const state = upgradeToCurrentVersion(VERSION_1_FILE);
 
-    expect(state?.version).toBe(3);
+    expect(state?.version).toBe(4);
     expect(state?.focusedWindowId).toBe(FIRST_WINDOW_ID);
     expect(state?.otherWindows).toEqual([]);
   });
 
-  it("turns a version 2 file into version 3: one window, same Space and selection", () => {
+  it("turns a version 2 file into the current version: one window, same Space and selection", () => {
     const version2File = { ...createInitialState(), version: 2, focusedWindowId: undefined, otherWindows: undefined, activeSpaceId: "space-work", selectedTabIdBySpace: { "space-personal": null, "space-work": null } };
 
     const state = upgradeToCurrentVersion(JSON.parse(JSON.stringify(version2File)));
 
-    expect(state).toMatchObject({ version: 3, focusedWindowId: FIRST_WINDOW_ID, otherWindows: [], activeSpaceId: "space-work" });
+    expect(state).toMatchObject({ version: 4, focusedWindowId: FIRST_WINDOW_ID, otherWindows: [], activeSpaceId: "space-work" });
+  });
+
+  it("turns a version 3 file into version 4: every parked window gets the sidebar, Pinned sections and folders all shared", () => {
+    const initial = createInitialState();
+    const folder = { kind: "folder", id: "folder-1", title: "F", childIds: [], isOpen: true };
+    const spaces = initial.spaces.map((space) => (space.id === "space-work" ? { ...space, isPinnedOpen: false } : space));
+    const parkedV3 = { id: "window-2", activeSpaceId: "space-work", selectedTabIdBySpace: { "space-personal": null, "space-work": null } };
+    const version3File = {
+      ...initial,
+      version: 3,
+      items: { "folder-1": folder },
+      spaces: spaces,
+      settings: { ...initial.settings, isSidebarVisible: false, sidebarWidth: 280 },
+      otherWindows: [parkedV3],
+    };
+
+    const state = upgradeToCurrentVersion(JSON.parse(JSON.stringify(version3File)));
+
+    expect(state?.version).toBe(4);
+    expect(state?.otherWindows[0]).toEqual({
+      ...parkedV3,
+      isSidebarVisible: false,
+      sidebarWidth: 280,
+      collapsedPinnedSpaceIds: ["space-work"],
+      openFolderIds: ["folder-1"],
+    });
+    expect(state?.settings).toMatchObject({ isSidebarVisible: false, sidebarWidth: 280 });
   });
 
   it("returns a current file unchanged", () => {
@@ -69,7 +96,7 @@ describe("upgradeToCurrentVersion", () => {
 
   it("refuses files it does not understand", () => {
     expect(upgradeToCurrentVersion(null)).toBeNull();
-    expect(upgradeToCurrentVersion({ version: 4, spaces: [] })).toBeNull();
+    expect(upgradeToCurrentVersion({ version: 5, spaces: [] })).toBeNull();
     expect(upgradeToCurrentVersion({ ...createInitialState(), otherWindows: undefined })).toBeNull();
     expect(upgradeToCurrentVersion({ version: 1, spaces: [], tabs: [], archive: [], activeSpaceId: "x" })).toBeNull();
   });

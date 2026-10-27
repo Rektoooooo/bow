@@ -25,6 +25,22 @@ user's Arc never had more than one); the user asked what it was, and it was buil
 - The window list is restored at start: each window's Space and selection from `browser-state.json`, its place from
   `window-state.json` (now a map of window id → bounds; the old single rectangle belongs to `window-1`).
 
+## Closer to Arc (3.6, same day)
+
+The user's Arc backup (StorableWindows snapshots, read only) shows what Arc keeps per window: `sidebarMode`
+(anchored / noChrome), `sidebarWidth`, `spacesWithCollapsedPinnedSections` and `expandedItems` (open folders). The
+top-level `sidebarViewPreferences` is not updated on every toggle (three snapshots have one open window that
+differs from it); every snapshot fits "the sidebar of the last window closed", and new windows start from it.
+
+- **Piece 1 (saved shape v4):** `ParkedWindow` (was `WindowSelection`) also holds `isSidebarVisible`,
+  `sidebarWidth`, `collapsedPinnedSpaceIds` and `openFolderIds`. The focused window's values stay in
+  `settings.isSidebarVisible` / `sidebarWidth`, `Space.isPinnedOpen` and `FolderItem.isOpen`, so ⌘S, the width drag,
+  the Pinned header and folder toggles act on the focused window with the same pure functions; `windows.ts` swaps
+  them on focus and projects them for each sidebar. `newWindowSidebar` = the last closed window's sidebar (Arc's
+  sidebarViewPreferences); a new window takes it, and the Pinned sections and folders of the window it came from
+  (our choice). `getLayoutOptions(windowId)` and the sidebar peek read each window's own sidebar. `migrate.ts`
+  v3 → v4 copies the shared values into every parked window.
+
 ## How it is built
 
 - **Saved shape v3** (`src/shared/types.ts`): `focusedWindowId` and `otherWindows: WindowSelection[]` (id, Space,
@@ -68,8 +84,6 @@ user's Arc never had more than one); the user asked what it was, and it was buil
 
 ## Known limits (our choices or not done)
 
-- ⌘S (sidebar shown or hidden) and the sidebar width are still global settings: every window follows. Arc may keep
-  them per window; unverified.
 - Notes and Easels have no page view, so two windows can show the same note's editor at once; the last save wins.
 - Extensions: a tab belongs to the window it was first shown in for `chrome.tabs` / `chrome.windows` (the library
   cannot move a tab between windows without its removeTab, which would close our tab).

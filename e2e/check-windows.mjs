@@ -34,14 +34,20 @@ const urlOf = (name) => `${origin}/${name}`;
 
 const now = Date.now();
 const tab = (id, name) => ({ kind: "tab", id, url: urlOf(name), title: name, customTitle: null, faviconUrl: null, homeUrl: null, lastActiveAt: now, isMuted: false });
-const space = (id, name, todayIds) => ({ id, name, icon: "✦", theme: { colors: ["#000000"], appearance: "dark", grain: 0 }, profileId: "profile-default", pinnedIds: [], todayIds, isPinnedOpen: true });
+const space = (id, name, todayIds, pinnedIds = []) => ({ id, name, icon: "✦", theme: { colors: ["#000000"], appearance: "dark", grain: 0 }, profileId: "profile-default", pinnedIds, todayIds, isPinnedOpen: true });
+const folder = { kind: "folder", id: "folder-reading", title: "Reading", childIds: [], isOpen: true };
+
+/** Same values as shared/settings.ts: where the page card starts with the sidebar shown, and with it hidden. */
+const SIDEBAR_WIDTH = 242;
+const CARD_GAP = 7;
+const CARD_INSET = 10;
 fs.writeFileSync(
   path.join(userDataDir, "browser-state.json"),
   JSON.stringify({
     version: 3,
-    items: { "tab-alpha": tab("tab-alpha", "alpha"), "tab-beta": tab("tab-beta", "beta"), "tab-work": tab("tab-work", "work") },
+    items: { "tab-alpha": tab("tab-alpha", "alpha"), "tab-beta": tab("tab-beta", "beta"), "tab-work": tab("tab-work", "work"), "folder-reading": folder },
     profiles: [{ id: "profile-default", name: "Default", favoriteIds: [] }],
-    spaces: [space("space-main", "Main", ["tab-alpha", "tab-beta"]), space("space-work", "Work", ["tab-work"])],
+    spaces: [space("space-main", "Main", ["tab-alpha", "tab-beta"], ["folder-reading"]), space("space-work", "Work", ["tab-work"])],
     activeSpaceId: "space-main",
     selectedTabIdBySpace: { "space-main": "tab-alpha", "space-work": "tab-work" },
     focusedWindowId: "window-1",
@@ -80,7 +86,8 @@ async function waitForSidebars(app, count) {
   while (Date.now() < deadline) {
     const sidebars = app.windows().filter(isSidebarPage);
     if (sidebars.length >= count) {
-      for (const sidebar of sidebars) await sidebar.waitForSelector(".space-title", { timeout: 30000 });
+      // "attached": a window whose sidebar is hidden (⌘S) still draws it, out of sight.
+      for (const sidebar of sidebars) await sidebar.waitForSelector(".space-title", { state: "attached", timeout: 30000 });
       return sidebars;
     }
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -111,6 +118,7 @@ function describeWindows(app) {
         tag: tag,
         bounds: window.getNormalBounds(),
         pageUrls: urls.filter((url) => url.startsWith("http")),
+        pageX: children.find((child) => child.webContents.getURL().startsWith("http"))?.getBounds().x ?? null,
         hasOverlay: urls.some((url) => url.endsWith("/overlay/overlay.html")),
       });
     }
@@ -186,7 +194,7 @@ let firstState = await getState(firstSidebar);
 let secondState = await getState(secondSidebar);
 check(
   "both windows show the same Spaces and tabs",
-  JSON.stringify(firstState.spaces) === JSON.stringify(secondState.spaces) && Object.keys(secondState.items).length === 3,
+  JSON.stringify(firstState.spaces) === JSON.stringify(secondState.spaces) && Object.keys(secondState.items).length === 4,
 );
 check("the new window starts on the same Space with nothing selected", secondState.activeSpaceId === "space-main" && selectedTabId(secondState) === null && selectedTabId(firstState) === "tab-alpha");
 check("the new window has the focus", secondState.focusedWindowId !== "window-1" && firstState.otherWindows.length === 1);
@@ -255,6 +263,36 @@ secondState = await getState(secondSidebar);
 check("a menu command acts on the focused window only", firstState.activeSpaceId === "space-work" && secondState.activeSpaceId === "space-main");
 await dispatch(firstSidebar, { type: "switchSpace", spaceId: "space-main" });
 
+// Each window has its own sidebar (⌘S, width), Pinned sections and open folders, like Arc's StorableWindows.
+const sidebarHidden = (sidebar) => sidebar.evaluate(() => document.body.classList.contains("sidebar-hidden"));
+await dispatch(secondSidebar, { type: "setSidebarVisible", isVisible: false });
+windows = await waitForWindows(app, (list) => findWindow(list, "second")?.pageX === CARD_INSET);
+await secondSidebar.waitForTimeout(300);
+check(
+  "⌘S hides the sidebar of its own window only",
+  findWindow(windows, "second").pageX === CARD_INSET && findWindow(windows, "first").pageX === SIDEBAR_WIDTH + CARD_GAP && (await sidebarHidden(secondSidebar)) && !(await sidebarHidden(firstSidebar)),
+  JSON.stringify(windows.map((window) => window.pageX)),
+);
+await dispatch(secondSidebar, { type: "setSidebarPeek", isPeeking: true });
+windows = await waitForWindows(app, (list) => findWindow(list, "second")?.pageX === CARD_INSET + SIDEBAR_WIDTH);
+check("the hidden sidebar peeks in its own window, and the page glides aside there only", findWindow(windows, "second").pageX === CARD_INSET + SIDEBAR_WIDTH && findWindow(windows, "first").pageX === SIDEBAR_WIDTH + CARD_GAP, JSON.stringify(windows.map((window) => window.pageX)));
+await dispatch(secondSidebar, { type: "setSidebarPeek", isPeeking: false });
+await dispatch(firstSidebar, { type: "setSidebarWidth", width: 300, isFinal: true });
+windows = await waitForWindows(app, (list) => findWindow(list, "first")?.pageX === 300 + CARD_GAP && findWindow(list, "second")?.pageX === CARD_INSET);
+firstState = await getState(firstSidebar);
+secondState = await getState(secondSidebar);
+check("the sidebar width is per window too", findWindow(windows, "first").pageX === 300 + CARD_GAP && firstState.settings.sidebarWidth === 300 && secondState.settings.sidebarWidth === undefined, JSON.stringify(windows.map((window) => window.pageX)));
+await dispatch(firstSidebar, { type: "setPinnedSectionOpen", spaceId: "space-main", isOpen: false });
+await dispatch(secondSidebar, { type: "toggleFolder", folderId: "folder-reading" });
+await secondSidebar.waitForTimeout(400);
+firstState = await getState(firstSidebar);
+secondState = await getState(secondSidebar);
+const mainSpaceOf = (state) => state.spaces.find((candidate) => candidate.id === "space-main");
+check("collapsing a Pinned section is per window", mainSpaceOf(firstState).isPinnedOpen === false && mainSpaceOf(secondState).isPinnedOpen === true);
+check("and so is opening or closing a folder", firstState.items["folder-reading"].isOpen === true && secondState.items["folder-reading"].isOpen === false);
+const shownFolderRows = (sidebar) => sidebar.evaluate(() => document.querySelectorAll('.pinned-list [data-item-id="folder-reading"]').length);
+check("each sidebar draws its own", (await shownFolderRows(firstSidebar)) === 0 && (await shownFolderRows(secondSidebar)) === 1);
+
 // Close Window (⇧⌘W) closes one window; the other stays and keeps working.
 await dispatch(secondSidebar, { type: "switchSpace", spaceId: "space-main" });
 await secondSidebar.waitForTimeout(300);
@@ -282,6 +320,10 @@ secondSidebar = sidebars.find((sidebar) => sidebar !== firstSidebar);
 await tagWindows([secondSidebar], ["second"]);
 await waitForWindows(app, (list) => findWindow(list, "second")?.hasOverlay === true);
 await overlayPage.keyboard.press("Escape");
+secondState = await getState(secondSidebar);
+check("a new window starts with the sidebar of the last window closed (hidden there), like Arc", secondState.settings.isSidebarVisible === false && (await sidebarHidden(secondSidebar)));
+check("and the same Pinned sections as the window it came from (our choice)", mainSpaceOf(secondState).isPinnedOpen === false);
+await dispatch(secondSidebar, { type: "setPinnedSectionOpen", spaceId: "space-main", isOpen: true });
 await dispatch(secondSidebar, { type: "switchSpace", spaceId: "space-work" });
 await dispatch(secondSidebar, { type: "selectTab", tabId: "tab-work" });
 await secondSidebar.waitForTimeout(400);
@@ -308,6 +350,13 @@ const firstBefore = boundsBeforeQuit.find((window) => window.tag === "first")?.b
 const secondBefore = boundsBeforeQuit.find((window) => window.tag === "second")?.bounds;
 check("each window opens where it was", sameBounds(firstBefore, findWindow(windows, "first")?.bounds) && sameBounds(secondBefore, findWindow(windows, "second")?.bounds), JSON.stringify(windows.map((window) => window.bounds)));
 check("and shows its pages", findWindow(windows, "first").pageUrls.join() === urlOf("beta") && findWindow(windows, "second").pageUrls.join() === urlOf("work"), JSON.stringify(windows.map((window) => window.pageUrls)));
+const restoredFirst = restoredStates[workIndex === 0 ? 1 : 0];
+const restoredSecond = restoredStates[workIndex];
+check(
+  "and its own sidebar, width and Pinned sections",
+  restoredFirst.settings.isSidebarVisible && restoredFirst.settings.sidebarWidth === 300 && !mainSpaceOf(restoredFirst).isPinnedOpen && !restoredSecond.settings.isSidebarVisible && mainSpaceOf(restoredSecond).isPinnedOpen,
+  JSON.stringify(windows.map((window) => window.pageX)),
+);
 
 // Closing every window ends the app; the last one is kept for the next start.
 const exited = new Promise((resolve) => app.process().once("exit", () => resolve(true)));
