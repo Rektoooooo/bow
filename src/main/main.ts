@@ -16,6 +16,7 @@ import * as path from "node:path";
 import {
   ARCHIVE_PRUNE_INTERVAL_MS,
   ARCHIVE_SWEEP_INTERVAL_MS,
+  APP_ICON_DRAW_DELAY_MS,
   EXTENSION_UPDATE_FIRST_CHECK_MS,
   EXTENSION_UPDATE_INTERVAL_MS,
   IN_USE_REFRESH_INTERVAL_MS,
@@ -261,6 +262,22 @@ function startExtensionUpdates(): void {
 }
 
 /**
+ * Shows the chosen Dock icon once the first window has loaded: drawing one blocks the main process for a moment, and
+ * the sidebar's first picture waits for answers from it.
+ */
+function drawAppIconAfterStart(): void {
+  const applyChosenIcon = (): void => {
+    applyAppIcon(getState().settings.appIcon).catch((error) => console.warn("Could not show the chosen app icon:", error));
+  };
+  const firstWindow = getWindow();
+  if (firstWindow === null || !firstWindow.webContents.isLoading()) {
+    setTimeout(applyChosenIcon, APP_ICON_DRAW_DELAY_MS);
+    return;
+  }
+  firstWindow.webContents.once("did-finish-load", () => setTimeout(applyChosenIcon, APP_ICON_DRAW_DELAY_MS));
+}
+
+/**
  * Returns the first web address in a list of command-line arguments, or null.
  */
 function findUrlArgument(argumentList: string[]): string | null {
@@ -339,7 +356,7 @@ async function handleAppReady(): Promise<void> {
   setTabViewEvents(tabViewEvents);
   // Every window of the last session opens again, each with its own Space and selection (mainWindows.ts).
   restoreMainWindows();
-  applyAppIcon(getState().settings.appIcon).catch((error) => console.warn("Could not show the chosen app icon:", error));
+  drawAppIconAfterStart();
   followSystemAppearance(() => getState().settings.appIcon);
   initializePeek(tabViewEvents);
   createOverlayView();

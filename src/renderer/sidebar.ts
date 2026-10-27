@@ -786,8 +786,10 @@ async function startSidebar(): Promise<void> {
   window.browserApi.getSymbols().then(installSymbols).catch(() => undefined);
   // Themes set to "auto" follow macOS between light and dark.
   onSystemAppearanceChange(() => renderAll());
-  currentRuntime = await window.browserApi.getRuntimeState();
-  currentState = await window.browserApi.getState();
+  // Both at once: each answer waits for the main process, which is busy opening windows at startup.
+  const [runtime, state] = await Promise.all([window.browserApi.getRuntimeState(), window.browserApi.getState()]);
+  currentRuntime = runtime;
+  currentState = state;
   renderAll();
 }
 

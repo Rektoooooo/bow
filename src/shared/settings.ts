@@ -158,6 +158,13 @@ export const APP_UPDATE_INTERVAL_MS = 4 * 60 * 60 * 1000;
  */
 export const STATE_SAVE_DELAY_MS = 500;
 
+/**
+ * A Dock icon other than the bundle's own (an alternate icon, or Glass's dark twin) is drawn this long after the first
+ * window has loaded: drawing it blocks the main process for about 230 ms (measured 2026-10-27), which used to delay
+ * the sidebar's first picture. Our choice.
+ */
+export const APP_ICON_DRAW_DELAY_MS = 500;
+
 /** Live folders refresh this often. Our choice; Arc does not document its interval. */
 export const LIVE_FOLDER_REFRESH_MS = 10 * 60 * 1000;
 
