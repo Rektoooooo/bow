@@ -120,6 +120,18 @@ export const EXTENSION_UPDATE_FIRST_CHECK_MS = 60 * 1000;
 /** Then extensions are checked for updates this often. Chrome's default interval is about 5 hours. */
 export const EXTENSION_UPDATE_INTERVAL_MS = 5 * 60 * 60 * 1000;
 
+/**
+ * Where Bow's update feeds live: GitHub serves the newest published release's files at this address (drafts and
+ * pre-releases are skipped). tools/release-mac.sh attaches update-darwin-<arch>.json to each release.
+ */
+export const APP_UPDATE_FEED_BASE_URL = "https://github.com/Rektoooooo/bow/releases/latest/download";
+
+/** The first app update check runs this long after startup, so the start stays quick. Our choice. */
+export const APP_UPDATE_FIRST_CHECK_MS = 2 * 60 * 1000;
+
+/** Then Bow looks for a new version this often. Our choice: a few times a day, a small file each time. */
+export const APP_UPDATE_INTERVAL_MS = 4 * 60 * 60 * 1000;
+
 /** Live folders refresh this often. Our choice; Arc does not document its interval. */
 export const LIVE_FOLDER_REFRESH_MS = 10 * 60 * 1000;
 

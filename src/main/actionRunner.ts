@@ -61,6 +61,7 @@ import {
 import { setDeveloperMode } from "../shared/developerMode";
 import { openDeveloperTool, translatePage } from "./pageCommands";
 import { setAsDefaultBrowser } from "./defaultBrowser";
+import { restartToUpdate } from "./appUpdates";
 import { createFeedLiveFolderFromPage, createGitHubLiveFolder, openLiveFolderSource, refreshLiveFolder } from "./liveFolderRefresher";
 import { showHiddenLiveFolderItems } from "./liveFolders";
 import { setSplitOrientation, separateTabFromSplit, splitTabs, unsplit } from "./split";
@@ -389,6 +390,9 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => finishWelcome(state));
     case "setAsDefaultBrowser":
       setAsDefaultBrowser().catch((error) => console.error("Setting the default browser failed:", error));
+      return;
+    case "restartToUpdate":
+      restartToUpdate();
       return;
     case "translatePage": {
       const contents = getFocusedContents();

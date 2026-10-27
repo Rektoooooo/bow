@@ -67,6 +67,8 @@ function runButtonAction(button: HTMLElement): void {
       return dispatch({ type: "toggleMediaPlayback" });
     case "media-dismiss":
       return dispatch({ type: "dismissMedia" });
+    case "restart-to-update":
+      return dispatch({ type: "restartToUpdate" });
     case "navigate":
       return dispatch({ type: "navigate", command: (data.command ?? "reload") as NavigationCommand });
     case "open-command-bar":

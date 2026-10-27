@@ -75,8 +75,12 @@ function buildFixedActions(host: CommandActionHost): FixedAction[] {
     { entry: { id: "private-window", title: "New Private Window", keywords: ["incognito", "private browsing"] }, run: () => commands.openPrivateWindow() },
     { entry: { id: "import-arc", title: "Import from Arc", keywords: ["arc", "migrate"] }, run: () => commands.importFromArc() },
     { entry: { id: "default-browser", title: "Set as Default Browser", keywords: ["default browser", "open links"] }, run: () => commands.setAsDefaultBrowser() },
+    { entry: { id: "check-updates", title: "Check for Updates", keywords: ["update", "new version", "upgrade"] }, run: () => commands.checkForUpdates() },
   ];
 }
+
+/** The Command Bar entry that appears once a new version has downloaded. */
+const RESTART_TO_UPDATE_ID = "restart-to-update";
 
 /**
  * Builds the registry. list() is rebuilt on each query, so per-Space and per-theme entries are always current.
@@ -96,6 +100,10 @@ export function createCommandActionRegistry(host: CommandActionHost): CommandAct
     for (const preset of THEME_PRESETS) {
       entries.push({ id: `theme:${preset.label}`, title: `Theme: ${preset.label}`, keywords: ["color", "space theme"] });
     }
+    const readyVersion = host.commands.readyUpdateVersion();
+    if (readyVersion !== null) {
+      entries.push({ id: RESTART_TO_UPDATE_ID, title: `Restart to Update to Bow ${readyVersion}`, keywords: ["update", "relaunch", "new version"] });
+    }
     return entries;
   };
 
@@ -103,6 +111,10 @@ export function createCommandActionRegistry(host: CommandActionHost): CommandAct
     const fixedAction = fixedActions.find((action) => action.entry.id === actionId);
     if (fixedAction !== undefined) {
       fixedAction.run();
+      return;
+    }
+    if (actionId === RESTART_TO_UPDATE_ID) {
+      host.commands.restartToUpdate();
       return;
     }
     runGeneratedAction(host, actionId);

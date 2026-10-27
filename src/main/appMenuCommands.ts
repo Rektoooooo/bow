@@ -12,6 +12,7 @@
 import type { AppMenuCommands } from "./appMenu";
 import { importFromArc } from "./arcImportController";
 import { setAsDefaultBrowser } from "./defaultBrowser";
+import { checkForUpdatesNow, getReadyUpdateVersion, restartToUpdate } from "./appUpdates";
 import { applyChange, getState } from "./browserCore";
 import { openLittleWindow } from "./littleWindow";
 import { closeFrontWindow, openNewWindow } from "./mainWindows";
@@ -132,6 +133,11 @@ export const appMenuCommands: AppMenuCommands = {
   openPrivateWindow: () => openLittleWindow(null, { isPrivate: true }),
   zapElements: () => runSiteCommand("zap"),
   printPage: () => getFocusedContents()?.print(),
+  checkForUpdates: () => {
+    checkForUpdatesNow().catch((error) => console.error("Checking for updates failed:", error));
+  },
+  restartToUpdate: () => restartToUpdate(),
+  readyUpdateVersion: () => getReadyUpdateVersion(),
   setAsDefaultBrowser: () => {
     setAsDefaultBrowser().catch((error) => console.error("Set as default browser failed:", error));
   },

@@ -126,6 +126,8 @@ export type BrowserAction =
   | { type: "createEasel" }
   | { type: "finishWelcome" }
   | { type: "setAsDefaultBrowser" }
+  /** The sidebar's update notice: quit and start the version that has downloaded. */
+  | { type: "restartToUpdate" }
   | { type: "translatePage" }
   | { type: "createGitHubLiveFolder"; list: GitHubLiveList }
   | { type: "createFeedLiveFolder" }
@@ -228,6 +230,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "createEasel",
   "finishWelcome",
   "setAsDefaultBrowser",
+  "restartToUpdate",
   "translatePage",
   "createGitHubLiveFolder",
   "createFeedLiveFolder",

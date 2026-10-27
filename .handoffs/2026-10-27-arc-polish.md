@@ -130,8 +130,9 @@ approved fixes Peek (3), tab tooltip (6) and sidebar width (7). The user was awa
 
 ## Next (approved order)
 
-AppleScript (the user drives Arc from Raycast), then GitHub releases with auto-update and notarization (credentials
-only in the user's keychain, never in this public repo).
+AppleScript (the user drives Arc from Raycast). Done since: the open-source setup (repo Rektoooooo/bow, MIT), the
+release pipeline (`npm run release`: Developer ID, notarization, DMG) and auto-update (`appUpdates.ts`, see
+CLAUDE.md). v0.1.0 is a draft on GitHub until the user stores the notary credentials and says publish.
 
 AppleScript needs more than Electron offers: the standard suite (open a URL) works through `open-url`, but Raycast's
 Arc commands use Arc's own dictionary (windows, tabs, Spaces, `make new tab`, `URL of active tab`). An Electron app

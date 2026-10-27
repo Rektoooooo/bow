@@ -27,7 +27,8 @@ npm run e2e          # build + drive the real app: check-app, check-overlay, che
 node e2e/window-shot.mjs   # README screenshots from sample data → docs/screenshot-*.png
 node e2e/arc-compare.mjs   # side-by-side crops with the user's Arc screenshots (reference/, local only) → e2e/output
 npm run package      # release/Bow-darwin-arm64/Bow.app (ad-hoc signed, git-ignored)
-npm run release      # release/Bow-<version>-arm64.dmg: Developer ID signed, hardened runtime, notarized + stapled
+npm run release      # release/: Bow-<version>-arm64.dmg (Developer ID, hardened runtime, notarized + stapled), the
+                     # updater's Bow-<version>-arm64.zip and update-darwin-arm64.json; upload all three to the release
                      # (needs the keychain's Developer ID certificate and the notarytool profile "bow-notary")
 node e2e/check-package.mjs # checks that packaged app (Info.plist, menu, links from other apps)
 tools/make-icon.sh   # redraws build/icon.icns from tools/make-icon.cjs (our own icon design)
@@ -93,6 +94,12 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   macOS's sharing picker (`setDisplayMediaRequestHandler` with `useSystemPicker`), everything else and anything
   from our own pages is refused. Our pages block `will-navigate` and `window.open`. `e2e/permission-check.mjs`
   proves it. Keep it passing.
+- **Updates** (`appUpdates.ts`): Electron's Squirrel.Mac reads `update-darwin-<arch>.json` from the newest published
+  GitHub release (`releases/latest/download/…`, so drafts are invisible to installed apps), downloads the zip, checks
+  its SHA-256, size and Developer ID signature, and installs on quit or "Restart to Update". Off for builds from
+  source and for `--user-data-dir` runs (tests never reach GitHub); `--update-feed=<url>` points it at a local feed
+  (check-package does). A real update was verified by hand on 2026-10-27: a signed 0.1.0 downloaded a signed 0.1.1
+  from a local feed and installed it on quit. Never break the feed format: installed apps cannot update past it.
 - Build output: `dist/node` (main + preloads, CommonJS) and `dist/web` (sidebar, overlay and Little Window pages,
   ES modules).
 

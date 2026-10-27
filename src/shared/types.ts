@@ -382,6 +382,8 @@ export interface RuntimeState {
    * "Adding…" on the extension's Web Store page until the download is done.
    */
   extensionsBeingAdded: ExtensionBeingAdded[];
+  /** A new version of Bow that has downloaded and starts with the next restart (appUpdates.ts), or null. */
+  updateReadyVersion: string | null;
 }
 
 /** A profile waiting for a Web Store extension's download (RuntimeState.extensionsBeingAdded). */

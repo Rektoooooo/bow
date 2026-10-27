@@ -1,11 +1,14 @@
 // Checks the packaged app (npm run package first): it starts, knows it is "Bow", declares http and https
 // so macOS can make it the default browser, offers "Set as Default Browser…", opens a link from another app in a
-// Little Window, and runs a Chrome extension (so the extension library and its preload made it into the package).
+// Little Window, runs a Chrome extension (so the extension library and its preload made it into the package), and
+// asks its update feed for a new version (a local feed here, which says this version is the newest; a download
+// that finished is played to the updater, so the sidebar's notice and the app menu's restart are checked too).
 // usage: npm run package && node e2e/check-package.mjs
 // Uses a throwaway --user-data-dir folder and never changes the default browser.
 import { _electron } from "playwright-core";
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
+import * as http from "node:http";
 import * as path from "node:path";
 
 const appDir = path.resolve(import.meta.dirname, "..");
@@ -38,7 +41,18 @@ const usageTexts = [infoPlist.NSCameraUsageDescription, infoPlist.NSMicrophoneUs
 check("Info.plist explains camera, microphone and location use", usageTexts.every((text) => typeof text === "string" && text.startsWith("Websites you allow")), usageTexts.join(" | "));
 check("the app icon is ours", fs.readFileSync(path.join(bundlePath, "Contents", "Resources", infoPlist.CFBundleIconFile)).equals(fs.readFileSync(path.join(appDir, "build", "icon.icns"))));
 
-const app = await _electron.launch({ executablePath, args: [`--user-data-dir=${userDataDir}`, "--skip-welcome"], timeout: 30000 });
+// The update feed: this app's own version is the newest, so the check must find nothing to download.
+const feedRequests = [];
+const feedServer = http.createServer((request, response) => {
+  feedRequests.push(request.url);
+  const feed = { currentRelease: infoPlist.CFBundleShortVersionString, releases: [{ version: infoPlist.CFBundleShortVersionString, updateTo: { version: infoPlist.CFBundleShortVersionString, name: infoPlist.CFBundleShortVersionString, url: "http://127.0.0.1/never-downloaded.zip" } }] };
+  response.writeHead(200, { "Content-Type": "application/json" });
+  response.end(JSON.stringify(feed));
+});
+await new Promise((resolve) => feedServer.listen(0, "127.0.0.1", resolve));
+const feedUrl = `http://127.0.0.1:${feedServer.address().port}/update-darwin-${architecture}.json`;
+
+const app = await _electron.launch({ executablePath, args: [`--user-data-dir=${userDataDir}`, "--skip-welcome", `--update-feed=${feedUrl}`], timeout: 30000 });
 const deadline = Date.now() + 30000;
 let page = null;
 while (page === null && Date.now() < deadline) {
@@ -57,6 +71,23 @@ check("uses the user data folder it was given", appInfo.userData === userDataDir
 const appMenuLabels = await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items[0].submenu.items.map((item) => item.label));
 check("the app menu offers Set as Default Browser…", appMenuLabels.includes("Set as Default Browser…"));
 check("the app menu says Bow", appMenuLabels.includes("About Bow") && appMenuLabels.includes("Quit Bow"), appMenuLabels.join(", "));
+check("the app menu offers Check for Updates…", appMenuLabels.includes("Check for Updates…"));
+
+const updateOutcome = await app.evaluate(({ autoUpdater }) => new Promise((resolve) => {
+  autoUpdater.once("update-not-available", () => resolve("newest"));
+  autoUpdater.once("update-available", () => resolve("available"));
+  autoUpdater.once("error", (error) => resolve(`error: ${error.message}`));
+  autoUpdater.checkForUpdates();
+}));
+check("the updater reads its feed and finds this version is the newest", updateOutcome === "newest" && feedRequests.length > 0, `${updateOutcome}, ${feedRequests.length} feed request(s)`);
+// What Squirrel says once a new version has downloaded (it was checked against a real signed update by hand).
+await app.evaluate(({ autoUpdater }) => autoUpdater.emit("update-downloaded", {}, "", "9.9.9", new Date(), ""));
+const notice = page.locator("#update-notice");
+await notice.waitFor({ state: "visible", timeout: 5000 }).catch(() => undefined);
+const noticeText = await notice.innerText().catch(() => "");
+check("a downloaded update shows the sidebar's restart notice", noticeText.includes("Bow 9.9.9") && noticeText.includes("Restart"), noticeText.replaceAll("\n", " · "));
+const menuAfterDownload = await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items[0].submenu.items.map((item) => item.label));
+check("and the app menu offers the restart", menuAfterDownload.includes("Restart to Update to Bow 9.9.9"), menuAfterDownload.slice(0, 3).join(", "));
 
 // The hidden window that draws the Dock icon (a data: page, in dark mode right at startup) is not one of the app's.
 const windowCount = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((window) => !window.webContents.getURL().startsWith("data:")).length);
@@ -91,6 +122,7 @@ check("a Chrome extension runs in the packaged app", marker === "on", marker);
 check("no page errors in the sidebar", consoleErrors.length === 0, consoleErrors.join(" | "));
 
 await app.close();
+feedServer.close();
 fs.rmSync(userDataDir, { recursive: true, force: true });
 
 const failed = results.filter((result) => !result.ok);

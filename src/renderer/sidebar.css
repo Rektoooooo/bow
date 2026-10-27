@@ -1237,6 +1237,64 @@ button:disabled {
   background: var(--row-hover);
 }
 
+/* ---------- Update notice (a new version of Bow has downloaded) ---------- */
+
+.update-notice {
+  flex: none;
+  margin: 4px 0 2px;
+}
+
+.update-notice[hidden] {
+  display: none;
+}
+
+.update-notice-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--tile);
+  color: var(--ink);
+  text-align: left;
+  transition: background-color var(--motion-fast) linear;
+}
+
+.update-notice-button:hover {
+  background: var(--row-hover);
+}
+
+.update-notice-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.update-notice-title {
+  font-weight: 600;
+}
+
+.update-notice-version {
+  opacity: 0.6;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.update-notice-restart {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--frame-2);
+  font-size: 11px;
+  font-weight: 600;
+}
+
 /* ---------- Bottom bar: Library, the Space switcher, + ---------- */
 
 .bottom-bar {

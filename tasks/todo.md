@@ -305,8 +305,10 @@ repo: the user stores them in their own keychain); Arc Max and sync/sharing stay
       passes on the signed app)
 - [ ] First release v0.1.0: the draft exists on GitHub (notes only). Left: the user saves notarytool credentials
       (profile "bow-notary"), `npm run release` from a clean checkout of origin/main, upload
-      release/Bow-0.1.0-arm64.dmg to the draft, the user says publish
-- [ ] Auto-update (Bow does not update itself yet; the README says to watch releases)
+      release/Bow-0.1.0-arm64.dmg, Bow-0.1.0-arm64.zip and update-darwin-arm64.json to the draft, the user says
+      publish
+- [x] Auto-update (2026-10-27, `appUpdates.ts`): GitHub release feed + Squirrel.Mac, sidebar notice, menu and
+      Command Bar; verified with a real signed 0.1.0 → 0.1.1 update from a local feed
 - [x] Adding a Web Store extension to a second profile re-downloads into the folder the first profile has loaded;
       reuse the existing copy instead (rare). Fixed 2026-10-27: a second profile shares the copy
       (`findExtensionCopy`); one that asks while the download runs waits for it and gets the same copy.

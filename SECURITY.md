@@ -26,5 +26,7 @@ to a newer Electron release.
   windows.
 - Extensions from the Chrome Web Store are checked like Chrome checks them (signed with the extension's own key)
   before anything is unpacked.
+- Updates come only from this repository's GitHub releases. macOS's updater installs one only when it is signed by
+  the same Developer ID as the running Bow and matches the SHA-256 and size listed in the release's update feed.
 
 `e2e/permission-check.mjs` tests these promises. A way around any of them is a vulnerability.

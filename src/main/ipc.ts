@@ -313,6 +313,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   createEasel: {},
   finishWelcome: {},
   setAsDefaultBrowser: {},
+  restartToUpdate: {},
   translatePage: {},
   createGitHubLiveFolder: { list: isGitHubLiveList },
   createFeedLiveFolder: {},

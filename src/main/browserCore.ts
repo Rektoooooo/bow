@@ -93,6 +93,9 @@ const liveFolderStatuses = new Map<ItemId, LiveFolderStatus>();
 /** Web Store extensions downloading and the profiles waiting for each (RuntimeState.extensionsBeingAdded). */
 let extensionsBeingAdded: ExtensionBeingAdded[] = [];
 
+/** A downloaded version of Bow waiting for a restart (RuntimeState.updateReadyVersion). */
+let updateReadyVersion: string | null = null;
+
 /** The sidebar width while its edge is being dragged in the focused window; null otherwise (the saved width applies). */
 let previewSidebarWidth: number | null = null;
 
@@ -498,6 +501,7 @@ export function collectRuntimeState(windowId: WindowId = currentState.focusedWin
     isLibraryOpen: libraryWindowId === windowId,
     libraryWidth: getLibraryWidth(windowId),
     faviconAccents: getFaviconAccents(),
+    updateReadyVersion: updateReadyVersion,
   };
 }
 
@@ -533,6 +537,14 @@ export function getExtensionsBeingAdded(): ExtensionBeingAdded[] {
  */
 export function setExtensionsBeingAdded(entries: ExtensionBeingAdded[]): void {
   extensionsBeingAdded = entries;
+  scheduleRuntimePush();
+}
+
+/**
+ * A new version of Bow has downloaded (appUpdates.ts): every sidebar shows its notice.
+ */
+export function setUpdateReadyVersion(version: string | null): void {
+  updateReadyVersion = version;
   scheduleRuntimePush();
 }
 

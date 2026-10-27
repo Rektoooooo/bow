@@ -58,6 +58,7 @@ let currentRuntime: RuntimeState = {
   editorTabIdsHere: [],
   itemDraggedInOtherWindow: null,
   extensionsBeingAdded: [],
+  updateReadyVersion: null,
   isWindowActive: true,
   isLibraryOpen: false,
   libraryWidth: LIBRARY_COLUMN_WIDTH_PX,
@@ -405,6 +406,33 @@ function renderMediaPlayer(state: BrowserState): void {
   player.hidden = false;
 }
 
+/**
+ * Draws the notice for a new version of Bow that has downloaded: one button that restarts into it. It stays until
+ * the restart; quitting Bow installs the update too.
+ */
+function renderUpdateNotice(): void {
+  const notice = document.getElementById("update-notice");
+  if (notice === null) {
+    return;
+  }
+  const readyVersion = currentRuntime.updateReadyVersion;
+  if (readyVersion === null) {
+    notice.hidden = true;
+    morphChildren(notice, [], { animate: false });
+    return;
+  }
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "update-notice-button";
+  button.title = `Restart to update to Bow ${readyVersion}`;
+  button.dataset.action = "restart-to-update";
+  const text = createElement("span", "update-notice-text");
+  text.append(createElement("span", "update-notice-title", "Update ready"), createElement("span", "update-notice-version", `Bow ${readyVersion}`));
+  button.append(createIcon("download"), text, createElement("span", "update-notice-restart", "Restart"));
+  morphChildren(notice, [button], { animate: false });
+  notice.hidden = false;
+}
+
 /** Brightness (0…1) above which the toolbar's text and icons turn dark. */
 const LIGHT_TOOLBAR_LUMINANCE = 0.55;
 
@@ -507,6 +535,7 @@ function renderAll(): void {
   }
   hasRenderedOnce = true;
   renderMediaPlayer(state);
+  renderUpdateNotice();
   renderBottomBar(state);
   // The page area follows the real selection even while "New Tab" carries the highlight (Arc's shot 3).
   const selectedTabId = getSelectedTabId(state);

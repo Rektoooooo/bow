@@ -10,6 +10,7 @@
  *
  * Data flow:
  *   app ready → installAppMenu(commands) → user presses ⌘T → commands.openCommandBar("newTab")
+ *   an update has downloaded → installAppMenu(commands) again → "Restart to Update to Bow …"
  */
 import { Menu } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
@@ -59,6 +60,12 @@ export interface AppMenuCommands {
   zapElements(): void;
   setAsDefaultBrowser(): void;
   printPage(): void;
+  /** Bow › Check for Updates…: checks now and says what it found. */
+  checkForUpdates(): void;
+  /** Quits and starts the version that has downloaded. */
+  restartToUpdate(): void;
+  /** The downloaded version waiting for a restart, or null: the menu then offers the restart instead of a check. */
+  readyUpdateVersion(): string | null;
 }
 
 /** Where the Help menu points. */
@@ -82,6 +89,17 @@ function buildNumberedItems(labelPrefix: string, modifier: string, onSelect: (nu
 }
 
 /**
+ * The app menu's update item: a check, or the restart once a new version has downloaded.
+ */
+function buildUpdateItem(commands: AppMenuCommands): MenuItemConstructorOptions {
+  const readyVersion = commands.readyUpdateVersion();
+  if (readyVersion === null) {
+    return { label: "Check for Updates…", click: () => commands.checkForUpdates() };
+  }
+  return { label: `Restart to Update to Bow ${readyVersion}`, click: () => commands.restartToUpdate() };
+}
+
+/**
  * Builds the whole menu bar.
  */
 function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] {
@@ -90,6 +108,7 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
       role: "appMenu",
       submenu: [
         { role: "about" },
+        buildUpdateItem(commands),
         { type: "separator" },
         { label: "Set as Default Browser…", click: () => commands.setAsDefaultBrowser() },
         { type: "separator" },
@@ -208,7 +227,7 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
 }
 
 /**
- * Installs the menu bar.
+ * Installs the menu bar. Called again when an update has downloaded, so the app menu offers the restart.
  */
 export function installAppMenu(commands: AppMenuCommands): void {
   const menu = Menu.buildFromTemplate(buildTemplate(commands));

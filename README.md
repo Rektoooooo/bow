@@ -62,8 +62,10 @@ browsing history and your Chrome Web Store extensions (copied, so they survive A
 Arc). Running it twice adds nothing twice. Chrome, Brave, Edge, Vivaldi and Safari can be imported too
 (Library › Settings).
 
-Bow does not update itself yet: watch the repository's releases (Watch › Custom › Releases) to hear about new
-versions.
+Bow keeps itself up to date: a few times a day it looks for a new release here on GitHub, downloads it in the
+background, and the sidebar says **Update ready**. Click **Restart**, or just quit Bow; the new version is there the
+next time it opens. **Bow › Check for Updates…** looks right away. The check downloads a small file from this
+repository's releases and sends nothing about you.
 
 ## Build it yourself
 
@@ -76,8 +78,9 @@ npm run e2e    # drives the real app with Playwright (opens windows for a few mi
 ```
 
 `npm run package` builds **release/Bow-darwin-arm64/Bow.app**, signed ad hoc for your own Mac. `npm run release`
-builds the signed, notarized disk image (it needs a Developer ID certificate and notarytool credentials; see the top
-of `tools/release-mac.sh`).
+builds a release's files: the signed, notarized disk image, the zip and the feed that installed copies update from
+(it needs a Developer ID certificate and notarytool credentials; see the top of `tools/release-mac.sh`). A build from
+source never updates itself.
 
 ## What works
 
