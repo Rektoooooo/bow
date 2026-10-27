@@ -161,6 +161,23 @@ check("selecting tabs (pages start loading) redraws within a frame", perSelectMs
 const longTasks = await sidebar.evaluate(() => globalThis.longTasks);
 check(`no long tasks (over ${LONG_TASK_MS} ms) while changing`, longTasks.length === 0, longTasks.length === 0 ? "" : `${longTasks.join(", ")} ms`);
 
+// Arc's overlay scroller: the long list gives no width to a scroll bar, a knob shows while it scrolls, then fades.
+const scrollFacts = () =>
+  sidebar.evaluate(() => {
+    const scroller = document.getElementById("sidebar-scroll");
+    const thumb = document.querySelector(".overlay-scroll-thumb");
+    return { barWidth: scroller.offsetWidth - scroller.clientWidth, isShown: thumb?.classList.contains("is-visible") ?? false, top: thumb?.offsetTop ?? 0, listTop: scroller.offsetTop };
+  });
+const beforeScroll = await scrollFacts();
+check("the long sidebar list takes no width for a scroll bar, like Arc's overlay scroller", beforeScroll.barWidth === 0 && !beforeScroll.isShown, JSON.stringify(beforeScroll));
+await sidebar.evaluate(() => document.getElementById("sidebar-scroll").scrollBy(0, 600));
+await sidebar.waitForTimeout(150);
+const whileScrolling = await scrollFacts();
+check("scrolling shows the knob, moved down the list", whileScrolling.isShown && whileScrolling.top > whileScrolling.listTop + 2, JSON.stringify(whileScrolling));
+await sidebar.waitForTimeout(1500);
+const afterScroll = await scrollFacts();
+check("and it fades once the list stops", !afterScroll.isShown, JSON.stringify(afterScroll));
+
 await app.close();
 const failed = results.filter((result) => !result.ok).length;
 console.log(`\n${results.length - failed}/${results.length} performance checks passed.`);

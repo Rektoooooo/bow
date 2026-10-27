@@ -28,6 +28,7 @@ import { renderFavoriteTile, renderItemRows, startRowRedraw } from "./rows.js";
 import type { RowContext } from "./rows.js";
 import { installSidebarEvents } from "./sidebarEvents.js";
 import { createIcon, installSymbols } from "./icons.js";
+import { installOverlayScrollbar } from "./overlayScrollbar.js";
 import { applySpaceTheme, onSystemAppearanceChange } from "./theme.js";
 import { createNavigationButtons, renderToolbar } from "./toolbar.js";
 import { installFolderListHover } from "./folderListHover.js";
@@ -770,6 +771,10 @@ async function startSidebar(): Promise<void> {
     installFolderListHover(sidebar);
     installDragAndDrop(sidebar);
     sidebar.addEventListener("wheel", handleSidebarWheel, { passive: true });
+  }
+  const sidebarScroll = document.getElementById("sidebar-scroll");
+  if (sidebarScroll !== null) {
+    installOverlayScrollbar(sidebarScroll);
   }
   if (toolbar !== null) {
     installSidebarEvents(toolbar, callbacks);
