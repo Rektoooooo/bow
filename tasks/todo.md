@@ -174,8 +174,13 @@ differs from it), and new windows start from it.
 
 ### 3.7 Live Arc comparison (user's screen recording of Arc, 2026-10-27; frames in reference/arc-live/, git-ignored)
 Found by watching the user's real Arc (active window) next to ours. Each item: what Arc does → what we do.
-- [ ] Frame colour follows window focus: black theme sidebar #060606 while active, #353535 while inactive (all five
-      reference shots were inactive, so our palette only matches the inactive look) → ours never changes
+User's go-ahead and order (2026-10-27): 1 active look, 2 theme editor, 3 Peek, 4 Library, 5 folder hover list, 6 tab
+tooltip, 7 sidebar width, then AppleScript.
+- [ ] Active vs inactive window: Arc's whole sidebar palette is darker while its window is active. Measured on the
+      user's black "Main" Space (sRGB values; active = recording frame f0136, inactive = live window capture):
+      frame 17 vs 53, selected row 55 vs 73, Space label 113 vs 145, row text 211 vs 217, GitHub (near-black page)
+      toolbar 56 vs 66. Our tokens and palette match only the inactive column (all five reference shots were inactive).
+      The hidden sidebar shown at the edge is its own darker floating panel (6, rounded, bordered).
 - [ ] Library lives in the sidebar column: a vertical icon rail (Media, Downloads, Easels, Spaces, Boosts, Archived
       Tabs) with the list beside it; Spaces spread over the window in columns → ours is a floating panel
 - [ ] Peek: a card almost the whole page card wide, over the toolbar, with its own toolbar row (back, forward,
@@ -189,9 +194,13 @@ Found by watching the user's real Arc (active window) next to ours. Each item: w
       3 s) → ours shows a page preview card
 - [ ] Sidebar width: the user's Arc is 254 pt (StorableWindows sidebarWidth) → ours 242; the Arc import should carry it
 - [ ] Sidebar scrollbar: thin overlay scrollbar while scrolling → check ours
-- [ ] New window (⌘N?): a purple gradient window, sidebar with only the Space name and New Tab, Command Bar open →
-      ours shows the full sidebar; ask the user which command opened it before changing anything
-- Note: the user runs Raycast, which talks to Arc through AppleScript; ours has no AppleScript yet
+- New window: the purple window in the first recording was most likely incognito (⇧⌘N; the user is not sure), so
+  Arc's ⌘N window and its "open in another window" placeholder are still unobserved; no change planned
+- [ ] AppleScript dictionary (the user runs Raycast, which talks to Arc through AppleScript; ours has none yet)
+
+User decisions (2026-10-27): publish releases on GitHub for auto-updates (yes); notarize with the user's Apple
+Developer account (yes; the repo is open source, so certificates, notary credentials and team ids never go into the
+repo: the user stores them in their own keychain); Arc Max and sync/sharing stay skipped.
 
 ### 3.4 Verification
 - [x] e2e/arc-compare.mjs (side-by-side with the reference; positions match within about a point)

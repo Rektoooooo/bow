@@ -41,7 +41,7 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
 - **Pure core.** `state.ts`, `spaces.ts`, `split.ts`, `tree.ts`, `windows.ts`, `autoArchive.ts`, `commandBar.ts`,
   `history.ts`, `layout.ts`, `migrate.ts` and the Arc importers take data in and return a changed copy. No Electron, no
   `Date.now()` inside; `now` is a parameter. Return the *same object* when nothing changed.
-- **Data model** (`src/shared/types.ts`, version 3) follows Arc's: every sidebar object is an item; order lives only
+- **Data model** (`src/shared/types.ts`, version 4) follows Arc's: every sidebar object is an item; order lives only
   in ordered id lists (profile Favorites, Space Pinned / Today, folder and split children). No parent pointers.
   A saved-shape change needs a version bump and an upgrade step in `migrate.ts`.
 - **One way to change state.** Only `applyChange()` in `src/main/browserCore.ts` replaces the state; it saves, calls
@@ -51,8 +51,11 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   `activeSpaceId` / `selectedTabIdBySpace`, so every pure function acts on "the focused window"; the other windows'
   are parked in `otherWindows` and swapped in on focus (`windows.ts`). Each sidebar gets the state projected for its
   window. `getWindow()` is the last focused main window (never `BrowserWindow.getFocusedWindow()`). A page view has
-  one parent: it stays with the window that shows it, another window shows "Open in another window". The overlay,
-  Peek and status bubble move to the focused window when they open.
+  one parent: it stays with the window that shows it, another window shows "Open in another window" (Notes and
+  Easels follow the same one-window rule). The overlay, Peek and status bubble move to the focused window when they
+  open. Each window also has its own sidebar (shown or hidden, width), collapsed Pinned sections and open folders,
+  like Arc's StorableWindows; a new window takes the last closed window's sidebar. Items can be dragged from one
+  window's sidebar into another's (main carries the dragged item's id between the windows).
 - **Actions.** The sidebar sends one `BrowserAction` (`src/shared/actions.ts`) on one channel; `ipc.ts` checks every
   field (`parseAction`) and only from our own pages; `actionRunner.ts` runs it. Menu items live in `appMenu.ts`
   (accelerators = Arc's shortcuts) and `appMenuCommands.ts`; the Command Bar's actions reuse them.
