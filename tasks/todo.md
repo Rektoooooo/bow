@@ -299,7 +299,14 @@ repo: the user stores them in their own keychain); Arc Max and sync/sharing stay
       `.handoffs/2026-10-27-multiple-windows.md`. (It had been deferred because every StorableWindows snapshot in the
       user's Arc backup holds 0 or 1 window; the user asked for it.)
 - [x] Multiple windows follow-ups: see 3.6
-- [ ] Sign and notarize the app (needs a Developer ID) so it runs on other Macs
+- [x] Open-source setup (2026-10-27): repo renamed to Rektoooooo/bow, MIT LICENSE, CONTRIBUTING, CODE_OF_CONDUCT,
+      SECURITY (private vulnerability reporting on), issue forms, PR template, CI (build + unit tests), README
+- [x] Release pipeline: `npm run release` (Developer ID signing with hardened runtime checked: e2e/check-package
+      passes on the signed app)
+- [ ] First release v0.1.0: the draft exists on GitHub (notes only). Left: the user saves notarytool credentials
+      (profile "bow-notary"), `npm run release` from a clean checkout of origin/main, upload
+      release/Bow-0.1.0-arm64.dmg to the draft, the user says publish
+- [ ] Auto-update (Bow does not update itself yet; the README says to watch releases)
 - [x] Adding a Web Store extension to a second profile re-downloads into the folder the first profile has loaded;
       reuse the existing copy instead (rare). Fixed 2026-10-27: a second profile shares the copy
       (`findExtensionCopy`); one that asks while the download runs waits for it and gets the same copy.
