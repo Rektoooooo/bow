@@ -168,7 +168,7 @@ by window id), because they change on every drag.
   menus on the focused window, ⇧⌘W, restart with both windows (place, Space, selection, focus), quitting with the
   last window and the next start opening it. Suites: `npm test` 301, `check-app` 47, `check-overlay` 68,
   `check-extensions` 20, `permission-check`, `check-motion` 6, `check-live-folders` 21, `check-performance` 4,
-  `check-windows` 29.
+  `check-windows` 30, `check-package` 12.
 - **Known limits:** in `.handoffs/2026-10-27-multiple-windows.md` (⌘S and sidebar width are global, one note editor
   per window, extensions keep a tab's first window, no drag between windows).
 

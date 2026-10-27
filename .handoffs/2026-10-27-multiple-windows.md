@@ -62,7 +62,9 @@ user's Arc never had more than one); the user asked what it was, and it was buil
 - `e2e/check-windows.mjs` (in `npm run e2e`): ⌘N, own Space and selection per window, the placeholder and Move to
   This Window, a let-go page returning, actions and the Command Bar in the window they came from, a menu acting on
   the focused window only, Close Window, restart restoring both windows (place, Space, selection, focus), quitting
-  with the last window and the next start opening that one. `E2E_DEBUG=1` streams the main process's output.
+  with the last window and the next start opening that one, and an old one-rectangle `window-state.json` placing
+  the first window (30 checks). `E2E_DEBUG=1` streams the main process's output. `check-package` (packaged app, not
+  part of `npm run e2e`) is green too (12).
 
 ## Known limits (our choices or not done)
 

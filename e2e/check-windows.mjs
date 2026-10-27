@@ -51,6 +51,10 @@ fs.writeFileSync(
   }),
 );
 
+// window-state.json as it was before several windows: one rectangle. It belongs to the first window.
+const LEGACY_BOUNDS = { x: 140, y: 90, width: 1100, height: 760 };
+fs.writeFileSync(path.join(userDataDir, "window-state.json"), JSON.stringify(LEGACY_BOUNDS));
+
 const isSidebarPage = (page) => page.url().endsWith("/renderer/index.html");
 
 async function launch() {
@@ -158,6 +162,13 @@ let { app, mainLog } = await launch();
 let [firstSidebar] = await waitForSidebars(app, 1);
 await firstSidebar.waitForTimeout(800);
 await tagWindows([firstSidebar], ["first"]);
+const legacyWindow = findWindow(await describeWindows(app), "first");
+const legacyBounds = legacyWindow?.bounds;
+check(
+  "an old window-state.json (one rectangle) places the first window",
+  legacyBounds?.x === LEGACY_BOUNDS.x && legacyBounds?.y === LEGACY_BOUNDS.y && legacyBounds?.width === LEGACY_BOUNDS.width && legacyBounds?.height === LEGACY_BOUNDS.height,
+  JSON.stringify(legacyBounds),
+);
 
 await clickMenuItem(app, "New Window");
 let sidebars = await waitForSidebars(app, 2);
