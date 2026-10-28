@@ -230,6 +230,25 @@ const sourceLinkBox = await (async () => {
   });
   return sourceViewBounds === null ? null : { x: sourceViewBounds.x + linkInPage.x, y: sourceViewBounds.y + linkInPage.y, width: linkInPage.width, height: linkInPage.height };
 })();
+// Playwright's clicks never move the system pointer, which main reads to find the link: point it at the link's middle
+// for this click. The overlay's animations are held where they start, so "the page waits for the grow" is checked
+// without racing the clock.
+await app.evaluate(({ BrowserWindow, screen }, linkBox) => {
+  const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  const content = win.getContentBounds();
+  globalThis.realCursorPoint = screen.getCursorScreenPoint;
+  screen.getCursorScreenPoint = () => ({ x: Math.round(content.x + linkBox.x + linkBox.width / 2), y: Math.round(content.y + linkBox.y + linkBox.height / 2) });
+}, sourceLinkBox);
+await overlay.evaluate(() => {
+  window.heldAnimations = [];
+  window.realAnimate = Element.prototype.animate;
+  Element.prototype.animate = function (...settings) {
+    const animation = window.realAnimate.apply(this, settings);
+    animation.pause();
+    window.heldAnimations.push(animation);
+    return animation;
+  };
+});
 await clickLinkInPage("example.com/peek-source");
 // Like Arc's, the Peek opens as an empty card growing out of the clicked link; its page goes on top once it has grown.
 const growTransform = await overlay
@@ -243,18 +262,34 @@ const growTransform = await overlay
   )
   .then((handle) => handle.jsonValue())
   .catch(() => null);
+// Past the grow's natural end (270 ms), well before main's fallback (870 ms).
+await sidebar.waitForTimeout(300);
 const viewsWhileGrowing = await peekViews();
-const isStillGrowing = await overlay.evaluate(() => document.querySelector(".peek-card")?.getAnimations().some((animation) => animation.playState === "running") ?? false);
+await app.evaluate(({ screen }) => {
+  screen.getCursorScreenPoint = globalThis.realCursorPoint;
+});
+await overlay.evaluate(() => {
+  Element.prototype.animate = window.realAnimate;
+  for (const animation of window.heldAnimations) {
+    animation.finish();
+  }
+});
 const growCardBox = await overlay.$eval(".peek-card", (element) => ({ x: parseFloat(element.style.left), y: parseFloat(element.style.top), width: parseFloat(element.style.width), height: parseFloat(element.style.height) })).catch(() => null);
 const growNumbers = (growTransform ?? "").match(/-?[\d.]+/g)?.map(Number) ?? [];
 const growStart = growCardBox === null || growNumbers.length !== 4 ? null : { x: growCardBox.x + growNumbers[0], y: growCardBox.y + growNumbers[1], width: growCardBox.width * growNumbers[2], height: growCardBox.height * growNumbers[3] };
 const isFromLink = growStart !== null && sourceLinkBox !== null && ["x", "y", "width", "height"].every((key) => Math.abs(growStart[key] - sourceLinkBox[key]) <= 2);
 check("the Peek's card grows out of the clicked link", isFromLink, `from ${JSON.stringify(growStart)} link ${JSON.stringify(sourceLinkBox)} (${growTransform})`);
-// The page view may only be on screen once the card has grown (checked while the grow is still running).
-const isPageEarly = isStillGrowing && viewsWhileGrowing.some((view) => view.url.includes("iana.org"));
-check("…empty, its page shows once it has grown", !isPageEarly, `still growing ${isStillGrowing}, views ${viewsWhileGrowing.map((view) => view.url).join(",")}`);
-await sidebar.waitForTimeout(2500);
-let views = await peekViews();
+// The page view goes on screen only once the card has grown: not while the grow is held, at once after it.
+const isPageEarly = viewsWhileGrowing.some((view) => view.url.includes("iana.org"));
+let views = [];
+for (let attempt = 0; attempt < 25 && !views.some((view) => view.url.includes("iana.org")); attempt += 1) {
+  await sidebar.waitForTimeout(100);
+  views = await peekViews();
+}
+const isPageShownAfter = views.some((view) => view.url.includes("iana.org"));
+check("…empty, its page shows once it has grown", !isPageEarly && isPageShownAfter, `while growing ${viewsWhileGrowing.map((view) => view.url).join(",")}`);
+await sidebar.waitForTimeout(2000);
+views = await peekViews();
 const peekEntry = views.find((view) => view.url.includes("iana.org"));
 state = await getState();
 check("a link from a pinned tab to another site opens in a Peek", peekEntry !== undefined, JSON.stringify(views.map((view) => view.url)));
@@ -341,8 +376,13 @@ await app.evaluate(({ webContents }) => {
   const peekContents = ianaPages.sort((first, second) => second.id - first.id)[0];
   peekContents.sendInputEvent({ type: "keyDown", keyCode: "Escape" });
 });
-await sidebar.waitForTimeout(1000);
-views = await peekViews();
+for (let attempt = 0; attempt < 30; attempt += 1) {
+  await sidebar.waitForTimeout(100);
+  views = await peekViews();
+  if (!views.some((view) => view.url.includes("iana.org")) && !(await overlayIsShown())) {
+    break;
+  }
+}
 check("Escape dismisses the Peek", !views.some((view) => view.url.includes("iana.org")) && !(await overlayIsShown()), JSON.stringify(views.map((view) => view.url)));
 const closeSeen = await overlay.evaluate(() => window.peekCloseSeen);
 const shrinkScales = (closeSeen.shrinkTo ?? "").match(/scale\(([\d.]+), ([\d.]+)\)/);

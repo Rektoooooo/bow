@@ -59,7 +59,7 @@ import {
 import { buildFolderList } from "./folderList";
 import type { Bounds } from "./layout";
 import { getOverlayContents, hideOverlay, sendToOverlay, setOverlayBounds, showOverlay } from "./overlay";
-import { closePeek, finishPeekClose, finishPeekGrow, isPeekOpen, navigatePeek, openPeekAsTab, openPeekInSplit } from "./peek";
+import { closePeek, finishPeekCloseOf, finishPeekGrow, isPeekClosing, isPeekOpen, navigatePeek, openPeekAsTab, openPeekInSplit } from "./peek";
 import { toggleDevTools, translatePage, zoomPage } from "./pageCommands";
 import { splitTabs } from "./split";
 import { getSelectedTabId, openTab, selectTab } from "./state";
@@ -670,8 +670,9 @@ export function closeOverlay(returnsKeyboard: boolean = true): void {
   if (window === null) {
     return;
   }
-  // The overlay under a Peek belongs to the Peek: closing it (a click outside, Escape) dismisses the Peek.
-  if (isPeekOpen()) {
+  // The overlay under a Peek belongs to the Peek, also while it shrinks away: closing it (a click outside, Escape)
+  // dismisses the Peek.
+  if (isPeekOpen() || isPeekClosing()) {
     closePeek();
     return;
   }
@@ -1196,7 +1197,7 @@ export function registerOverlayIpc(): void {
     setLibrarySection(section as LibrarySection);
     relayoutOverlay();
   });
-  ipcMain.handle(OVERLAY_CHANNELS.peekCommand, (event, command: unknown) => {
+  ipcMain.handle(OVERLAY_CHANNELS.peekCommand, (event, command: unknown, peekNumber: unknown) => {
     if (!isFromOverlay(event)) {
       return;
     }
@@ -1212,11 +1213,12 @@ export function registerOverlayIpc(): void {
     if (command === "back" || command === "forward" || command === "reload") {
       navigatePeek(command);
     }
-    if (command === "grown") {
-      finishPeekGrow();
+    const isPeekNumber = typeof peekNumber === "number" && Number.isInteger(peekNumber);
+    if (command === "grown" && isPeekNumber) {
+      finishPeekGrow(peekNumber);
     }
-    if (command === "closeReady") {
-      finishPeekClose();
+    if (command === "closeReady" && isPeekNumber) {
+      finishPeekCloseOf(peekNumber);
     }
   });
   ipcMain.handle(OVERLAY_CHANNELS.openUrl, (event, url: unknown) => {

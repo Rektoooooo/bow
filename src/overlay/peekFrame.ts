@@ -25,6 +25,7 @@ import {
   PEEK_GROW_MS,
   PEEK_SHRINK_FADE_MS,
   PEEK_SHRINK_MS,
+  PEEK_START_SCALE,
   PEEK_TOOLBAR_HEIGHT_PX,
 } from "../shared/settings.js";
 import type { IconName } from "../renderer/icons";
@@ -39,9 +40,6 @@ const BUTTONS_TOP_PX = 20;
 
 /** The buttons fade in over the grow's last stretch, so they arrive with the card. Our choice. */
 const BUTTONS_FADE_IN_MS = 90;
-
-/** A closing card without a link to go back to shrinks to this share of its size, about its middle. Our choice. */
-const SHRINK_SCALE_WITHOUT_LINK = 0.94;
 
 /**
  * Places an element at a rectangle of the window.
@@ -120,9 +118,9 @@ function transformOnto(card: OverlayRect, target: OverlayRect): string {
  * Arc's opening: the dim fades in while the empty card grows out of the clicked link; the buttons arrive with it.
  * Main puts the page on top once the card says it has grown.
  */
-function playPeekOpen(dim: HTMLElement, card: HTMLElement, buttons: HTMLElement, cardBox: OverlayRect, growFrom: OverlayRect): void {
+function playPeekOpen(dim: HTMLElement, card: HTMLElement, buttons: HTMLElement, cardBox: OverlayRect, growFrom: OverlayRect, peekNumber: number): void {
   if (prefersLessMotion()) {
-    window.overlayApi.peekCommand("grown");
+    window.overlayApi.peekCommand("grown", peekNumber);
     return;
   }
   dim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: PEEK_DIM_IN_MS, easing: "linear", fill: "backwards" });
@@ -134,7 +132,18 @@ function playPeekOpen(dim: HTMLElement, card: HTMLElement, buttons: HTMLElement,
   });
   const buttonsDelay = PEEK_GROW_DELAY_MS + PEEK_GROW_MS - BUTTONS_FADE_IN_MS;
   buttons.animate([{ opacity: 0 }, { opacity: 1 }], { duration: BUTTONS_FADE_IN_MS, delay: buttonsDelay, easing: "linear", fill: "backwards" });
-  grow.finished.then(() => window.overlayApi.peekCommand("grown")).catch(() => undefined);
+  sayGrownWhenDone(grow, card, peekNumber).catch(() => undefined);
+}
+
+/**
+ * Tells main the card has grown once its animation is done, so the page goes on top. A card taken away meanwhile
+ * (the Peek closed, or became a tab) has nothing left to show.
+ */
+async function sayGrownWhenDone(grow: Animation, card: HTMLElement, peekNumber: number): Promise<void> {
+  await grow.finished;
+  if (card.isConnected) {
+    await window.overlayApi.peekCommand("grown", peekNumber);
+  }
 }
 
 /**
@@ -165,10 +174,10 @@ export function renderPeekFrame(host: HTMLElement, panel: PeekPanel): void {
   placePeekFrame(newDim, newCard, newButtons, panel);
   host.replaceChildren(newDim, newCard, newButtons);
   if (panel.growFrom === null) {
-    window.overlayApi.peekCommand("grown");
+    window.overlayApi.peekCommand("grown", panel.peekNumber);
     return;
   }
-  playPeekOpen(newDim, newCard, newButtons, computeCardBox(panel), panel.growFrom);
+  playPeekOpen(newDim, newCard, newButtons, computeCardBox(panel), panel.growFrom, panel.peekNumber);
 }
 
 /**
@@ -196,7 +205,7 @@ export async function playPeekClose(host: HTMLElement, message: PeekClosingMessa
   const card = host.querySelector<HTMLElement>(".peek-card");
   const buttons = host.querySelector<HTMLElement>(".peek-buttons");
   if (dim === null || card === null || buttons === null) {
-    window.overlayApi.peekCommand("closeReady");
+    window.overlayApi.peekCommand("closeReady", message.peekNumber);
     return;
   }
   if (message.pictureUrl !== null) {
@@ -208,14 +217,14 @@ export async function playPeekClose(host: HTMLElement, message: PeekClosingMessa
     card.querySelector(".peek-body")?.append(picture);
     await waitForPaint();
   }
-  window.overlayApi.peekCommand("closeReady");
+  window.overlayApi.peekCommand("closeReady", message.peekNumber);
   // A new Peek (or another panel) replaced this card while the picture loaded: nothing left to shrink.
   if (!card.isConnected || prefersLessMotion()) {
     return;
   }
-  const cardRectangle = card.getBoundingClientRect();
-  const cardBox = { x: cardRectangle.x, y: cardRectangle.y, width: cardRectangle.width, height: cardRectangle.height };
-  const target = message.target ?? scaleAboutCenter(cardBox, SHRINK_SCALE_WITHOUT_LINK);
+  // Its place without any transform (the offset box ignores one, should a grow still be running).
+  const cardBox = { x: card.offsetLeft, y: card.offsetTop, width: card.offsetWidth, height: card.offsetHeight };
+  const target = message.target ?? scaleAboutCenter(cardBox, PEEK_START_SCALE);
   const shrunk = transformOnto(cardBox, target);
   const totalMs = PEEK_SHRINK_MS + PEEK_SHRINK_FADE_MS;
   card.animate(

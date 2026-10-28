@@ -97,13 +97,15 @@ export function getOverlayShowCount(): number {
 }
 
 /**
- * Tells the Peek's frame to shrink back into its link (peek.ts, while the overlay still shows the Peek).
+ * Tells the Peek's frame to shrink back into its link (peek.ts, while the overlay still shows the Peek). False when
+ * the overlay is no longer on screen, so nobody will answer.
  */
-export function sendPeekClosing(message: PeekClosingMessage): void {
+export function sendPeekClosing(message: PeekClosingMessage): boolean {
   if (overlayView === null || !isShown) {
-    return;
+    return false;
   }
   overlayView.webContents.send(OVERLAY_CHANNELS.peekClosing, message);
+  return true;
 }
 
 /**

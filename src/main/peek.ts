@@ -27,6 +27,7 @@ import {
   PEEK_PICTURE_WAIT_MS,
   PEEK_SHRINK_FADE_MS,
   PEEK_SHRINK_MS,
+  PEEK_START_SCALE,
   PEEK_TOOLBAR_HEIGHT_PX,
   PEEK_TOP_SPACE_PX,
 } from "../shared/settings";
@@ -39,7 +40,7 @@ import { getOverlayShowCount, hideOverlay, raiseOverlayIfShown, sendPeekClosing,
 import { getProfileSession } from "./profiles";
 import { splitTabs } from "./split";
 import { getSelectedTabId, openTab, updateTabPage } from "./state";
-import { adoptTabView, getTabViews } from "./tabViews";
+import { adoptTabView, getFocusedContents, getTabViews } from "./tabViews";
 import type { TabViewEvents } from "./tabViews";
 import { createId, findProfileIdOfItem, getActiveSpace } from "./tree";
 
@@ -54,12 +55,6 @@ const PEEK_SIDE_MARGIN_RATIO = 0.1;
 /** Corner radius of the Peek's page (its bottom corners show; the top ones sit under the toolbar row). */
 const PEEK_RADIUS_PX = 10;
 
-/**
- * Without a link to grow from (the pointer was outside the window), the card grows from this share of its size,
- * about its middle. Our choice.
- */
-const PEEK_START_SCALE = 0.94;
-
 /** Without the link's own box, the card grows from a square this big around the pointer. Our choice. */
 const PEEK_POINTER_ORIGIN_PX = 16;
 
@@ -73,10 +68,16 @@ const PEEK_PAGE_COLOR_LIGHT = "#ffffff";
 /** The page's picture for the closing card: JPEG at this quality, at 1× (it shows for about 120 ms). Our choice. */
 const PEEK_PICTURE_JPEG_QUALITY = 80;
 
-/** The link lookup runs in its own JavaScript world, so the page's scripts never see it. Any id above 0 works. */
+/**
+ * The link lookup runs in a JavaScript world of its own, so the page's scripts never see it: not 0 (the page's) nor
+ * 999 (Electron's for preloads). Our choice.
+ */
 const LINK_LOOKUP_WORLD_ID = 1007;
 
-/** If the overlay never says the card has grown (or the picture is in place), the page shows (or goes) after this. */
+/**
+ * If the overlay never says the card has grown (or the picture is in place), the page shows (or goes) after this.
+ * Our choice: well past the animations, short enough to look like a hiccup rather than a hang.
+ */
 const PEEK_STEP_FALLBACK_MS = 600;
 
 /**
@@ -106,8 +107,14 @@ let peekOrigin: Bounds | null = null;
 /** True once the open Peek's card has grown and its page is on screen. */
 let isPeekPageShown = false;
 
+/**
+ * Each Peek's number: the overlay sends it back with "grown" and "closeReady", so a late message from an earlier
+ * Peek's card is not taken for the current one's.
+ */
+let peekNumber = 0;
+
 /** A closed Peek's page, on screen until the overlay shows its picture in the shrinking card. */
-let closingPeek: { view: WebContentsView; window: BrowserWindow; showCount: number; fallbackTimer: NodeJS.Timeout | null } | null = null;
+let closingPeek: { view: WebContentsView; window: BrowserWindow; peekNumber: number; showCount: number; fallbackTimer: NodeJS.Timeout | null } | null = null;
 
 /** Page events for a Peek that becomes a tab. Set once by main.ts. */
 let tabViewEvents: TabViewEvents | null = null;
@@ -123,6 +130,13 @@ export function initializePeek(events: TabViewEvents): void {
 
 export function isPeekOpen(): boolean {
   return peekView !== null;
+}
+
+/**
+ * True while a closed Peek still shrinks away: ⌘W and a click outside belong to it until then, not to the page behind.
+ */
+export function isPeekClosing(): boolean {
+  return closingPeek !== null;
 }
 
 /**
@@ -269,8 +283,9 @@ function chooseGrowOrigin(linkBox: Bounds | null, pointer: { x: number; y: numbe
 function showPeekFrame(contents: WebContents, takesKeyboard: boolean = true, isFirstDraw: boolean = false): void {
   const window = peekWindow;
   const frame = computePeekBounds(window);
-  // Page events before the first draw wait for it (it reads the address and history when it happens).
-  if (window === null || frame === null || peekView === null || peekOrigin === null) {
+  // Page events before the first draw wait for it (it reads the address and history when it happens); a closing
+  // Peek's page events are not this Peek's.
+  if (window === null || frame === null || peekView === null || peekOrigin === null || contents !== peekView.webContents) {
     return;
   }
   const contentSize = window.getContentSize();
@@ -288,6 +303,7 @@ function showPeekFrame(contents: WebContents, takesKeyboard: boolean = true, isF
     canGoBack: history.canGoBack(),
     canGoForward: history.canGoForward(),
     growFrom: isFirstDraw ? peekOrigin : null,
+    peekNumber: peekNumber,
   };
   const view = peekView;
   showOverlay(window, fullWindow, { panel: panel, isDark: palette.isDark, library: null, site: null }, takesKeyboard).then(() => {
@@ -316,10 +332,10 @@ function showPeekPage(view: WebContentsView): void {
 }
 
 /**
- * The overlay's card has grown: the open Peek's page shows.
+ * The overlay's card of Peek `grownPeekNumber` has grown: if it is the open Peek, its page shows.
  */
-export function finishPeekGrow(): void {
-  if (peekView !== null) {
+export function finishPeekGrow(grownPeekNumber: number): void {
+  if (peekView !== null && grownPeekNumber === peekNumber) {
     showPeekPage(peekView);
   }
 }
@@ -328,6 +344,12 @@ export function finishPeekGrow(): void {
  * Keeps the Peek above everything after other views were added.
  */
 function raisePeek(): void {
+  // A closing Peek's page stays above the overlay until its picture is in the card, or the empty card would flash.
+  const closing = closingPeek;
+  if (closing !== null && !closing.window.isDestroyed()) {
+    raiseOverlayIfShown(closing.window);
+    closing.window.contentView.addChildView(closing.view);
+  }
   const window = peekWindow;
   if (window === null || window.isDestroyed() || peekView === null) {
     return;
@@ -388,12 +410,18 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
   peekView = view;
   peekOrigin = null;
   isPeekPageShown = false;
+  peekNumber += 1;
   peekSourceTabId = sourceTabId ?? getSelectedTabId(state);
 
   const contents = view.webContents;
-  // Escape dismisses a Peek, like Arc; ⌘O and ⌘W come through the app menu.
+  // Escape dismisses a Peek, like Arc; ⌘O and ⌘W come through the app menu. A held Escape repeats, and a closing
+  // Peek's page keeps the keyboard for a moment: neither may close anything else.
   contents.on("before-input-event", (event, input) => {
     const isPlainEscape = input.type === "keyDown" && input.key === "Escape" && !input.meta && !input.control && !input.alt;
+    if (isPlainEscape && (input.isAutoRepeat || peekView !== view)) {
+      event.preventDefault();
+      return;
+    }
     if (isPlainEscape) {
       event.preventDefault();
       closePeek();
@@ -427,6 +455,9 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
 async function encodePeekPicture(view: WebContentsView): Promise<string | null> {
   try {
     const image = await view.webContents.capturePage();
+    if (image.isEmpty()) {
+      return null;
+    }
     const picture = image.resize({ width: view.getBounds().width, quality: "good" });
     const jpegBytes = picture.toJPEG(PEEK_PICTURE_JPEG_QUALITY);
     return `data:image/jpeg;base64,${jpegBytes.toString("base64")}`;
@@ -451,25 +482,38 @@ async function playPeekClose(window: BrowserWindow, view: WebContentsView, origi
   // A Peek still closing goes at once.
   finishPeekClose();
   const showCount = getOverlayShowCount();
-  closingPeek = { view: view, window: window, showCount: showCount, fallbackTimer: null };
+  const closingNumber = peekNumber;
+  closingPeek = { view: view, window: window, peekNumber: closingNumber, showCount: showCount, fallbackTimer: null };
   const pictureUrl = await capturePeekPicture(view);
   if (closingPeek?.view !== view) {
     return;
   }
-  // Another panel (or a new Peek) took the overlay meanwhile: the old page just goes.
-  if (getOverlayShowCount() !== showCount || window.isDestroyed()) {
+  // Another panel (or a new Peek) took the overlay meanwhile, or it is gone: the old page just goes.
+  const isOverlayStillOurs = getOverlayShowCount() === showCount && !window.isDestroyed();
+  const isSent = isOverlayStillOurs && sendPeekClosing({ target: origin, pictureUrl: pictureUrl, peekNumber: closingNumber });
+  if (!isSent) {
     finishPeekClose();
     return;
   }
-  sendPeekClosing({ target: origin, pictureUrl: pictureUrl });
   closingPeek.fallbackTimer = setTimeout(() => finishPeekClose(), PEEK_STEP_FALLBACK_MS);
 }
 
 /**
- * The closing card shows the page's picture (the overlay says so, or the fallback timer): the page view goes, and
- * the overlay once the card has shrunk, unless a new panel took it meanwhile.
+ * The overlay's closing card of Peek `readyPeekNumber` shows the page's picture: if that Peek is the one closing,
+ * its page goes (see finishPeekClose).
  */
-export function finishPeekClose(): void {
+export function finishPeekCloseOf(readyPeekNumber: number): void {
+  if (closingPeek !== null && closingPeek.peekNumber === readyPeekNumber) {
+    finishPeekClose();
+  }
+}
+
+/**
+ * The closing card shows the page's picture (or the fallback timer, or a new Peek, cuts it short): the page view
+ * goes, the page behind gets the keyboard back, and the overlay goes once the card has shrunk, unless a new panel
+ * took it meanwhile.
+ */
+function finishPeekClose(): void {
   const closing = closingPeek;
   if (closing === null) {
     return;
@@ -482,6 +526,9 @@ export function finishPeekClose(): void {
     closing.window.contentView.removeChildView(closing.view);
   }
   closing.view.webContents.close();
+  if (getOverlayShowCount() === closing.showCount) {
+    getFocusedContents()?.focus();
+  }
   setTimeout(() => {
     if (getOverlayShowCount() === closing.showCount) {
       hideOverlay(true);
@@ -502,8 +549,11 @@ function removePeek(keepPage: boolean): WebContentsView | null {
   peekOrigin = null;
   isPeekPageShown = false;
   setPeekWindow(null);
+  // Nothing open: a Peek still closing keeps the overlay until its card has shrunk.
   if (view === null) {
-    hideOverlay();
+    if (closingPeek === null) {
+      hideOverlay();
+    }
     return null;
   }
   if (keepPage) {
@@ -520,6 +570,7 @@ function removePeek(keepPage: boolean): WebContentsView | null {
     window.contentView.removeChildView(view);
   }
   view.webContents.close();
+  getFocusedContents()?.focus();
   return null;
 }
 

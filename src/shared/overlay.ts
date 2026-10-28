@@ -54,7 +54,7 @@ export type OverlayPanel =
    * it. The first draw of a Peek carries `growFrom`, the clicked link's place: the card grows out of it, empty (in
    * `pageColor`, the page view's color before it paints), and the page shows once it has grown.
    */
-  | { kind: "peek"; frame: OverlayRect; card: OverlayRect; url: string; chromeColor: string; pageColor: string; canGoBack: boolean; canGoForward: boolean; growFrom: OverlayRect | null }
+  | { kind: "peek"; frame: OverlayRect; card: OverlayRect; url: string; chromeColor: string; pageColor: string; canGoBack: boolean; canGoForward: boolean; growFrom: OverlayRect | null; peekNumber: number }
   | { kind: "permission"; requestId: string; host: string; kinds: SitePermissionKind[]; appName: string | null }
   | { kind: "capture"; frame: { x: number; y: number; width: number; height: number } }
   | { kind: "switcher"; tabs: SwitcherTab[]; index: number }
@@ -97,10 +97,14 @@ export interface OverlayRect {
  */
 export type PeekCommand = "openAsTab" | "split" | "close" | "back" | "forward" | "reload" | "grown" | "closeReady";
 
-/** A Peek is closing: the card shrinks into `target` (the link it grew from), showing `pictureUrl` (null: none). */
+/**
+ * A Peek is closing: the card shrinks into `target` (the link it grew from), showing `pictureUrl` (null: none).
+ * `peekNumber` says which Peek (sent back with "closeReady").
+ */
 export interface PeekClosingMessage {
   target: OverlayRect | null;
   pictureUrl: string | null;
+  peekNumber: number;
 }
 
 /** One line in the Command Bar, as the overlay draws it. */
@@ -283,7 +287,8 @@ export interface OverlayApi {
   clearHistory(): Promise<void>;
   showDownload(downloadId: string): Promise<void>;
   openUrl(url: string): Promise<void>;
-  peekCommand(command: PeekCommand): Promise<void>;
+  /** `peekNumber` goes with "grown" and "closeReady": the Peek they are about (the panel's and message's number). */
+  peekCommand(command: PeekCommand, peekNumber?: number): Promise<void>;
   /** Capture: the part of the page the user dragged out (null: cancelled). */
   captureRegion(region: OverlayRect | null): Promise<void>;
   /** The Control Center: open an extension's popup under its tile, or the "…" menu under the button. */

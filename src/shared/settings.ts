@@ -126,6 +126,12 @@ export const PEEK_SHRINK_FADE_MS = 35;
 export const PEEK_DIM_OUT_MS = 60;
 
 /**
+ * Without a link to grow from or shrink back into (opened with no pointer over the window), the card grows from and
+ * shrinks to this share of its size, about its middle. Our choice.
+ */
+export const PEEK_START_SCALE = 0.94;
+
+/**
  * How long opening waits to learn where the clicked link is in its page, and closing for a picture of the page,
  * before they animate without (from the pointer, or a plain card). Our choice: short enough not to be felt.
  */

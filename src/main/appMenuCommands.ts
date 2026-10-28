@@ -18,7 +18,7 @@ import { openLittleWindow } from "./littleWindow";
 import { closeFrontWindow, openNewWindow } from "./mainWindows";
 import { findNextMatch, openCommandBar, openFind, openLibrary, openTabSwitcher, runSiteCommand } from "./overlayController";
 import { copyTabUrl, toggleDevTools, zoomPage } from "./pageCommands";
-import { closePeek, getPeekContents, isPeekOpen, openPeekAsTab } from "./peek";
+import { closePeek, getPeekContents, isPeekClosing, isPeekOpen, openPeekAsTab } from "./peek";
 import { buildImportMenu, showMenuRequest } from "./menus";
 import { menuHost } from "./actionRunner";
 import { showToast } from "./statusBubble";
@@ -50,8 +50,8 @@ function getSelectedId(): string | null {
 export const appMenuCommands: AppMenuCommands = {
   openCommandBar: (mode) => openCommandBar(mode),
   closeSelectedTab: () => {
-    // With a Peek open, ⌘W dismisses the Peek, like Arc.
-    if (isPeekOpen()) {
+    // With a Peek open, ⌘W dismisses the Peek, like Arc (a second ⌘W while it shrinks away does nothing more).
+    if (isPeekOpen() || isPeekClosing()) {
       closePeek();
       return;
     }

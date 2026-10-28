@@ -91,7 +91,7 @@ function createOverlayApi(): OverlayApi {
     clearHistory: () => ipcRenderer.invoke(CHANNELS.clearHistory),
     showDownload: (downloadId) => ipcRenderer.invoke(CHANNELS.showDownload, downloadId),
     openUrl: (url) => ipcRenderer.invoke(CHANNELS.openUrl, url),
-    peekCommand: (command) => ipcRenderer.invoke(CHANNELS.peekCommand, command),
+    peekCommand: (command, peekNumber) => ipcRenderer.invoke(CHANNELS.peekCommand, command, peekNumber),
     captureRegion: (region) => ipcRenderer.invoke(CHANNELS.captureRegion, region),
     activateExtension: (extensionId, anchor) => ipcRenderer.invoke(CHANNELS.activateExtension, extensionId, anchor),
     showSiteMenu: (anchor) => ipcRenderer.invoke(CHANNELS.showSiteMenu, anchor),
