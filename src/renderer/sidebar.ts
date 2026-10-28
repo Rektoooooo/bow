@@ -27,6 +27,7 @@ import type { MorphOptions } from "./morph.js";
 import { renderFavoriteTile, renderItemRows, startRowRedraw } from "./rows.js";
 import type { RowContext } from "./rows.js";
 import { installSidebarEvents } from "./sidebarEvents.js";
+import { clearMultiSelection, extendTo, keepOnly, toggleTab } from "./multiSelect.js";
 import { createIcon, installSymbols } from "./icons.js";
 import { installOverlayScrollbar } from "./overlayScrollbar.js";
 import { applySpaceTheme, onSystemAppearanceChange } from "./theme.js";
@@ -67,7 +68,7 @@ let currentRuntime: RuntimeState = {
   faviconAccents: {},
   sleepingTabIds: [],
   archivingSoon: {},
-  archiveUndo: null,
+  notice: null,
 };
 
 /** The Note or Easel tab whose editor this page last told main it has open, or null. */
@@ -412,28 +413,36 @@ function renderMediaPlayer(state: BrowserState): void {
 }
 
 /**
- * Draws the Undo offer after the sweep or Clear archived tabs ("Cleared 4 tabs · Undo"), for as long as main offers it
- * (archiveUndoController.ts). It sits where the tabs left, at the bottom of the sidebar.
+ * The tab rows of the Space on screen (Pinned, then Today, folders open), in sidebar order: what ⇧-click ranges over.
  */
-function renderArchiveUndo(): void {
-  const bar = document.getElementById("archive-undo");
+function listTabRowOrder(): ItemId[] {
+  const rows = document.querySelectorAll<HTMLElement>("#space-content .tab-row[data-item-id]");
+  return Array.from(rows, (row) => row.dataset.itemId ?? "");
+}
+
+/**
+ * Draws the sidebar's notice, a short offer with one button ("Cleared 4 tabs · Undo"), for as long as main offers it
+ * (main/sidebarNotice.ts). It sits at the bottom of the sidebar, where the tabs it is about left or came from.
+ */
+function renderNotice(): void {
+  const bar = document.getElementById("sidebar-notice");
   if (bar === null) {
     return;
   }
-  const offer = currentRuntime.archiveUndo;
-  if (offer === null) {
+  const notice = currentRuntime.notice;
+  if (notice === null) {
     bar.hidden = true;
     morphChildren(bar, [], { animate: false });
     return;
   }
-  const message = createElement("span", "archive-undo-text", offer.message);
-  const undoButton = document.createElement("button");
-  undoButton.type = "button";
-  undoButton.className = "archive-undo-button";
-  undoButton.dataset.action = "archive-undo";
-  undoButton.textContent = "Undo";
-  const closeButton = createActionButton("close", "Dismiss", "media-button", "archive-undo-dismiss");
-  morphChildren(bar, [message, undoButton, closeButton], { animate: false });
+  const message = createElement("span", "sidebar-notice-text", notice.message);
+  const actionButton = document.createElement("button");
+  actionButton.type = "button";
+  actionButton.className = "sidebar-notice-button";
+  actionButton.dataset.action = "notice-action";
+  actionButton.textContent = notice.buttonLabel;
+  const closeButton = createActionButton("close", "Dismiss", "media-button", "notice-dismiss");
+  morphChildren(bar, [message, actionButton, closeButton], { animate: false });
   bar.hidden = false;
 }
 
@@ -558,9 +567,14 @@ function renderAll(): void {
   // A Space switch replaces the whole list: it slides in instead of every row growing in one by one.
   const isSpaceSwitch = lastRenderedSpaceId !== null && lastRenderedSpaceId !== state.activeSpaceId;
   const motion: MorphOptions = { animate: hasRenderedOnce && !isSpaceSwitch };
+  // Picked tabs belong to the Space they were picked in (multiSelect.ts).
+  if (isSpaceSwitch) {
+    clearMultiSelection();
+  }
   renderHeader(state);
   renderFavorites(state, space, context, motion);
   renderSpaceContent(state, space, context, motion);
+  keepOnly(listTabRowOrder());
   const content = document.getElementById("space-content");
   if (content !== null) {
     slideIfSpaceChanged(state, content);
@@ -568,7 +582,7 @@ function renderAll(): void {
   hasRenderedOnce = true;
   renderMediaPlayer(state);
   renderUpdateNotice();
-  renderArchiveUndo();
+  renderNotice();
   renderBottomBar(state);
   // The page area follows the real selection even while "New Tab" carries the highlight (Arc's shot 3).
   const selectedTabId = getSelectedTabId(state);
@@ -802,7 +816,27 @@ async function startSidebar(): Promise<void> {
       renamingSpaceId = spaceId;
       renderAll();
     },
+    pickTab: (tabId: ItemId, isRange: boolean) => {
+      const onScreenTabId = currentState === null ? null : getSelectedTabId(currentState);
+      if (isRange) {
+        extendTo(tabId, listTabRowOrder(), onScreenTabId);
+      } else {
+        toggleTab(tabId, onScreenTabId);
+      }
+      renderAll();
+    },
+    clearPickedTabs: () => {
+      if (clearMultiSelection()) {
+        renderAll();
+      }
+    },
   };
+  // Escape forgets the picked tabs.
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && clearMultiSelection()) {
+      renderAll();
+    }
+  });
   const sidebar = document.getElementById("sidebar");
   const toolbar = document.getElementById("toolbar");
   if (sidebar !== null) {

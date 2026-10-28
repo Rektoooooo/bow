@@ -18,7 +18,7 @@ import type { NavigationCommand } from "../shared/actions";
 
 /** What the menu items do. main.ts implements each one. */
 export interface AppMenuCommands {
-  openCommandBar(mode: "newTab" | "editUrl" | "splitWith"): void;
+  openCommandBar(mode: "newTab" | "editUrl" | "splitWith" | "tabs"): void;
   closeSelectedTab(): void;
   reopenClosedTab(): void;
   togglePinSelected(): void;
@@ -29,6 +29,8 @@ export interface AppMenuCommands {
   /** ⌃Tab / ⌃⇧Tab: the recent-tab switcher, one step forward or back. */
   switchRecentTab(step: number): void;
   clearTodayTabs(): void;
+  /** Tabs › Close Duplicate Tabs: Today copies of pages already open (duplicateTabs.ts), with Undo. */
+  closeDuplicateTabs(): void;
   addSplitPane(): void;
   closeSplitPane(): void;
   switchSpaceByOffset(offset: number): void;
@@ -216,9 +218,11 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
         { label: "Pin / Unpin Tab", accelerator: "CommandOrControl+D", click: () => commands.togglePinSelected() },
         { label: "Duplicate Tab", click: () => commands.duplicateSelected() },
         { label: "Clear Today Tabs", accelerator: "CommandOrControl+Shift+K", click: () => commands.clearTodayTabs() },
+        { label: "Close Duplicate Tabs", click: () => commands.closeDuplicateTabs() },
         { type: "separator" },
         { label: "Next Tab", accelerator: "CommandOrControl+Alt+Down", click: () => commands.cycleTab(1) },
         { label: "Previous Tab", accelerator: "CommandOrControl+Alt+Up", click: () => commands.cycleTab(-1) },
+        { label: "Search Tabs…", accelerator: "CommandOrControl+Shift+A", click: () => commands.openCommandBar("tabs") },
         { label: "Recent Tab", accelerator: "Control+Tab", click: () => commands.switchRecentTab(1) },
         { label: "Recent Tab, Backwards", accelerator: "Control+Shift+Tab", click: () => commands.switchRecentTab(-1) },
         ...buildNumberedItems("Tab", "CommandOrControl", (number) => commands.selectTabNumber(number)),

@@ -273,7 +273,10 @@ M about a day, L several days.
 - [x] 4. (⌘, Settings; ⌘/ shortcuts sheet read from the menu; zoom per host; download folder / ask; search
       keywords; Save Page As ⇧⌘S and Export as PDF) Everyday basics: zoom remembered per site; downloads folder or ask where to save; ⌘, opens Settings;
       custom search engines with keywords; Save Page As and Save as PDF; a Keyboard Shortcuts sheet (S each)
-- [ ] 5. Tab power tools: select several tabs (⇧/⌘-click) for close, move, pin, split; duplicate-tab detection
+- [x] 5. (⌘/⇧-click picks Pinned and Today rows, menu Close / Move / Pin / Split for two, Close with Undo;
+      typed, Command Bar and routed links switch to an open copy with "Open Another"; Close Duplicate Tabs; ⇧⌘A
+      Search Tabs with Space and "open in another window". Not done: Favorites in the selection, dragging several)
+      Tab power tools: select several tabs (⇧/⌘-click) for close, move, pin, split; duplicate-tab detection
       ("already open, switch to it?"); tab search ⌘⇧A that shows each tab's Space and window (M)
 
 ### 4.2 Arc features, done better

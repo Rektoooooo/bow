@@ -20,6 +20,7 @@ import { createActionButton, createElement, createFavicon, dispatch, getDisplayH
 import { createIcon } from "./icons.js";
 import { encodeLocation, markDraggable, markDropTarget, markSplitTarget } from "./dragDrop.js";
 import { createKeepPlaceholder } from "./morph.js";
+import { isMultiSelected } from "./multiSelect.js";
 import { isDeveloperModeOn } from "../shared/developerMode.js";
 import { tidyTitle } from "../shared/tidyTitles.js";
 import { isNoteUrl } from "../shared/notes.js";
@@ -187,7 +188,7 @@ function isLiveFolderList(location: ItemLocation, state: BrowserState): boolean 
 
 /**
  * Everything a tab row shows depends on, as one text: the tab, where it sits, its runtime facts, whether it is
- * selected, in Developer Mode, asleep or archiving soon, and the tidy-titles setting.
+ * selected, picked with others, in Developer Mode, asleep or archiving soon, and the tidy-titles setting.
  */
 function describeTabRowInputs(tab: TabItem, location: ItemLocation, index: number, depth: number, context: RowContext): TabRowInputs {
   const encodedLocation = encodeLocation(location);
@@ -203,6 +204,7 @@ function describeTabRowInputs(tab: TabItem, location: ItemLocation, index: numbe
     isLiveFolderList(location, context.state),
     context.runtime.sleepingTabIds.includes(tab.id),
     context.runtime.archivingSoon[tab.id] ?? null,
+    isMultiSelected(tab.id),
   ];
   return { key: `tab:${encodedLocation}:${tab.id}`, text: JSON.stringify(facts) };
 }
@@ -246,6 +248,7 @@ function buildTabRow(tab: TabItem, location: ItemLocation, index: number, depth:
   row.classList.toggle("is-selected", isSelected);
   row.classList.toggle("is-loaded", isLoaded);
   row.classList.toggle("is-asleep", context.runtime.sleepingTabIds.includes(tab.id));
+  row.classList.toggle("is-multi-selected", isMultiSelected(tab.id));
   if (isSelected) {
     row.setAttribute("aria-current", "page");
   }

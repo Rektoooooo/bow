@@ -16,11 +16,16 @@
  */
 import type { DeveloperTool, NavigationCommand, ToolbarSiteCommand } from "../shared/actions.js";
 import { dispatch } from "./dom.js";
+import { getMultiSelection } from "./multiSelect.js";
 
 /** What only sidebar.ts can do: inline editing lives in its page state. */
 export interface SidebarEventCallbacks {
   beginRename(itemId: string): void;
   beginSpaceRename(spaceId: string): void;
+  /** ⌘-click (toggle) or ⇧-click (range) on a tab row picks it (multiSelect.ts). */
+  pickTab(tabId: string, isRange: boolean): void;
+  /** A plain click forgets the picked tabs. */
+  clearPickedTabs(): void;
 }
 
 /** Mouse button number of the middle button (auxclick). */
@@ -71,10 +76,10 @@ function runButtonAction(button: HTMLElement): void {
       return dispatch({ type: "dismissMedia" });
     case "restart-to-update":
       return dispatch({ type: "restartToUpdate" });
-    case "archive-undo":
-      return dispatch({ type: "undoArchive" });
-    case "archive-undo-dismiss":
-      return dispatch({ type: "dismissArchiveUndo" });
+    case "notice-action":
+      return dispatch({ type: "runNoticeAction" });
+    case "notice-dismiss":
+      return dispatch({ type: "dismissNotice" });
     case "navigate":
       return dispatch({ type: "navigate", command: (data.command ?? "reload") as NavigationCommand });
     case "open-command-bar":
@@ -174,6 +179,12 @@ function runContextMenu(event: MouseEvent): boolean {
     dispatch({ type: "showMenu", request: { menu: "item", itemId: data.tabId ?? "" } });
     return true;
   }
+  // Right-clicking one of several picked tabs acts on all of them (multiSelect.ts).
+  const pickedTabIds = getMultiSelection();
+  if (data.row === "tab" && pickedTabIds.includes(data.itemId ?? "")) {
+    dispatch({ type: "showMenu", request: { menu: "tabs", tabIds: pickedTabIds } });
+    return true;
+  }
   if (data.row === "tab" || data.row === "favorite" || data.row === "folder" || data.row === "split") {
     dispatch({ type: "showMenu", request: { menu: "item", itemId: data.itemId ?? "" } });
     return true;
@@ -193,9 +204,16 @@ export function installSidebarEvents(root: HTMLElement, callbacks: SidebarEventC
       return;
     }
     const row = findClosest(event, "[data-row]");
-    if (row !== null && root.contains(row)) {
-      runRowClick(row);
+    if (row === null || !root.contains(row)) {
+      return;
     }
+    const isPickingTabs = row.dataset.row === "tab" && (event.metaKey || event.shiftKey);
+    if (isPickingTabs) {
+      callbacks.pickTab(row.dataset.itemId ?? "", event.shiftKey);
+      return;
+    }
+    callbacks.clearPickedTabs();
+    runRowClick(row);
   });
   root.addEventListener("dblclick", (event) => {
     if (findClosest(event, "[data-action]") !== null) {

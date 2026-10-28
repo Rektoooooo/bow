@@ -243,8 +243,12 @@ Same keys as Arc. ⌘T new tab, ⌘N new window, ⇧⌘W close window, ⌘L edit
 (⌥⇧⌘C as Markdown), ⌘S sidebar, ⌘[ / ⌘] back/forward, ⌘R reload, ⌥⌘↑ / ⌥⌘↓ previous/next tab, ⌘1–⌘9 tab N,
 ⌃Tab / ⌃⇧Tab recent tabs, ⌃⌘N new note, ⌥⌘← / ⌥⌘→ previous/next Space, ⌃1–⌃9 Space N, ⇧⌘K clear Today, ⌃⇧= split view, ⌃⇧- close pane,
 ⌘O open Peek as tab, ⌥⌘N Little Window, ⌘F find, ⇧⌘L Library, ⌘+ / ⌘- / ⌘0 zoom, ⌥⌘I developer tools.
-Beyond Arc: ⌘, Settings, ⇧⌘S Save Page As, ⌘/ **Keyboard Shortcuts**, a sheet of every shortcut read from the menu
-itself, so it is always right.
+Beyond Arc: ⌘, Settings, ⇧⌘S Save Page As, ⇧⌘A **Search Tabs** (every tab in every Space, with where it lives), ⌘/
+**Keyboard Shortcuts**, a sheet of every shortcut read from the menu itself, so it is always right.
+
+**Tab power tools.** ⌘-click and ⇧-click pick several tabs; right-click one of them to close, move, pin or split them
+all (closing comes with Undo). Typing an address you already have open switches to that tab (the sidebar offers
+"Open Another"), and Tabs › Close Duplicate Tabs tidies up the copies that piled up.
 
 **Everyday basics.** Zoom is remembered per site (per host, like Chrome) and comes back the next time the page opens;
 private windows remember nothing. Library › Settings picks the folder downloads go to, or asks where to save each

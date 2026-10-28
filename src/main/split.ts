@@ -20,7 +20,7 @@ import { createId, findLocation, findSplitOfTab, findTab, getIdsAt, insertIntoLo
 /**
  * True when a tab may join a split view: it must exist and must not be a Favorite (Favorites are tiles).
  */
-function canJoinSplit(state: BrowserState, tabId: ItemId): boolean {
+export function canJoinSplit(state: BrowserState, tabId: ItemId): boolean {
   const location = findLocation(state, tabId);
   return findTab(state, tabId) !== undefined && location !== null && location.kind !== "favorites";
 }

@@ -24,7 +24,7 @@ import { createPrivateSession, getProfileSession } from "./profiles";
 import { findRoutedSpaceId } from "./routing";
 import { switchSpace } from "./spaces";
 import { addPageToArchive, openTab } from "./state";
-import { openLinkInNewTab } from "./tabActions";
+import { openLinkInNewTab, openOrSwitchToTab } from "./tabActions";
 import { getActiveSpace } from "./tree";
 import { normalizeTypedInput } from "./urls";
 import { findSearchEngine } from "../shared/searchEngines";
@@ -204,7 +204,8 @@ export function handleExternalUrl(url: string): void {
     return;
   }
   const now = Date.now();
-  applyChange((state) => openTab(switchSpace(state, routedSpaceId, now), url, now));
+  applyChange((state) => switchSpace(state, routedSpaceId, now));
+  openOrSwitchToTab(url);
   const mainWindow = getWindow();
   mainWindow?.show();
   mainWindow?.focus();

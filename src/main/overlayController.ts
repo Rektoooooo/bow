@@ -28,13 +28,15 @@ import {
   getRecentTabIds,
   getState,
   getWindow,
+  listMainWindows,
   sendSidebarCommand,
   getLibrarySection,
   setLibrarySection,
   setLibraryWindow,
   setNewTabPending,
 } from "./browserCore";
-import { rankCommandBarResults } from "./commandBar";
+import { rankCommandBarResults, rankTabSearchResults } from "./commandBar";
+import { focusMainWindow } from "./mainWindows";
 import type { CommandBarResult } from "./commandBar";
 import type { CommandActionRegistry } from "./commandBarActions";
 import * as os from "node:os";
@@ -71,8 +73,8 @@ import { splitTabs } from "./split";
 import { getSelectedTabId, openTab, selectTab } from "./state";
 import { areFavoritesKeptAwake, isKeptAwake, readTabSleepAfter } from "./tabSleep";
 import { collectTaskList } from "./tabSleepController";
-import { loadUrlInTab, openLinkInNewTab, setMuted } from "./tabActions";
-import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
+import { loadUrlInTab, openLinkInNewTab, openOrSwitchToTab, setMuted } from "./tabActions";
+import { findWindowShowingTab, getFocusedContents, getShownTabIdsInWindow, getTabContents, getTabViews } from "./tabViews";
 import { showToast } from "./statusBubble";
 import { findProfileIdOfItem, findTab, getActiveSpace } from "./tree";
 import { getPermissionOrigin, getSitePermissions } from "./sitePermissions";
@@ -782,6 +784,9 @@ function toLines(results: CommandBarResult[]): CommandBarLine[] {
  */
 function rankForQuery(query: string, mode: CommandBarMode, suggestions: string[]): CommandBarResult[] {
   const state = getState();
+  if (mode === "tabs") {
+    return rankTabSearchResults({ query: query, state: state, tabIdsInOtherWindows: listTabsOnScreenElsewhere() });
+  }
   const selectedTabId = getSelectedTabId(state);
   const selectedTab = selectedTabId === null ? undefined : findTab(state, selectedTabId);
   const actions = mode === "splitWith" || actionRegistry === null ? [] : actionRegistry.list();
@@ -801,6 +806,20 @@ function rankForQuery(query: string, mode: CommandBarMode, suggestions: string[]
     return results;
   }
   return results.filter((result) => result.tabId !== selectedTabId);
+}
+
+/**
+ * The tabs on screen in a main window other than the focused one (a page is in one window at a time).
+ */
+function listTabsOnScreenElsewhere(): ItemId[] {
+  const focusedWindowId = getState().focusedWindowId;
+  const tabIds: ItemId[] = [];
+  for (const entry of listMainWindows()) {
+    if (entry.windowId !== focusedWindowId) {
+      tabIds.push(...getShownTabIdsInWindow(entry.windowId));
+    }
+  }
+  return tabIds;
 }
 
 /**
@@ -836,7 +855,7 @@ function handleQuery(query: string, mode: CommandBarMode): CommandBarLine[] {
   const lines = toLines(rankForQuery(query, mode, []));
   // A keyword search ("yt cats") goes to its own page: the default engine's suggestions would not fit it.
   const isKeywordSearch = matchSearchKeyword(query, getState().searchKeywords ?? []) !== null;
-  const wantsSuggestions = query.trim() !== "" && !looksLikeWebAddress(query.trim()) && !isKeywordSearch;
+  const wantsSuggestions = mode !== "tabs" && query.trim() !== "" && !looksLikeWebAddress(query.trim()) && !isKeywordSearch;
   if (wantsSuggestions) {
     fetchSuggestions(query.trim()).then((suggestions) => {
       if (suggestions.length === 0 || latestQuery !== query || shownPanel?.kind !== "commandBar") {
@@ -867,7 +886,7 @@ function openAddress(url: string, mode: CommandBarMode): void {
     });
     return;
   }
-  openLinkInNewTab(url, "foreground");
+  openOrSwitchToTab(url);
 }
 
 /**
@@ -878,7 +897,8 @@ function handleChoose(resultId: string | null, typedText: string, mode: CommandB
   closeOverlay();
   if (result === undefined) {
     const text = typedText.trim();
-    if (text !== "") {
+    // Tab search only switches to tabs: Return with no tab matching opens nothing.
+    if (text !== "" && mode !== "tabs") {
       const state = getState();
       const searchEngine = findSearchEngine(state.settings.searchEngine);
       openAddress(normalizeTypedInput(text, searchEngine, state.searchKeywords), mode);
@@ -890,6 +910,12 @@ function handleChoose(resultId: string | null, typedText: string, mode: CommandB
     const selectedTabId = getSelectedTabId(getState());
     if (mode === "splitWith" && selectedTabId !== null) {
       applyChange((state) => splitTabs(state, selectedTabId, tabId, Date.now()));
+      return;
+    }
+    // A page is on screen in one window at a time: a tab another window shows is reached by going to that window.
+    const windowShowingTab = findWindowShowingTab(tabId);
+    if (windowShowingTab !== null && windowShowingTab !== getState().focusedWindowId) {
+      focusMainWindow(windowShowingTab);
       return;
     }
     applyChange((state) => selectTab(state, tabId, Date.now()));
@@ -1024,7 +1050,7 @@ function isFromOverlay(event: IpcMainInvokeEvent): boolean {
 }
 
 function isMode(value: unknown): value is CommandBarMode {
-  return value === "newTab" || value === "editUrl" || value === "splitWith";
+  return value === "newTab" || value === "editUrl" || value === "splitWith" || value === "tabs";
 }
 
 const SITE_COMMANDS: SiteCommand[] = [

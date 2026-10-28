@@ -76,6 +76,7 @@ const PLACEHOLDERS: Record<CommandBarMode, string> = {
   newTab: "Search or Enter URL…",
   editUrl: "Search or Enter URL…",
   splitWith: "Open in Split View…",
+  tabs: "Search Tabs…",
 };
 
 /** The Command Bar's current lines and which one is highlighted. */

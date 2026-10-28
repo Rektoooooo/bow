@@ -25,6 +25,8 @@ import type { HistoryEntry } from "./history";
 import { looksLikeWebAddress, normalizeTypedInput } from "./urls";
 import { buildSearchUrl, findSearchEngine } from "../shared/searchEngines";
 import { matchSearchKeyword } from "../shared/searchKeywords";
+import { describeSpaceIconAsText } from "../shared/spaceIcons";
+import { findSpaceIdOfItem } from "./tree";
 
 /** One line in the Command Bar. */
 export interface CommandBarResult {
@@ -63,6 +65,9 @@ export interface CommandBarInput {
 
 /** Most lines shown. Arc shows about this many before scrolling. */
 export const RESULTS_LIMIT = 8;
+
+/** Most tabs tab search (⇧⌘A) lists; the list scrolls. Our choice. */
+export const TAB_SEARCH_LIMIT = 100;
 
 /** Open tabs listed when nothing is typed yet. The user's Arc lists five lines (shot 3). */
 const EMPTY_QUERY_TAB_COUNT = 5;
@@ -149,7 +154,7 @@ export function scoreAddressMatch(url: string, query: string): number {
  * The key under which two results count as the same destination: the address without scheme, "www." and a
  * trailing slash.
  */
-function toDedupeKey(url: string): string {
+export function toDedupeKey(url: string): string {
   const stripped = stripAddress(url).toLowerCase();
   return stripped.endsWith("/") ? stripped.slice(0, -1) : stripped;
 }
@@ -190,6 +195,44 @@ function createTabResult(tab: TabItem): CommandBarResult {
     actionId: null,
     faviconUrl: tab.faviconUrl,
   };
+}
+
+/** What tab search (⇧⌘A) ranks: the query, the tabs, and the tabs on screen in another window. */
+export interface TabSearchInput {
+  query: string;
+  state: BrowserState;
+  tabIdsInOtherWindows: ItemId[];
+}
+
+/**
+ * Where a tab lives, for tab search: its Space ("🏠 Home"), or Favorites, and whether another window shows it.
+ */
+function describeTabPlace(input: TabSearchInput, tabId: ItemId): string {
+  const spaceId = findSpaceIdOfItem(input.state, tabId);
+  const space = input.state.spaces.find((candidate) => candidate.id === spaceId);
+  const place = space === undefined ? "Favorites" : `${describeSpaceIconAsText(space.icon)} ${space.name}`;
+  return input.tabIdsInOtherWindows.includes(tabId) ? `${place} · open in another window` : place;
+}
+
+/**
+ * Tab search (⇧⌘A): every tab in every Space, matching tabs first and the most recently used first, each with where
+ * it lives. Nothing typed lists them all.
+ * Example: query "mail" → [{ title: "Inbox", subtitle: "💼 Work" }, …]
+ */
+export function rankTabSearchResults(input: TabSearchInput): CommandBarResult[] {
+  const query = input.query.trim();
+  const ranked: { result: CommandBarResult; score: number; lastActiveAt: number }[] = [];
+  for (const { tab } of listAllTabs(input.state)) {
+    const name = tab.customTitle ?? tab.title;
+    const matchScore = query === "" ? 0 : Math.max(scoreTextMatch(name, query), scoreAddressMatch(tab.url, query));
+    if (query !== "" && matchScore === 0) {
+      continue;
+    }
+    const result: CommandBarResult = { ...createTabResult(tab), subtitle: describeTabPlace(input, tab.id) };
+    ranked.push({ result: result, score: matchScore, lastActiveAt: tab.lastActiveAt });
+  }
+  ranked.sort((first, second) => (second.score !== first.score ? second.score - first.score : second.lastActiveAt - first.lastActiveAt));
+  return ranked.slice(0, TAB_SEARCH_LIMIT).map((entry) => entry.result);
 }
 
 /**

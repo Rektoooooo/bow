@@ -19,7 +19,8 @@ import type { ArchivedTab, ItemId, RoutingRule, SearchKeyword, SitePermissionKin
 /** What a Command Bar line does when chosen. */
 export type CommandBarResultKind = "navigate" | "search" | "tab" | "history" | "action";
 
-export type CommandBarMode = "newTab" | "editUrl" | "splitWith";
+/** "tabs" is tab search (⇧⌘A): only tabs, every Space. */
+export type CommandBarMode = "newTab" | "editUrl" | "splitWith" | "tabs";
 
 export const LIBRARY_SECTIONS = ["archive", "history", "media", "downloads", "spaces", "boosts", "extensions", "tasks", "settings"] as const;
 

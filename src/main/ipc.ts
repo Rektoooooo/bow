@@ -169,7 +169,7 @@ function isRoutingMatchType(value: unknown): boolean {
 }
 
 function isCommandBarMode(value: unknown): boolean {
-  return value === "newTab" || value === "editUrl";
+  return value === "newTab" || value === "editUrl" || value === "tabs";
 }
 
 /** True for an object (not null, not an array). */
@@ -220,6 +220,16 @@ function isTheme(value: unknown): boolean {
   return colorCountOk && colorsOk && appearanceOk && grainOk && intensityOk;
 }
 
+/** Most picked tabs one menu acts on. Our choice: far more than fit in a sidebar. */
+const MAX_PICKED_TABS = 500;
+
+/**
+ * Several picked tabs' ids (renderer/multiSelect.ts): two or more, at most MAX_PICKED_TABS.
+ */
+function isPickedTabList(value: unknown): boolean {
+  return Array.isArray(value) && value.length >= 2 && value.length <= MAX_PICKED_TABS && value.every((tabId) => isText(tabId));
+}
+
 /**
  * True for a native-menu request such as { menu: "item", itemId: "tab-1" }.
  */
@@ -229,6 +239,9 @@ function isMenuRequest(value: unknown): boolean {
   }
   if (value.menu === "item") {
     return isText(value.itemId);
+  }
+  if (value.menu === "tabs") {
+    return isPickedTabList(value.tabIds);
   }
   if (value.menu === "space") {
     return isText(value.spaceId);
@@ -350,8 +363,10 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   setAskWhereToSave: { isOn: isBoolean },
   setTabNeverArchived: { tabId: isText, isNeverArchived: isBoolean },
   setSpaceArchiveAfter: { spaceId: isText, archiveAfterMs: isSpaceArchiveAfter },
-  undoArchive: {},
-  dismissArchiveUndo: {},
+  runNoticeAction: {},
+  dismissNotice: {},
+  closeDuplicateTabs: {},
+  closeTabs: { tabIds: isPickedTabList },
   sleepTab: { tabId: isText },
   sleepOtherTabs: {},
   setSiteKeptAwake: { site: isSite, isKeptAwake: isBoolean },

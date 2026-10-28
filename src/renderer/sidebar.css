@@ -750,6 +750,11 @@ button:disabled {
   box-shadow: var(--row-shadow);
 }
 
+/* Tabs picked with ⌘- or ⇧-click (multiSelect.ts): the selected look, so the group reads as one. */
+.row.is-multi-selected {
+  background: var(--row-selected);
+}
+
 .row.is-dragging,
 .favorite-tile.is-dragging {
   opacity: 0.4;
@@ -1277,8 +1282,8 @@ button:disabled {
   display: none;
 }
 
-/* "Cleared 4 tabs · Undo" after the sweep or Clear (archiveUndoController.ts): a tile like the media player's. */
-.archive-undo {
+/* The sidebar's notice, "Cleared 4 tabs · Undo" (main/sidebarNotice.ts): a tile like the media player's. */
+.sidebar-notice {
   flex: none;
   display: flex;
   align-items: center;
@@ -1289,11 +1294,11 @@ button:disabled {
   background: var(--tile);
 }
 
-.archive-undo[hidden] {
+.sidebar-notice[hidden] {
   display: none;
 }
 
-.archive-undo-text {
+.sidebar-notice-text {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -1301,7 +1306,7 @@ button:disabled {
   white-space: nowrap;
 }
 
-.archive-undo-button {
+.sidebar-notice-button {
   flex: none;
   padding: 3px 9px;
   border: 0;
@@ -1311,7 +1316,7 @@ button:disabled {
   font-weight: 600;
 }
 
-.archive-undo-button:hover {
+.sidebar-notice-button:hover {
   opacity: 0.85;
 }
 

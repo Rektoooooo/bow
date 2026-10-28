@@ -25,6 +25,8 @@ export type ToolbarSiteCommand = "copyLink" | "capture" | "screenshot";
 /** Which native menu the sidebar wants to show (main.ts builds it, so it can call Electron). */
 export type MenuRequest =
   | { menu: "item"; itemId: ItemId }
+  /** Several picked tab rows (renderer/multiSelect.ts): Close, Move to Space, Pin, Split View for all of them. */
+  | { menu: "tabs"; tabIds: ItemId[] }
   | { menu: "space"; spaceId: SpaceId }
   | { menu: "plus" }
   | { menu: "sidebar" }
@@ -136,8 +138,10 @@ export type BrowserAction =
   | { type: "setAskWhereToSave"; isOn: boolean }
   | { type: "setTabNeverArchived"; tabId: ItemId; isNeverArchived: boolean }
   | { type: "setSpaceArchiveAfter"; spaceId: SpaceId; archiveAfterMs: number | null | "default" }
-  | { type: "undoArchive" }
-  | { type: "dismissArchiveUndo" }
+  | { type: "runNoticeAction" }
+  | { type: "dismissNotice" }
+  | { type: "closeDuplicateTabs" }
+  | { type: "closeTabs"; tabIds: ItemId[] }
   | { type: "sleepTab"; tabId: ItemId }
   | { type: "sleepOtherTabs" }
   | { type: "setSiteKeptAwake"; site: string; isKeptAwake: boolean }
@@ -262,8 +266,10 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setAskWhereToSave",
   "setTabNeverArchived",
   "setSpaceArchiveAfter",
-  "undoArchive",
-  "dismissArchiveUndo",
+  "runNoticeAction",
+  "dismissNotice",
+  "closeDuplicateTabs",
+  "closeTabs",
   "sleepTab",
   "sleepOtherTabs",
   "setSiteKeptAwake",

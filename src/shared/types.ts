@@ -435,8 +435,11 @@ export interface RuntimeState {
   sleepingTabIds: ItemId[];
   /** Today tabs that archive soon, with the minutes left (autoArchive.ts findTabsArchivingSoon): their rows say so. */
   archivingSoon: Record<ItemId, number>;
-  /** What the last sweep or Clear archived, while it can still be undone (archiveUndoController.ts), or null. */
-  archiveUndo: { message: string } | null;
+  /**
+   * A short offer at the bottom of the sidebar with one button ("Cleared 4 tabs · Undo"; main/sidebarNotice.ts), or
+   * null.
+   */
+  notice: { message: string; buttonLabel: string } | null;
 }
 
 /** A profile waiting for a Web Store extension's download (RuntimeState.extensionsBeingAdded). */

@@ -37,7 +37,8 @@ import { exportBackup, restoreBackup, revealBackupsFolder } from "./backupContro
 import { chooseSyncFolder, revealSyncFolder, stopSyncing } from "./syncController";
 import { setFavoritesKeptAwake, setSiteKeptAwake } from "./tabSleep";
 import { canSleepNow, sleepOtherTabsNow, sleepTabNow } from "./tabSleepController";
-import { clearTodayTabsWithUndo, dismissArchiveUndo, undoLastArchive } from "./archiveUndoController";
+import { clearTodayTabsWithUndo, closeDuplicateTabsWithUndo, closeTabsWithUndo } from "./archiveUndoController";
+import { dismissSidebarNotice, runSidebarNoticeAction } from "./sidebarNotice";
 import { askForDownloadFolder } from "./downloads";
 import { importFromBrowser } from "./browserImportController";
 import { applyCosmeticFilters, ensureFilterLists } from "./adBlock";
@@ -84,7 +85,6 @@ import {
   deleteItem,
   duplicateTab,
   moveItem,
-  openTab,
   pinTab,
   renameItem,
   restoreArchivedTab,
@@ -120,7 +120,7 @@ import {
   switchSpaceByOffset,
 } from "./spaces";
 import { takeItemIntoFocusedWindow } from "./windows";
-import { closeSplitByUser, closeTabByUser, navigateFocusedPage, openLinkInNewTab, resetTabToHome, setMuted } from "./tabActions";
+import { closeSplitByUser, closeTabByUser, navigateFocusedPage, openLinkInNewTab, openOrSwitchToTab, resetTabToHome, setMuted } from "./tabActions";
 import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
 import { createId } from "./tree";
 import { normalizeTypedInput } from "./urls";
@@ -233,7 +233,7 @@ export function runAction(action: BrowserAction): void {
       const settingsState = getState();
       const searchEngine = findSearchEngine(settingsState.settings.searchEngine);
       const url = normalizeTypedInput(action.typedText, searchEngine, settingsState.searchKeywords);
-      applyChange((state) => openTab(state, url, now));
+      openOrSwitchToTab(url);
       return;
     }
     case "selectTab":
@@ -457,10 +457,14 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => setTabNeverArchived(state, action.tabId, action.isNeverArchived));
     case "setSpaceArchiveAfter":
       return applyChange((state) => setSpaceArchiveAfter(state, action.spaceId, action.archiveAfterMs));
-    case "undoArchive":
-      return undoLastArchive();
-    case "dismissArchiveUndo":
-      return dismissArchiveUndo();
+    case "runNoticeAction":
+      return runSidebarNoticeAction();
+    case "dismissNotice":
+      return dismissSidebarNotice();
+    case "closeDuplicateTabs":
+      return closeDuplicateTabsWithUndo();
+    case "closeTabs":
+      return closeTabsWithUndo(action.tabIds);
     case "sleepTab":
       sleepTabNow(action.tabId);
       return;

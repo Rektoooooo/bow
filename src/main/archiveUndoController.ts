@@ -2,30 +2,30 @@
  * WHY this file exists:
  *   When the sweep or Clear archives Today tabs, the sidebar offers Undo for a few seconds, so a Clear pressed by
  *   mistake or a sweep you did not expect costs one click. archiveUndo.ts notes the tabs' places and puts them back;
- *   this file runs the archiving, keeps the note while Undo is offered, and takes the offer away after
- *   ARCHIVE_UNDO_SHOWN_MS.
+ *   this file runs the archiving and offers Undo in the sidebar's notice (sidebarNotice.ts) for
+ *   SIDEBAR_NOTICE_SHOWN_MS, the note kept by the notice's button. Close Duplicate Tabs archives the same way.
  *
  * Data source:
  *   The state (browserCore.ts) and the tabs to archive (main.ts sweep, Clear from the menu, the sidebar or the
  *   Command Bar).
  *
  * Data flow:
- *   archiveWithUndo(tabIds, reason) → captureArchiveBatch → applyChange(moveTabsToArchive) → setArchiveUndo(offer)
- *   → the sidebar shows "Cleared 4 tabs · Undo" → undoLastArchive() → applyChange(undoArchiveBatch)
+ *   archiveWithUndo(tabIds, reason) → captureArchiveBatch → applyChange(moveTabsToArchive) → offerSidebarNotice
+ *   → the sidebar shows "Cleared 4 tabs · Undo" → its button → undoArchive(batch) → applyChange(undoArchiveBatch)
  */
-import { applyChange, getState, setArchiveUndo } from "./browserCore";
+import { applyChange, getState } from "./browserCore";
+import { offerSidebarNotice } from "./sidebarNotice";
 import { captureArchiveBatch, undoArchiveBatch } from "./archiveUndo";
 import type { ArchiveBatch } from "./archiveUndo";
+import { findDuplicateTodayTabs } from "./duplicateTabs";
 import { listClearableTodayTabIds, moveTabsToArchive } from "./state";
-import { ARCHIVE_UNDO_SHOWN_MS } from "../shared/settings";
+import { closeTabByUser } from "./tabActions";
+import { findRootLocation } from "./tree";
+import { SIDEBAR_NOTICE_SHOWN_MS } from "../shared/settings";
 import type { ArchiveReason, ItemId } from "../shared/types";
 
-/** The tabs the last sweep or Clear archived, while Undo is offered. */
-let pendingBatch: ArchiveBatch | null = null;
-let offerTimer: NodeJS.Timeout | null = null;
-
 /**
- * Archives tabs and offers Undo with a message about how many left ("Cleared 4 tabs").
+ * Archives tabs and offers Undo in the sidebar with a message about how many left ("Cleared 4 tabs").
  */
 function archiveWithUndo(tabIds: ItemId[], reason: ArchiveReason, describe: (count: number) => string): void {
   const batch = captureArchiveBatch(getState(), tabIds);
@@ -34,12 +34,7 @@ function archiveWithUndo(tabIds: ItemId[], reason: ArchiveReason, describe: (cou
   if (batch.places.length === 0) {
     return;
   }
-  pendingBatch = batch;
-  setArchiveUndo({ message: describe(batch.places.length) });
-  if (offerTimer !== null) {
-    clearTimeout(offerTimer);
-  }
-  offerTimer = setTimeout(() => dismissArchiveUndo(), ARCHIVE_UNDO_SHOWN_MS);
+  offerSidebarNotice(describe(batch.places.length), "Undo", () => undoArchive(batch), SIDEBAR_NOTICE_SHOWN_MS);
 }
 
 /**
@@ -58,25 +53,31 @@ export function archiveUnusedTabsWithUndo(tabIds: ItemId[]): void {
 }
 
 /**
- * Undo: puts the tabs back where they were.
+ * Close Duplicate Tabs: the Today copies of addresses another tab of the profile shows (duplicateTabs.ts).
  */
-export function undoLastArchive(): void {
-  const batch = pendingBatch;
-  dismissArchiveUndo();
-  if (batch === null) {
-    return;
-  }
-  applyChange((state) => undoArchiveBatch(state, batch, Date.now()));
+export function closeDuplicateTabsWithUndo(): void {
+  const tabIds = findDuplicateTodayTabs(getState());
+  archiveWithUndo(tabIds, "manual", (count) => (count === 1 ? "Closed 1 duplicate tab" : `Closed ${count} duplicate tabs`));
 }
 
 /**
- * Takes the Undo offer away (its time is up, or the user closed it).
+ * Close for several picked tabs: Today tabs go to the Archive together, with Undo; a pinned tab or Favorite puts its
+ * page away and keeps its place, as ⌘W does (tabActions.ts).
  */
-export function dismissArchiveUndo(): void {
-  pendingBatch = null;
-  if (offerTimer !== null) {
-    clearTimeout(offerTimer);
-    offerTimer = null;
+export function closeTabsWithUndo(tabIds: ItemId[]): void {
+  const state = getState();
+  const todayTabIds = tabIds.filter((tabId) => findRootLocation(state, tabId)?.kind === "today");
+  const otherTabIds = tabIds.filter((tabId) => !todayTabIds.includes(tabId));
+  for (const tabId of otherTabIds) {
+    closeTabByUser(tabId);
   }
-  setArchiveUndo(null);
+  archiveWithUndo(todayTabIds, "manual", (count) => (count === 1 ? "Closed 1 tab" : `Closed ${count} tabs`));
 }
+
+/**
+ * Undo: puts the tabs back where they were.
+ */
+function undoArchive(batch: ArchiveBatch): void {
+  applyChange((state) => undoArchiveBatch(state, batch, Date.now()));
+}
+

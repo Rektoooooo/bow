@@ -42,8 +42,11 @@ export const DEFAULT_ARCHIVE_AFTER_MS = 12 * HOUR_MS;
 export const ARCHIVE_SOON_MS = 1 * HOUR_MS;
 export const ARCHIVE_SOON_SHARE = 4;
 
-/** How long "Undo" stays offered after the sweep or Clear archived tabs (archiveUndoController.ts). Our choice. */
-export const ARCHIVE_UNDO_SHOWN_MS = 8000;
+/**
+ * How long the sidebar's notice stays: "Undo" after the sweep or Clear archived tabs (archiveUndoController.ts), "Open
+ * Another" after switching to a tab already open (tabActions.ts). Our choice.
+ */
+export const SIDEBAR_NOTICE_SHOWN_MS = 8000;
 
 /**
  * The "Sleep unused tabs after" menu (main/tabSleep.ts): a page left alone this long closes its renderer and wakes

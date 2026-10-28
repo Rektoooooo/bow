@@ -300,18 +300,18 @@ await dispatch(page, { type: "clearTodayTabs" });
 await page.waitForTimeout(300);
 state = await getState(page);
 check("Clear archives Today tabs and keeps Pinned ones", todayTabs(state).length === 0 && state.archive[0]?.reason === "clear-button" && pinnedItems(state).length === 1);
-// The sidebar offers Undo for a few seconds (archiveUndoController.ts); it puts the tab back where it was.
+// The sidebar offers Undo for a few seconds (archiveUndoController.ts, sidebarNotice.ts); it puts the tab back.
 const clearedTabId = state.archive[0]?.tab.id;
-const undoText = await page.textContent("#archive-undo:not([hidden]) .archive-undo-text", { timeout: 3000 }).catch(() => null);
+const undoText = await page.textContent("#sidebar-notice:not([hidden]) .sidebar-notice-text", { timeout: 3000 }).catch(() => null);
 check("after Clear the sidebar offers Undo", undoText === "Cleared 1 tab", String(undoText));
-await page.click("#archive-undo .archive-undo-button");
+await page.click("#sidebar-notice .sidebar-notice-button");
 await page.waitForFunction(() => document.querySelectorAll(".today-list .tab-row").length === 1, null, { timeout: 5000 }).catch(() => undefined);
 state = await getState(page);
-const isOfferGone = await page.waitForSelector("#archive-undo[hidden]", { state: "attached", timeout: 3000 }).then(() => true, () => false);
+const isOfferGone = await page.waitForSelector("#sidebar-notice[hidden]", { state: "attached", timeout: 3000 }).then(() => true, () => false);
 check("Undo brings the cleared tab back, out of the Archive, and the offer goes", todayTabs(state)[0]?.id === clearedTabId && state.archive[0]?.tab.id !== clearedTabId && isOfferGone, `${todayTabs(state).map((tab) => tab?.id).join(",")} offer gone ${isOfferGone}`);
 // Back to the state the checks below expect: Today cleared, no offer on screen.
 await dispatch(page, { type: "clearTodayTabs" });
-await dispatch(page, { type: "dismissArchiveUndo" });
+await dispatch(page, { type: "dismissNotice" });
 await page.waitForTimeout(300);
 
 await dispatch(page, { type: "setSidebarVisible", isVisible: false });
@@ -466,6 +466,80 @@ state = await getState(page);
 check("choosing another app icon is saved and drawn for the Dock", state.settings.appIcon === "pixel", String(state.settings.appIcon));
 await dispatch(page, { type: "setAppIcon", variantId: "glass" });
 await page.waitForTimeout(1000);
+
+// ---------- Tab power tools: duplicates, Close Duplicate Tabs, tab search (⇧⌘A), several tabs at once ----------
+const tabsWith = (current, part) => Object.values(current.items).filter((item) => item.kind === "tab" && item.url.includes(part));
+const tabCount = (current) => Object.values(current.items).filter((item) => item.kind === "tab").length;
+const noticeText = () => page.textContent("#sidebar-notice:not([hidden]) .sidebar-notice-text", { timeout: 3000 }).catch(() => null);
+for (const part of ["power-a", "power-b", "power-c"]) {
+  await dispatch(page, { type: "openTab", typedText: `example.com/${part}` });
+}
+await page.waitForTimeout(800);
+state = await getState(page);
+const firstPowerA = tabsWith(state, "power-a")[0]?.id;
+const countBeforeDuplicate = tabCount(state);
+await dispatch(page, { type: "openTab", typedText: "https://www.example.com/power-a/" });
+await page.waitForTimeout(500);
+state = await getState(page);
+const switchNotice = await noticeText();
+check("typing an address already open switches to its tab, and says so", state.selectedTabIdBySpace[state.activeSpaceId] === firstPowerA && tabCount(state) === countBeforeDuplicate && switchNotice === "Switched to the tab you already had open", String(switchNotice));
+await page.click("#sidebar-notice .sidebar-notice-button");
+await page.waitForTimeout(500);
+state = await getState(page);
+check("its Open Another opens the address in a new tab anyway", tabsWith(state, "power-a").length === 2);
+await dispatch(page, { type: "closeDuplicateTabs" });
+await page.waitForTimeout(500);
+state = await getState(page);
+const duplicatesNotice = await noticeText();
+check("Close Duplicate Tabs keeps one copy, with Undo", tabsWith(state, "power-a").length === 1 && duplicatesNotice === "Closed 1 duplicate tab", String(duplicatesNotice));
+await dispatch(page, { type: "dismissNotice" });
+
+const overlayPage = app.windows().find((candidate) => candidate.url().includes("/overlay/overlay.html"));
+await dispatch(page, { type: "openCommandBar", mode: "tabs" });
+await overlayPage.waitForSelector(".command-input", { timeout: 5000 });
+await overlayPage.fill(".command-input", "power-b");
+await overlayPage.waitForTimeout(500);
+const tabSearchLines = await overlayPage.$$eval(".command-line", (lines) => lines.map((line) => line.querySelector(".command-line-subtitle")?.textContent ?? ""));
+const spaceName = activeSpace(state).name;
+check("tab search (⇧⌘A) lists the matching tabs with their Space", tabSearchLines.length === 1 && tabSearchLines[0].includes(spaceName), JSON.stringify(tabSearchLines));
+await overlayPage.press(".command-input", "Enter");
+await page.waitForTimeout(500);
+state = await getState(page);
+check("and choosing one switches to it", state.items[state.selectedTabIdBySpace[state.activeSpaceId]]?.url.includes("power-b") === true);
+
+const powerIds = ["power-a", "power-b", "power-c"].map((part) => tabsWith(state, part)[0]?.id);
+const rowOf = (tabId) => `#space-content .tab-row[data-item-id="${tabId}"]`;
+const todayOrder = activeSpace(state).todayIds.filter((itemId) => powerIds.includes(itemId));
+await page.click(rowOf(todayOrder[0]), { modifiers: ["Meta"] });
+await page.click(rowOf(todayOrder[2]), { modifiers: ["Shift"] });
+const pickedIds = await page.$$eval(".tab-row.is-multi-selected", (rows) => rows.map((row) => row.dataset.itemId));
+check("⌘-click and ⇧-click pick several tab rows", powerIds.every((tabId) => pickedIds.includes(tabId)), `${pickedIds.length} picked`);
+await app.evaluate(({ Menu }) => {
+  globalThis.originalPopup = Menu.prototype.popup;
+  Menu.prototype.popup = function capturePopup() {
+    globalThis.lastMenu = this;
+  };
+});
+await page.click(rowOf(todayOrder[1]), { button: "right" });
+await page.waitForTimeout(400);
+const pickedMenuLabels = await app.evaluate(() => globalThis.lastMenu?.items.map((item) => item.label) ?? []);
+check("right-clicking a picked tab acts on all of them", pickedMenuLabels.includes(`Close ${pickedIds.length} Tabs`) && pickedMenuLabels.includes(`Pin ${pickedIds.length} Tabs`), pickedMenuLabels.join(" | "));
+await app.evaluate((_electron, label) => globalThis.lastMenu.items.find((item) => item.label === label).click(), `Close ${pickedIds.length} Tabs`);
+await page.waitForTimeout(500);
+state = await getState(page);
+const closedNotice = await noticeText();
+check("closing them archives them together, with Undo", powerIds.every((tabId) => state.items[tabId] === undefined) && closedNotice === `Closed ${pickedIds.length} tabs`, String(closedNotice));
+await page.click("#sidebar-notice .sidebar-notice-button");
+await page.waitForTimeout(500);
+state = await getState(page);
+check("and Undo brings them all back", powerIds.every((tabId) => state.items[tabId] !== undefined));
+await page.click(rowOf(powerIds[0]), { modifiers: ["Meta"] });
+await page.keyboard.press("Escape");
+await page.waitForTimeout(200);
+check("Escape forgets the picked tabs", (await page.$$(".tab-row.is-multi-selected")).length === 0);
+await app.evaluate(({ Menu }) => {
+  Menu.prototype.popup = globalThis.originalPopup;
+});
 
 // A site without /favicon.ico answers 404; Chromium logs that as a console error, but it is expected, not a bug.
 const realErrors = consoleErrors.filter((message) => !message.startsWith("Failed to load resource"));

@@ -14,9 +14,13 @@ import type { WebContents } from "electron";
 import type { NavigationCommand } from "../shared/actions";
 import type { ItemId } from "../shared/types";
 import { applyChange, getState, scheduleRuntimePush } from "./browserCore";
+import { findOpenTabForUrl } from "./duplicateTabs";
+import { focusMainWindow } from "./mainWindows";
+import { offerSidebarNotice } from "./sidebarNotice";
+import { SIDEBAR_NOTICE_SHOWN_MS } from "../shared/settings";
 import { closeTab, deleteItem, getSelectedTabId, openTab, selectTab, setTabMuted, updateTab } from "./state";
 import type { OpenTabOptions } from "./state";
-import { destroyTabView, getFocusedContents, getTabContents } from "./tabViews";
+import { destroyTabView, findWindowShowingTab, getFocusedContents, getTabContents } from "./tabViews";
 import type { OpenDisposition } from "./tabViews";
 import { findTab, isInToday } from "./tree";
 import { resetPinnedTabInEveryWindow, resetPinnedTabsInEveryWindow } from "./windows";
@@ -27,6 +31,29 @@ import { resetPinnedTabInEveryWindow, resetPinnedTabsInEveryWindow } from "./win
 export function openLinkInNewTab(url: string, disposition: OpenDisposition): void {
   const options: OpenTabOptions = { select: disposition === "foreground" };
   applyChange((state) => openTab(state, url, Date.now(), options));
+}
+
+/**
+ * Opens an address the user asked for (typed in the sidebar or the Command Bar, a link from another app sent to a
+ * Space) in a new Today tab, unless a tab of the active Space's profile already shows it (duplicateTabs.ts): then
+ * that tab is shown (in its own window when another window has it on screen), and the sidebar offers to open another
+ * anyway. Links opened from pages keep opening new tabs: there the user chose where to go.
+ */
+export function openOrSwitchToTab(url: string): void {
+  const state = getState();
+  const existingTabId = findOpenTabForUrl(state, url, state.activeSpaceId);
+  if (existingTabId === null) {
+    applyChange((current) => openTab(current, url, Date.now()));
+    return;
+  }
+  const windowShowingTab = findWindowShowingTab(existingTabId);
+  if (windowShowingTab !== null && windowShowingTab !== state.focusedWindowId) {
+    focusMainWindow(windowShowingTab);
+  } else {
+    applyChange((current) => selectTab(current, existingTabId, Date.now()));
+  }
+  const openAnother = (): void => applyChange((current) => openTab(current, url, Date.now()));
+  offerSidebarNotice("Switched to the tab you already had open", "Open Another", openAnother, SIDEBAR_NOTICE_SHOWN_MS);
 }
 
 /**

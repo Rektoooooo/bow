@@ -25,6 +25,7 @@ import { describeSpaceIconAsText } from "../shared/spaceIcons";
 import { getSiteKey } from "../shared/siteKey";
 import { ARCHIVE_THRESHOLD_OPTIONS } from "../shared/settings";
 import { isKeptAwake } from "./tabSleep";
+import { canJoinSplit } from "./split";
 
 /** What the menus need from main.ts. */
 export interface MenuHost {
@@ -240,6 +241,41 @@ function buildSleepItems(host: MenuHost, tab: TabItem): MenuItemConstructorOptio
     click: () => host.runAction({ type: "setSiteKeptAwake", site: site, isKeptAwake: !isSiteKeptAwake }),
   });
   return items;
+}
+
+/**
+ * The menu for several picked tab rows (renderer/multiSelect.ts): Close, Move to Space, Pin or Unpin all of them,
+ * and Split View when there are two that can share one.
+ */
+function buildPickedTabsMenu(host: MenuHost, pickedTabIds: ItemId[]): MenuItemConstructorOptions[] {
+  const state = host.getState();
+  const tabIds = pickedTabIds.filter((tabId) => findTab(state, tabId) !== undefined);
+  const count = tabIds.length;
+  const runForEach = (makeAction: (tabId: ItemId) => BrowserAction): void => {
+    for (const tabId of tabIds) {
+      host.runAction(makeAction(tabId));
+    }
+  };
+  const otherSpaces = state.spaces.filter((space) => space.id !== state.activeSpaceId);
+  const moveMenu: MenuItemConstructorOptions[] = otherSpaces.map((space) => ({
+    label: `${describeSpaceIconAsText(space.icon)}  ${space.name}`,
+    click: () => runForEach((tabId) => ({ type: "moveItemToSpace", itemId: tabId, spaceId: space.id })),
+  }));
+  const areAllPinned = tabIds.every((tabId) => findRootLocation(state, tabId)?.kind === "pinned");
+  const pinItem: MenuItemConstructorOptions = areAllPinned
+    ? { label: `Unpin ${count} Tabs`, click: () => runForEach((tabId) => ({ type: "unpinTab", tabId: tabId })) }
+    : { label: `Pin ${count} Tabs`, click: () => runForEach((tabId) => ({ type: "pinTab", tabId: tabId })) };
+  const template: MenuItemConstructorOptions[] = [
+    { label: `Close ${count} Tabs`, click: () => host.runAction({ type: "closeTabs", tabIds: tabIds }) },
+    { label: `Move ${count} Tabs to Space`, submenu: moveMenu, enabled: moveMenu.length > 0 },
+    pinItem,
+  ];
+  const [firstTabId, secondTabId] = tabIds;
+  const canSplit = count === 2 && firstTabId !== undefined && secondTabId !== undefined && canJoinSplit(state, firstTabId) && canJoinSplit(state, secondTabId);
+  if (canSplit) {
+    template.push({ label: "Open in Split View", click: () => host.runAction({ type: "splitTabs", firstTabId: firstTabId, secondTabId: secondTabId }) });
+  }
+  return template;
 }
 
 /**
@@ -476,6 +512,10 @@ export function showMenuRequest(host: MenuHost, request: MenuRequest): void {
     if (space !== undefined) {
       popUp(host, buildSpaceMenu(host, space));
     }
+    return;
+  }
+  if (request.menu === "tabs") {
+    popUp(host, buildPickedTabsMenu(host, request.tabIds));
     return;
   }
   if (request.menu === "item") {

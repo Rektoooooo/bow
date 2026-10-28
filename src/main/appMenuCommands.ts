@@ -22,7 +22,7 @@ import { closePeek, getPeekContents, isPeekClosing, isPeekOpen, openPeekAsTab } 
 import { buildImportMenu, showMenuRequest } from "./menus";
 import { menuHost } from "./actionRunner";
 import { showToast } from "./statusBubble";
-import { clearTodayTabsWithUndo } from "./archiveUndoController";
+import { clearTodayTabsWithUndo, closeDuplicateTabsWithUndo } from "./archiveUndoController";
 import {
   createFolder,
   duplicateTab,
@@ -87,6 +87,7 @@ export const appMenuCommands: AppMenuCommands = {
   selectTabNumber: (tabNumber) => selectTabIfAny(findTabIdByNumber(getState(), tabNumber)),
   switchRecentTab: (step) => openTabSwitcher(step),
   clearTodayTabs: () => clearTodayTabsWithUndo(),
+  closeDuplicateTabs: () => closeDuplicateTabsWithUndo(),
   addSplitPane: () => {
     if (getSelectedId() !== null) {
       openCommandBar("splitWith");
