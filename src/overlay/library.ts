@@ -838,10 +838,10 @@ function describeSyncStatus(sync: SyncStatusData): string {
     sentences.push(`Last synced at ${time}.`);
   }
   if (sync.conflicts === 1) {
-    sentences.push("1 change made on two Macs at the same moment kept this Mac's version.");
+    sentences.push("1 thing was changed on two Macs at the same moment; both now show the same version.");
   }
   if (sync.conflicts > 1) {
-    sentences.push(`${sync.conflicts} changes made on two Macs at the same moment kept this Mac's version.`);
+    sentences.push(`${sync.conflicts} things were changed on two Macs at the same moment; both now show the same version.`);
   }
   return sentences.join(" ");
 }

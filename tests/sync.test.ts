@@ -44,7 +44,7 @@ function fileOf(mac: Mac, now: number): SyncPayload {
 }
 
 /** One Mac reads another's file. */
-function receive(mac: Mac, payload: SyncPayload, now: number): Mac & { conflicts: number } {
+function receive(mac: Mac, payload: SyncPayload, now: number): Mac & { conflicts: string[] } {
   const result = mergePeer(mac.state, mac.meta, payload, mac.notes, now);
   return { ...mac, state: result.state, meta: result.meta, notes: { ...mac.notes, ...result.notes }, conflicts: result.conflicts };
 }
@@ -118,13 +118,41 @@ describe("folder sync", () => {
     expect(getPinnedIds(bAfter.state)).not.toContain(tabIds[0]);
   });
 
-  it("changes too close in time to order keep this Mac's version", () => {
+  it("changes too close in time to order are counted, and both Macs end with the same one", () => {
     const { macA, macB, tabIds } = sharedMacs();
+    const tabKey = `item:${tabIds[0]}`;
     const renamedOnA = stamp({ ...macA, state: renameItem(macA.state, tabIds[0] as ItemId, "From A") }, ONE_PM + MINUTE_MS);
     const renamedOnB = stamp({ ...macB, state: renameItem(macB.state, tabIds[0] as ItemId, "From B") }, ONE_PM + MINUTE_MS + CLOCK_SKEW_GUARD_MS - 1000);
     const bAfter = receive(renamedOnB, fileOf(renamedOnA, ONE_PM + 2 * MINUTE_MS), ONE_PM + 2 * MINUTE_MS);
+    const aAfter = receive(renamedOnA, fileOf(renamedOnB, ONE_PM + 2 * MINUTE_MS), ONE_PM + 2 * MINUTE_MS);
     expect(tabTitle(bAfter, tabIds[0] as ItemId)).toBe("From B");
-    expect(bAfter.conflicts).toBe(1);
+    expect(tabTitle(aAfter, tabIds[0] as ItemId)).toBe("From B");
+    expect(bAfter.conflicts).toEqual([tabKey]);
+    expect(aAfter.conflicts).toEqual([tabKey]);
+    // Once alike, reading each other's files again finds nothing to merge and no conflict.
+    const aAgain = receive(aAfter, fileOf(stamp(bAfter, ONE_PM + 3 * MINUTE_MS), ONE_PM + 3 * MINUTE_MS), ONE_PM + 3 * MINUTE_MS);
+    expect(aAgain.state).toBe(aAfter.state);
+    expect(aAgain.conflicts).toEqual([]);
+  });
+
+  it("changes at the very same moment are decided alike on both Macs", () => {
+    const { macA, macB, tabIds } = sharedMacs();
+    const renamedOnA = stamp({ ...macA, state: renameItem(macA.state, tabIds[0] as ItemId, "From A") }, ONE_PM + MINUTE_MS);
+    const renamedOnB = stamp({ ...macB, state: renameItem(macB.state, tabIds[0] as ItemId, "From B") }, ONE_PM + MINUTE_MS);
+    const bAfter = receive(renamedOnB, fileOf(renamedOnA, ONE_PM + 2 * MINUTE_MS), ONE_PM + 2 * MINUTE_MS);
+    const aAfter = receive(renamedOnA, fileOf(renamedOnB, ONE_PM + 2 * MINUTE_MS), ONE_PM + 2 * MINUTE_MS);
+    expect(tabTitle(aAfter, tabIds[0] as ItemId)).toBe(tabTitle(bAfter, tabIds[0] as ItemId));
+  });
+
+  it("a deletion and an edit at the same moment end deleted on both Macs", () => {
+    const { macA, macB, tabIds } = sharedMacs();
+    const editedOnB = stamp({ ...macB, state: renameItem(macB.state, tabIds[0] as ItemId, "Same moment") }, ONE_PM + MINUTE_MS);
+    const withoutTab = { ...macA.state, spaces: macA.state.spaces.map((space) => ({ ...space, pinnedIds: space.pinnedIds.filter((itemId) => itemId !== tabIds[0]) })) };
+    const deletedOnA = stamp({ ...macA, state: withoutTab }, ONE_PM + MINUTE_MS);
+    const bAfter = receive(editedOnB, fileOf(deletedOnA, ONE_PM + 2 * MINUTE_MS), ONE_PM + 2 * MINUTE_MS);
+    const aAfter = receive(deletedOnA, fileOf(editedOnB, ONE_PM + 2 * MINUTE_MS), ONE_PM + 2 * MINUTE_MS);
+    expect(bAfter.state.items[tabIds[0] as ItemId]).toBeUndefined();
+    expect(getPinnedIds(aAfter.state)).not.toContain(tabIds[0]);
   });
 
   it("a live folder syncs its source, and each Mac keeps the items it filled", () => {

@@ -20,11 +20,14 @@ The setup is cut into small units: a tab, a folder, a split view, a Space's name
 Space order, a profile's Favorites, a Boost, the rules, a Note, an Easel. Each Mac records a fingerprint of every unit
 and when it last changed there (`src/main/sync.ts`). When another Mac's file changes:
 
-- A unit changed later on the other Mac (by more than 3 seconds, so differing clocks can't reorder changes) takes its
-  version. Units this Mac doesn't have are added.
-- A deletion wins over an older edit, and an edit made after a deletion brings the unit back.
-- Changes on both Macs within those 3 seconds keep this Mac's version; the Library counts them.
-- A Note changed on both Macs keeps this Mac's text as a copy next to it, named "… (before <Mac>'s change)".
+- A unit changed later on the other Mac takes its version. Units this Mac doesn't have are added.
+- A deletion wins over an older edit or one made at the same moment; an edit made after a deletion brings the unit
+  back.
+- Changes on two Macs less than 3 seconds apart may be ordered wrongly by clocks that differ: the Library counts them
+  as conflicts. Both Macs still decide them the same way (the later time, then the larger fingerprint), so they always
+  end up alike.
+- A Note changed on both Macs keeps the losing Mac's text as a copy next to it, named "… (before <Mac>'s change)",
+  and that copy syncs too: no text is lost.
 - Renaming a tab on one Mac and pinning a page on the other keeps both: they are different units.
 
 Joining a folder where other Macs already sync asks first and keeps a **Before Sync** copy of this Mac's setup in
@@ -51,6 +54,10 @@ the joining Mac has are added for the others. **Stop Syncing** leaves this Mac's
 `state` is the synced part of Bow's state (same shape as in a backup, without Today tabs, the Archive and windows).
 Another Mac's file is checked like a restored backup: only web, note and easel addresses get in, references must
 exist, and a file from a newer Bow is not read until this one is updated. Deletions are remembered for 30 days.
+
+A Mac's id is chosen at random and kept in `Sync.json` in Bow's own folder, with a fingerprint of the Mac's hardware
+id (the start of its SHA-256). Migration Assistant copies that file to a new Mac; there the fingerprint differs, so
+the new Mac takes its own id and joins the folder like any new Mac (its setup came from the old one anyway).
 
 Bow writes its file two seconds after a synced change, reads the folder when macOS reports a change, and also every
 minute (network drives often don't report changes). A folder that does not answer within 10 seconds is shown as a

@@ -19,7 +19,7 @@
 import { app, dialog, shell } from "electron";
 import type { MessageBoxOptions, OpenDialogOptions } from "electron";
 import { execFile, execFileSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -55,6 +55,13 @@ const ICLOUD_TOOL_PATH = "/usr/bin/brctl";
 /** macOS's settings tool; `scutil --get ComputerName` prints the name System Settings › General › About shows. */
 const SETTINGS_TOOL_PATH = "/usr/sbin/scutil";
 
+/** macOS's hardware registry tool; its IOPlatformExpertDevice entry holds the Mac's hardware id (IOPlatformUUID). */
+const HARDWARE_TOOL_PATH = "/usr/sbin/ioreg";
+const HARDWARE_ID_PATTERN = /"IOPlatformUUID" = "([^"]+)"/;
+
+/** Hex characters of the hardware id's SHA-256 kept in Sync.json: enough to tell two Macs apart. */
+const MACHINE_FINGERPRINT_LENGTH = 16;
+
 /**
  * Tests read the folder every half second: `--sync-poll-ms=500`. Like --skip-welcome, only whoever starts the app
  * can pass it.
@@ -69,6 +76,11 @@ const CANCEL_JOIN_BUTTON_INDEX = 1;
 /** What Sync.json holds. */
 interface SyncSettingsFile {
   deviceId: string;
+  /**
+   * A fingerprint of the hardware id of the Mac that chose deviceId. Migration Assistant copies Sync.json to a new
+   * Mac; a different fingerprint there means the id belongs to the old Mac, and the new one takes its own.
+   */
+  machine: string;
   folderPath: string | null;
   meta: SyncMeta | null;
 }
@@ -78,6 +90,9 @@ let deviceId = "";
 
 /** This Mac's name as people know it, read once. */
 let deviceName: string | null = null;
+
+/** A fingerprint of this Mac's hardware id (read at start), or "" when it can't be read. */
+let machineFingerprint = "";
 
 /** The sync folder, or null when sync is off. */
 let folderPath: string | null = null;
@@ -92,10 +107,6 @@ let meta: SyncMeta | null = null;
 let writtenStamps: SyncMeta["stamps"] | null = null;
 let writtenTombstones: SyncMeta["tombstones"] | null = null;
 
-/** Notes and Easels as last read or saved, so a change check doesn't read every file again. */
-const noteTexts = new Map<string, string>();
-const easelTexts = new Map<string, string>();
-
 /** Each peer file's modification time when last read, so an unchanged file is not read again. */
 const peerFileTimes = new Map<string, number>();
 
@@ -104,7 +115,9 @@ const peerNames = new Map<string, string>();
 
 /** What the Library shows. */
 let lastSyncAt: number | null = null;
-let conflictCount = 0;
+
+/** The units changed on two Macs too close in time to order since sync started here (sync.ts counts them). */
+const conflictKeys = new Set<string>();
 
 /** What went wrong, by cause: the folder could not be read, this Mac's file could not be written, peer files. */
 let folderProblem: string | null = null;
@@ -140,7 +153,8 @@ function loadSettings(): void {
   try {
     const parsed = JSON.parse(fs.readFileSync(getSettingsFilePath(), "utf8")) as Partial<SyncSettingsFile>;
     const isDeviceIdValid = typeof parsed.deviceId === "string" && DEVICE_ID_PATTERN.test(parsed.deviceId);
-    deviceId = isDeviceIdValid ? (parsed.deviceId as string) : randomUUID();
+    const isCopiedFromAnotherMac = typeof parsed.machine === "string" && machineFingerprint !== "" && parsed.machine !== machineFingerprint;
+    deviceId = isDeviceIdValid && !isCopiedFromAnotherMac ? (parsed.deviceId as string) : randomUUID();
     folderPath = typeof parsed.folderPath === "string" ? parsed.folderPath : null;
     const hasMeta = parsed.meta !== null && typeof parsed.meta === "object" && parsed.meta.deviceId === deviceId;
     meta = hasMeta ? (parsed.meta as SyncMeta) : null;
@@ -155,7 +169,7 @@ function loadSettings(): void {
  * Writes Sync.json (to a temporary file first, then renamed, so a crash never leaves half a file).
  */
 function saveSettings(): void {
-  const contents: SyncSettingsFile = { deviceId: deviceId, folderPath: folderPath, meta: meta };
+  const contents: SyncSettingsFile = { deviceId: deviceId, machine: machineFingerprint, folderPath: folderPath, meta: meta };
   const filePath = getSettingsFilePath();
   try {
     fs.writeFileSync(`${filePath}.writing`, JSON.stringify(contents));
@@ -166,6 +180,23 @@ function saveSettings(): void {
 }
 
 // ---------- Helpers ----------
+
+/**
+ * A fingerprint of this Mac's hardware id: the start of its SHA-256 (the id itself never leaves the Mac's registry).
+ */
+function readMachineFingerprint(): string {
+  try {
+    const output = execFileSync(HARDWARE_TOOL_PATH, ["-rd1", "-c", "IOPlatformExpertDevice"], { encoding: "utf8", timeout: 2000 });
+    const match = HARDWARE_ID_PATTERN.exec(output);
+    if (match === null) {
+      return "";
+    }
+    const digest = createHash("sha256").update(match[1] as string).digest("hex");
+    return digest.slice(0, MACHINE_FINGERPRINT_LENGTH);
+  } catch {
+    return "";
+  }
+}
 
 /**
  * This Mac's name as other Macs show it: the Computer Name from System Settings ("Alex's MacBook Pro"), or its
@@ -206,7 +237,8 @@ function withTimeout<Result>(work: Promise<Result>): Promise<Result> {
 }
 
 /**
- * The Notes and Easels the synced tabs use, from the cache or their files.
+ * The Notes and Easels the synced tabs use, read from their files each time: a restore or another window may have
+ * written them.
  */
 function readSyncedFiles(): { notes: Record<string, string>; easels: Record<string, string> } {
   const state = getState();
@@ -219,15 +251,11 @@ function readSyncedFiles(): { notes: Record<string, string>; easels: Record<stri
     }
     const noteId = getNoteId(item.url);
     if (noteId !== null) {
-      const html = noteTexts.get(noteId) ?? readNote(noteId);
-      noteTexts.set(noteId, html);
-      notes[noteId] = html;
+      notes[noteId] = readNote(noteId);
     }
     const easelId = getEaselId(item.url);
     if (easelId !== null) {
-      const json = easelTexts.get(easelId) ?? readEasel(easelId);
-      easelTexts.set(easelId, json);
-      easels[easelId] = json;
+      easels[easelId] = readEasel(easelId);
     }
   }
   return { notes: notes, easels: easels };
@@ -421,11 +449,9 @@ function mergeOne(payload: SyncPayload): void {
   saveSettings();
   for (const [noteId, html] of Object.entries(result.notes)) {
     writeNote(noteId, html);
-    noteTexts.set(noteId, html);
   }
   for (const [easelId, json] of Object.entries(result.easels)) {
     writeEasel(easelId, json);
-    easelTexts.set(easelId, json);
   }
   if (result.state !== before) {
     applyChange(() => result.state);
@@ -435,9 +461,25 @@ function mergeOne(payload: SyncPayload): void {
   if (changedNoteIds.length > 0 || changedEaselIds.length > 0) {
     sendSidebarCommandToAllWindows({ kind: "reloadFiles", noteIds: changedNoteIds, easelIds: changedEaselIds });
   }
-  conflictCount += result.conflicts;
+  for (const key of result.conflicts) {
+    conflictKeys.add(key);
+  }
   lastSyncAt = now;
   scheduleWrite();
+}
+
+/**
+ * Merges the files just read from the sync folder.
+ */
+function mergeAll(payloads: SyncPayload[]): void {
+  for (const payload of payloads) {
+    mergeOne(payload);
+  }
+  lastSyncAt = Date.now();
+  folderProblem = null;
+  if (payloads.length > 0) {
+    reportStatusChanged();
+  }
 }
 
 /**
@@ -455,17 +497,9 @@ async function readPeers(): Promise<void> {
   isReading = true;
   try {
     const payloads = await readPeerFiles(folder, true);
-    // Sync may have stopped, or moved to another folder, while the files were read.
-    if (folderPath !== folder) {
-      return;
-    }
-    for (const payload of payloads) {
-      mergeOne(payload);
-    }
-    lastSyncAt = Date.now();
-    folderProblem = null;
-    if (payloads.length > 0) {
-      reportStatusChanged();
+    // Sync may have stopped, or moved to another folder, while the files were read: those files are not merged.
+    if (folderPath === folder) {
+      mergeAll(payloads);
     }
   } catch {
     folderProblem = "Bow can't read the sync folder. Is the drive connected?";
@@ -526,6 +560,7 @@ function stopWatching(): void {
  */
 export function startSync(onStatusChanged: () => void): void {
   reportStatusChanged = onStatusChanged;
+  machineFingerprint = readMachineFingerprint();
   loadSettings();
   onStateChanged(() => scheduleWrite());
   if (folderPath === null) {
@@ -542,15 +577,9 @@ export function startSync(onStatusChanged: () => void): void {
 }
 
 /**
- * A Note or an Easel was saved here (main.ts): its cache is updated and this Mac's file is written soon.
+ * A Note or an Easel was saved here (main.ts): this Mac's file is written soon.
  */
-export function markNoteSaved(noteId: string, html: string): void {
-  noteTexts.set(noteId, html);
-  scheduleWrite();
-}
-
-export function markEaselSaved(easelId: string, json: string): void {
-  easelTexts.set(easelId, json);
+export function markSyncedFileSaved(): void {
   scheduleWrite();
 }
 
@@ -621,9 +650,16 @@ export async function chooseSyncFolder(): Promise<void> {
   meta = createSyncMeta(deviceId);
   writtenStamps = null;
   writtenTombstones = null;
-  conflictCount = 0;
+  conflictKeys.clear();
   folderProblem = null;
   writeProblem = null;
+  // The first read of the new folder reads every file again (and reports damaged ones); merged ones change nothing.
+  peerFileTimes.clear();
+  unreadableFiles.clear();
+  peerNames.clear();
+  for (const peer of peers) {
+    peerNames.set(peer.deviceId, peer.deviceName);
+  }
   folderPath = folder;
   stampNow(now, peers.length === 0 ? now : 0);
   saveSettings();
@@ -633,6 +669,7 @@ export async function chooseSyncFolder(): Promise<void> {
   lastSyncAt = now;
   startWatching(folder);
   await writeOwnFile();
+  scheduleRead();
   reportStatusChanged();
 }
 
@@ -651,7 +688,7 @@ export function stopSyncing(): void {
   writtenStamps = null;
   writtenTombstones = null;
   lastSyncAt = null;
-  conflictCount = 0;
+  conflictKeys.clear();
   peerFileTimes.clear();
   peerNames.clear();
   unreadableFiles.clear();
@@ -702,7 +739,7 @@ export function getSyncStatus(): SyncStatusData {
     deviceName: getDeviceName(),
     peerNames: [...new Set(peerNames.values())],
     lastSyncAt: lastSyncAt,
-    conflicts: conflictCount,
+    conflicts: conflictKeys.size,
     problem: describeProblem(),
   };
 }

@@ -5,8 +5,9 @@
  *   cut into small units (a tab, a folder, a split view, a Space's name and look, a Space's Pinned order, the Space
  *   order, a profile's Favorites, a Boost, the Air Traffic Control rules, a Note, an Easel), each with a fingerprint
  *   and the time it last changed on the Mac that changed it. Merging goes unit by unit: the newer change wins, a
- *   deletion wins over older edits, and a unit changed on both Macs keeps this Mac's version when the two times are
- *   too close to tell (clocks differ). So renaming a tab on one Mac and pinning a page on the other keeps both.
+ *   deletion wins over older edits and ties, and a unit changed on both Macs too close in time to tell which came
+ *   first (clocks differ) is counted as a conflict and decided the same way on both Macs, so they always end up
+ *   alike. So renaming a tab on one Mac and pinning a page on the other keeps both.
  *   Today tabs, the Archive, windows, extensions and settings stay on each Mac; a live folder syncs its source and
  *   each Mac fills it.
  *
@@ -39,7 +40,10 @@ export const SYNC_FORMAT = "bow-sync";
 /** The sync file format's version. A newer peer's file is not read until this Bow is updated. */
 export const SYNC_FORMAT_VERSION = 1;
 
-/** Two changes closer than this cannot be ordered across Macs whose clocks differ: this Mac's version stays. */
+/**
+ * Two changes closer than this cannot be ordered across Macs whose clocks differ: they count as a conflict (the Library
+ * says so), decided by a rule both Macs apply alike. Our choice.
+ */
 export const CLOCK_SKEW_GUARD_MS = 3000;
 
 /** A deletion is remembered this long, so a Mac that was away for a while still learns of it. Our choice. */
@@ -92,8 +96,8 @@ export interface MergeResult {
   /** Notes and Easels to write (by id), adopted from the peer or kept as a conflict copy. */
   notes: Record<string, string>;
   easels: Record<string, string>;
-  /** Units changed on both Macs (this Mac's version stayed, or the other one's is kept as a copy). */
-  conflicts: number;
+  /** The keys of units changed on both Macs too close in time to order, and of Notes kept as a copy. */
+  conflicts: string[];
 }
 
 // ---------- Fingerprints ----------
@@ -405,21 +409,33 @@ export function parseSyncPayload(text: string): SyncPayload | null {
 interface MergePlan {
   adopt: string[];
   delete: string[];
-  conflicts: number;
+  conflicts: string[];
   stamps: Record<string, UnitStamp>;
   tombstones: Record<string, number>;
 }
 
 /**
- * Decides, unit by unit, whether the peer's version wins: a newer change (by more than CLOCK_SKEW_GUARD_MS) or a unit
- * this Mac does not have; a peer's deletion wins over an older change here; a deletion here wins over an older change
- * there. Adopted units take the peer's stamps, so they never count as changes made here (no ping-pong).
+ * Whether the peer's version of a unit both Macs have wins: the later change does; at the same moment, the larger
+ * fingerprint (an arbitrary rule, but both Macs see the same two stamps and so pick the same version). Changes closer
+ * than CLOCK_SKEW_GUARD_MS may be ordered wrongly by clocks that differ, so planMerge counts them as conflicts.
+ */
+function doesRemoteWin(local: UnitStamp, remote: UnitStamp): boolean {
+  if (remote.updatedAt !== local.updatedAt) {
+    return remote.updatedAt > local.updatedAt;
+  }
+  return remote.hash > local.hash;
+}
+
+/**
+ * Decides, unit by unit, whether the peer's version wins (doesRemoteWin, or a unit this Mac does not have). A
+ * deletion wins over an older change or one made at the same moment, on either Mac. Adopted units take the peer's
+ * stamps, so they never count as changes made here (no ping-pong).
  */
 function planMerge(meta: SyncMeta, payload: SyncPayload, remoteUnits: Map<string, Unit>): MergePlan {
-  const plan: MergePlan = { adopt: [], delete: [], conflicts: 0, stamps: { ...meta.stamps }, tombstones: { ...meta.tombstones } };
+  const plan: MergePlan = { adopt: [], delete: [], conflicts: [], stamps: { ...meta.stamps }, tombstones: { ...meta.tombstones } };
   for (const [key, deletedAt] of Object.entries(payload.tombstones)) {
     const local = meta.stamps[key];
-    const isNewerThanLocal = local === undefined || deletedAt > local.updatedAt;
+    const isNewerThanLocal = local === undefined || deletedAt >= local.updatedAt;
     if (isNewerThanLocal && meta.tombstones[key] === undefined && payload.stamps[key] === undefined) {
       plan.delete.push(key);
       delete plan.stamps[key];
@@ -436,13 +452,10 @@ function planMerge(meta: SyncMeta, payload: SyncPayload, remoteUnits: Map<string
     if (local !== undefined && local.hash === remoteUnit.hash) {
       continue;
     }
-    const isNewer = local === undefined || remoteStamp.updatedAt > local.updatedAt + CLOCK_SKEW_GUARD_MS;
-    if (!isNewer) {
-      // Changed on both Macs within the clocks' uncertainty: this Mac's version stays, counted as a conflict.
-      const isTooCloseToTell = local !== undefined && Math.abs(remoteStamp.updatedAt - local.updatedAt) <= CLOCK_SKEW_GUARD_MS;
-      if (isTooCloseToTell) {
-        plan.conflicts += 1;
-      }
+    if (local !== undefined && Math.abs(remoteStamp.updatedAt - local.updatedAt) <= CLOCK_SKEW_GUARD_MS) {
+      plan.conflicts.push(key);
+    }
+    if (local !== undefined && !doesRemoteWin(local, remoteStamp)) {
       continue;
     }
     plan.adopt.push(key);
@@ -627,7 +640,7 @@ function applyDeletions(state: BrowserState, keys: string[], now: number): Brows
  * new (its file was read before, or every unit already matches).
  */
 export function mergePeer(state: BrowserState, meta: SyncMeta, payload: SyncPayload, localNotes: Record<string, string>, now: number): MergeResult {
-  const unchanged: MergeResult = { state: state, meta: meta, notes: {}, easels: {}, conflicts: 0 };
+  const unchanged: MergeResult = { state: state, meta: meta, notes: {}, easels: {}, conflicts: [] };
   const lastMerged = meta.peers[payload.deviceId];
   if (payload.deviceId === meta.deviceId || (lastMerged !== undefined && payload.writtenAt <= lastMerged.writtenAt)) {
     return unchanged;
@@ -646,7 +659,7 @@ export function mergePeer(state: BrowserState, meta: SyncMeta, payload: SyncPayl
   const notes: Record<string, string> = {};
   const easels: Record<string, string> = {};
   let merged = afterDeletions;
-  let conflicts = plan.conflicts;
+  const conflicts = new Set(plan.conflicts);
   for (const key of plan.adopt) {
     const fileId = key.slice(key.indexOf(":") + 1);
     if (key.startsWith("easel:")) {
@@ -667,11 +680,11 @@ export function mergePeer(state: BrowserState, meta: SyncMeta, payload: SyncPayl
     if (copy !== null) {
       merged = copy.state;
       notes[copy.noteId] = localText;
-      conflicts += 1;
+      conflicts.add(key);
     }
   }
   const tidied = repairOtherWindows(repairSelections(tidyLists(merged)));
-  return { state: tidied, meta: mergedMeta, notes: notes, easels: easels, conflicts: conflicts };
+  return { state: tidied, meta: mergedMeta, notes: notes, easels: easels, conflicts: [...conflicts] };
 }
 
 /**

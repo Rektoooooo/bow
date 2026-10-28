@@ -186,7 +186,7 @@ export interface SyncStatusData {
   /** The other Macs whose files were read. */
   peerNames: string[];
   lastSyncAt: number | null;
-  /** Changes made on two Macs too close in time to order, where this Mac's version stayed. */
+  /** Things changed on two Macs too close in time to order (both Macs then pick the same version). */
   conflicts: number;
   problem: string | null;
 }

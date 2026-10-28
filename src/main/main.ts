@@ -65,7 +65,7 @@ import { openWelcome, refreshOpenPanel, registerOverlayIpc, setCommandActionRegi
 import { startHandoff } from "./handoff";
 import { noticeVisitedPage, startLiveFolderRefreshing } from "./liveFolderRefresher";
 import { markSnapshotNeeded, startAutomaticSnapshots } from "./backupController";
-import { flushSyncNow, markEaselSaved, markNoteSaved, startSync } from "./syncController";
+import { flushSyncNow, markSyncedFileSaved, startSync } from "./syncController";
 import { getProfileSession, onProfileSessionCreated, restrictWebPermissions, useChromeUserAgent } from "./profiles";
 import { retakeCapture } from "./liveCaptures";
 import { linkNativeMessagingHosts, listOtherBrowserHostFolders } from "./nativeMessagingHosts";
@@ -330,7 +330,7 @@ async function handleAppReady(): Promise<void> {
     readNote: (noteId) => readNote(noteId),
     saveNote: (noteId, html, title) => {
       markSnapshotNeeded();
-      markNoteSaved(noteId, html);
+      markSyncedFileSaved();
       if (writeNote(noteId, html)) {
         applyChange((state) => setNoteTitle(state, createNoteUrl(noteId), title));
       }
@@ -338,7 +338,7 @@ async function handleAppReady(): Promise<void> {
     readEasel: (easelId) => readEasel(easelId),
     saveEasel: (easelId, json) => {
       markSnapshotNeeded();
-      markEaselSaved(easelId, json);
+      markSyncedFileSaved();
       writeEasel(easelId, json);
     },
     listCaptures: () =>

@@ -1,6 +1,7 @@
 // End-to-end check of folder sync (Library › Settings › Sync) with two copies of Bow standing in for two Macs, each
 // with its own throwaway --user-data-dir, syncing through one folder under e2e/output. Made-up data only.
 //   - Mac A starts syncing in an empty folder: no question, its file appears, Today tabs stay out of it.
+//   - Mac B was set up from A by Migration Assistant (A's Sync.json, made on another Mac): it takes its own id.
 //   - Mac B is asked before joining; Cancel leaves everything as it was. Join keeps a "Before Sync" copy, brings A's
 //     Space, pinned tabs and note, and keeps B's own Space and Today tabs.
 //   - Changes travel both ways while both run: B's Space reaches A (without its Today tab), a rename on B reaches A,
@@ -165,6 +166,9 @@ const settingsA = await readSyncSettings(macA);
 check("Library › Settings › Sync says where it syncs", settingsA.includes("Syncing through sync-shared") && settingsA.includes("Stop Syncing"), settingsA.replaceAll("\n", " | "));
 
 // ---------- Mac B is asked, cancels, then joins ----------
+// B's Bow folder came from A by Migration Assistant: A's device id, chosen on another Mac (another fingerprint).
+const deviceIdOfA = (filesAfterA[0] ?? "").replace(/\.json$/, "");
+fs.writeFileSync(path.join(userDataB, "Sync.json"), JSON.stringify({ deviceId: deviceIdOfA, machine: "0123456789abcdef", folderPath: null, meta: null }));
 const macB = await launch(userDataB);
 await macB.app.evaluate(() => {
   globalThis.messageResponse = 1;
@@ -194,6 +198,8 @@ const beforeSyncCopies = fs.existsSync(backupsB) ? fs.readdirSync(backupsB).filt
 check("B keeps a “Before Sync” copy of its setup first", beforeSyncCopies.length === 1, beforeSyncCopies.join(", "));
 const filesAfterB = await waitFor(async () => syncFiles(), (names) => names.length === 2);
 check("B writes its own file next to A's", filesAfterB.length === 2, filesAfterB.join(", "));
+const settingsOfB = JSON.parse(fs.readFileSync(path.join(userDataB, "Sync.json"), "utf8"));
+check("B's Sync.json, copied from another Mac, got B its own id", settingsOfB.deviceId !== deviceIdOfA && settingsOfB.machine !== "0123456789abcdef");
 
 // ---------- Changes travel both ways ----------
 const homeOnA = await waitFor(() => macA.getState(), (state) => spaceNamed(state, "Home") !== undefined);
