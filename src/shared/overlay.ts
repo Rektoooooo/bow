@@ -15,7 +15,6 @@ import type { SearchEngineId } from "./searchEngines";
 import type { ShortcutGroup } from "./shortcuts";
 import type { SymbolImage } from "./symbols";
 import type { LinkSourceApp } from "./routingRules";
-import type { WelcomeData } from "./onboarding";
 import type { ArchivedTab, CommandChain, GlobalShortcutTarget, PrivacySummary, ItemId, RoutingRule, SearchKeyword, SitePermissionKind, SpaceTheme, ThemeAppearance } from "./types";
 
 /** What a Command Bar line does when chosen. */
@@ -67,8 +66,6 @@ export type OverlayPanel =
   | { kind: "folderList"; frame: OverlayRect; folderTitle: string; entries: FolderListEntry[] }
   /** Arc's tab tooltip; the frame (window coordinates) is the box itself, sized by the sidebar. */
   | { kind: "tabTooltip"; frame: OverlayRect; title: string; showsRenameHint: boolean }
-  /** The first-start onboarding (overlay/onboarding.ts); later changes come as "overlay:welcome-update". */
-  | { kind: "welcome"; data: WelcomeData }
   /** Help › Keyboard Shortcuts, read from the app menu (main/shortcutSheet.ts). */
   | { kind: "shortcuts"; groups: ShortcutGroup[] };
 
@@ -356,8 +353,6 @@ export interface OverlayApi {
   onFindProgress(listener: (progress: FindProgress) => void): void;
   /** The panel is closing: play the closing animation and clear the page (the view goes away right after). */
   onClosing(listener: () => void): void;
-  /** The onboarding's data changed (a theme, an import, a switch): it updates what it shows, without starting over. */
-  onWelcomeUpdate(listener: (data: WelcomeData) => void): void;
   /** The Peek is closing: its card shrinks back into the link (peekFrame.ts playPeekClose). */
   onPeekClosing(listener: (message: PeekClosingMessage) => void): void;
   /** The switcher: ⌃Tab pressed again (+1) or ⌃⇧Tab (−1), and ⌃ let go while the page still had the keyboard. */
@@ -419,5 +414,4 @@ export const OVERLAY_CHANNELS = {
   chooseTab: "overlay:choose-tab",
   mediaCommand: "overlay:media-command",
   librarySection: "overlay:library-section",
-  welcomeUpdate: "overlay:welcome-update",
 } as const;

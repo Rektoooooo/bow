@@ -1,15 +1,18 @@
 /**
  * WHY this file exists:
  *   The first-start onboarding's rules that need no screen: which scenes it has and how keys move between them, what
- *   an import brought over in one line, and the three colors of its background wash. Kept pure, so they are tested
- *   on their own; the overlay page (overlay/onboarding.ts) and main (overlayController.ts) share them.
+ *   an import brought over in one line, and the three colors of its background wash; and the messages between its
+ *   window's page and main. Kept pure, so they are tested on their own; the page (onboarding/onboarding.ts) and main
+ *   (onboardingWindow.ts) share them.
  *
  * Data source:
  *   None. Values in, values out.
  *
  * Data flow:
- *   overlayController.ts buildWelcomeData() → WelcomeData → overlay/onboarding.ts → these helpers → the scenes
+ *   onboardingWindow.ts buildWelcomeData() → "onboarding:data" → onboarding/onboarding.ts → these helpers → the scenes
+ *   the page → onboardingApi (preload/onboardingPreload.ts) → ONBOARDING_CHANNELS → onboardingWindow.ts
  */
+import type { SymbolImage } from "./symbols";
 import type { SpaceTheme, ThemeAppearance } from "./types";
 
 /** The scenes, in order (overlay/onboarding.ts draws one per id). */
@@ -203,3 +206,22 @@ export function vividWashColor(color: string, isDark: boolean): string {
   const keptSaturation = saturation < WASH_GREY_SATURATION ? saturation : Math.max(saturation, WASH_MIN_SATURATION);
   return hslToHex(hue, keptSaturation, keptLightness);
 }
+
+/** The functions the onboarding's page may call (preload/onboardingPreload.ts provides them as window.onboardingApi). */
+export interface OnboardingApi {
+  /** What the onboarding shows now; later changes come through onData. */
+  getData(): Promise<WelcomeData | null>;
+  /** Something it shows changed (a theme, an import, a switch, the system's appearance): update in place. */
+  onData(listener: (data: WelcomeData) => void): void;
+  /** The onboarding is done (its outro has played): its window closes and the browser shows. */
+  close(): Promise<void>;
+  /** The SF Symbols the icons use, rendered by macOS (the same as every page of ours). */
+  getSymbols(): Promise<Record<string, SymbolImage>>;
+}
+
+/** Channel names between the onboarding's page and main (onboardingWindow.ts checks every sender is that page). */
+export const ONBOARDING_CHANNELS = {
+  getData: "onboarding:get-data",
+  data: "onboarding:data",
+  close: "onboarding:close",
+} as const;

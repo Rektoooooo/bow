@@ -76,7 +76,8 @@ import { applyBoostToPage, runBoostJavaScript } from "./boostPages";
 import { createStatusBubble, showLinkStatus } from "./statusBubble";
 import { initializePeek, openPeek } from "./peek";
 import { createOverlayView, getOverlayContents } from "./overlay";
-import { openWelcome, refreshOpenPanel, refreshWelcome, registerOverlayIpc, setCommandActionRegistry } from "./overlayController";
+import { refreshOpenPanel, registerOverlayIpc, setCommandActionRegistry } from "./overlayController";
+import { getOnboardingContents, openOnboarding, refreshOnboarding, registerOnboardingIpc } from "./onboardingWindow";
 import { startHandoff } from "./handoff";
 import { noticeVisitedPage, startLiveFolderRefreshing } from "./liveFolderRefresher";
 import { markSnapshotNeeded, startAutomaticSnapshots } from "./backupController";
@@ -358,13 +359,14 @@ async function handleAppReady(): Promise<void> {
     () => getState().settings,
   );
   registerIpcHandlers({
-    isTrustedSender: (sender) => findMainWindowIdOf(sender) !== null || sender === getOverlayContents(),
+    isTrustedSender: (sender) => findMainWindowIdOf(sender) !== null || sender === getOverlayContents() || sender === getOnboardingContents(),
     // The overlay is always in the focused window, so it gets the focused window's state.
     getState: (sender) => getStateForWindow(findMainWindowIdOf(sender) ?? getState().focusedWindowId),
     getRuntimeState: (sender) => collectRuntimeState(findMainWindowIdOf(sender) ?? getState().focusedWindowId),
     runAction: (action, sender) => {
       runActionFromWindow(action, findMainWindowIdOf(sender));
       refreshOpenPanel();
+      refreshOnboarding();
     },
     readNote: (noteId) => readNote(noteId),
     saveNote: (noteId, html, title) => {
@@ -388,6 +390,7 @@ async function handleAppReady(): Promise<void> {
     retakeCapture: (source) => retakeCapture(source, getProfileSession(getActiveSpace(getState()).profileId)),
   });
   registerOverlayIpc();
+  registerOnboardingIpc();
   registerLittleWindowIpc();
   registerSymbolIpc();
   registerPictureInPictureIpc();
@@ -405,8 +408,10 @@ async function handleAppReady(): Promise<void> {
   await prepareExtensions();
 
   setTabViewEvents(tabViewEvents);
-  // Every window of the last session opens again, each with its own Space and selection (mainWindows.ts).
-  restoreMainWindows();
+  // Every window of the last session opens again, each with its own Space and selection (mainWindows.ts). At the
+  // first start the onboarding's window comes first and the browser window shows when it ends.
+  const showsOnboarding = isFirstStart && getState().settings.hasSeenWelcome !== true;
+  restoreMainWindows(showsOnboarding);
   drawAppIconAfterStart();
   followSystemAppearance(() => getState().settings.appIcon);
   initializePeek(tabViewEvents);
@@ -435,7 +440,9 @@ async function handleAppReady(): Promise<void> {
   startExtensionUpdates();
   // Once an update has downloaded, the app menu offers the restart instead of a check.
   startAppUpdates(() => reinstallAppMenu());
-  offerMoveToApplications().catch((error) => console.error("Moving to Applications failed:", error));
+  if (!showsOnboarding) {
+    offerMoveToApplications().catch((error) => console.error("Moving to Applications failed:", error));
+  }
   startLiveFolderRefreshing();
   startGlobalShortcut();
   startSavingTabHistories();
@@ -444,17 +451,14 @@ async function handleAppReady(): Promise<void> {
   startSync(() => refreshOpenPanel());
   startHandoff();
   // The onboarding's default-browser row: macOS asks in its own window, and Bow is active again once it is answered.
-  app.on("did-become-active", () => refreshWelcome());
+  app.on("did-become-active", () => refreshOnboarding());
   // The onboarding follows the system's light or dark while the Space's look is automatic.
-  nativeTheme.on("updated", () => refreshWelcome());
-  const firstWindow = getWindow();
-  if (isFirstStart && getState().settings.hasSeenWelcome !== true && firstWindow !== null) {
-    // Once the sidebar has drawn, so the tour opens over a finished window.
-    if (firstWindow.webContents.isLoading()) {
-      firstWindow.webContents.once("did-finish-load", () => openWelcome());
-    } else {
-      openWelcome();
-    }
+  nativeTheme.on("updated", () => refreshOnboarding());
+  if (showsOnboarding) {
+    // Moving to Applications (from the disk image) restarts Bow there, so it is asked first; then the onboarding.
+    offerMoveToApplications(false)
+      .catch((error) => console.error("Moving to Applications failed:", error))
+      .finally(() => openOnboarding(true));
   }
 }
 

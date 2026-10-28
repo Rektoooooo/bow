@@ -27,7 +27,6 @@ import { renderCapture } from "./capture.js";
 import { handleSwitcherKey, installSwitcherMessages, renderSwitcher } from "./switcher.js";
 import { renderFolderList } from "./folderList.js";
 import { renderTabTooltip } from "./tabTooltip.js";
-import { renderOnboarding, updateOnboarding } from "./onboarding.js";
 import { renderShortcutSheet } from "./shortcutSheet.js";
 import { buildSiteSearchUrl, findSiteSearch } from "../shared/siteSearch.js";
 import type { SiteSearch } from "../shared/siteSearch.js";
@@ -472,8 +471,7 @@ function showPanel(message: OverlayShowMessage): void {
   document.body.dataset.panel = message.panel.kind;
   // The Find bar's and a permission prompt's overlay is only as big as the card, so it needs no backdrop; Capture
   // draws its own dimming.
-  // The onboarding paints the whole window itself.
-  const hasOwnBackground = ["find", "permission", "capture", "tabTooltip", "library", "folderList", "welcome"].includes(message.panel.kind);
+  const hasOwnBackground = ["find", "permission", "capture", "tabTooltip", "library", "folderList"].includes(message.panel.kind);
   backdrop.hidden = hasOwnBackground;
 
   if (message.panel.kind === "commandBar") {
@@ -518,9 +516,6 @@ function showPanel(message: OverlayShowMessage): void {
   if (message.panel.kind === "folderList") {
     renderFolderList(host, message.panel);
   }
-  if (message.panel.kind === "welcome") {
-    renderOnboarding(host, message.panel);
-  }
   if (message.panel.kind === "shortcuts") {
     renderShortcutSheet(host, message.panel);
   }
@@ -552,7 +547,6 @@ function startOverlay(): void {
   window.overlayApi.getSymbols().then(installSymbols).catch(() => undefined);
   window.overlayApi.onShow(showPanel);
   window.overlayApi.onClosing(playClosing);
-  window.overlayApi.onWelcomeUpdate(updateOnboarding);
   window.overlayApi.onPeekClosing((message) => {
     const host = document.getElementById("panel");
     if (host !== null) {
@@ -585,8 +579,7 @@ function startOverlay(): void {
       event.preventDefault();
       return;
     }
-    // The onboarding ends with its own outro (onboarding.ts handles its keys).
-    if (event.key === "Escape" && document.body.dataset.panel !== "welcome") {
+    if (event.key === "Escape") {
       event.preventDefault();
       closeOverlay();
     }

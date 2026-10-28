@@ -87,7 +87,9 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   and the state push to the sidebars is coalesced per event-loop turn (a sidebar command flushes it first).
 - **Floating UI** lives in one transparent overlay view (`overlay.ts` / `overlayController.ts`, pages in
   `src/overlay`): Command Bar, Library, site controls, Find, the Peek frame. Peek's page is its own view above it
-  (`peek.ts`). Little Windows are separate windows (`littleWindow.ts`, bar page in `src/little`).
+  (`peek.ts`). Little Windows are separate windows (`littleWindow.ts`, bar page in `src/little`). The onboarding is
+  a window of its own too (`onboardingWindow.ts`, page in `src/onboarding`, preload `onboardingPreload.ts`): at the
+  first start the browser window stays hidden until it ends; Help › Welcome to Bow… opens it again.
 - **Render from state.** `src/renderer/sidebar.ts` redraws the sidebar and toolbar on every state; redraws wait while
   a drag is in progress.
 - **Constants** live in `src/shared/settings.ts` with a comment on where each value comes from (measured from Arc,

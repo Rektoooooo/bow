@@ -238,14 +238,15 @@ function isAppFolderWritable(): boolean {
 /**
  * Bow opened from its disk image (or macOS's read-only copy of it): offers to move it to Applications, where it keeps
  * working after the image is ejected and can update itself. A sheet on the window, so the browser is usable behind
- * it. Electron's move replaces an older Bow there, or switches to it when that one is running.
+ * it; at the first start a dialog of its own, before the onboarding (the browser window is still hidden then).
+ * Electron's move replaces an older Bow there, or switches to it when that one is running.
  */
-export async function offerMoveToApplications(): Promise<void> {
+export async function offerMoveToApplications(isSheetOnWindow: boolean = true): Promise<void> {
   if (!app.isPackaged || !isRunningFromDiskImage(process.execPath) || isAppFolderWritable()) {
     return;
   }
   console.log(`Bow runs from ${process.execPath}; offering to move it to Applications.`);
-  const window = getWindow();
+  const window = isSheetOnWindow ? getWindow() : null;
   const options = {
     type: "question" as const,
     message: "Move Bow to your Applications folder?",

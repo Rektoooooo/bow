@@ -181,9 +181,10 @@ function createMainWindow(windowId: WindowId, bounds: Rectangle | null): Browser
 
 /**
  * Opens every window of the saved list, each at its saved place. The focused one opens last, so it ends up in front
- * with the focus. Runs once at startup; main.ts then makes the views match.
+ * with the focus. Runs once at startup; main.ts then makes the views match. `isHidden`: at the first start the
+ * onboarding's window comes first; showMainWindows() shows these when it ends.
  */
-export function restoreMainWindows(): void {
+export function restoreMainWindows(isHidden: boolean = false): void {
   app.on("before-quit", () => {
     isQuitting = true;
   });
@@ -196,6 +197,26 @@ export function restoreMainWindows(): void {
   const openingOrder = [...listWindowIds(state)].reverse();
   for (const windowId of openingOrder) {
     const window = createMainWindow(windowId, loadWindowBounds(windowId));
+    if (isHidden) {
+      continue;
+    }
+    if (windowId === state.focusedWindowId) {
+      window.show();
+    } else {
+      window.showInactive();
+    }
+  }
+}
+
+/**
+ * Shows the main windows that were kept hidden while the first start's onboarding ran: the focused one in front.
+ */
+export function showMainWindows(): void {
+  const state = getState();
+  for (const { windowId, window } of listMainWindows()) {
+    if (window.isDestroyed() || window.isVisible()) {
+      continue;
+    }
     if (windowId === state.focusedWindowId) {
       window.show();
     } else {

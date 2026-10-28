@@ -1,21 +1,20 @@
 /**
  * WHY this file exists:
- *   Bow's first start: a full-window onboarding instead of an empty window. Six short scenes: hello, bring your things
+ *   Bow's first start: an onboarding in its own window (main/onboardingWindow.ts). Six short scenes: hello, bring your things
  *   (Arc or another browser, imported right here with the result on its card), make it yours (a Space look with a live
  *   preview that tints the whole scene), the essentials (a tour with small looping demos), a few good defaults, and
  *   you're all set, which dissolves into the browser. Every scene can be skipped; it shows once, and again from
  *   Help › Welcome to Bow….
  *
  * Data source:
- *   The "welcome" panel (WelcomeData, built by overlayController.ts), then "overlay:welcome-update" whenever
+ *   WelcomeData (built by onboardingWindow.ts), first from onboardingApi.getData(), then "onboarding:data" whenever
  *   something it shows changed (the theme, an import, a switch, the system's appearance).
  *
  * Data flow:
- *   overlay.ts showPanel → renderOnboarding() → scenes → buttons dispatch actions (import, setSpaceTheme, switches)
+ *   onboardingPage.ts → renderOnboarding() → scenes → buttons dispatch actions (import, setSpaceTheme, switches)
  *   → main changes the state → updateOnboarding(data): the scenes change in place, nothing restarts
- *   Start Browsing / Skip / Escape → the outro plays → overlayApi.close() → main records that it was seen
+ *   Start Browsing / Skip / Escape → the outro plays → onboardingApi.close() → main records that it was seen
  */
-import type { OverlayPanel } from "../shared/overlay";
 import type { OnboardingScene, WelcomeData, WelcomeImportSource, WelcomePreset } from "../shared/onboarding";
 import { ARC_IMPORT_SOURCE_ID, BOW_WASH_COLORS, ONBOARDING_SCENES, describeImportSummary, pickWashColors, stepScene, vividWashColor } from "../shared/onboarding.js";
 import type { SpaceTheme, ThemeAppearance } from "../shared/types";
@@ -26,8 +25,6 @@ import { createIcon } from "../renderer/icons.js";
 import type { IconName } from "../renderer/icons.js";
 import { TOUR_DEMO_CYCLE_MS, createMiniWindow, createTourItems, prefersLessMotion } from "./onboardingScenes.js";
 import type { MiniWindow, TourItem } from "./onboardingScenes.js";
-
-type WelcomePanel = Extract<OverlayPanel, { kind: "welcome" }>;
 
 /** The onboarding's easing curves (onboarding.css --ease-out and --ease-emphasized). */
 const EASE_OUT = "cubic-bezier(0.2, 0.8, 0.2, 1)";
@@ -659,7 +656,7 @@ function goToScene(state: Onboarding, delta: number): void {
 }
 
 /**
- * Ends the onboarding: the scene lifts away, the wash opens up and fades, then the overlay closes over the browser
+ * Ends the onboarding: the scene lifts away, the wash opens up and fades, then its window closes
  * (main records that the onboarding was seen).
  */
 function finishOnboarding(state: Onboarding): void {
@@ -670,7 +667,7 @@ function finishOnboarding(state: Onboarding): void {
   state.scenes[state.sceneIndex]?.leave();
   if (prefersLessMotion()) {
     const fade = state.root.animate([{ opacity: 1 }, { opacity: 0 }], { duration: REDUCED_FADE_MS, fill: "forwards" });
-    fade.finished.then(() => window.overlayApi.close()).catch(() => window.overlayApi.close());
+    fade.finished.then(() => window.onboardingApi.close()).catch(() => window.onboardingApi.close());
     return;
   }
   const content = state.root.querySelector(".onboarding-content");
@@ -680,7 +677,7 @@ function finishOnboarding(state: Onboarding): void {
   const backdrop = state.root.querySelector(".onboarding-base");
   backdrop?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: OUTRO_WASH_MS, delay: OUTRO_CONTENT_MS / 2, easing: EASE_OUT, fill: "forwards" });
   const done = washAnimation?.finished ?? Promise.resolve();
-  done.then(() => window.overlayApi.close()).catch(() => window.overlayApi.close());
+  done.then(() => window.onboardingApi.close()).catch(() => window.onboardingApi.close());
 }
 
 /**
@@ -737,9 +734,9 @@ function createWash(): HTMLElement[] {
 }
 
 /**
- * Builds the onboarding into the overlay's panel host and plays its entrance.
+ * Builds the onboarding into its page and plays its entrance.
  */
-export function renderOnboarding(host: HTMLElement, panel: WelcomePanel): void {
+export function renderOnboarding(host: HTMLElement, data: WelcomeData): void {
   onboarding?.scenes[onboarding.sceneIndex]?.leave();
   const root = createElement("div", "onboarding");
   root.setAttribute("role", "dialog");
@@ -781,7 +778,7 @@ export function renderOnboarding(host: HTMLElement, panel: WelcomePanel): void {
     root: root,
     scenes: [],
     sceneIndex: 0,
-    data: panel.data,
+    data: data,
     hasPickedLook: false,
     isLeaving: false,
     progressMarks: progressMarks,
@@ -794,10 +791,10 @@ export function renderOnboarding(host: HTMLElement, panel: WelcomePanel): void {
   };
   state.scenes = [
     createHelloScene(),
-    createImportScene(panel.data),
-    createLookScene(panel.data, markLookPicked),
-    createEssentialsScene(panel.data),
-    createDefaultsScene(panel.data),
+    createImportScene(data),
+    createLookScene(data, markLookPicked),
+    createEssentialsScene(data),
+    createDefaultsScene(data),
     createReadyScene(),
   ];
   state.scenes.forEach((scene, index) => {

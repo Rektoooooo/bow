@@ -1,9 +1,8 @@
 /*
   WHY this file exists:
-    The onboarding's look (overlay/onboarding.ts): a full-window scene in light or dark, a slow wash of three colored
+    The onboarding's look (onboarding/onboarding.ts, in its own window): a full-window scene in light or dark, a slow wash of three colored
     lights with film grain behind it, New York (macOS's own serif) for the headlines and SF for the rest, glass
-    surfaces, and the small Bow window the scenes and the tour's demos are drawn with. Its own file, because it is a
-    world of its own next to the overlay's panels (overlay.css).
+    surfaces, and the small Bow window the scenes and the tour's demos are drawn with.
 
   Data source:
     body.dark (the Space's look, or the system's), --wash-1…3 on .onboarding and --mini-1…3 on each small window
@@ -116,8 +115,55 @@ body.dark .onboarding {
   --onb-grain-opacity: 0.3;
 }
 
-body[data-panel="welcome"] {
-  background: transparent;
+/* ---------- The page ---------- */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #0c0c11;
+}
+
+body {
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  user-select: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: default;
+}
+
+/* Icons (renderer/icons.ts): SF Symbols as a mask tinted with the text color, and our own drawings. */
+.icon {
+  display: block;
+  flex: none;
+}
+
+.icon-part-none {
+  fill: none;
+}
+
+.icon-part-solid {
+  fill: currentColor;
+}
+
+.icon-symbol {
+  width: calc(var(--symbol-width, 16px) * var(--symbol-scale, 1));
+  height: calc(var(--symbol-height, 16px) * var(--symbol-scale, 1));
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
 }
 
 /* ---------- The wash: three soft lights drifting, and grain ---------- */

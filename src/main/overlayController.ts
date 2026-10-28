@@ -68,7 +68,6 @@ import {
   FOLDER_LIST_ROW_HEIGHT_PX,
   FOLDER_LIST_SEARCH_HEIGHT_PX,
   FOLDER_LIST_WIDTH_PX,
-  GLOBAL_SHORTCUT_CHOICES,
   SIDEBAR_WIDTH_PX,
   TASK_MANAGER_REFRESH_MS,
 } from "../shared/settings";
@@ -78,7 +77,7 @@ import { getOverlayContents, hideOverlay, sendToOverlay, setOverlayBounds, showO
 import { closePeek, finishPeekCloseOf, finishPeekGrow, isPeekClosing, isPeekOpen, navigatePeek, openPeekAsTab, openPeekInSplit } from "./peek";
 import { toggleDevTools, translatePage, zoomPage } from "./pageCommands";
 import { splitTabs } from "./split";
-import { finishWelcome, getSelectedTabId, openTab, restoreArchivedTab, selectTab } from "./state";
+import { getSelectedTabId, openTab, restoreArchivedTab, selectTab } from "./state";
 import { areFavoritesKeptAwake, isKeptAwake, readTabSleepAfter } from "./tabSleep";
 import { collectTaskList } from "./tabSleepController";
 import { loadUrlInTab, openLinkInNewTab, openOrSwitchToTab, setMuted } from "./tabActions";
@@ -91,10 +90,6 @@ import { buildSuggestUrl, findSearchEngine, findSpaceSearchEngine } from "../sha
 import { DEFAULT_APP_ICON_ID } from "../shared/appIconDrawing";
 import { isDeveloperModeOn } from "../shared/developerMode";
 import { listImportSources } from "./browserImportController";
-import { isArcSidebarPresent } from "./arcImportController";
-import { isDefaultBrowser } from "./defaultBrowser";
-import { ARC_IMPORT_SOURCE_ID } from "../shared/onboarding";
-import type { ImportSummary, WelcomeData, WelcomeImportSource, WelcomeImportState } from "../shared/onboarding";
 import { addMenuIcons } from "./menuIcons";
 import { describeAdBlock, getBlockedCount, isAdBlockActiveFor } from "./adBlock";
 
@@ -483,10 +478,6 @@ function openPanel(panel: OverlayPanel): void {
   if (window === null || bounds === null) {
     return;
   }
-  // The onboarding is not replaced by a panel a key or a menu opens (⌘T, ⌘,): it ends only by its own buttons.
-  if (shownPanel?.kind === "welcome" && panel.kind !== "welcome") {
-    return;
-  }
   const state = getState();
   const replacedPanel = shownPanel;
   shownPanel = panel;
@@ -545,88 +536,6 @@ export function openCommandBar(mode: CommandBarMode, typedText: string = ""): vo
   const initialText = typedText === "" ? currentUrl : typedText;
   latestQuery = initialText;
   openPanel({ kind: "commandBar", mode: mode, initialText: initialText });
-}
-
-/** Imports started from the onboarding, by source id: their cards show them running, then what arrived. */
-const welcomeImports = new Map<string, WelcomeImportState>();
-
-/** What this Mac has to import from, read once when the onboarding opens (it reads the disk). */
-let welcomeSources: WelcomeImportSource[] = [];
-
-/** The shortcut from any app the onboarding offers when none is set: ⌥⌘Space (⌥Space is Raycast's and Alfred's). */
-const WELCOME_GLOBAL_SHORTCUT = GLOBAL_SHORTCUT_CHOICES[1];
-
-/**
- * Everything the onboarding shows that can change while it is open: the active Space and its look, what this Mac
- * has to import from and how those imports went, and the defaults it offers.
- */
-function buildWelcomeData(state: BrowserState): WelcomeData {
-  const space = getActiveSpace(state);
-  const presets = THEME_PRESETS.map((preset) => ({ label: preset.label, colors: preset.colors, appearance: preset.appearance }));
-  const shortcutAccelerator = state.settings.globalShortcut ?? WELCOME_GLOBAL_SHORTCUT.accelerator;
-  const shortcutChoice = GLOBAL_SHORTCUT_CHOICES.find((choice) => choice.accelerator === shortcutAccelerator) ?? WELCOME_GLOBAL_SHORTCUT;
-  return {
-    spaceId: space.id,
-    theme: space.theme,
-    isSystemDark: nativeTheme.shouldUseDarkColors,
-    importSources: welcomeSources,
-    imports: Object.fromEntries(welcomeImports),
-    presets: presets,
-    isPackaged: app.isPackaged,
-    isDefaultBrowser: app.isPackaged && isDefaultBrowser(),
-    isAdBlockOn: state.settings.isAdBlockOn === true,
-    globalShortcut: {
-      accelerator: shortcutChoice.accelerator,
-      label: shortcutChoice.label,
-      status: state.settings.globalShortcut === undefined ? "off" : getGlobalShortcutStatus(),
-    },
-  };
-}
-
-/**
- * The first-start onboarding (overlay/onboarding.ts), also Help › Welcome to Bow….
- */
-export function openWelcome(): void {
-  welcomeImports.clear();
-  const browserSources = listImportSources().map((source) => ({ id: source.id, label: source.label }));
-  const arcSources = isArcSidebarPresent() ? [{ id: ARC_IMPORT_SOURCE_ID, label: "Arc" }] : [];
-  welcomeSources = [...arcSources, ...browserSources];
-  openPanel({ kind: "welcome", data: buildWelcomeData(getState()) });
-}
-
-/**
- * Sends the onboarding what it shows now, when it is open: it updates in place (a full redraw would restart its
- * animations). Also after macOS's default-browser question was answered (main.ts, the app becomes active again).
- */
-export function refreshWelcome(): void {
-  if (shownPanel?.kind !== "welcome") {
-    return;
-  }
-  const data = buildWelcomeData(getState());
-  shownPanel = { kind: "welcome", data: data };
-  sendToOverlay(OVERLAY_CHANNELS.welcomeUpdate, data);
-}
-
-/**
- * Runs an import the onboarding started: its card shows it running, then what arrived; cancelled (the file picker,
- * Safari's Full Disk Access) brings the card back; an error shows it failed (the importer told the user why).
- */
-export function runWelcomeImport(sourceId: string, runImport: () => Promise<ImportSummary | null>): void {
-  welcomeImports.set(sourceId, { phase: "running", summary: null });
-  refreshWelcome();
-  runImport()
-    .then((summary) => {
-      if (summary === null) {
-        welcomeImports.delete(sourceId);
-      } else {
-        welcomeImports.set(sourceId, { phase: "done", summary: summary });
-      }
-    })
-    .catch((error) => {
-      console.error("Import from the onboarding failed:", error);
-      welcomeImports.set(sourceId, { phase: "failed", summary: null });
-    })
-    .finally(() => refreshWelcome());
 }
 
 /**
@@ -881,11 +790,6 @@ export function closeOverlay(returnsKeyboard: boolean = true): void {
   }
   const closedPanel = shownPanel;
   shownPanel = null;
-  // However the onboarding ends (Skip, Escape, Start Browsing, another window taking the focus), it is done: Help ›
-  // Welcome to Bow… shows it again.
-  if (closedPanel?.kind === "welcome") {
-    applyChange((state) => finishWelcome(state));
-  }
   setNewTabPending(false);
   setLibraryWindow(null);
   stopWatchingFolderListPointer();
@@ -924,7 +828,6 @@ export function relayoutOverlay(): void {
  * Sends fresh Library data after the state or the downloads changed, when the Library is open.
  */
 export function refreshOpenPanel(): void {
-  refreshWelcome();
   if (shownPanel?.kind === "library") {
     sendToOverlay(OVERLAY_CHANNELS.libraryUpdate, buildLibraryData(getState()));
   }

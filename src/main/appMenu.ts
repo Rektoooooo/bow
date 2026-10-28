@@ -63,7 +63,7 @@ export interface AppMenuCommands {
   /** Bow › Settings… (⌘,): Library › Settings. Help › Keyboard Shortcuts (⌘/): the sheet of the menu's shortcuts. */
   openSettings(): void;
   openShortcutSheet(): void;
-  /** Help › Welcome to Bow…: the first-start onboarding again (overlay/onboarding.ts). */
+  /** Help › Welcome to Bow…: the first-start onboarding again, in its own window (onboardingWindow.ts). */
   openWelcome(): void;
   /** Tabs › Sleep Other Tabs and Task Manager (tabSleepController.ts, Library › Task Manager). */
   sleepOtherTabs(): void;

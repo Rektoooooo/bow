@@ -70,13 +70,13 @@ import {
   openThemeEditor,
   runCommandBarAction,
   runSiteCommand,
-  runWelcomeImport,
   setFolderListPointer,
   showFolderList,
   showTabTooltip,
 } from "./overlayController";
 import { setDeveloperMode } from "../shared/developerMode";
 import { ARC_IMPORT_SOURCE_ID } from "../shared/onboarding";
+import { runWelcomeImport } from "./onboardingWindow";
 import { openDeveloperTool, translatePage } from "./pageCommands";
 import { setAsDefaultBrowser } from "./defaultBrowser";
 import { setTabSleepAfter } from "./tabSleep";

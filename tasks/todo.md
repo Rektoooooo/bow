@@ -363,6 +363,18 @@ yours, the essentials, a few good defaults, you're all set). Our own CSS/DOM/SVG
 - [x] 4. Scene 5 defaults, scene 6 and the outro, Help › Welcome to Bow… and the Command Bar replay, reduced motion
 - [x] 5. check-onboarding.mjs (23 checks); screenshots (light/dark, 640×400 and 1280×820) and a slowed recording; polish pass
 
+### 5.2 Onboarding v2 (the user's review, 2026-10-29: Arc's first launch and the D'arce onboarding as references)
+- [x] 1. Its own window (70 % of the screen, the browser hidden until it ends) with its own preload and channels;
+      replay from Help; the overlay welcome removed; check-app and check-onboarding adapted
+- [ ] 2. Imports read first, then bring the chosen parts (counts before importing, "Choose what comes over", progress
+      per part); every supported browser with its real icon (drawn by macOS from the installed app); the sidebar
+      preview that fills in
+- [ ] 3. The cleaner look: bold sans titles, left column with a live preview, the whole window takes the picked colour,
+      "Make Bow your browser?" with a message bubble, "You're all set."; no dashes in any text
+- [ ] 4. The startup: a glow on the desktop that grows into the onboarding window, Bow's mark drawing itself; the
+      onboarding fading into the browser window
+- [ ] 5. Screenshots and a recording for the user; polish
+
 ## Review (2026-10-28, an unattended night: open source, releases, auto-update, speed, polish)
 - **Works and verified:** open-source setup and repo rename; `npm run release` up to Apple's notarization (signing,
   hardened runtime, DMG checked by hand; notarization waits for the user's credentials); auto-update (a real signed

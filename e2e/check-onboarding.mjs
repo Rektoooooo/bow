@@ -1,10 +1,11 @@
-// End-to-end check of the first-start onboarding (overlay/onboarding.ts): a real first start shows it over the whole
-// window; Continue, ↩, → and ← move through its six scenes; an import started from it shows its progress and then
-// what arrived on its card (a stand-in import: the real ones read this Mac's browsers); picking a look changes the
-// Space in place (nothing is redrawn from scratch, the wash takes its colors) and light / dark follow it; the tour
-// moves between its demos, which run, and hold still with reduced motion; the defaults' switches turn ad blocking and
-// the shortcut from any app on; ⌘T does not replace it; Start Browsing ends it for good; Help › Welcome to Bow…
-// shows it again and Escape ends it; a restart does not show it; every scene fits a 640 × 400 window.
+// End-to-end check of the first-start onboarding (onboarding/onboarding.ts, in its own window, onboardingWindow.ts):
+// a real first start opens it in a window of its own (about 70 % of the screen, centred) while the browser window stays
+// hidden; Continue, ↩, → and ← move through its six scenes; an import started from it shows its progress and then what
+// arrived on its card (a stand-in import: the real ones read this Mac's browsers); picking a look changes the Space in
+// place (nothing is redrawn from scratch, the wash takes its colors) and light / dark follow it; the tour moves
+// between its demos, which run, and hold still with reduced motion; the defaults' switches turn ad blocking and the
+// shortcut from any app on; Start Browsing closes it and shows the browser, for good; Help › Welcome to Bow… opens it
+// again and Escape ends it; a restart does not show it; every scene fits its smallest window.
 // usage: npm run build && node e2e/check-onboarding.mjs      (uses a throwaway --user-data-dir)
 import "./background.mjs";
 import { _electron } from "playwright-core";
@@ -40,16 +41,23 @@ async function launch() {
   };
   const sidebar = await findPage("/renderer/index.html");
   await sidebar.waitForSelector(".space-title", { state: "attached", timeout: 15000 });
-  const overlay = await findPage("/overlay/overlay.html");
-  return { app, sidebar, overlay };
+  return { app, sidebar, findPage };
 }
 
-let { app, sidebar, overlay } = await launch();
+let { app, sidebar, findPage } = await launch();
+const ONBOARDING_PAGE = "/onboarding/onboarding.html";
 const overlayErrors = [];
-overlay.on("pageerror", (error) => overlayErrors.push(error.message));
-overlay.on("console", (message) => {
-  if (message.type() === "error") overlayErrors.push(message.text());
-});
+/** The onboarding's page; a new window (Help › Welcome to Bow…) brings a new page. */
+let overlay = null;
+async function findOnboarding() {
+  overlay = await findPage(ONBOARDING_PAGE);
+  overlay.on("pageerror", (error) => overlayErrors.push(error.message));
+  overlay.on("console", (message) => {
+    if (message.type() === "error") overlayErrors.push(message.text());
+  });
+  return overlay;
+}
+await findOnboarding();
 const getState = () => sidebar.evaluate(() => window.browserApi.getState());
 const activeTheme = async () => {
   const state = await getState();
@@ -73,25 +81,36 @@ const waitForScene = async (name, timeoutMs = 4000) => {
   await overlay.waitForTimeout(700);
   return shown;
 };
-const overlayInWindow = () =>
-  app.evaluate(({ BrowserWindow }) => {
-    const window = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
-    const view = window?.contentView.children.find((child) => child.webContents?.getURL().endsWith("/overlay/overlay.html"));
-    return view === undefined ? null : { bounds: view.getBounds(), content: window.getContentSize() };
+/** The onboarding window (null when none is open), its screen's work area, and whether the browser window shows. */
+const onboardingWindowInfo = () =>
+  app.evaluate(({ BrowserWindow, screen }) => {
+    const windows = BrowserWindow.getAllWindows().filter((candidate) => !candidate.isDestroyed());
+    const onboarding = windows.find((candidate) => candidate.webContents.getURL().endsWith("/onboarding/onboarding.html"));
+    const browser = windows.find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+    if (onboarding === undefined) {
+      return { isOpen: false, isBrowserVisible: browser?.isVisible() ?? false };
+    }
+    const area = screen.getDisplayMatching(onboarding.getBounds()).workArea;
+    return { isOpen: true, bounds: onboarding.getBounds(), area: area, isBrowserVisible: browser?.isVisible() ?? false };
   });
+const overlayInWindow = async () => ((await onboardingWindowInfo()).isOpen ? true : null);
 
 // ---------- First start ----------
 
 await overlay.waitForSelector(".onboarding", { timeout: 10000 });
 await overlay.waitForTimeout(1500);
 const heroTitle = await overlay.getAttribute(".onboarding-title-hero", "aria-label");
-const firstPlace = await overlayInWindow();
-const isBackdropHidden = await overlay.evaluate(() => document.getElementById("backdrop").hidden);
+const firstPlace = await onboardingWindowInfo();
+const shareOf = (part, whole) => Math.round((part / whole) * 100);
+const isSeventyPercent = firstPlace.isOpen && Math.abs(shareOf(firstPlace.bounds.width, firstPlace.area.width) - 70) <= 2 && Math.abs(shareOf(firstPlace.bounds.height, firstPlace.area.height) - 70) <= 2;
+const centre = (box) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
+const isCentred = firstPlace.isOpen && Math.abs(centre(firstPlace.bounds).x - centre(firstPlace.area).x) <= 2 && Math.abs(centre(firstPlace.bounds).y - centre(firstPlace.area).y) <= 2;
 check(
-  "a first start shows the onboarding over the whole window, with no backdrop of the panels",
-  heroTitle === "Welcome to Bow" && firstPlace !== null && firstPlace.bounds.width === firstPlace.content[0] && firstPlace.bounds.height === firstPlace.content[1] && isBackdropHidden,
-  JSON.stringify({ heroTitle, firstPlace, isBackdropHidden }),
+  "a first start opens the onboarding in its own window, about 70 % of the screen and centred",
+  heroTitle === "Welcome to Bow" && isSeventyPercent && isCentred,
+  JSON.stringify({ heroTitle, firstPlace }),
 );
+check("the browser window stays hidden while the onboarding is open", firstPlace.isBrowserVisible === false);
 check("it starts on the first scene with its progress mark lit", (await currentScene()).scene === "scene-hello" && (await currentScene()).mark === 0);
 
 // ---------- Keys ----------
@@ -115,7 +134,7 @@ if (sourceIds.length > 0) {
   // A stand-in for the import (the real ones read this Mac's browsers), run through the real progress and summary.
   const firstSource = sourceIds[0];
   // The built module by its full path: the same instance (Node's module cache) the app runs.
-  const controllerPath = path.join(appDir, "dist", "node", "main", "overlayController.js");
+  const controllerPath = path.join(appDir, "dist", "node", "main", "onboardingWindow.js");
   await app.evaluate((_electron, details) => {
     const controller = process.mainModule.require(details.controllerPath);
     controller.runWelcomeImport(details.sourceId, () => new Promise((resolve) => setTimeout(() => resolve({ spaces: 2, tabs: 14, bookmarks: 0, historyPages: 1200 }), 1200)));
@@ -219,21 +238,19 @@ check(
   JSON.stringify({ isAdBlockOn: settingsAfterSwitches.isAdBlockOn, globalShortcut: settingsAfterSwitches.globalShortcut, switchStates }),
 );
 
-// ---------- Nothing replaces it ----------
-
-await sidebar.evaluate(() => window.browserApi.dispatch({ type: "openCommandBar", mode: "newTab" }));
-await overlay.waitForTimeout(600);
-const stillOnboarding = await overlay.evaluate(() => document.body.dataset.panel === "welcome" && document.querySelector(".onboarding") !== null && document.querySelector(".command-input") === null);
-check("⌘T (or any panel) does not replace the onboarding", stillOnboarding);
-
 // ---------- You're all set ----------
 
 await overlay.click(".onboarding-next");
 await waitForScene("ready");
 check("the last scene's button says Start Browsing", (await overlay.textContent(".onboarding-next")) === "Start Browsing");
 await overlay.click(".onboarding-next");
-await overlay.waitForTimeout(1600);
-check("Start Browsing plays the outro and leaves the browser, for good", (await overlayInWindow()) === null && (await getState()).settings.hasSeenWelcome === true);
+await sidebar.waitForTimeout(1600);
+const afterStart = await onboardingWindowInfo();
+check(
+  "Start Browsing plays the outro, closes the onboarding window and shows the browser, for good",
+  !afterStart.isOpen && afterStart.isBrowserVisible && (await getState()).settings.hasSeenWelcome === true,
+  JSON.stringify(afterStart),
+);
 
 // ---------- Help › Welcome to Bow… and Escape ----------
 
@@ -248,12 +265,13 @@ await app.evaluate(({ Menu }) => {
   };
   find(Menu.getApplicationMenu().items)?.click();
 });
+await findOnboarding();
 await overlay.waitForSelector(".onboarding", { timeout: 5000 }).catch(() => undefined);
 await overlay.waitForTimeout(1200);
 const replayed = await currentScene();
-check("Help › Welcome to Bow… shows it again from the start", replayed.scene === "scene-hello", JSON.stringify(replayed));
+check("Help › Welcome to Bow… opens it again, in its own window, from the start", replayed.scene === "scene-hello" && (await onboardingWindowInfo()).isOpen, JSON.stringify(replayed));
 await overlay.keyboard.press("Escape");
-await overlay.waitForTimeout(1600);
+await sidebar.waitForTimeout(1600);
 check("Escape ends it", (await overlayInWindow()) === null);
 
 // ---------- Fits a small window ----------
@@ -270,8 +288,6 @@ const fitsScene = () =>
     const isScrolling = document.documentElement.scrollHeight > window.innerHeight + 1;
     return { scene: scene.className.replace("onboarding-scene ", ""), fits: top >= stage.top - 1 && bottom <= stage.bottom + 1 && !isScrolling, top: Math.round(top), bottom: Math.round(bottom), stage: [Math.round(stage.top), Math.round(stage.bottom)] };
   });
-await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html")).setContentSize(640, 400));
-await sidebar.waitForTimeout(600);
 await app.evaluate(({ Menu }) => {
   const find = (items) => {
     for (const item of items) {
@@ -283,7 +299,10 @@ await app.evaluate(({ Menu }) => {
   };
   find(Menu.getApplicationMenu().items)?.click();
 });
+await findOnboarding();
 await overlay.waitForSelector(".onboarding", { timeout: 5000 }).catch(() => undefined);
+// The onboarding window at its smallest (onboardingWindow.ts: 760 × 520).
+await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/onboarding/onboarding.html")).setSize(760, 520));
 await overlay.waitForTimeout(1500);
 const fitResults = [];
 for (let index = 0; index < 6; index++) {
@@ -293,17 +312,19 @@ for (let index = 0; index < 6; index++) {
     await overlay.waitForTimeout(1300);
   }
 }
-check("every scene fits a 640 × 400 window, nothing scrolls", fitResults.every((result) => result.fits), JSON.stringify(fitResults.filter((result) => !result.fits)));
+check("every scene fits the onboarding window at its smallest, nothing scrolls", fitResults.every((result) => result.fits), JSON.stringify(fitResults.filter((result) => !result.fits)));
 await overlay.keyboard.press("Escape");
-await overlay.waitForTimeout(1500);
+// Escape closes the onboarding window (and its page): wait on the browser's page.
+await sidebar.waitForTimeout(1500);
 check("no errors in the onboarding's page", overlayErrors.length === 0, overlayErrors.slice(0, 3).join(" | "));
 await app.close();
 
 // ---------- A restart does not show it again ----------
 
-({ app, sidebar, overlay } = await launch());
+({ app, sidebar, findPage } = await launch());
 await sidebar.waitForTimeout(2500);
-check("a restart does not show it again", (await overlayInWindow()) === null && (await overlay.$(".onboarding")) === null);
+const afterRestart = await onboardingWindowInfo();
+check("a restart does not show it again, and the browser shows at once", !afterRestart.isOpen && afterRestart.isBrowserVisible, JSON.stringify(afterRestart));
 await app.close();
 
 const failed = results.filter((result) => !result.ok).length;

@@ -401,3 +401,11 @@ export const SYNC_FILE_TIMEOUT_MS = 10 * 1000;
 
 /** Library › Task Manager measures the pages again this often while it is shown (Activity Monitor's default: 2 s). */
 export const TASK_MANAGER_REFRESH_MS = 2000;
+
+/**
+ * The onboarding's window: this share of the screen's work area, centred, and never smaller than this. The user's
+ * choice (2026-10-29: "like 70 % as big as a full-screen browser"); the minimum keeps two columns readable.
+ */
+export const ONBOARDING_SCREEN_SHARE = 0.7;
+export const ONBOARDING_MIN_WIDTH_PX = 760;
+export const ONBOARDING_MIN_HEIGHT_PX = 520;
