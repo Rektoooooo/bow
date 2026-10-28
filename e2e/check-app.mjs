@@ -210,9 +210,20 @@ check("a split view shows two pages side by side", splitBounds.length === 2 && s
 check("the split shows as one row with two panes", (await page.locator(".split-row .split-pane").count()) === 2);
 await windowShot(app, "03-split-view");
 state = await getState(page);
+// Like a Today tab's row, the split's row shows × on hover: it closes the split view, its tabs go to the Archive.
 const splitItem = Object.values(state.items).find((item) => item.kind === "split");
-await dispatch(page, { type: "unsplit", splitId: splitItem.id });
-await page.waitForTimeout(300);
+await page.hover(".split-row");
+await page.waitForTimeout(250);
+const splitCloseOpacity = await page.$eval(".split-row .row-close", (button) => getComputedStyle(button).opacity).catch(() => "none");
+await page.click(".split-row .row-close");
+await page.waitForTimeout(500);
+state = await getState(page);
+const archivedIds = state.archive.slice(0, 2).map((entry) => entry.tab.id);
+const isSplitClosed = state.items[splitItem.id] === undefined && todayTabs(state).length === 0 && splitItem.childIds.every((tabId) => archivedIds.includes(tabId));
+check("hovering a split view's row shows × and it closes the split view into the Archive", splitCloseOpacity === "1" && isSplitClosed, `opacity ${splitCloseOpacity}, today ${todayTabs(state).length}, archived ${archivedIds.join(",")}`);
+// Clear (below) needs a Today tab again.
+await dispatch(page, { type: "openTab", typedText: "example.net" });
+await page.waitForFunction(() => document.querySelectorAll(".today-list .tab-row").length === 1, null, { timeout: 10000 });
 
 await dispatch(page, { type: "setArchiveAfter", archiveAfterMs: 3600000 });
 await page.waitForTimeout(200);

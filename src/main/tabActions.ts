@@ -14,7 +14,7 @@ import type { WebContents } from "electron";
 import type { NavigationCommand } from "../shared/actions";
 import type { ItemId } from "../shared/types";
 import { applyChange, getState, scheduleRuntimePush } from "./browserCore";
-import { closeTab, getSelectedTabId, openTab, resetPinnedTab, selectTab, setTabMuted, updateTab } from "./state";
+import { closeTab, deleteItem, getSelectedTabId, openTab, resetPinnedTab, selectTab, setTabMuted, updateTab } from "./state";
 import type { OpenTabOptions } from "./state";
 import { destroyTabView, getFocusedContents, getTabContents } from "./tabViews";
 import type { OpenDisposition } from "./tabViews";
@@ -42,6 +42,25 @@ export function closeTabByUser(tabId: ItemId): void {
   applyChange((state) => resetPinnedTab(state, tabId));
   // The page is gone even when the state did not change, so the sidebar must hear about it.
   scheduleRuntimePush();
+}
+
+/**
+ * The × on a split view's row. In Today the split view closes with its tabs (they go to the Archive), like a Today
+ * tab's ×; a pinned split view keeps its place and puts its pages away, like a pinned tab's.
+ */
+export function closeSplitByUser(splitId: ItemId): void {
+  const state = getState();
+  const split = state.items[splitId];
+  if (split === undefined || split.kind !== "split") {
+    return;
+  }
+  if (isInToday(state, splitId)) {
+    applyChange((current) => deleteItem(current, splitId, Date.now()));
+    return;
+  }
+  for (const tabId of split.childIds) {
+    closeTabByUser(tabId);
+  }
 }
 
 /**

@@ -490,6 +490,14 @@ export function renderSplitRow(split: SplitItem, location: ItemLocation, index: 
     row.append(pane);
   }
 
+  // A close button on hover, like a tab row's: in Today it closes the split view, pinned it puts its pages away.
+  const isToday = location.kind === "today";
+  const isAnyPaneLoaded = split.childIds.some((tabId) => context.runtime.tabs[tabId] !== undefined);
+  if (isToday || isAnyPaneLoaded) {
+    const closeLabel = isToday ? "Close split view (its tabs move to the Archive)" : "Close pages (keeps the pinned split view)";
+    row.append(createActionButton("close", closeLabel, "row-action row-close", "close-split", { itemId: split.id }));
+  }
+
   markDraggable(row, split.id);
   markDropTarget(row, location, index, null);
   const firstTabId = split.childIds[0];

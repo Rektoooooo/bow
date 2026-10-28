@@ -259,6 +259,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   splitTabs: { firstTabId: isText, secondTabId: isText },
   separateTabFromSplit: { tabId: isText },
   unsplit: { splitId: isText },
+  closeSplit: { splitId: isText },
   setSplitOrientation: { splitId: isText, orientation: isOrientation },
   switchSpace: { spaceId: isText },
   switchSpaceByOffset: { offset: isWholeNumber },

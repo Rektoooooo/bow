@@ -108,7 +108,7 @@ import {
   switchSpaceByOffset,
 } from "./spaces";
 import { takeItemIntoFocusedWindow } from "./windows";
-import { closeTabByUser, navigateFocusedPage, openLinkInNewTab, resetTabToHome, setMuted } from "./tabActions";
+import { closeSplitByUser, closeTabByUser, navigateFocusedPage, openLinkInNewTab, resetTabToHome, setMuted } from "./tabActions";
 import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
 import { createId } from "./tree";
 import { normalizeTypedInput } from "./urls";
@@ -260,6 +260,8 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => separateTabFromSplit(state, action.tabId));
     case "unsplit":
       return applyChange((state) => unsplit(state, action.splitId));
+    case "closeSplit":
+      return closeSplitByUser(action.splitId);
     case "setSplitOrientation":
       return applyChange((state) => setSplitOrientation(state, action.splitId, action.orientation));
     case "switchSpace":

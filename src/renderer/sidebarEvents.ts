@@ -43,6 +43,8 @@ function runButtonAction(button: HTMLElement): void {
   switch (data.action) {
     case "close-tab":
       return dispatch({ type: "closeTab", tabId: itemId });
+    case "close-split":
+      return dispatch({ type: "closeSplit", splitId: itemId });
     case "toggle-mute":
       return dispatch({ type: "setTabMuted", tabId: itemId, isMuted: data.isMuted !== "true" });
     case "reset-tab":

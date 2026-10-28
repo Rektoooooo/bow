@@ -63,6 +63,7 @@ export type BrowserAction =
   | { type: "splitTabs"; firstTabId: ItemId; secondTabId: ItemId }
   | { type: "separateTabFromSplit"; tabId: ItemId }
   | { type: "unsplit"; splitId: ItemId }
+  | { type: "closeSplit"; splitId: ItemId }
   | { type: "setSplitOrientation"; splitId: ItemId; orientation: SplitOrientation }
   | { type: "switchSpace"; spaceId: SpaceId }
   | { type: "switchSpaceByOffset"; offset: number }
@@ -169,6 +170,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "splitTabs",
   "separateTabFromSplit",
   "unsplit",
+  "closeSplit",
   "setSplitOrientation",
   "switchSpace",
   "switchSpaceByOffset",
