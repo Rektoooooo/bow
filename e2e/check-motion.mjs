@@ -3,6 +3,7 @@
 // in-between places and arrive where the layout says. The sidebar page's own card must move along (its grid column
 // eases with the same duration). Also checks that a window resize does not animate.
 // usage: npm run build && node e2e/check-motion.mjs      (uses a throwaway --user-data-dir)
+import "./background.mjs";
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
 import * as fs from "node:fs";

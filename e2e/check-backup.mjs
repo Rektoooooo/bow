@@ -8,6 +8,7 @@
 //     --snapshot-interval-ms); with the setting off, none; Restore opens in that folder.
 // The save, open and message dialogs are replaced in the main process (a test cannot click macOS sheets).
 // usage: npm run build && node e2e/check-backup.mjs      (uses a throwaway --user-data-dir)
+import "./background.mjs";
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
 import * as fs from "node:fs";

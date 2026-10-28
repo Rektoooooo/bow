@@ -5,6 +5,7 @@
 // The sidebar page runs with reduced motion (emulated): rows appear and disappear at once, so checks never meet a
 // row that is still animating. e2e/check-motion.mjs checks the animations themselves.
 // Playwright emulates light mode by default, so screenshots here are light.
+import "./background.mjs";
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
 import * as fs from "node:fs";

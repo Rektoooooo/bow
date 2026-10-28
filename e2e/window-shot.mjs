@@ -16,6 +16,11 @@ import { captureWindow } from "./composite.mjs";
 const appDir = path.resolve(import.meta.dirname, "..");
 const outDir = process.env.E2E_OUTPUT_DIR || path.join(appDir, "e2e", "output");
 const isOpenOnly = process.argv.includes("--open");
+// The shots taken by itself run in the background like the checks (e2e/background.mjs); --open is for hand-taken
+// screenshots, so Bow stays on screen then.
+if (!isOpenOnly && process.env.BOW_E2E_FOREGROUND !== "1") {
+  process.env.BOW_E2E_BACKGROUND = "1";
+}
 const userDataDir = path.join(outDir, isOpenOnly ? "screenshot-profile" : "user-data-shot");
 fs.rmSync(userDataDir, { recursive: true, force: true });
 fs.mkdirSync(userDataDir, { recursive: true });

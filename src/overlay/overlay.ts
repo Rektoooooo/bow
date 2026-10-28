@@ -147,7 +147,14 @@ function createCommandLine(line: CommandBarLine, index: number): HTMLElement {
   hint.append(arrowBox);
 
   row.append(iconSlot, text, hint);
-  row.addEventListener("mousemove", () => highlightLine(index, false));
+  row.addEventListener("mousemove", (event) => {
+    // Chromium also sends a still "mousemove" when lines appear under a resting pointer; only real movement picks a
+    // line, so the highlight stays on what you typed (like the ⌃Tab switcher).
+    const isStill = event.movementX === 0 && event.movementY === 0;
+    if (!isStill) {
+      highlightLine(index, false);
+    }
+  });
   row.addEventListener("click", () => chooseLine(index));
   return row;
 }

@@ -5,6 +5,7 @@
 // usage: npm run build && node e2e/check-performance.mjs      (uses a throwaway --user-data-dir)
 //   PERF_DETAIL=1 prints the metrics (style, layout); PERF_PROFILE=change or =select saves a CPU profile of that step
 //   to e2e/output/sidebar-profile.cpuprofile (open it in Chrome's DevTools › Performance).
+import "./background.mjs";
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
 import * as fs from "node:fs";

@@ -8,6 +8,7 @@
 // The app's own functions are reached with process.mainModule.require (the module instance the app uses, cached by
 // path): deprecated in Node, so if this check breaks with "mainModule", that is why.
 // usage: npm run build && node e2e/check-tab-sleep.mjs      (uses a throwaway --user-data-dir and a local web server)
+import "./background.mjs";
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
 import { captureWindow } from "./composite.mjs";

@@ -8,6 +8,7 @@
 //     in the HTML is read from it; a list drawn by scripts is read from a hidden window, which is closed afterwards.
 //     An empty list says so. Deleting a live folder does not fill the Archive.
 // usage: npm run build && node e2e/check-live-folders.mjs      (uses a throwaway --user-data-dir)
+import "./background.mjs";
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
 import * as fs from "node:fs";

@@ -8,6 +8,7 @@
 // deleted one by one.
 // usage: npm run e2e   (or: npm run build && node e2e/check-extensions.mjs)
 // Uses a throwaway --user-data-dir folder, so your real browser state is never touched.
+import "./background.mjs";
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";

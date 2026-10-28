@@ -40,7 +40,11 @@ node e2e/check-package.mjs # checks that packaged app (Info.plist, menu, links f
 tools/make-icon.sh   # redraws build/icon.icns from tools/make-icon.cjs (our own icon design)
 ```
 
-`npm run e2e` opens real windows on screen for a few minutes and uses throwaway `--user-data-dir` folders under
+`npm run e2e` runs the real app in the background (`e2e/background.mjs` → `src/main/backgroundTesting.ts`: no Dock
+icon, invisible windows that never take the focus and let clicks pass), so the Mac stays usable during a run; every
+check imports `./background.mjs` first. `BOW_E2E_FOREGROUND=1 node e2e/check-<area>.mjs` shows the windows to watch
+a check. Checks drive pages through Chromium's DevTools protocol; window focus is simulated for the app's own
+bookkeeping (focus/blur events, `isFocused`). Each run uses throwaway `--user-data-dir` folders under
 `e2e/output/`, so the real state in `~/Library/Application Support/Sidebar Browser/` is never touched (the app was
 renamed Bow on 2026-10-27; `main.ts keepDataFolder` keeps the folder's first name, and the bundle id stays
 `io.github.rektoooooo.sidebar-browser`; `npm start` and the packaged app share the folder).

@@ -10,6 +10,7 @@
 //   - Stop Syncing: B no longer receives A's changes.
 // The folder dialog and the question are replaced in each main process (a test cannot click macOS sheets).
 // usage: npm run build && node e2e/check-sync.mjs
+import "./background.mjs";
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
 import * as fs from "node:fs";

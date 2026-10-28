@@ -2,6 +2,7 @@
 // Enter, edit the address with ⌘L's mode, run an action, restore from the Library, find in page, Escape to close,
 // and move a Little Window into a Space.
 // usage: npm run build && node e2e/check-overlay.mjs      (uses a throwaway --user-data-dir)
+import "./background.mjs";
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
 import * as fs from "node:fs";
@@ -806,7 +807,8 @@ await overlay.mouse.up();
 // Like Arc, pictures land in the Library (Media), kept in the app's data folder.
 const capturesDir = path.join(userDataDir, "Captures");
 let capturedFiles = [];
-for (let attempt = 0; attempt < 25 && capturedFiles.length === 0; attempt += 1) {
+// Up to 10 s: copying the picture to the clipboard and keeping it can take a few seconds on a busy Mac.
+for (let attempt = 0; attempt < 50 && capturedFiles.length === 0; attempt += 1) {
   await sidebar.waitForTimeout(200);
   capturedFiles = fs.existsSync(capturesDir) ? fs.readdirSync(capturesDir).filter((name) => name.endsWith(".png")) : [];
 }
@@ -880,6 +882,8 @@ await sidebar.waitForTimeout(300);
 await dispatch({ type: "openCommandBar", mode: "newTab" });
 await overlay.fill(".command-input", "lofi beats");
 await overlay.waitForTimeout(400);
+// A pointer resting where the lines appear gets a "mousemove" without moving: it must not pick a line.
+await overlay.$eval(".command-line:last-child", (line) => line.dispatchEvent(new MouseEvent("mousemove", { bubbles: true })));
 const searchLine = await overlay.textContent(".command-line.is-highlighted .command-line-subtitle").catch(() => null);
 check("Library › Settings picks the search engine, and the Command Bar searches with it", chosenEngine === "google" && searchLine === "Search Google", `${chosenEngine} / ${searchLine}`);
 await overlay.press(".command-input", "Escape");

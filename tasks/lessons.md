@@ -138,6 +138,11 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   clicking it on screen). Rerun the check alone, and the previous commit's build too, before calling it a regression
   (2026-10-28: both passed on rerun).
 
+- e2e windows on screen took the user's keyboard and mouse for the whole run, and the user's typing and clicks broke
+  checks (2026-10-28: a capture drag ending 300 px off, a Settings form never filled). Checks now run in the
+  background (`backgroundTesting.ts`); a new check imports `./background.mjs` first. A check that needs real OS
+  focus or real mouse events cannot work there: drive the page through Playwright (CDP) instead.
+
 ## Dependencies
 - Check a package's license **per version** and diff a just-published release against the previous one before
   adding it (electron-chrome-extensions 4.9 was GPL with a runtime license check; 4.10, one day old, is MIT and only

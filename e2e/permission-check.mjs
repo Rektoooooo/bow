@@ -5,6 +5,7 @@
 // - screen sharing goes to macOS's sharing picker for sites (it shows on screen until the app quits), never for ours.
 // Uses notifications: camera and microphone requests can wait on a macOS system dialog, which a test cannot answer.
 // usage: npm run build && node e2e/permission-check.mjs
+import "./background.mjs";
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
 import * as fs from "node:fs";

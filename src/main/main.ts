@@ -30,6 +30,7 @@ import { appMenuCommands } from "./appMenuCommands";
 import { findTabsArchivingSoon, findTabsToArchive, pruneArchive } from "./autoArchive";
 import { archiveUnusedTabsWithUndo } from "./archiveUndoController";
 import { applySiteZoom } from "./pageCommands";
+import { keepTestRunInBackground } from "./backgroundTesting";
 import {
   applyChange,
   collectRuntimeState,
@@ -437,6 +438,8 @@ function keepDataFolder(): void {
  * then start once Electron is ready. Quits when the last main window closes (mainWindows.ts).
  */
 function startApp(): void {
+  // e2e runs only: windows stay invisible and never take the focus (backgroundTesting.ts).
+  keepTestRunInBackground();
   // Before anything reads the data folder (the single-instance lock lives in it).
   keepDataFolder();
   useChromeUserAgent();
