@@ -586,12 +586,13 @@ export function openSpaceIconPicker(spaceId: string, anchor: OverlayRect): void 
 }
 
 /**
- * Shows Arc's tooltip for a tab row where the sidebar placed it, unless another panel is open. It does not take the
- * keyboard.
+ * Shows Arc's tooltip for a tab row where the sidebar placed it, unless another panel or a Peek is open (the Peek's
+ * toolbar row and buttons are drawn in the overlay too, without a panel of ours: a tooltip would take their place,
+ * found 2026-10-28). It does not take the keyboard.
  */
 export function showTabTooltip(title: string, showsRenameHint: boolean, frame: OverlayRect): void {
   const isOtherPanelOpen = shownPanel !== null && shownPanel.kind !== "tabTooltip";
-  if (isOtherPanelOpen) {
+  if (isOtherPanelOpen || isPeekOpen() || isPeekClosing()) {
     return;
   }
   openPanel({ kind: "tabTooltip", frame: frame, title: title, showsRenameHint: showsRenameHint });
@@ -633,7 +634,8 @@ export function setFolderListPointer(isInside: boolean): void {
 
 /**
  * Shows Arc's list of a closed folder's tabs beside the sidebar, centered on the folder's row (anchor, window
- * coordinates), unless another panel is open or the folder holds no tabs. It takes the keyboard for its search field.
+ * coordinates), unless another panel or a Peek is open (like the tab tooltip) or the folder holds no tabs. It takes the
+ * keyboard for its search field.
  * Asked again for the list that shows, it only notes that the pointer is back on the row.
  */
 export function showFolderList(folderId: string, anchor: OverlayRect): void {
@@ -645,7 +647,7 @@ export function showFolderList(folderId: string, anchor: OverlayRect): void {
   const window = getWindow();
   const state = getState();
   const folder = state.items[folderId];
-  if (isOtherPanelOpen || window === null || folder === undefined || folder.kind !== "folder") {
+  if (isOtherPanelOpen || isPeekOpen() || isPeekClosing() || window === null || folder === undefined || folder.kind !== "folder") {
     return;
   }
   const entries = buildFolderList(state, folderId);

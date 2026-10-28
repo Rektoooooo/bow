@@ -326,6 +326,17 @@ const dragRegions = () =>
   }));
 const dragWhilePeek = await dragRegions();
 check("while a Peek is open the toolbar under it does not drag the window (the sidebar's top strip still does)", dragWhilePeek.toolbar === "no-drag" && dragWhilePeek.header === "drag", JSON.stringify(dragWhilePeek));
+// The Peek's toolbar row and buttons are drawn in the overlay: resting on a sidebar tab must not put a tab tooltip in
+// their place (the user lost the buttons and could not close the Peek, 2026-10-28).
+const hoverRowBox = await sidebar.locator(".tab-row").first().boundingBox();
+await sidebar.mouse.move(hoverRowBox.x + 40, hoverRowBox.y + hoverRowBox.height / 2);
+await sidebar.mouse.move(hoverRowBox.x + 42, hoverRowBox.y + hoverRowBox.height / 2);
+await sidebar.waitForTimeout(1500);
+const peekFrameAfterHover = await overlay.evaluate(() => ({ buttons: document.querySelector(".peek-buttons") !== null, tooltip: document.querySelector(".tab-tooltip") !== null }));
+await sidebar.mouse.move(hoverRowBox.x + 40, hoverRowBox.y + hoverRowBox.height * 8);
+await sidebar.waitForTimeout(500);
+const isPeekStillOpen = (await peekViews()).some((view) => view.url.includes("iana.org"));
+check("resting on a sidebar tab while a Peek is open keeps the Peek's buttons (no tab tooltip over them)", peekFrameAfterHover.buttons && !peekFrameAfterHover.tooltip && isPeekStillOpen, `${JSON.stringify(peekFrameAfterHover)} open=${isPeekStillOpen}`);
 await overlay.click(".peek-button[aria-label^='Open as Tab']");
 await sidebar.waitForTimeout(800);
 state = await getState();
