@@ -280,7 +280,7 @@ M about a day, L several days.
       ("already open, switch to it?"); tab search ⌘⇧A that shows each tab's Space and window (M)
 
 ### 4.2 Arc features, done better
-- [ ] 6. Link menu: Open Link in Little Window, in Peek, in Split View (S)
+- [x] 6. Link menu: Open Link in Little Window, in Peek, in Split View (S)
 - [ ] 7. Split view: drag the divider to resize, swap panes, 2×2 grid and keyboard layouts (M)
 - [ ] 8. Boosts: share and import as files; a clear badge while a JavaScript Boost runs (S)
 - [ ] 9. Live Folders: GitHub notifications and issues, Linear and Jira through the user's sign-in, ready-made feed

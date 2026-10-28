@@ -151,5 +151,9 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 ## This Mac
 - Never `pkill -f` with a pattern that also appears in the command line running it: it kills its own shell (happened
   twice on 2026-10-27). Find the pid with `pgrep` first and `kill` that pid.
+- macOS has no `timeout` command (a GNU tool): `timeout 100 npx …` fails silently and prints nothing. Use the tool's
+  own time limit instead. And a `cat > file` with no input waits for ever: write test files with `printf` or Write.
+- The `pkill -f` rule above was broken again on 2026-10-28 (the pattern sat in the same command line): look the pid
+  up with `pgrep -fl` in one call, kill it by number in the next.
 - Two macOS accounts; facts differ per account (Homebrew owner, Node location, gh accounts). Check `whoami` and the
   "This Mac" section of `CLAUDE.md` before installing anything.

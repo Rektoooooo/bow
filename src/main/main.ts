@@ -135,7 +135,7 @@ const tabViewEvents: TabViewEvents = {
     openPeek(url, tabId);
     return true;
   },
-  onContextMenu: (_tabId, contents, params) => showPageContextMenu(menuHost, contents, params, getExtensionMenuItems(contents, params)),
+  onContextMenu: (tabId, contents, params) => showPageContextMenu(menuHost, contents, params, getExtensionMenuItems(contents, params), tabId),
   onDomReady: (_tabId, contents) => {
     applySiteZoom(contents);
     applyBoostToPage(contents, getState()).catch(() => undefined);

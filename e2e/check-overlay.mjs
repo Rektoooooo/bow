@@ -881,11 +881,16 @@ await overlay.press("body", "Escape");
 await sidebar.waitForTimeout(300);
 await dispatch({ type: "openCommandBar", mode: "newTab" });
 await overlay.fill(".command-input", "lofi beats");
-await overlay.waitForTimeout(400);
+await overlay.waitForTimeout(1200);
 // A pointer resting where the lines appear gets a "mousemove" without moving: it must not pick a line.
+const highlightedBefore = await overlay.$eval(".command-line.is-highlighted", (line) => Array.from(line.parentElement.children).indexOf(line)).catch(() => -1);
 await overlay.$eval(".command-line:last-child", (line) => line.dispatchEvent(new MouseEvent("mousemove", { bubbles: true })));
-const searchLine = await overlay.textContent(".command-line.is-highlighted .command-line-subtitle").catch(() => null);
+const highlightedAfter = await overlay.$eval(".command-line.is-highlighted", (line) => Array.from(line.parentElement.children).indexOf(line)).catch(() => -1);
+// The typed search's line (an open tab matching the words may rank above it, as Switch to Tab).
+const lineSubtitles = await overlay.$$eval(".command-line .command-line-subtitle", (subtitles) => subtitles.map((subtitle) => subtitle.textContent ?? ""));
+const searchLine = lineSubtitles.find((subtitle) => subtitle.startsWith("Search ")) ?? null;
 check("Library › Settings picks the search engine, and the Command Bar searches with it", chosenEngine === "google" && searchLine === "Search Google", `${chosenEngine} / ${searchLine}`);
+check("a pointer resting where the lines appear does not move the highlight", highlightedBefore !== -1 && highlightedAfter === highlightedBefore, `${highlightedBefore} → ${highlightedAfter}`);
 await overlay.press(".command-input", "Escape");
 await dispatch({ type: "setSearchEngine", engineId: "duckduckgo" });
 await sidebar.waitForTimeout(300);
@@ -1402,6 +1407,47 @@ for (let attempt = 0; attempt < 25 && !(fs.existsSync(savedPagePath) && fs.exist
 }
 check("File › Save Page As… saves the page", fs.existsSync(savedPagePath) && fs.readFileSync(savedPagePath, "utf8").includes("Basics page /saved-zoom"));
 check("File › Export as PDF… writes a PDF", fs.existsSync(pdfPath) && fs.readFileSync(pdfPath).subarray(0, 4).toString() === "%PDF");
+// The link menu of a page: Open Link in Split View, in Peek and in Little Window. The menu is caught instead of shown
+// (a background run has no screen for native menus) and its items are clicked.
+const linkUrl = `${basicsOrigin}/linked`;
+const openPageLinkMenu = () =>
+  app.evaluate(({ Menu, webContents }, { pageUrl, url }) => {
+    globalThis.caughtMenu = null;
+    Menu.prototype.popup = function catchMenu() {
+      globalThis.caughtMenu = this;
+    };
+    const page = webContents.getAllWebContents().find((contents) => contents.getURL() === pageUrl);
+    const noEditing = { canUndo: false, canRedo: false, canCut: false, canCopy: false, canPaste: false, canDelete: false, canSelectAll: false, canEditRichly: false };
+    page.emit("context-menu", { preventDefault: () => undefined }, { x: 10, y: 10, linkURL: url, linkText: "Linked", pageURL: pageUrl, frameURL: pageUrl, srcURL: "", mediaType: "none", hasImageContents: false, isEditable: false, selectionText: "", titleText: "", altText: "", suggestedFilename: "", misspelledWord: "", dictionarySuggestions: [], frameCharset: "", inputFieldType: "none", menuSourceType: "mouse", mediaFlags: {}, editFlags: noEditing, spellcheckEnabled: false });
+    return globalThis.caughtMenu?.items.map((item) => item.label) ?? [];
+  }, { pageUrl: localhostUrl, url: linkUrl });
+const clickCaughtItem = (label) => app.evaluate((_electron, wanted) => globalThis.caughtMenu.items.find((item) => item.label === wanted)?.click(), label);
+const linkMenuLabels = await openPageLinkMenu();
+check("a page's link menu offers Peek, Split View and Little Window", ["Open Link in Peek", "Open Link in Split View", "Open Link in Little Window"].every((label) => linkMenuLabels.includes(label)), linkMenuLabels.join(" | "));
+await clickCaughtItem("Open Link in Split View");
+await sidebar.waitForTimeout(800);
+state = await getState();
+const splitItems = Object.values(state.items).filter((item) => item.kind === "split");
+const linkSplit = splitItems.find((split) => split.childIds.some((tabId) => state.items[tabId]?.url === linkUrl));
+check("Open Link in Split View puts the link beside its page", linkSplit !== undefined && linkSplit.childIds.some((tabId) => state.items[tabId]?.url === localhostUrl));
+await openPageLinkMenu();
+await clickCaughtItem("Open Link in Peek");
+await sidebar.waitForTimeout(1500);
+const peekFacts = await app.evaluate(({ webContents }, url) => ({ pages: webContents.getAllWebContents().filter((contents) => contents.getURL() === url).length }), linkUrl);
+const isPeekShown = await overlayIsShown();
+check("Open Link in Peek opens it in a Peek", peekFacts.pages === 2 && isPeekShown, JSON.stringify({ ...peekFacts, isPeekShown }));
+await overlay.press("body", "Escape");
+await sidebar.waitForTimeout(600);
+await openPageLinkMenu();
+await clickCaughtItem("Open Link in Little Window");
+await sidebar.waitForTimeout(1200);
+const littleWithLink = await app.evaluate(({ BrowserWindow }, url) => BrowserWindow.getAllWindows().some((window) => window.webContents.getURL().includes("/little/") && window.contentView.children.some((child) => child.webContents?.getURL() === url)), linkUrl);
+check("Open Link in Little Window opens it in a Little Window", littleWithLink);
+await app.evaluate(({ BrowserWindow }) => {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.webContents.getURL().includes("/little/")) window.close();
+  }
+});
 basicsServer.close();
 
 await app.close();

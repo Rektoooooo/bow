@@ -22,8 +22,9 @@ import { closeTab, deleteItem, getSelectedTabId, openTab, selectTab, setTabMuted
 import type { OpenTabOptions } from "./state";
 import { destroyTabView, findWindowShowingTab, getFocusedContents, getTabContents } from "./tabViews";
 import type { OpenDisposition } from "./tabViews";
-import { findTab, isInToday } from "./tree";
+import { createId, findTab, isInToday } from "./tree";
 import { resetPinnedTabInEveryWindow, resetPinnedTabsInEveryWindow } from "./windows";
+import { splitTabs } from "./split";
 
 /**
  * Opens a link in a new Today tab. Background links (⌘-click) do not take the selection.
@@ -54,6 +55,19 @@ export function openOrSwitchToTab(url: string): void {
   }
   const openAnother = (): void => applyChange((current) => openTab(current, url, Date.now()));
   offerSidebarNotice("Switched to the tab you already had open", "Open Another", openAnother, SIDEBAR_NOTICE_SHOWN_MS);
+}
+
+/**
+ * Open Link in Split View: the link in a new tab beside its page, the two side by side. When the page cannot take a
+ * split view (it is already in a full one), the link still opens, in a tab of its own.
+ */
+export function openLinkInSplitView(url: string, sourceTabId: ItemId): void {
+  const now = Date.now();
+  const newTabId = createId("tab", now);
+  applyChange((state) => {
+    const withNewTab = openTab(state, url, now, { id: newTabId, select: false });
+    return splitTabs(withNewTab, sourceTabId, newTabId, now);
+  });
 }
 
 /**

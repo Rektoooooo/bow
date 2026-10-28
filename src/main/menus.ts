@@ -37,7 +37,12 @@ export interface MenuHost {
   isTabLoaded(tabId: ItemId): boolean;
   /** The tab's page is awake and may sleep now: not on screen, not in use (tabSleepController.ts). */
   canTabSleep(tabId: ItemId): boolean;
+  /** Opens a link from a tab's page in a Peek, a Little Window, or a split view beside that tab. */
+  openLinkElsewhere(url: string, place: LinkPlace, sourceTabId: ItemId): void;
 }
+
+/** Where the link menu can open a link besides a tab. */
+export type LinkPlace = "peek" | "littleWindow" | "split";
 
 /** Most tabs listed in a "Split View with" submenu; more would make the menu taller than the screen. */
 const SPLIT_CANDIDATES_LIMIT = 15;
@@ -532,16 +537,25 @@ export function showMenuRequest(host: MenuHost, request: MenuRequest): void {
 /**
  * Builds the link part of the page menu.
  */
-function buildLinkItems(host: MenuHost, params: ContextMenuParams): MenuItemConstructorOptions[] {
-  if (params.linkURL === "") {
+function buildLinkItems(host: MenuHost, params: ContextMenuParams, sourceTabId: ItemId | null): MenuItemConstructorOptions[] {
+  const url = params.linkURL;
+  if (url === "") {
     return [];
   }
-  return [
-    { label: "Open Link in New Tab", click: () => host.openInNewTab(params.linkURL, false) },
-    { label: "Open Link in Background Tab", click: () => host.openInNewTab(params.linkURL, true) },
-    { label: "Copy Link Address", click: () => clipboard.writeText(params.linkURL) },
-    { type: "separator" },
+  const items: MenuItemConstructorOptions[] = [
+    { label: "Open Link in New Tab", click: () => host.openInNewTab(url, false) },
+    { label: "Open Link in Background Tab", click: () => host.openInNewTab(url, true) },
   ];
+  // From a tab's page: also in a Peek, a Little Window or beside the page (a Little Window's own page has no tab).
+  if (sourceTabId !== null) {
+    items.push(
+      { label: "Open Link in Peek", click: () => host.openLinkElsewhere(url, "peek", sourceTabId) },
+      { label: "Open Link in Split View", click: () => host.openLinkElsewhere(url, "split", sourceTabId) },
+      { label: "Open Link in Little Window", click: () => host.openLinkElsewhere(url, "littleWindow", sourceTabId) },
+    );
+  }
+  items.push({ label: "Copy Link Address", click: () => clipboard.writeText(url) }, { type: "separator" });
+  return items;
 }
 
 /**
@@ -616,11 +630,11 @@ function buildTextItems(host: MenuHost, contents: WebContents, params: ContextMe
  * Shows the right-click menu inside a web page: link, image and text commands, the page's extension items
  * (chrome.contextMenus), then navigation and Inspect.
  */
-export function showPageContextMenu(host: MenuHost, contents: WebContents, params: ContextMenuParams, extensionItems: MenuItem[] = []): void {
+export function showPageContextMenu(host: MenuHost, contents: WebContents, params: ContextMenuParams, extensionItems: MenuItem[] = [], sourceTabId: ItemId | null = null): void {
   const history = contents.navigationHistory;
   const extensionPart: (MenuItemConstructorOptions | MenuItem)[] = extensionItems.length === 0 ? [] : [...extensionItems, { type: "separator" }];
   const template: (MenuItemConstructorOptions | MenuItem)[] = [
-    ...buildLinkItems(host, params),
+    ...buildLinkItems(host, params, sourceTabId),
     ...buildImageItems(host, contents, params),
     ...buildTextItems(host, contents, params),
     ...extensionPart,

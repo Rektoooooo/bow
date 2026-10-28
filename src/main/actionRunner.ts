@@ -13,7 +13,7 @@
  */
 import type { BrowserAction } from "../shared/actions";
 import { SIDEBAR_COLLAPSE_WIDTH_PX } from "../shared/settings";
-import type { SpaceTheme, WindowId } from "../shared/types";
+import type { ItemId, SpaceTheme, WindowId } from "../shared/types";
 import {
   applyChange,
   getState,
@@ -49,7 +49,7 @@ import { checkForExtensionUpdatesNow, installFromWebStore, loadUnpackedExtension
 import { answerPermissionPrompt } from "./permissionPrompts";
 import { removePermissionAnswer } from "./sitePermissions";
 import { showMenuRequest } from "./menus";
-import type { MenuHost } from "./menus";
+import type { LinkPlace, MenuHost } from "./menus";
 import {
   fadeHoverPanel,
   hideFolderList,
@@ -120,9 +120,11 @@ import {
   switchSpaceByOffset,
 } from "./spaces";
 import { takeItemIntoFocusedWindow } from "./windows";
-import { closeSplitByUser, closeTabByUser, navigateFocusedPage, openLinkInNewTab, openOrSwitchToTab, resetTabToHome, setMuted } from "./tabActions";
+import { closeSplitByUser, closeTabByUser, navigateFocusedPage, openLinkInNewTab, openLinkInSplitView, openOrSwitchToTab, resetTabToHome, setMuted } from "./tabActions";
 import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
 import { createId } from "./tree";
+import { openPeek } from "./peek";
+import { openLittleWindow } from "./littleWindow";
 import { normalizeTypedInput } from "./urls";
 import { findSearchEngine } from "../shared/searchEngines";
 
@@ -135,7 +137,23 @@ export const menuHost: MenuHost = {
   openInNewTab: (url, inBackground) => openLinkInNewTab(url, inBackground ? "background" : "foreground"),
   isTabLoaded: (tabId) => getTabContents(tabId) !== null,
   canTabSleep: (tabId) => canSleepNow(tabId),
+  openLinkElsewhere: (url, place, sourceTabId) => openLinkElsewhere(url, place, sourceTabId),
 };
+
+/**
+ * The link menu's Open Link in Peek, in Split View or in Little Window.
+ */
+function openLinkElsewhere(url: string, place: LinkPlace, sourceTabId: ItemId): void {
+  if (place === "peek") {
+    openPeek(url, sourceTabId);
+    return;
+  }
+  if (place === "split") {
+    openLinkInSplitView(url, sourceTabId);
+    return;
+  }
+  openLittleWindow(url);
+}
 
 /**
  * Dragging the sidebar's edge: moves the page live, and saves the width when the drag ends. Letting go far to the
