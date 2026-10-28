@@ -487,19 +487,24 @@ body.dark .command-info-button {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: clamp(2px, calc((100vh - 744px) / 7), 20px);
+  /* Twelve entries: the gaps between them give way first, so each entry keeps room around its icon and name (the
+     selected one's background touched both, 2026-10-28). */
+  gap: clamp(2px, calc((100vh - 860px) / 11), 12px);
   padding: 0 8px 56px;
   overflow-y: auto;
 }
 
 .library-tab {
-  flex: 0 1 80px;
+  flex: 0 1 72px;
   min-height: 48px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
+  /* Room above the icon and below the name: 9 px in a tall window, down to 4 px where all twelve only just fit
+     (a 700 px window), so the rail never has to scroll there. */
+  padding: clamp(4px, calc((100vh - 640px) / 28), 9px) 4px;
   border: 0;
   border-radius: 12px;
   background: none;
