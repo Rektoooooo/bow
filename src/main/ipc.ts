@@ -100,6 +100,16 @@ function isSpaceArchiveAfter(value: unknown): boolean {
   return value === "default" || isAllowedArchiveAfter(value);
 }
 
+/** A Space's search engine: a known engine, or "default" for the one in Settings. */
+function isSpaceSearchEngine(value: unknown): boolean {
+  return value === "default" || isSearchEngineId(value);
+}
+
+/** A Space's new-tab page: a web address (http or https), or null for the Command Bar. */
+function isNewTabUrl(value: unknown): boolean {
+  return value === null || (isText(value) && /^https?:\/\//i.test(value as string) && URL.canParse(value as string));
+}
+
 function isAllowedTabSleepAfter(value: unknown): boolean {
   return TAB_SLEEP_OPTIONS.some((option) => option.valueMs === value);
 }
@@ -393,6 +403,8 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   setAskWhereToSave: { isOn: isBoolean },
   setTabNeverArchived: { tabId: isText, isNeverArchived: isBoolean },
   setSpaceArchiveAfter: { spaceId: isText, archiveAfterMs: isSpaceArchiveAfter },
+  setSpaceSearchEngine: { spaceId: isText, engineId: isSpaceSearchEngine },
+  setSpaceNewTabUrl: { spaceId: isText, url: isNewTabUrl },
   runNoticeAction: {},
   dismissNotice: {},
   closeDuplicateTabs: {},

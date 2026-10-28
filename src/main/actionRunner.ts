@@ -85,6 +85,8 @@ import {
   setAskWhereToSave,
   setDownloadFolder,
   setSpaceArchiveAfter,
+  setSpaceNewTabUrl,
+  setSpaceSearchEngine,
   setTabNeverArchived,
   createFolder,
   deleteItem,
@@ -132,7 +134,7 @@ import { checkCommandChain, createCommandChain, deleteCommandChain, saveCommandC
 import { openPeek } from "./peek";
 import { openLittleWindow } from "./littleWindow";
 import { normalizeTypedInput } from "./urls";
-import { findSearchEngine } from "../shared/searchEngines";
+import { findSpaceSearchEngine } from "../shared/searchEngines";
 
 /** What menus.ts needs from the rest of the app. */
 export const menuHost: MenuHost = {
@@ -268,7 +270,7 @@ export function runAction(action: BrowserAction): void {
         return;
       }
       const settingsState = getState();
-      const searchEngine = findSearchEngine(settingsState.settings.searchEngine);
+      const searchEngine = findSpaceSearchEngine(settingsState, settingsState.activeSpaceId);
       const url = normalizeTypedInput(action.typedText, searchEngine, settingsState.searchKeywords);
       openOrSwitchToTab(url);
       return;
@@ -520,6 +522,10 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => setTabNeverArchived(state, action.tabId, action.isNeverArchived));
     case "setSpaceArchiveAfter":
       return applyChange((state) => setSpaceArchiveAfter(state, action.spaceId, action.archiveAfterMs));
+    case "setSpaceSearchEngine":
+      return applyChange((state) => setSpaceSearchEngine(state, action.spaceId, action.engineId));
+    case "setSpaceNewTabUrl":
+      return applyChange((state) => setSpaceNewTabUrl(state, action.spaceId, action.url));
     case "runNoticeAction":
       return runSidebarNoticeAction();
     case "dismissNotice":

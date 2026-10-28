@@ -18,7 +18,7 @@ import type { BrowserState, FolderItem, ItemId, Space, TabItem } from "../shared
 import { getSelectedTabId, listVisibleTabIds } from "./state";
 import { applyPreset, GRAIN_CHOICES, THEME_PRESETS } from "./themePresets";
 import { findLocation, findRootLocation, findSpace, findSplitOfTab, findTab } from "./tree";
-import { buildSearchUrl, findSearchEngine } from "../shared/searchEngines";
+import { buildSearchUrl, findSearchEngine, findSpaceSearchEngine, SEARCH_ENGINE_IDS, SEARCH_ENGINES } from "../shared/searchEngines";
 import { listImportSources } from "./browserImportController";
 import { addMenuIcons } from "./menuIcons";
 import { describeSpaceIconAsText } from "../shared/spaceIcons";
@@ -27,6 +27,9 @@ import { ARCHIVE_THRESHOLD_OPTIONS } from "../shared/settings";
 import { isKeptAwake } from "./tabSleep";
 import { canJoinSplit } from "./split";
 import { GRID_MIN_PANES } from "../shared/splitLayout";
+
+/** Longest address a menu item shows. Our choice: about what a menu shows without getting very wide. */
+const MENU_ADDRESS_MAX_LENGTH = 48;
 
 /** What the menus need from main.ts. */
 export interface MenuHost {
@@ -220,6 +223,69 @@ function buildSpaceArchiveMenu(host: MenuHost, space: Space): MenuItemConstructo
     });
   }
   return items;
+}
+
+/**
+ * A Space's own search engine: the one in Settings ("Default (DuckDuckGo)"), or one of the engines.
+ */
+function buildSpaceSearchMenu(host: MenuHost, space: Space): MenuItemConstructorOptions[] {
+  const settingEngine = findSearchEngine(host.getState().settings.searchEngine);
+  const items: MenuItemConstructorOptions[] = [
+    {
+      label: `Default (${settingEngine.name})`,
+      type: "radio",
+      checked: space.searchEngine === undefined,
+      click: () => host.runAction({ type: "setSpaceSearchEngine", spaceId: space.id, engineId: "default" }),
+    },
+    { type: "separator" },
+  ];
+  for (const engineId of SEARCH_ENGINE_IDS) {
+    items.push({
+      label: SEARCH_ENGINES[engineId].name,
+      type: "radio",
+      checked: space.searchEngine === engineId,
+      click: () => host.runAction({ type: "setSpaceSearchEngine", spaceId: space.id, engineId: engineId }),
+    });
+  }
+  return items;
+}
+
+/**
+ * What ⌘T opens in a Space: the Command Bar, or a page of the Space's own (the page on screen becomes it).
+ */
+function buildSpaceNewTabMenu(host: MenuHost, space: Space): MenuItemConstructorOptions[] {
+  const state = host.getState();
+  const selectedTabId = getSelectedTabId(state);
+  const selectedTab = selectedTabId === null ? undefined : findTab(state, selectedTabId);
+  const currentUrl = selectedTab !== undefined && /^https?:\/\//i.test(selectedTab.url) ? selectedTab.url : null;
+  const items: MenuItemConstructorOptions[] = [
+    {
+      label: "Command Bar",
+      type: "radio",
+      checked: space.newTabUrl === undefined,
+      click: () => host.runAction({ type: "setSpaceNewTabUrl", spaceId: space.id, url: null }),
+    },
+  ];
+  if (space.newTabUrl !== undefined) {
+    items.push({ label: describeShortAddress(space.newTabUrl), type: "radio", checked: true });
+  }
+  items.push(
+    { type: "separator" },
+    {
+      label: currentUrl === null ? "Use Current Page" : `Use Current Page (${describeShortAddress(currentUrl)})`,
+      enabled: currentUrl !== null && currentUrl !== space.newTabUrl,
+      click: () => host.runAction({ type: "setSpaceNewTabUrl", spaceId: space.id, url: currentUrl }),
+    },
+  );
+  return items;
+}
+
+/**
+ * An address without its scheme and "www.", shortened for a menu: "github.com/notifications".
+ */
+function describeShortAddress(url: string): string {
+  const withoutScheme = url.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "");
+  return withoutScheme.length > MENU_ADDRESS_MAX_LENGTH ? `${withoutScheme.slice(0, MENU_ADDRESS_MAX_LENGTH - 1)}…` : withoutScheme;
 }
 
 /**
@@ -437,6 +503,8 @@ function buildSpaceMenu(host: MenuHost, space: Space): MenuItemConstructorOption
     { label: "Grain", submenu: grainMenu },
     { label: "Profile (cookies, logins, Favorites)", submenu: profileMenu },
     { label: "Archive Today Tabs After", submenu: buildSpaceArchiveMenu(host, space) },
+    { label: "Search Engine", submenu: buildSpaceSearchMenu(host, space) },
+    { label: "New Tab Opens", submenu: buildSpaceNewTabMenu(host, space) },
     { type: "separator" },
     { label: "Move Left", enabled: spaceIndex > 0, click: () => host.runAction({ type: "moveSpace", spaceId: space.id, index: spaceIndex - 1 }) },
     {
@@ -636,7 +704,8 @@ function buildTextItems(host: MenuHost, contents: WebContents, params: ContextMe
     return [];
   }
   const shortText = selectedText.length > SEARCH_LABEL_MAX_LENGTH ? `${selectedText.slice(0, SEARCH_LABEL_MAX_LENGTH - 1)}…` : selectedText;
-  const searchEngine = findSearchEngine(host.getState().settings.searchEngine);
+  const menuState = host.getState();
+  const searchEngine = findSpaceSearchEngine(menuState, menuState.activeSpaceId);
   const searchUrl = buildSearchUrl(searchEngine, selectedText);
   return [
     { role: "copy" },

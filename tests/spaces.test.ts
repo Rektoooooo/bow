@@ -16,7 +16,9 @@ import {
   switchSpaceByNumber,
   switchSpaceByOffset,
 } from "../src/main/spaces";
-import { addToFavorites, createInitialState, getSelectedTabId } from "../src/main/state";
+import { addToFavorites, createInitialState, getSelectedTabId, setSpaceNewTabUrl, setSpaceSearchEngine } from "../src/main/state";
+import { rankCommandBarResults } from "../src/main/commandBar";
+import { findSpaceSearchEngine } from "../src/shared/searchEngines";
 import { HOUR_MS } from "../src/shared/settings";
 import type { BrowserState, ItemId, SpaceTheme } from "../src/shared/types";
 import { getPinnedIds, getTodayIds, ONE_PM, openPinnedTabs, openTabs, PERSONAL_SPACE_ID, WORK_SPACE_ID } from "./builders";
@@ -141,3 +143,32 @@ describe("profiles", () => {
     expect(getSelectedTabId(state)).toBeNull();
   });
 });
+
+describe("per-Space defaults", () => {
+  it("a Space searches with its own engine, others with the one in Settings", () => {
+    const state = setSpaceSearchEngine(createInitialState(ONE_PM), WORK_SPACE_ID, "google");
+    expect(findSpaceSearchEngine(state, WORK_SPACE_ID).id).toBe("google");
+    expect(findSpaceSearchEngine(state, PERSONAL_SPACE_ID).id).toBe("duckduckgo");
+    expect(setSpaceSearchEngine(state, WORK_SPACE_ID, "google")).toBe(state);
+    expect(setSpaceSearchEngine(state, WORK_SPACE_ID, "default").spaces.find((space) => space.id === WORK_SPACE_ID)?.searchEngine).toBeUndefined();
+  });
+
+  it("the Command Bar searches with the active Space's engine", () => {
+    const state = setSpaceSearchEngine(createInitialState(ONE_PM), WORK_SPACE_ID, "google");
+    const inWork = { ...state, activeSpaceId: WORK_SPACE_ID };
+    const input = { query: "pizza", state: inWork, history: [], suggestions: [], actions: [], currentUrl: null, recentTabIds: [] };
+    const searchLine = rankCommandBarResults(input, ONE_PM).find((result) => result.kind === "search");
+    expect(searchLine?.subtitle).toBe("Search Google");
+    expect(searchLine?.url?.startsWith("https://www.google.com/")).toBe(true);
+  });
+
+  it("a Space's new-tab page is a web page, or the Command Bar again", () => {
+    const state = createInitialState(ONE_PM);
+    const withPage = setSpaceNewTabUrl(state, WORK_SPACE_ID, "https://github.com/notifications");
+    expect(withPage.spaces.find((space) => space.id === WORK_SPACE_ID)?.newTabUrl).toBe("https://github.com/notifications");
+    expect(setSpaceNewTabUrl(state, WORK_SPACE_ID, "javascript:alert(1)")).toBe(state);
+    expect(setSpaceNewTabUrl(withPage, WORK_SPACE_ID, null).spaces.find((space) => space.id === WORK_SPACE_ID)?.newTabUrl).toBeUndefined();
+    expect(setSpaceNewTabUrl(state, WORK_SPACE_ID, null)).toBe(state);
+  });
+});
+

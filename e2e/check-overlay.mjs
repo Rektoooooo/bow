@@ -898,6 +898,37 @@ check("a pointer resting where the lines appear does not move the highlight", hi
 await overlay.press(".command-input", "Escape");
 await dispatch({ type: "setSearchEngine", engineId: "duckduckgo" });
 await sidebar.waitForTimeout(300);
+
+// A Space can search with its own engine and open its own page on ⌘T (Space menu › Search Engine, New Tab Opens).
+const ownSpaceId = (await getState()).activeSpaceId;
+await dispatch({ type: "setSpaceSearchEngine", spaceId: ownSpaceId, engineId: "kagi" });
+await dispatch({ type: "openCommandBar", mode: "newTab" });
+await overlay.waitForSelector(".command-input", { timeout: 5000 });
+await overlay.fill(".command-input", "pizza near me");
+await overlay.waitForTimeout(500);
+const spaceSearchSubtitles = await overlay.$$eval(".command-line .command-line-subtitle", (subtitles) => subtitles.map((subtitle) => subtitle.textContent ?? ""));
+const spaceSearchLine = spaceSearchSubtitles.find((subtitle) => subtitle.startsWith("Search ")) ?? null;
+check("a Space with its own search engine searches with it in the Command Bar", spaceSearchLine === "Search Kagi", String(spaceSearchLine));
+await overlay.press(".command-input", "Escape");
+await dispatch({ type: "setSpaceSearchEngine", spaceId: ownSpaceId, engineId: "default" });
+const todayBeforeNewTabPage = activeSpace(await getState()).todayIds.length;
+await dispatch({ type: "setSpaceNewTabUrl", spaceId: ownSpaceId, url: "https://example.com/start" });
+await dispatch({ type: "openCommandBar", mode: "newTab" });
+await sidebar.waitForTimeout(300);
+await dispatch({ type: "openCommandBar", mode: "newTab" });
+await sidebar.waitForTimeout(500);
+const newTabPageState = await getState();
+const newTabPageIds = activeSpace(newTabPageState).todayIds.slice(0, 2);
+check(
+  "with a new-tab page, ⌘T opens it in a new tab every time, without the Command Bar",
+  activeSpace(newTabPageState).todayIds.length === todayBeforeNewTabPage + 2 && selectedTab(newTabPageState)?.url === "https://example.com/start" && !(await overlayIsShown()),
+  `${todayBeforeNewTabPage} → ${activeSpace(newTabPageState).todayIds.length} / ${selectedTab(newTabPageState)?.url}`,
+);
+await dispatch({ type: "setSpaceNewTabUrl", spaceId: ownSpaceId, url: null });
+for (const tabId of newTabPageIds) {
+  await dispatch({ type: "closeTab", tabId: tabId });
+}
+await sidebar.waitForTimeout(300);
 // Copy URL (⇧⌘C) confirms with a toast at the bottom center of the card, like Arc's, which then goes away.
 await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items.flatMap((menu) => menu.submenu?.items ?? []).find((item) => item.label === "Copy URL").click());
 await sidebar.waitForTimeout(400);

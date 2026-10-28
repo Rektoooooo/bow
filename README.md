@@ -137,6 +137,9 @@ source never updates itself.
   an intensity slider and a grain dial), reorder, delete. Two-finger swipe on the sidebar or ⌃1–⌃9 switches Spaces.
 - Each profile has its own cookies, logins and Favorites (an Electron session partition). Space menu › Profile
   moves a Space to another profile or a new one.
+- Each Space can have its own defaults (Space menu): **Search Engine** (Work searches with Google, the rest with
+  DuckDuckGo) and **New Tab Opens** a page of its own (Use Current Page) instead of the Command Bar; ⌘L still opens
+  the Command Bar there. They stay on each Mac, like the Space's archive timing.
 - Private windows (⇧⌘N) keep nothing: an in-memory session, no history, no archive.
 
 **Windows**

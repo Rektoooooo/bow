@@ -149,6 +149,10 @@ export type BrowserAction =
   | { type: "setAskWhereToSave"; isOn: boolean }
   | { type: "setTabNeverArchived"; tabId: ItemId; isNeverArchived: boolean }
   | { type: "setSpaceArchiveAfter"; spaceId: SpaceId; archiveAfterMs: number | null | "default" }
+  /** A Space's own search engine, or the one in Settings ("default"). */
+  | { type: "setSpaceSearchEngine"; spaceId: SpaceId; engineId: SearchEngineId | "default" }
+  /** The page ⌘T opens in a Space (http or https), or the Command Bar again (null). */
+  | { type: "setSpaceNewTabUrl"; spaceId: SpaceId; url: string | null }
   | { type: "runNoticeAction" }
   | { type: "dismissNotice" }
   | { type: "closeDuplicateTabs" }
@@ -290,6 +294,8 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setAskWhereToSave",
   "setTabNeverArchived",
   "setSpaceArchiveAfter",
+  "setSpaceSearchEngine",
+  "setSpaceNewTabUrl",
   "runNoticeAction",
   "dismissNotice",
   "closeDuplicateTabs",

@@ -30,7 +30,7 @@ import type { ArchivedTab, BrowserState, ItemId, TabItem } from "../shared/types
 import { readDatePhrase } from "./historyDates";
 import type { HistoryEntry } from "./history";
 import { looksLikeWebAddress, normalizeTypedInput } from "./urls";
-import { buildSearchUrl, findSearchEngine } from "../shared/searchEngines";
+import { buildSearchUrl, findSpaceSearchEngine } from "../shared/searchEngines";
 import { matchSearchKeyword } from "../shared/searchKeywords";
 import { describeSpaceIconAsText } from "../shared/spaceIcons";
 import { findSpaceIdOfItem } from "./tree";
@@ -359,7 +359,7 @@ function scoreAnswer(input: CommandBarInput): ScoredResult[] {
 function scoreTypedAndSuggestions(input: CommandBarInput): ScoredResult[] {
   const query = input.query.trim();
   const scored: ScoredResult[] = [];
-  const searchEngine = findSearchEngine(input.state.settings.searchEngine);
+  const searchEngine = findSpaceSearchEngine(input.state, input.state.activeSpaceId);
   const keywordMatch = matchSearchKeyword(query, input.state.searchKeywords ?? []);
   const typedUrl = normalizeTypedInput(query, searchEngine, input.state.searchKeywords);
   const isAddress = keywordMatch === null && looksLikeWebAddress(query);

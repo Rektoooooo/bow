@@ -10,9 +10,10 @@
  *   OpenSearch shape ["query", ["suggestion 1", …]] (each checked by hand, 2026-10-27).
  *
  * Data flow:
- *   BrowserState.settings.searchEngine → findSearchEngine() → urls.ts normalizeTypedInput(), the Command Bar's
- *   search lines and suggestions, the page menu's "Search for …"
+ *   the Space's own engine, else BrowserState.settings.searchEngine → findSpaceSearchEngine() → urls.ts
+ *   normalizeTypedInput(), the Command Bar's search lines and suggestions, the page menu's "Search for …"
  */
+import type { BrowserState, SpaceId } from "./types";
 
 /** A search engine the browser can use. */
 export interface SearchEngine {
@@ -80,6 +81,14 @@ export function isSearchEngineId(value: unknown): value is SearchEngineId {
 export function findSearchEngine(engineId: string | undefined): SearchEngine {
   const knownId = isSearchEngineId(engineId) ? engineId : DEFAULT_SEARCH_ENGINE_ID;
   return SEARCH_ENGINES[knownId];
+}
+
+/**
+ * The engine a Space searches with: its own choice, else the one in Library › Settings.
+ */
+export function findSpaceSearchEngine(state: BrowserState, spaceId: SpaceId): SearchEngine {
+  const space = state.spaces.find((candidate) => candidate.id === spaceId);
+  return findSearchEngine(space?.searchEngine ?? state.settings.searchEngine);
 }
 
 /**

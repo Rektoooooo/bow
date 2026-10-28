@@ -81,7 +81,7 @@ import { showToast } from "./statusBubble";
 import { findProfileIdOfItem, findTab, getActiveSpace } from "./tree";
 import { getPermissionOrigin, getSitePermissions } from "./sitePermissions";
 import { looksLikeWebAddress, normalizeTypedInput } from "./urls";
-import { buildSuggestUrl, findSearchEngine } from "../shared/searchEngines";
+import { buildSuggestUrl, findSearchEngine, findSpaceSearchEngine } from "../shared/searchEngines";
 import { DEFAULT_APP_ICON_ID } from "../shared/appIconDrawing";
 import { isDeveloperModeOn } from "../shared/developerMode";
 import { listImportSources } from "./browserImportController";
@@ -477,6 +477,13 @@ export function closePermissionPrompt(requestId: string): void {
  */
 export function openCommandBar(mode: CommandBarMode): void {
   const state = getState();
+  // A Space can open a page of its own on ⌘T instead (Space menu › New Tab Opens). Always a new tab: the
+  // duplicate-tab rule (switch to an open copy) would make a second ⌘T go back to the first one.
+  const newTabUrl = getActiveSpace(state).newTabUrl;
+  if (mode === "newTab" && newTabUrl !== undefined) {
+    applyChange((current) => openTab(current, newTabUrl, Date.now()));
+    return;
+  }
   const selectedTabId = getSelectedTabId(state);
   const selectedTab = selectedTabId === null ? undefined : findTab(state, selectedTabId);
   const initialText = mode === "editUrl" && selectedTab !== undefined ? selectedTab.url : "";
@@ -853,7 +860,8 @@ async function fetchSuggestions(query: string): Promise<string[]> {
   const timer = setTimeout(() => controller.abort(), SUGGESTION_TIMEOUT_MS);
   try {
     // Typed text only goes to the engine the user chose.
-    const searchEngine = findSearchEngine(getState().settings.searchEngine);
+    const suggestState = getState();
+    const searchEngine = findSpaceSearchEngine(suggestState, suggestState.activeSpaceId);
     const response = await net.fetch(buildSuggestUrl(searchEngine, query), { signal: controller.signal });
     const body: unknown = await response.json();
     // The answer is ["query", ["suggestion 1", "suggestion 2", …]].
@@ -925,7 +933,7 @@ function handleChoose(resultId: string | null, typedText: string, mode: CommandB
     // Tab search only switches to tabs: Return with no tab matching opens nothing.
     if (text !== "" && mode !== "tabs") {
       const state = getState();
-      const searchEngine = findSearchEngine(state.settings.searchEngine);
+      const searchEngine = findSpaceSearchEngine(state, state.activeSpaceId);
       openAddress(normalizeTypedInput(text, searchEngine, state.searchKeywords), mode);
     }
     return;

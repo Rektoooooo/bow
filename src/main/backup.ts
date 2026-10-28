@@ -26,7 +26,7 @@ import {
   SNAPSHOTS_HOURLY_KEPT,
   SPLIT_PANES_LIMIT,
 } from "../shared/settings";
-import { SEARCH_ENGINE_IDS } from "../shared/searchEngines";
+import { isSearchEngineId, SEARCH_ENGINE_IDS } from "../shared/searchEngines";
 import { isValidSearchKeyword } from "../shared/searchKeywords";
 import { createNoteUrl, getNoteId, isNoteId } from "../shared/notes";
 import { createEaselUrl, getEaselId, isEaselId } from "../shared/easels";
@@ -427,6 +427,13 @@ function checkSpaces(raw: unknown, profileIds: Set<ProfileId>, fallbackProfileId
     const isTiming = isFiniteNumber(entry.archiveAfterMs) && entry.archiveAfterMs > 0;
     if (entry.archiveAfterMs === null || isTiming) {
       space.archiveAfterMs = entry.archiveAfterMs as number | null;
+    }
+    if (isSearchEngineId(entry.searchEngine)) {
+      space.searchEngine = entry.searchEngine;
+    }
+    const isWebPage = isRestorableUrl(entry.newTabUrl) && /^https?:/i.test(entry.newTabUrl);
+    if (isWebPage) {
+      space.newTabUrl = entry.newTabUrl as string;
     }
     spaces.push(space);
   }

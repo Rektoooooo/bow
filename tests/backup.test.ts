@@ -193,6 +193,21 @@ describe("backups", () => {
     expect(restored.state.items["live-3"]?.kind).toBe("folder");
   });
 
+  it("keep a Space's own search engine and new-tab page, but only a known engine and a web page", () => {
+    const text = craftedBackupText((backup) => {
+      const [first, second] = backup.state.spaces;
+      if (first === undefined || second === undefined) {
+        throw new Error("setup");
+      }
+      backup.state.spaces[0] = { ...first, searchEngine: "google", newTabUrl: "https://github.com/notifications" };
+      backup.state.spaces[1] = { ...second, searchEngine: "evil" as "google", newTabUrl: "javascript:alert(1)" };
+    });
+    const restored = parseOrFail(text);
+    expect(restored.state.spaces[0]).toMatchObject({ searchEngine: "google", newTabUrl: "https://github.com/notifications" });
+    expect(restored.state.spaces[1]?.searchEngine).toBeUndefined();
+    expect(restored.state.spaces[1]?.newTabUrl).toBeUndefined();
+  });
+
   it("keep command chains, and drop a chain with a step that is not a web page or an action", () => {
     const morning = { id: "chain-1-1", name: "Morning", steps: [{ kind: "open", url: "https://news.example/" }, { kind: "action", actionId: "toggle-sidebar" }] };
     const crafted = { id: "chain-1-2", name: "Crafted", steps: [{ kind: "open", url: "javascript:alert(document.cookie)" }] };

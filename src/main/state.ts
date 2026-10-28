@@ -819,6 +819,42 @@ export function setTabNeverArchived(state: BrowserState, tabId: ItemId, isNeverA
 }
 
 /**
+ * Gives a Space its own search engine, or back to the one in Library › Settings ("default").
+ */
+export function setSpaceSearchEngine(state: BrowserState, spaceId: SpaceId, engineId: SearchEngineId | "default"): BrowserState {
+  const space = findSpace(state, spaceId);
+  const current = space?.searchEngine ?? "default";
+  if (space === undefined || current === engineId) {
+    return state;
+  }
+  const changedSpace: Space = { ...space };
+  if (engineId === "default") {
+    delete changedSpace.searchEngine;
+  } else {
+    changedSpace.searchEngine = engineId;
+  }
+  return { ...state, spaces: state.spaces.map((candidate) => (candidate.id === spaceId ? changedSpace : candidate)) };
+}
+
+/**
+ * Makes ⌘T in a Space open a web page (http or https) instead of the Command Bar, or the Command Bar again (null).
+ */
+export function setSpaceNewTabUrl(state: BrowserState, spaceId: SpaceId, url: string | null): BrowserState {
+  const space = findSpace(state, spaceId);
+  const isWebPage = url === null || /^https?:\/\//i.test(url);
+  if (space === undefined || !isWebPage || (space.newTabUrl ?? null) === url) {
+    return state;
+  }
+  const changedSpace: Space = { ...space };
+  if (url === null) {
+    delete changedSpace.newTabUrl;
+  } else {
+    changedSpace.newTabUrl = url;
+  }
+  return { ...state, spaces: state.spaces.map((candidate) => (candidate.id === spaceId ? changedSpace : candidate)) };
+}
+
+/**
  * Gives a Space its own archive timing, Never (null), or back to the setting ("default").
  */
 export function setSpaceArchiveAfter(state: BrowserState, spaceId: SpaceId, archiveAfterMs: number | null | "default"): BrowserState {

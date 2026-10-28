@@ -158,6 +158,16 @@ export interface Space {
    * means the setting in Library › Settings (main/autoArchive.ts). Stays on each Mac (sync.ts leaves it out).
    */
   archiveAfterMs?: number | null;
+  /**
+   * The engine this Space searches with. Optional: missing means the one in Library › Settings
+   * (shared/searchEngines.ts findSpaceSearchEngine). Stays on each Mac, like archiveAfterMs.
+   */
+  searchEngine?: SearchEngineId;
+  /**
+   * The web page ⌘T opens in this Space instead of the Command Bar. Optional: missing means the Command Bar. Stays on
+   * each Mac, like archiveAfterMs.
+   */
+  newTabUrl?: string;
 }
 
 /** A browsing identity: its own cookies and logins, and its own Favorites shared by every Space that uses it. */

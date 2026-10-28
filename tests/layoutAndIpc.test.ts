@@ -93,6 +93,16 @@ describe("parseAction", () => {
     expect(parseAction("selectTab")).toBeNull();
   });
 
+  it("takes a Space's search engine and new-tab page only when they are known and a web page", () => {
+    expect(parseAction({ type: "setSpaceSearchEngine", spaceId: "space-work", engineId: "kagi" })).not.toBeNull();
+    expect(parseAction({ type: "setSpaceSearchEngine", spaceId: "space-work", engineId: "default" })).not.toBeNull();
+    expect(parseAction({ type: "setSpaceSearchEngine", spaceId: "space-work", engineId: "evil" })).toBeNull();
+    expect(parseAction({ type: "setSpaceNewTabUrl", spaceId: "space-work", url: "https://github.com/" })).not.toBeNull();
+    expect(parseAction({ type: "setSpaceNewTabUrl", spaceId: "space-work", url: null })).not.toBeNull();
+    expect(parseAction({ type: "setSpaceNewTabUrl", spaceId: "space-work", url: "javascript:alert(1)" })).toBeNull();
+    expect(parseAction({ type: "setSpaceNewTabUrl", spaceId: "space-work", url: "file:///etc/passwd" })).toBeNull();
+  });
+
   it("takes a command chain only when every step may be kept", () => {
     const chain = { id: "chain-1-1", name: "Morning", steps: [{ kind: "open", url: "https://news.example/" }] };
     expect(parseAction({ type: "saveCommandChain", chain: chain })).not.toBeNull();
