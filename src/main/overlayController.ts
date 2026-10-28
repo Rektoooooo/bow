@@ -1155,14 +1155,15 @@ export function registerOverlayIpc(): void {
       showDownloadInFolder(downloadId);
     }
   });
-  ipcMain.handle(OVERLAY_CHANNELS.mediaCommand, (event, mediaId: unknown, command: unknown) => {
+  ipcMain.handle(OVERLAY_CHANNELS.mediaCommand, async (event, mediaId: unknown, command: unknown) => {
     if (!isFromOverlay(event) || !isShortText(mediaId) || !MEDIA_COMMANDS.includes(command as CaptureCommand)) {
-      return;
+      return false;
     }
-    const isListChanged = runCaptureCommand(mediaId, command as CaptureCommand, app.getPath("downloads"));
-    if (isListChanged) {
+    const isDone = await runCaptureCommand(mediaId, command as CaptureCommand, app.getPath("downloads"));
+    if (isDone && command === "delete") {
       refreshOpenPanel();
     }
+    return isDone;
   });
   ipcMain.handle(OVERLAY_CHANNELS.chooseTab, (event, tabId: unknown) => {
     if (!isFromOverlay(event) || !isShortText(tabId) || findTab(getState(), tabId) === undefined) {

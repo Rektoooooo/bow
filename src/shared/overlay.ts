@@ -278,7 +278,8 @@ export interface OverlayApi {
   activateExtension(extensionId: string, anchor: OverlayRect): Promise<void>;
   showSiteMenu(anchor: OverlayRect): Promise<void>;
   /** Library › Media: copy, show in Finder, save to Downloads or delete a picture. */
-  mediaCommand(mediaId: string, command: MediaCommand): Promise<void>;
+  /** Resolves true when the command worked (the Library says "Copied" or "Saved to Downloads"). */
+  mediaCommand(mediaId: string, command: MediaCommand): Promise<boolean>;
   /** The Library shows another section (Spaces widens its column). */
   setLibrarySection(section: LibrarySection): Promise<void>;
   /** The SF Symbols our icons use, rendered by macOS. */

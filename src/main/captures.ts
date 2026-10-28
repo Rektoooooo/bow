@@ -169,26 +169,32 @@ function buildExportName(record: CaptureRecord): string {
 }
 
 /**
- * Runs a Library button on a picture. Returns true when the list changed (deleted), so the Library redraws.
+ * Runs a Library button on a picture. Returns true when it worked, so the Library can say so ("Copied") or redraw
+ * (after a delete).
  */
-export function runCaptureCommand(id: string, command: CaptureCommand, downloadsFolder: string): boolean {
+export async function runCaptureCommand(id: string, command: CaptureCommand, downloadsFolder: string): Promise<boolean> {
   const record = captures.find((candidate) => candidate.id === id);
   if (record === undefined || capturesFolder === null) {
     return false;
   }
   const filePath = path.join(capturesFolder, record.fileName);
-  if (command === "copy") {
-    copyPngToClipboard(fs.readFileSync(filePath)).catch((error) => console.error("Copying the picture failed:", error));
-    return false;
-  }
-  if (command === "reveal") {
-    shell.showItemInFolder(filePath);
-    return false;
-  }
-  if (command === "save") {
-    const exportPath = path.join(downloadsFolder, buildExportName(record));
-    fs.copyFileSync(filePath, exportPath);
-    shell.showItemInFolder(exportPath);
+  try {
+    if (command === "copy") {
+      await copyPngToClipboard(fs.readFileSync(filePath));
+      return true;
+    }
+    if (command === "reveal") {
+      shell.showItemInFolder(filePath);
+      return true;
+    }
+    if (command === "save") {
+      const exportPath = path.join(downloadsFolder, buildExportName(record));
+      fs.copyFileSync(filePath, exportPath);
+      shell.showItemInFolder(exportPath);
+      return true;
+    }
+  } catch (error) {
+    console.error(`The picture's ${command} failed:`, error);
     return false;
   }
   removeFiles(record);

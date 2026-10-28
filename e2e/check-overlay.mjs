@@ -704,6 +704,31 @@ await overlay.click(".library-tab[data-section='media']");
 await overlay.waitForTimeout(300);
 const mediaTiles = await overlay.$$eval(".media-tile img", (images) => images.length);
 check("the capture shows in Library › Media with its thumbnail", mediaTiles === 1, String(mediaTiles));
+// The buttons on a picture: their symbols centered in their boxes (a button's default padding pushed them right), and
+// Copy says so once the picture is on the clipboard.
+const mediaIconOffsets = await overlay.$$eval(".media-action", (buttons) =>
+  buttons.map((button) => {
+    const box = button.getBoundingClientRect();
+    const icon = button.querySelector(".icon").getBoundingClientRect();
+    return Math.abs(icon.x - box.x - (box.width - icon.width) / 2) + Math.abs(icon.y - box.y - (box.height - icon.height) / 2);
+  }),
+);
+check("Media's buttons have their icons centered", mediaIconOffsets.length === 4 && mediaIconOffsets.every((offset) => offset < 0.6), JSON.stringify(mediaIconOffsets));
+await app.evaluate(({ clipboard }) => clipboard.clear());
+await overlay.hover(".media-tile");
+await overlay.click(".media-action[aria-label='Copy']");
+const copyFeedback = await overlay.waitForSelector(".media-feedback", { timeout: 3000 }).then((element) => element.textContent()).catch(() => "");
+// Electron 44's clipboard is the web's async one: the picture is an image/png item.
+const copiedSize = await app.evaluate(async ({ clipboard, nativeImage }) => {
+  const items = await clipboard.read();
+  const pictureItem = items.find((item) => item.types.includes("image/png"));
+  if (pictureItem === undefined) {
+    return null;
+  }
+  const pictureBlob = await pictureItem.getType("image/png");
+  return nativeImage.createFromBuffer(Buffer.from(await pictureBlob.arrayBuffer())).getSize();
+});
+check("Media's Copy puts the picture on the clipboard and says \"Copied\"", copyFeedback === "Copied" && copiedSize?.width === 100 && copiedSize?.height === 50, `${copyFeedback} ${JSON.stringify(copiedSize)}`);
 await overlay.click(".library-tab[data-section='spaces']");
 await overlay.waitForTimeout(200);
 const spaceLines = await overlay.$$eval(".space-column", (columns) => columns.length);

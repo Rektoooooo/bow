@@ -1678,19 +1678,72 @@ body.dark .tab-tooltip-hint {
   opacity: 1;
 }
 
+/* No padding: a button's default 6 px a side left the 17–21 px symbols a 16 px box, so they hung off its right. */
 .media-action {
   display: grid;
   place-items: center;
   width: 28px;
   height: 26px;
+  padding: 0;
   border: 0;
   border-radius: 7px;
   background: rgba(0, 0, 0, 0.62);
   color: #fff;
+  transition:
+    background-color var(--motion-fast) linear,
+    transform var(--motion-fast) var(--motion-ease);
+}
+
+.media-action .icon-symbol {
+  --symbol-scale: 0.8;
 }
 
 .media-action:hover {
   background: rgba(0, 0, 0, 0.8);
+}
+
+.media-action:active {
+  transform: scale(0.9);
+}
+
+/* "Copied" / "Saved to Downloads" on the picture for a moment after its button worked (library.ts). */
+.media-feedback {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px 6px 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: media-feedback 1600ms var(--motion-ease) both;
+}
+
+.media-feedback-icon.icon-symbol {
+  --symbol-scale: 0.75;
+}
+
+@keyframes media-feedback {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  12%,
+  80% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 .media-caption {

@@ -12,7 +12,7 @@
  * Data flow:
  *   "overlay:show" (library) → renderLibrary() → a section → click Restore → dispatch restoreArchivedTab → close
  */
-import type { ExtensionLine, HistoryLine, LibraryBoost, LibraryData, LibrarySection, LibrarySpace, LibrarySpaceItem, MediaLine } from "../shared/overlay";
+import type { ExtensionLine, HistoryLine, LibraryBoost, LibraryData, LibrarySection, LibrarySpace, LibrarySpaceItem, MediaCommand, MediaLine } from "../shared/overlay";
 import { computeFramePalette } from "../shared/themePalette.js";
 import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS, TAB_SLEEP_OPTIONS } from "../shared/settings.js";
 import { APP_ICON_VARIANTS, buildAppIconSvg } from "../shared/appIconDrawing.js";
@@ -334,6 +334,31 @@ function renderDownloadsSection(body: HTMLElement, data: LibraryData): void {
   body.replaceChildren(list);
 }
 
+/** How long a Media tile says what its button did: as long as Copy URL's toast (statusBubble.ts TOAST_SHOWN_MS). */
+const MEDIA_FEEDBACK_MS = 1600;
+
+/** What a Media tile says after a button worked; Show in Finder and Delete show their result themselves. */
+const MEDIA_FEEDBACK_TEXT: Partial<Record<MediaCommand, string>> = {
+  copy: "Copied",
+  save: "Saved to Downloads",
+};
+
+/**
+ * Runs a Media button and, once it worked, says so on the picture for a moment.
+ */
+async function runMediaCommand(picture: HTMLElement, mediaId: string, command: MediaCommand): Promise<void> {
+  const isDone = await window.overlayApi.mediaCommand(mediaId, command);
+  const text = MEDIA_FEEDBACK_TEXT[command];
+  if (!isDone || text === undefined) {
+    return;
+  }
+  picture.querySelector(".media-feedback")?.remove();
+  const feedback = createElement("div", "media-feedback");
+  feedback.append(createIcon("checkmark", "icon media-feedback-icon"), createElement("span", "", text));
+  picture.append(feedback);
+  setTimeout(() => feedback.remove(), MEDIA_FEEDBACK_MS);
+}
+
 /**
  * One picture in Media: its thumbnail, the page it shows and when, and Copy / Show in Finder / Save / Delete on hover.
  */
@@ -349,10 +374,10 @@ function createMediaTile(media: MediaLine, now: number): HTMLElement {
   }
   const actions = createElement("div", "media-actions");
   actions.append(
-    createIconButton("copy", "Copy", "media-action", () => window.overlayApi.mediaCommand(media.id, "copy")),
-    createIconButton("folder", "Show in Finder", "media-action", () => window.overlayApi.mediaCommand(media.id, "reveal")),
-    createIconButton("download", "Save to Downloads", "media-action", () => window.overlayApi.mediaCommand(media.id, "save")),
-    createIconButton("trash", "Delete", "media-action", () => window.overlayApi.mediaCommand(media.id, "delete")),
+    createIconButton("copy", "Copy", "media-action", () => runMediaCommand(picture, media.id, "copy")),
+    createIconButton("folder", "Show in Finder", "media-action", () => runMediaCommand(picture, media.id, "reveal")),
+    createIconButton("download", "Save to Downloads", "media-action", () => runMediaCommand(picture, media.id, "save")),
+    createIconButton("trash", "Delete", "media-action", () => runMediaCommand(picture, media.id, "delete")),
   );
   picture.append(actions);
   const caption = createElement("div", "media-caption");
