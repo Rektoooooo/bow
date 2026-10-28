@@ -203,21 +203,30 @@ function isBox(value: unknown): value is Bounds {
 }
 
 /**
- * The box of the link under the pointer in the tab the Peek came from, in window coordinates, or null (no such tab
- * on screen, no link there, the page did not answer within PEEK_LINK_LOOKUP_MS).
+ * The box of the clicked link in the tab the Peek came from, in window coordinates, or null (no such tab on screen,
+ * no such link, the page did not answer within PEEK_LINK_LOOKUP_MS). The page is asked for, in order: the link to
+ * `url` under the pointer, the focused link to `url` (opened with the keyboard), the first link to `url` on screen,
+ * and any link under the pointer (one that goes elsewhere through a script).
  */
-async function findClickedLink(sourceTabId: ItemId | null, pointer: { x: number; y: number } | null): Promise<Bounds | null> {
+async function findClickedLink(sourceTabId: ItemId | null, url: string, pointer: { x: number; y: number } | null): Promise<Bounds | null> {
   const sourceView = sourceTabId === null ? undefined : getTabViews().get(sourceTabId);
-  if (sourceView === undefined || pointer === null || sourceView.webContents.isDestroyed()) {
+  if (sourceView === undefined || sourceView.webContents.isDestroyed()) {
     return null;
   }
   const viewBounds = sourceView.getBounds();
   const zoomFactor = sourceView.webContents.getZoomFactor();
-  // Page coordinates are CSS pixels; the view's zoom scales them.
-  const pageX = Math.round((pointer.x - viewBounds.x) / zoomFactor);
-  const pageY = Math.round((pointer.y - viewBounds.y) / zoomFactor);
+  // Page coordinates are CSS pixels; the view's zoom scales them. Off the page means "no pointer".
+  const pageX = pointer === null ? -1 : Math.round((pointer.x - viewBounds.x) / zoomFactor);
+  const pageY = pointer === null ? -1 : Math.round((pointer.y - viewBounds.y) / zoomFactor);
+  // JSON.stringify makes the address a safe string literal in the script.
   const code = `(() => {
-    const link = document.elementFromPoint(${pageX}, ${pageY})?.closest("a");
+    const url = ${JSON.stringify(url)};
+    const isOnScreen = (box) => box.width > 0 && box.height > 0 && box.bottom > 0 && box.top < innerHeight && box.right > 0 && box.left < innerWidth;
+    const pointed = document.elementFromPoint(${pageX}, ${pageY})?.closest("a") ?? null;
+    const focused = document.activeElement?.closest?.("a") ?? null;
+    const firstShown = [...document.querySelectorAll("a[href]")].find((link) => link.href === url && isOnScreen(link.getBoundingClientRect())) ?? null;
+    const candidates = [pointed?.href === url ? pointed : null, focused?.href === url ? focused : null, firstShown, pointed];
+    const link = candidates.find((candidate) => candidate !== null);
     if (!link) return null;
     const box = link.getBoundingClientRect();
     return { x: box.x, y: box.y, width: box.width, height: box.height };
@@ -237,8 +246,8 @@ async function findClickedLink(sourceTabId: ItemId | null, pointer: { x: number;
 }
 
 /**
- * Where the card grows from: the clicked link, else a small square at the pointer, else the card itself a little
- * smaller.
+ * Where the card grows from: the clicked link, else a small square at the pointer, else the card (its toolbar row
+ * above the page's `bounds`) a little smaller.
  */
 function chooseGrowOrigin(linkBox: Bounds | null, pointer: { x: number; y: number } | null, bounds: Bounds): Bounds {
   if (linkBox !== null) {
@@ -248,7 +257,8 @@ function chooseGrowOrigin(linkBox: Bounds | null, pointer: { x: number; y: numbe
     const half = PEEK_POINTER_ORIGIN_PX / 2;
     return { x: Math.round(pointer.x - half), y: Math.round(pointer.y - half), width: PEEK_POINTER_ORIGIN_PX, height: PEEK_POINTER_ORIGIN_PX };
   }
-  return scaleAboutCenter(bounds, PEEK_START_SCALE);
+  const cardBox = { x: bounds.x, y: bounds.y - PEEK_TOOLBAR_HEIGHT_PX, width: bounds.width, height: bounds.height + PEEK_TOOLBAR_HEIGHT_PX };
+  return scaleAboutCenter(cardBox, PEEK_START_SCALE);
 }
 
 /**
@@ -401,7 +411,7 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
 
   contents.loadURL(url).catch(() => undefined);
   // The card grows out of the clicked link, like Arc's; its page loads meanwhile and shows once it has grown.
-  findClickedLink(sourceTabId, pointer).then((linkBox) => {
+  findClickedLink(sourceTabId, url, pointer).then((linkBox) => {
     if (peekView !== view) {
       return;
     }

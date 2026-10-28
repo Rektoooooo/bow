@@ -119,6 +119,12 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   whenever the colour is unknown or the page dims or changes its top; draw what lies behind instead (cornerMasks.ts).
 - `ELECTRON_DEBUG_DRAGGABLE_REGIONS=1` froze the app when a `type: "panel"` window opened; check drag regions in other
   windows only.
+- Electron hit-tests the drag regions of **every** view in a window, whatever lies on top (`NativeWindow::
+  NonClientHitTest` loops over all providers): a button in the overlay above the sidebar's `app-region: drag` toolbar
+  moves the window instead of being clicked. Turn the regions underneath to `no-drag` while a floating layer covers
+  them. Playwright's clicks go to the page directly and never meet this, so e2e checks cannot catch it.
+- Playwright's mouse never moves the system pointer: `screen.getCursorScreenPoint()` is wherever the real mouse is.
+  Code that needs "what was clicked" should ask the page (by address, focus) and use the pointer only as a hint.
 
 ## Dependencies
 - Check a package's license **per version** and diff a just-published release against the previous one before
