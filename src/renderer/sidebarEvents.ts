@@ -215,10 +215,16 @@ export function installSidebarEvents(root: HTMLElement, callbacks: SidebarEventC
     if (event.button !== MIDDLE_BUTTON) {
       return;
     }
-    const row = findClosest(event, "[data-row='tab'], [data-row='favorite']");
-    if (row !== null) {
-      dispatch({ type: "closeTab", tabId: row.dataset.itemId ?? "" });
+    const row = findClosest(event, "[data-row='tab'], [data-row='favorite'], [data-row='split']");
+    if (row === null) {
+      return;
     }
+    // A split view's row closes like its ×.
+    if (row.dataset.row === "split") {
+      dispatch({ type: "closeSplit", splitId: row.dataset.itemId ?? "" });
+      return;
+    }
+    dispatch({ type: "closeTab", tabId: row.dataset.itemId ?? "" });
   });
   root.addEventListener("contextmenu", (event) => {
     if (runContextMenu(event)) {

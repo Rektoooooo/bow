@@ -193,12 +193,12 @@ export async function runCaptureCommand(id: string, command: CaptureCommand, dow
       shell.showItemInFolder(exportPath);
       return true;
     }
+    removeFiles(record);
+    captures = captures.filter((candidate) => candidate.id !== id);
+    writeIndex();
+    return true;
   } catch (error) {
     console.error(`The picture's ${command} failed:`, error);
     return false;
   }
-  removeFiles(record);
-  captures = captures.filter((candidate) => candidate.id !== id);
-  writeIndex();
-  return true;
 }

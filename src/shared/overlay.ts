@@ -277,8 +277,10 @@ export interface OverlayApi {
   /** The Control Center: open an extension's popup under its tile, or the "…" menu under the button. */
   activateExtension(extensionId: string, anchor: OverlayRect): Promise<void>;
   showSiteMenu(anchor: OverlayRect): Promise<void>;
-  /** Library › Media: copy, show in Finder, save to Downloads or delete a picture. */
-  /** Resolves true when the command worked (the Library says "Copied" or "Saved to Downloads"). */
+  /**
+   * Library › Media: copy, show in Finder, save to Downloads or delete a picture. Resolves true when the command
+   * worked (the Library says "Copied" or "Saved to Downloads").
+   */
   mediaCommand(mediaId: string, command: MediaCommand): Promise<boolean>;
   /** The Library shows another section (Spaces widens its column). */
   setLibrarySection(section: LibrarySection): Promise<void>;

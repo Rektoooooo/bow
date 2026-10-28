@@ -25,6 +25,15 @@ import { createSpaceIcon } from "../renderer/spaceIcon.js";
 import { describeSpaceIconAsText } from "../shared/spaceIcons.js";
 import { describeDay } from "../shared/timeAgo.js";
 
+/** How long a Media tile says what its button did: as long as Copy URL's toast (statusBubble.ts TOAST_SHOWN_MS). */
+const MEDIA_FEEDBACK_MS = 1600;
+
+/** What a Media tile says after a button worked; Show in Finder and Delete show their result themselves. */
+const MEDIA_FEEDBACK_TEXT: Partial<Record<MediaCommand, string>> = {
+  copy: "Copied",
+  save: "Saved to Downloads",
+};
+
 /** Words shown for each archive reason. */
 const REASON_LABELS: Record<ArchiveReason, string> = {
   auto: "Auto-archived",
@@ -334,26 +343,20 @@ function renderDownloadsSection(body: HTMLElement, data: LibraryData): void {
   body.replaceChildren(list);
 }
 
-/** How long a Media tile says what its button did: as long as Copy URL's toast (statusBubble.ts TOAST_SHOWN_MS). */
-const MEDIA_FEEDBACK_MS = 1600;
-
-/** What a Media tile says after a button worked; Show in Finder and Delete show their result themselves. */
-const MEDIA_FEEDBACK_TEXT: Partial<Record<MediaCommand, string>> = {
-  copy: "Copied",
-  save: "Saved to Downloads",
-};
-
 /**
- * Runs a Media button and, once it worked, says so on the picture for a moment.
+ * Runs a Media button and, once it worked, says so on the picture for a moment. The picture is looked up again by
+ * its id: the Library may have redrawn meanwhile (a download's progress, a change in the sidebar).
  */
-async function runMediaCommand(picture: HTMLElement, mediaId: string, command: MediaCommand): Promise<void> {
-  const isDone = await window.overlayApi.mediaCommand(mediaId, command);
+async function runMediaCommand(mediaId: string, command: MediaCommand): Promise<void> {
+  const isDone = await window.overlayApi.mediaCommand(mediaId, command).catch(() => false);
   const text = MEDIA_FEEDBACK_TEXT[command];
-  if (!isDone || text === undefined) {
+  const picture = document.querySelector(`.media-tile[data-media-id="${CSS.escape(mediaId)}"] .media-picture`);
+  if (!isDone || text === undefined || picture === null) {
     return;
   }
   picture.querySelector(".media-feedback")?.remove();
   const feedback = createElement("div", "media-feedback");
+  feedback.style.animationDuration = `${MEDIA_FEEDBACK_MS}ms`;
   feedback.append(createIcon("checkmark", "icon media-feedback-icon"), createElement("span", "", text));
   picture.append(feedback);
   setTimeout(() => feedback.remove(), MEDIA_FEEDBACK_MS);
@@ -374,10 +377,10 @@ function createMediaTile(media: MediaLine, now: number): HTMLElement {
   }
   const actions = createElement("div", "media-actions");
   actions.append(
-    createIconButton("copy", "Copy", "media-action", () => runMediaCommand(picture, media.id, "copy")),
-    createIconButton("folder", "Show in Finder", "media-action", () => runMediaCommand(picture, media.id, "reveal")),
-    createIconButton("download", "Save to Downloads", "media-action", () => runMediaCommand(picture, media.id, "save")),
-    createIconButton("trash", "Delete", "media-action", () => runMediaCommand(picture, media.id, "delete")),
+    createIconButton("copy", "Copy", "media-action", () => runMediaCommand(media.id, "copy")),
+    createIconButton("folder", "Show in Finder", "media-action", () => runMediaCommand(media.id, "reveal")),
+    createIconButton("download", "Save to Downloads", "media-action", () => runMediaCommand(media.id, "save")),
+    createIconButton("trash", "Delete", "media-action", () => runMediaCommand(media.id, "delete")),
   );
   picture.append(actions);
   const caption = createElement("div", "media-caption");

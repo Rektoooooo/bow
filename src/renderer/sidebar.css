@@ -1482,9 +1482,11 @@ body.sidebar-hidden.library-open .main-column {
 
 /*
   Electron hit-tests every view's drag region, not only the top one's: the toolbar under an open Peek's toolbar row and
-  Close button would turn their clicks into window drags. The sidebar's top strip and the window's edge still drag.
+  Close button, and the frame's rim under its buttons in a narrow window, would turn their clicks into window drags.
+  The sidebar's top strip still drags.
 */
-body.peek-open .toolbar {
+body.peek-open .toolbar,
+body.peek-open .main-column {
   -webkit-app-region: no-drag;
 }
 

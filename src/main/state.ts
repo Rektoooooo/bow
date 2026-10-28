@@ -655,6 +655,21 @@ export function resetPinnedTab(state: BrowserState, tabId: ItemId): BrowserState
 }
 
 /**
+ * What the × on a pinned split view does: like resetPinnedTab for each of its tabs at once, so the selection leaves
+ * them all together (one by one, it would move to the other pane, which shows the split, and its page, again).
+ */
+export function resetPinnedTabs(state: BrowserState, tabIds: ItemId[]): BrowserState {
+  let resetState = state;
+  for (const tabId of tabIds) {
+    const tab = findTab(resetState, tabId);
+    if (tab !== undefined && tab.homeUrl !== null && tab.url !== tab.homeUrl) {
+      resetState = updateTab(resetState, tabId, { url: tab.homeUrl });
+    }
+  }
+  return repairSelections(resetState, new Set(tabIds));
+}
+
+/**
  * A tab removed from a live folder stays removed: its address joins the folder's hidden list, so the next refresh
  * does not bring it back. Tabs anywhere else are left alone.
  */

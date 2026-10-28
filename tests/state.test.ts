@@ -22,6 +22,7 @@ import {
   pinTab,
   renameItem,
   resetPinnedTab,
+  resetPinnedTabs,
   restoreArchivedTab,
   restoreLastArchivedTab,
   selectTab,
@@ -248,6 +249,24 @@ describe("moveTabsToArchive / closeTab", () => {
     expect(getTab(state, pinnedTabId).url).toBe("https://mail.example/inbox");
     expect(getPinnedIds(state)).toEqual([pinnedTabId]);
     expect(getSelectedTabId(state)).toBe(todayIds[0]);
+  });
+
+  it("resetPinnedTabs sends a pinned split's tabs home and moves the selection off both", () => {
+    const { state: withPinned, tabIds } = openPinnedTabs(["https://mail.example/inbox", "https://calendar.example/week"]);
+    const mailTabId = tabIds[0] as ItemId;
+    const calendarTabId = tabIds[1] as ItemId;
+    const navigated = updateTabPage(withPinned, mailTabId, "https://mail.example/message/42", "Message");
+    const { state: withToday, tabIds: todayIds } = openTabs(["https://news.example"], navigated);
+    // The calendar was used last, so a one-by-one reset of the mail tab would select it.
+    const usedBoth = selectTab(selectTab(withToday, mailTabId, THREE_PM), calendarTabId, FOUR_PM);
+    const selectedMail = selectTab(usedBoth, mailTabId, FOUR_PM + 1);
+
+    const state = resetPinnedTabs(selectedMail, [mailTabId, calendarTabId]);
+
+    expect(getTab(state, mailTabId).url).toBe("https://mail.example/inbox");
+    expect(getTab(state, calendarTabId).url).toBe("https://calendar.example/week");
+    expect(getSelectedTabId(state)).toBe(todayIds[0]);
+    expect(resetPinnedTabs(state, [mailTabId, calendarTabId])).toBe(state);
   });
 
   it("deleting a folder archives every tab inside it", () => {

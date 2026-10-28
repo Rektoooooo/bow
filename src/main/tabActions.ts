@@ -14,7 +14,7 @@ import type { WebContents } from "electron";
 import type { NavigationCommand } from "../shared/actions";
 import type { ItemId } from "../shared/types";
 import { applyChange, getState, scheduleRuntimePush } from "./browserCore";
-import { closeTab, deleteItem, getSelectedTabId, openTab, resetPinnedTab, selectTab, setTabMuted, updateTab } from "./state";
+import { closeTab, deleteItem, getSelectedTabId, openTab, resetPinnedTab, resetPinnedTabs, selectTab, setTabMuted, updateTab } from "./state";
 import type { OpenTabOptions } from "./state";
 import { destroyTabView, getFocusedContents, getTabContents } from "./tabViews";
 import type { OpenDisposition } from "./tabViews";
@@ -58,9 +58,13 @@ export function closeSplitByUser(splitId: ItemId): void {
     applyChange((current) => deleteItem(current, splitId, Date.now()));
     return;
   }
+  // The pages may be on screen in another window too; they go there as well.
   for (const tabId of split.childIds) {
-    closeTabByUser(tabId);
+    destroyTabView(tabId);
   }
+  applyChange((current) => resetPinnedTabs(current, split.childIds));
+  // The pages are gone even when the state did not change, so the sidebar must hear about it.
+  scheduleRuntimePush();
 }
 
 /**
