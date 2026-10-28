@@ -16,6 +16,17 @@
         <string>https</string>
       </array>
     </dict>
+    <!-- bow:// lets other apps drive Bow: Raycast, Alfred, Shortcuts (src/main/bowUrls.ts). -->
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>Bow command</string>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>bow</string>
+      </array>
+    </dict>
   </array>
   <!-- macOS shows these when a site you allowed first uses the camera, microphone or location. -->
   <key>NSCameraUsageDescription</key>

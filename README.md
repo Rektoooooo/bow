@@ -208,6 +208,10 @@ source never updates itself.
   sidebar. A Little Window left alone for 6 hours goes to the Archive.
 - **Shortcut from any app** (Library › Settings, off until you pick keys such as ⌥Space): brings up the Command Bar,
   or a Little Window, without switching to Bow first. If another app holds the keys, Settings says so.
+- **`bow://` addresses and Raycast**: other apps can open an address in a Space, switch Spaces, search the open tabs or
+  open the Command Bar with text (`open "bow://open?url=github.com&space=Work"`). `integrations/raycast` has three
+  Raycast script commands built on them (Open in Bow, Switch Bow Space, Search Bow Tabs); Alfred and Shortcuts can use
+  the same addresses.
 - **Boosts**: change a site's colors (shift them, or invert for a dark look) and font, Zap elements away, and add
   your own CSS and JavaScript (only once switched on). Turn a Boost off or reset it any time; Library › Boosts.
   Share one as a `.bowboost` file (Export…, Import…; imported JavaScript arrives switched off), and a "JS" badge in

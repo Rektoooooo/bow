@@ -1,4 +1,4 @@
-// Checks the packaged app (npm run package first): it starts, knows it is "Bow", declares http and https
+// Checks the packaged app (npm run package first): it starts, knows it is "Bow", declares http, https and bow
 // so macOS can make it the default browser, offers "Set as Default Browser…", opens a link from another app in a
 // Little Window, runs a Chrome extension (so the extension library and its preload made it into the package), and
 // asks its update feed for a new version (a local feed here, which says this version is the newest; a download
@@ -33,7 +33,7 @@ function check(name, ok, detail = "") {
 
 const infoPlist = JSON.parse(execFileSync("plutil", ["-convert", "json", "-o", "-", path.join(bundlePath, "Contents", "Info.plist")]).toString());
 const schemes = (infoPlist.CFBundleURLTypes ?? []).flatMap((type) => type.CFBundleURLSchemes ?? []);
-check("Info.plist declares http and https", schemes.includes("http") && schemes.includes("https"), schemes.join(", "));
+check("Info.plist declares http, https and bow (bow:// addresses from other apps)", schemes.includes("http") && schemes.includes("https") && schemes.includes("bow"), schemes.join(", "));
 check("Info.plist names the app", infoPlist.CFBundleName === "Bow", infoPlist.CFBundleName);
 // macOS ties the default-browser choice and website permissions to the bundle id, so it kept the first name.
 check("the bundle id stays the same after the rename", infoPlist.CFBundleIdentifier === "io.github.rektoooooo.sidebar-browser", infoPlist.CFBundleIdentifier);

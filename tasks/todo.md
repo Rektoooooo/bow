@@ -316,7 +316,10 @@ M about a day, L several days.
       Command Bar or a Little Window; says when another app holds the keys; e2e runs record the keys instead of
       taking them from the Mac)
       System-wide shortcut: Command Bar or a Little Window from any app (S)
-- [ ] 16. `bow://` URL scheme and a Raycast extension (search tabs, open in a Space, switch Spaces) (M)
+- [x] 16. (bow://open, space, search-tabs, command-bar, little; declared in Info.plist; Raycast as three script
+      commands in integrations/raycast with no dependencies. Not done: a full Raycast store extension with its own
+      tab list, which needs @raycast/api and publishing: ask first)
+      `bow://` URL scheme and a Raycast extension (search tabs, open in a Space, switch Spaces) (M)
 - [ ] 17. Privacy report (trackers blocked per site and week), HTTPS-only mode, per-Space "forget cookies on quit" (M)
 - [ ] 18. Tab notes: attach a Note to a tab or folder (S)
 - [ ] 19. Shortcut editor (M)

@@ -493,7 +493,7 @@ export function closePermissionPrompt(requestId: string): void {
 /**
  * Opens the Command Bar. "editUrl" starts with the current address, like ⌘L.
  */
-export function openCommandBar(mode: CommandBarMode): void {
+export function openCommandBar(mode: CommandBarMode, typedText: string = ""): void {
   const state = getState();
   // A Space can open a page of its own on ⌘T instead (Space menu › New Tab Opens). Always a new tab: the
   // duplicate-tab rule (switch to an open copy) would make a second ⌘T go back to the first one.
@@ -504,7 +504,9 @@ export function openCommandBar(mode: CommandBarMode): void {
   }
   const selectedTabId = getSelectedTabId(state);
   const selectedTab = selectedTabId === null ? undefined : findTab(state, selectedTabId);
-  const initialText = mode === "editUrl" && selectedTab !== undefined ? selectedTab.url : "";
+  const currentUrl = mode === "editUrl" && selectedTab !== undefined ? selectedTab.url : "";
+  // Text from elsewhere (a bow://command-bar address) is typed in already.
+  const initialText = typedText === "" ? currentUrl : typedText;
   latestQuery = initialText;
   openPanel({ kind: "commandBar", mode: mode, initialText: initialText });
 }

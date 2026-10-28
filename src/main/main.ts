@@ -62,6 +62,7 @@ import { registerIpcHandlers } from "./ipc";
 import { archiveIdleLittleWindows, handleExternalUrl, registerLittleWindowIpc } from "./littleWindow";
 import { readFrontApp } from "./linkSourceApps";
 import { startGlobalShortcut } from "./globalShortcutController";
+import { handleBowUrl } from "./bowUrlController";
 import { getReaderArticle, noticeReaderPageChanged, probeReaderPage } from "./readerController";
 import type { LinkSourceApp } from "../shared/routingRules";
 import { showPageContextMenu } from "./menus";
@@ -110,6 +111,9 @@ const TOOLBAR_COLORS_FILE_NAME = "toolbar-colors.json";
 
 /** Links from other apps that arrived before the app was ready; null once they have been opened. */
 let pendingExternalUrls: { url: string; sourceApp: LinkSourceApp | null }[] | null = [];
+
+/** bow:// addresses that arrived before the app was ready; null once they have been carried out. */
+let pendingBowUrls: string[] | null = [];
 
 /** What tabViews.ts calls when a page does something. */
 const tabViewEvents: TabViewEvents = {
@@ -405,6 +409,11 @@ async function handleAppReady(): Promise<void> {
   for (const link of waitingLinks) {
     handleExternalUrl(link.url, link.sourceApp);
   }
+  const waitingBowUrls = pendingBowUrls ?? [];
+  pendingBowUrls = null;
+  for (const url of waitingBowUrls) {
+    handleBowUrl(url);
+  }
 
   pruneOldArchiveEntries();
   startAutoArchiveTimers();
@@ -427,6 +436,17 @@ async function handleAppReady(): Promise<void> {
       openWelcome();
     }
   }
+}
+
+/**
+ * A bow:// address: carried out now, or kept until the app is ready.
+ */
+function receiveBowUrl(url: string): void {
+  if (pendingBowUrls === null) {
+    handleBowUrl(url);
+    return;
+  }
+  pendingBowUrls.push(url);
 }
 
 /**
@@ -481,6 +501,11 @@ function startApp(): void {
   // launched the app arrives before it is ready and waits in pendingExternalUrls.
   app.on("open-url", (event, url) => {
     event.preventDefault();
+    // bow:// addresses drive Bow from other apps (bowUrls.ts); one that launched the app waits until it is ready.
+    if (url.toLowerCase().startsWith("bow:")) {
+      receiveBowUrl(url);
+      return;
+    }
     if (!isRecordableUrl(url)) {
       return;
     }

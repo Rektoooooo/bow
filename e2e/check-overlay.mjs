@@ -770,6 +770,34 @@ state = await getState();
 check("a link from that app opens in the rule's Space", state.activeSpaceId === workSpace.id && selectedTab(state)?.url.startsWith("https://example.org/from-chat"), `${state.activeSpaceId} ${selectedTab(state)?.url}`);
 await dispatch({ type: "removeRoutingRule", ruleId: appRule?.id ?? "" });
 
+// bow:// addresses (Raycast's scripts, Alfred, Shortcuts), handed over the way macOS does: switch Spaces, open an
+// address in a Space, tab search with words typed in; a script address becomes a search; unknown commands do nothing.
+const openBowAddress = (address) => app.evaluate(({ app: electronApp }, url) => electronApp.emit("open-url", { preventDefault() {} }, url), address);
+await openBowAddress(`bow://space?name=${encodeURIComponent(state.spaces[0].name)}`);
+await sidebar.waitForTimeout(400);
+const firstSpaceId = state.spaces[0].id;
+check("bow://space switches to the Space it names", (await getState()).activeSpaceId === firstSpaceId);
+await openBowAddress(`bow://open?url=${encodeURIComponent("example.com/from-bow")}&space=2`);
+await waitForSelectedUrl("example.com/from-bow");
+state = await getState();
+check("bow://open opens the address in the Space it names (here by number)", state.activeSpaceId === workSpace.id && selectedTab(state)?.url.startsWith("https://example.com/from-bow"), `${state.activeSpaceId} ${selectedTab(state)?.url}`);
+await openBowAddress("bow://search-tabs?q=example");
+await overlay.waitForSelector(".command-input", { timeout: 5000 }).catch(() => undefined);
+const bowSearchText = await overlay.inputValue(".command-input").catch(() => null);
+check("bow://search-tabs opens tab search with the words typed in", bowSearchText === "example", String(bowSearchText));
+await overlay.press(".command-input", "Escape").catch(() => undefined);
+await openBowAddress("bow://open?url=javascript%3Aalert(1)");
+await sidebar.waitForTimeout(800);
+const scriptAddressTab = selectedTab(await getState())?.url ?? "";
+const itemCountBeforeUnknown = Object.keys((await getState()).items).length;
+await openBowAddress("bow://delete?all=1");
+await sidebar.waitForTimeout(300);
+check(
+  "a script address in bow://open becomes a search, and unknown commands do nothing",
+  scriptAddressTab.startsWith("https://") && Object.keys((await getState()).items).length === itemCountBeforeUnknown,
+  scriptAddressTab,
+);
+
 // Tab to search a site, like Arc: "youtu" offers it, Tab turns the input into a YouTube search, Backspace on the
 // empty input leaves it, Enter opens the site's results in a new tab.
 await dispatch({ type: "openCommandBar", mode: "newTab" });
