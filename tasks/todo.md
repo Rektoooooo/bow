@@ -361,7 +361,7 @@ yours, the essentials, a few good defaults, you're all set). Our own CSS/DOM/SVG
 - [x] 2. Scenes 1–3: hello, import cards with inline status, live theme preview and the aurora re-tint; screenshots
 - [x] 3. Scene 4: the essentials tour with its looping illustrations
 - [x] 4. Scene 5 defaults, scene 6 and the outro, Help › Welcome to Bow… and the Command Bar replay, reduced motion
-- [ ] 5. check-onboarding.mjs (done: 23 checks); screenshots (light/dark, 640×400 and 1280×820) and a slowed recording; polish pass
+- [x] 5. check-onboarding.mjs (23 checks); screenshots (light/dark, 640×400 and 1280×820) and a slowed recording; polish pass
 
 ## Review (2026-10-28, an unattended night: open source, releases, auto-update, speed, polish)
 - **Works and verified:** open-source setup and repo rename; `npm run release` up to Apple's notarization (signing,
