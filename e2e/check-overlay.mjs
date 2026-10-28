@@ -783,6 +783,16 @@ const soundAfter = await overlay.textContent(`${soundSetting} .control-setting-s
 const panelsAfterToggle = await overlay.$$eval(".control-center", (panels) => panels.length);
 check("the Sound setting mutes the tab, shown in the same panel", soundBefore === "On" && soundAfter === "Muted" && selectedTab(await getState())?.isMuted === true && panelsAfterToggle === 1, `${soundBefore} → ${soundAfter}`);
 await overlay.click(soundSetting);
+// Keep Awake: the site's pages never go to sleep by themselves (tabSleep.ts); clicking again lets them sleep.
+const keepAwakeSetting = '.control-setting:has(.control-setting-title:text-is("Keep Awake"))';
+const keepAwakeBefore = await overlay.textContent(`${keepAwakeSetting} .control-setting-state`).catch(() => null);
+await overlay.click(keepAwakeSetting);
+await overlay.waitForFunction((selector) => document.querySelector(`${selector} .control-setting-state`)?.textContent === "On", keepAwakeSetting, { timeout: 3000 }).catch(() => undefined);
+const keptSites = (await getState()).keepAwakeSites ?? [];
+check("Keep Awake in the Control Center keeps the site's pages awake", keepAwakeBefore === "Off" && keptSites.length === 1, `${keepAwakeBefore} → ${JSON.stringify(keptSites)}`);
+await overlay.click(keepAwakeSetting);
+await overlay.waitForFunction((selector) => document.querySelector(`${selector} .control-setting-state`)?.textContent === "Off", keepAwakeSetting, { timeout: 3000 }).catch(() => undefined);
+check("and clicking it again lets them sleep", ((await getState()).keepAwakeSites ?? []).length === 0);
 await overlay.click('.control-action[aria-label="Capture Part of the Page"]');
 await overlay.waitForSelector(".capture-layer", { timeout: 5000 });
 const pageFrame = await overlay.evaluate(() => {

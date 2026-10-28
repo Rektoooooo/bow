@@ -20,7 +20,7 @@ export type CommandBarResultKind = "navigate" | "search" | "tab" | "history" | "
 
 export type CommandBarMode = "newTab" | "editUrl" | "splitWith";
 
-export const LIBRARY_SECTIONS = ["archive", "history", "media", "downloads", "spaces", "boosts", "extensions", "settings"] as const;
+export const LIBRARY_SECTIONS = ["archive", "history", "media", "downloads", "spaces", "boosts", "extensions", "tasks", "settings"] as const;
 
 export type LibrarySection = (typeof LIBRARY_SECTIONS)[number];
 
@@ -178,6 +178,31 @@ export interface LibrarySpaceItem {
   depth: number;
 }
 
+/** One awake page in Library › Task Manager (main/taskList.ts). */
+export interface TaskLine {
+  tabId: ItemId;
+  title: string;
+  url: string;
+  faviconUrl: string | null;
+  /** Its process's memory and processor use (a process a few pages of one site share counts for each of them). */
+  memoryMb: number;
+  cpuPercent: number;
+  /** How many other awake tabs share its process. */
+  sharedWith: number;
+  /** False while it is on screen or in use (sound, picture-in-picture, a call): it would refuse to sleep. */
+  canSleep: boolean;
+}
+
+/** What Library › Task Manager shows. */
+export interface TaskListData {
+  lines: TaskLine[];
+  /** Memory of all awake pages' processes, each counted once. */
+  pagesMemoryMb: number;
+  /** Memory of Bow's own processes: windows, the GPU, extensions, helpers. */
+  bowMemoryMb: number;
+  sleepingCount: number;
+}
+
 /** What Library › Settings › Sync shows (syncController.ts). */
 export interface SyncStatusData {
   /** The sync folder, or null when sync is off. */
@@ -216,6 +241,11 @@ export interface LibraryData {
   /** Automatic hourly copies of the setup (backupController.ts). */
   areSnapshotsOn: boolean;
   sync: SyncStatusData;
+  /** "Keep Favorites awake" and the sites kept awake (main/tabSleep.ts). */
+  areFavoritesKeptAwake: boolean;
+  keepAwakeSites: string[];
+  /** Library › Task Manager; empty unless that section is shown (measuring costs a little). */
+  tasks: TaskListData;
   adBlock: { isOn: boolean; status: "off" | "loading" | "ready" | "failed"; filterCount: number };
   routingRules: RoutingRule[];
   extensions: ExtensionLine[];
@@ -241,6 +271,8 @@ export interface SiteInfo {
   permissions: { kind: SitePermissionKind; isAllowed: boolean }[];
   /** Arc's per-site Developer Mode (shared/developerMode.ts). */
   isDeveloperMode: boolean;
+  /** The site is on the Keep Awake list: its pages never go to sleep by themselves (main/tabSleep.ts). */
+  isKeptAwake: boolean;
   /** Ad blocking for this page: null while it is off in Library › Settings. */
   adBlock: { isOnForSite: boolean; blockedCount: number } | null;
   /** The profile's turned-on extensions, for the Control Center's grid. */

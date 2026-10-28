@@ -29,6 +29,8 @@ function buildSetup(): { state: BrowserState; noteId: string } {
     ...withNote,
     boosts: [{ id: "boost-1", site: "news.example", css: "body { color: red }", zappedSelectors: [], isEnabled: true, javascript: "console.log(1)", isJavaScriptOn: true }],
     routingRules: [{ id: "rule-1", matchType: "contains", value: "mail.example", spaceId: withNote.activeSpaceId }],
+    keepAwakeSites: ["mail.example"],
+    settings: { ...withNote.settings, areFavoritesKeptAwake: false },
   };
   return { state: state, noteId: noteId };
 }
@@ -80,6 +82,8 @@ describe("backups", () => {
     expect(restored.state.spaces).toEqual(state.spaces);
     expect(restored.state.items).toEqual(state.items);
     expect(restored.state.profiles).toEqual(state.profiles);
+    expect(restored.state.keepAwakeSites).toEqual(["mail.example"]);
+    expect(restored.state.settings.areFavoritesKeptAwake).toBe(false);
     expect(restored.notes).toEqual({ [noteId]: "<p>Hello</p>" });
     expect(restored.report).toMatchObject({ spaces: 2, pinnedTabs: 2, todayTabs: 2, folders: 1, notes: 1, boosts: 1, leftOut: 0, appVersion: APP_VERSION });
   });

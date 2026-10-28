@@ -12,7 +12,7 @@
  * Data flow:
  *   "overlay:show" (library) → renderLibrary() → a section → click Restore → dispatch restoreArchivedTab → close
  */
-import type { ExtensionLine, HistoryLine, LibraryBoost, LibraryData, LibrarySection, LibrarySpace, LibrarySpaceItem, MediaCommand, MediaLine, SyncStatusData } from "../shared/overlay";
+import type { ExtensionLine, HistoryLine, LibraryBoost, LibraryData, LibrarySection, LibrarySpace, LibrarySpaceItem, MediaCommand, MediaLine, SyncStatusData, TaskLine } from "../shared/overlay";
 import { computeFramePalette } from "../shared/themePalette.js";
 import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS, TAB_SLEEP_OPTIONS } from "../shared/settings.js";
 import { APP_ICON_VARIANTS, buildAppIconSvg } from "../shared/appIconDrawing.js";
@@ -50,8 +50,11 @@ const SECTIONS: { id: LibrarySection; label: string; icon: IconName }[] = [
   { id: "archive", label: "Archived Tabs", icon: "archiveOutline" },
   { id: "history", label: "History", icon: "clock" },
   { id: "extensions", label: "Extensions", icon: "puzzle" },
+  { id: "tasks", label: "Task Manager", icon: "taskManager" },
   { id: "settings", label: "Settings", icon: "gear" },
 ];
+
+const MEGABYTES_PER_GIGABYTE = 1024;
 
 /**
  * What an empty section shows: its own icon from the rail, a short title and one sentence on how things get there,
@@ -607,6 +610,84 @@ function renderExtensionsSection(body: HTMLElement, data: LibraryData): void {
 }
 
 /**
+ * Memory for people: "640 MB", "1.4 GB".
+ */
+function formatMemory(megabytes: number): string {
+  if (megabytes < MEGABYTES_PER_GIGABYTE) {
+    return `${megabytes} MB`;
+  }
+  return `${(megabytes / MEGABYTES_PER_GIGABYTE).toFixed(1)} GB`;
+}
+
+/**
+ * One awake page: its icon, name and site (and the tabs it shares a process with), its memory and processor use, and
+ * Sleep. Clicking the line switches to the tab.
+ */
+function createTaskLine(task: TaskLine): HTMLElement {
+  const line = createElement("div", "library-line task-line");
+  line.setAttribute("role", "button");
+  line.dataset.tabId = task.tabId;
+  line.title = task.url;
+  let meta = getDisplayHost(task.url);
+  if (task.sharedWith === 1) {
+    meta += " · shares its process with 1 other tab";
+  }
+  if (task.sharedWith > 1) {
+    meta += ` · shares its process with ${task.sharedWith} other tabs`;
+  }
+  const text = createElement("span", "library-line-text");
+  text.append(createElement("span", "library-line-title", task.title === "" ? task.url : task.title), createElement("span", "library-line-meta", meta));
+  const numbers = createElement("span", "task-numbers", `${formatMemory(task.memoryMb)} · ${task.cpuPercent}% CPU`);
+  const sleepButton = createTextButton("Sleep", "library-chip task-sleep", () => dispatch({ type: "sleepTab", tabId: task.tabId }));
+  sleepButton.disabled = !task.canSleep;
+  sleepButton.title = task.canSleep ? "Put this page to sleep" : "On screen or in use, so it stays awake";
+  line.append(createFavicon(task.faviconUrl, task.url), text, numbers, sleepButton);
+  line.addEventListener("click", (event) => {
+    const isOnButton = event.target instanceof Element && event.target.closest("button") !== null;
+    if (!isOnButton) {
+      window.overlayApi.chooseTab(task.tabId).catch(() => undefined);
+    }
+  });
+  return line;
+}
+
+/**
+ * Library › Task Manager: every awake page with the memory and processor it uses, biggest first, and what Bow itself
+ * uses. Main measures again every two seconds while this is shown.
+ */
+function renderTasksSection(body: HTMLElement, data: LibraryData): void {
+  const tasks = data.tasks;
+  const section = createElement("div", "library-tasks");
+  const toolbar = createElement("div", "library-toolbar");
+  toolbar.append(createTextButton("Sleep Other Tabs", "library-chip", () => dispatch({ type: "sleepOtherTabs" })));
+  section.append(toolbar);
+  const awake = tasks.lines.length === 1 ? "1 page awake uses" : `${tasks.lines.length} pages awake use`;
+  const asleep = tasks.sleepingCount === 1 ? "1 tab is asleep" : `${tasks.sleepingCount} tabs are asleep`;
+  const summary = `${awake} ${formatMemory(tasks.pagesMemoryMb)}; Bow itself (windows, graphics, extensions) uses ${formatMemory(tasks.bowMemoryMb)}. ${asleep}.`;
+  section.append(createElement("p", "library-setting-note task-summary", summary));
+  if (tasks.lines.length === 0) {
+    section.append(createEmptyState("tasks", "No pages awake", "Pages you open show up here with the memory they use."));
+  }
+  const list = createElement("div", "library-list");
+  list.append(...tasks.lines.map((task) => createTaskLine(task)));
+  section.append(list);
+  body.replaceChildren(section);
+}
+
+/**
+ * The sites kept awake, each with a button that lets it sleep again.
+ */
+function createKeepAwakeSites(data: LibraryData): HTMLElement {
+  const sites = createElement("div", "keep-awake-sites");
+  for (const site of data.keepAwakeSites) {
+    const chip = createTextButton(`${site} ×`, "library-chip", () => dispatch({ type: "setSiteKeptAwake", site: site, isKeptAwake: false }));
+    chip.title = `Let ${site}'s pages sleep again`;
+    sites.append(chip);
+  }
+  return sites;
+}
+
+/**
  * One setting: its name and a short explanation on the left, its control on the right.
  */
 function createSettingRow(label: string, note: string, control: HTMLElement): HTMLElement {
@@ -753,8 +834,18 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
     ),
     createSettingRow(
       "Sleep unused tabs after",
-      "A page you have not used for this long closes to free memory and wakes where you left it when you go back. Favorites, pages on screen, playing sound or in a call stay awake.",
+      "A page you have not used for this long closes to free memory and wakes where you left it when you go back; its tab fades meanwhile. Pages on screen, playing sound or in a call stay awake, and so do the sites below.",
       createTabSleepSelect(data),
+    ),
+    createSettingRow(
+      "Keep Favorites awake",
+      "Favorites are usually apps like mail and chat: kept awake, their unread counts keep coming. Pinned tabs sleep like others.",
+      createSwitch(data.areFavoritesKeptAwake, "Keep Favorites awake", (isOn) => dispatch({ type: "setFavoritesKeptAwake", isOn: isOn })),
+    ),
+    createSettingRow(
+      "Sites kept awake",
+      data.keepAwakeSites.length === 0 ? "None yet. Turn on Keep Awake in a site's Control Center or a tab's menu." : "Their pages never go to sleep by themselves.",
+      createKeepAwakeSites(data),
     ),
     createSettingRow(
       "Tidy titles for pinned tabs",
@@ -979,6 +1070,9 @@ function renderBody(data: LibraryData): void {
   }
   if (section === "extensions") {
     renderExtensionsSection(body, data);
+  }
+  if (section === "tasks") {
+    renderTasksSection(body, data);
   }
   if (section === "settings") {
     renderSettingsSection(body, data);

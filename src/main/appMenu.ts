@@ -44,6 +44,9 @@ export interface AppMenuCommands {
   openFind(): void;
   findNext(forward: boolean): void;
   openLibrary(): void;
+  /** Tabs › Sleep Other Tabs and Task Manager (tabSleepController.ts, Library › Task Manager). */
+  sleepOtherTabs(): void;
+  openTaskManager(): void;
   openLittleWindow(): void;
   /** File › New Window (⌘N): another full main window. */
   openNewWindow(): void;
@@ -214,6 +217,9 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
         { label: "Close Split Pane", accelerator: "Control+Shift+-", click: () => commands.closeSplitPane() },
         { type: "separator" },
         { label: "New Folder", click: () => commands.newFolder() },
+        { type: "separator" },
+        { label: "Sleep Other Tabs", click: () => commands.sleepOtherTabs() },
+        { label: "Task Manager", click: () => commands.openTaskManager() },
       ],
     },
     {

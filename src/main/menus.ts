@@ -22,6 +22,8 @@ import { buildSearchUrl, findSearchEngine } from "../shared/searchEngines";
 import { listImportSources } from "./browserImportController";
 import { addMenuIcons } from "./menuIcons";
 import { describeSpaceIconAsText } from "../shared/spaceIcons";
+import { getSiteKey } from "../shared/siteKey";
+import { isKeptAwake } from "./tabSleep";
 
 /** What the menus need from main.ts. */
 export interface MenuHost {
@@ -31,6 +33,8 @@ export interface MenuHost {
   sendSidebarCommand(command: SidebarCommand): void;
   openInNewTab(url: string, inBackground: boolean): void;
   isTabLoaded(tabId: ItemId): boolean;
+  /** The tab's page is awake and may sleep now: not on screen, not in use (tabSleepController.ts). */
+  canTabSleep(tabId: ItemId): boolean;
 }
 
 /** Most tabs listed in a "Split View with" submenu; more would make the menu taller than the screen. */
@@ -171,6 +175,28 @@ function buildCloseItems(host: MenuHost, tab: TabItem): MenuItemConstructorOptio
 }
 
 /**
+ * Sleep Tab, Sleep Other Tabs, and keeping the tab's site awake (tabSleep.ts).
+ */
+function buildSleepItems(host: MenuHost, tab: TabItem): MenuItemConstructorOptions[] {
+  const items: MenuItemConstructorOptions[] = [
+    { label: "Sleep Tab", enabled: host.canTabSleep(tab.id), click: () => host.runAction({ type: "sleepTab", tabId: tab.id }) },
+    { label: "Sleep Other Tabs", click: () => host.runAction({ type: "sleepOtherTabs" }) },
+  ];
+  const site = getSiteKey(tab.url);
+  if (site === null) {
+    return items;
+  }
+  const isSiteKeptAwake = isKeptAwake(host.getState(), tab.url);
+  items.push({
+    label: `Keep ${site} Awake`,
+    type: "checkbox",
+    checked: isSiteKeptAwake,
+    click: () => host.runAction({ type: "setSiteKeptAwake", site: site, isKeptAwake: !isSiteKeptAwake }),
+  });
+  return items;
+}
+
+/**
  * The menu for a tab row or Favorite tile.
  */
 function buildTabMenu(host: MenuHost, tab: TabItem): MenuItemConstructorOptions[] {
@@ -188,6 +214,7 @@ function buildTabMenu(host: MenuHost, tab: TabItem): MenuItemConstructorOptions[
     template.push(...buildSplitItems(host, tab.id));
   }
   template.push({ label: muteLabel, click: () => host.runAction({ type: "setTabMuted", tabId: tab.id, isMuted: !tab.isMuted }) });
+  template.push(...buildSleepItems(host, tab));
   template.push({ type: "separator" });
   template.push(...buildCloseItems(host, tab));
   return template;

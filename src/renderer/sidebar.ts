@@ -65,6 +65,7 @@ let currentRuntime: RuntimeState = {
   libraryWidth: LIBRARY_COLUMN_WIDTH_PX,
   isPeekOpen: false,
   faviconAccents: {},
+  sleepingTabIds: [],
 };
 
 /** The Note or Easel tab whose editor this page last told main it has open, or null. */

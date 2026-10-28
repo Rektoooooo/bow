@@ -261,7 +261,9 @@ M about a day, L several days.
       unit, docs/sync.md, e2e/check-sync.mjs with two copies of Bow) Backup and export of everything (Spaces, pins, folders, Live Folders, Boosts, rules, settings, Notes,
       Easels) to an open, documented file; restore with a preview (merge or replace); rolling automatic snapshots;
       account-free sync through a folder such as iCloud Drive (L)
-- [ ] 2. Smarter tab sleeping: per-site Keep Awake list (Settings, Control Center, tab menu), a decision for
+- [x] 2. (keepAwakeSites + Keep Favorites awake switch, pinned tabs sleep like Arc's, rows fade, Sleep Tab / Sleep
+      Other Tabs in the tab menu, Tabs menu and Command Bar, Library › Task Manager; e2e in check-tab-sleep and
+      check-overlay) Smarter tab sleeping: per-site Keep Awake list (Settings, Control Center, tab menu), a decision for
       pinned tabs and Favorites, sleeping tabs dimmed in the sidebar, Sleep Tab Now / Sleep Other Tabs, a Task
       Manager with memory and CPU per tab (M)
 - [ ] 3. Archive without surprises: Never Archive per tab and per Space, archive timing per Space, an Undo toast

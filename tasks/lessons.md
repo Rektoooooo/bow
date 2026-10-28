@@ -133,6 +133,11 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   under concurrent e2e load and pass alone: run suites in a quiet window (no other session's e2e) before treating one
   of them as a regression.
 
+- `permission-check` leaves macOS's screen-sharing picker open on purpose until it quits the app. If a run's quit
+  hangs with the picker up, the next run can get "shared without asking" from that picker session (or from someone
+  clicking it on screen). Rerun the check alone, and the previous commit's build too, before calling it a regression
+  (2026-10-28: both passed on rerun).
+
 ## Dependencies
 - Check a package's license **per version** and diff a just-published release against the previous one before
   adding it (electron-chrome-extensions 4.9 was GPL with a runtime license check; 4.10, one day old, is MIT and only

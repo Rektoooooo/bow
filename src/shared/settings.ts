@@ -300,3 +300,6 @@ export const SYNC_POLL_MS = 60 * 1000;
 
 /** A file operation on the sync folder that takes longer than this is given up (a drive that stopped answering). */
 export const SYNC_FILE_TIMEOUT_MS = 10 * 1000;
+
+/** Library › Task Manager measures the pages again this often while it is shown (Activity Monitor's default: 2 s). */
+export const TASK_MANAGER_REFRESH_MS = 2000;

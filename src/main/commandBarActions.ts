@@ -61,6 +61,8 @@ function buildFixedActions(host: CommandActionHost): FixedAction[] {
     { entry: { id: "duplicate", title: "Duplicate Tab", keywords: ["copy tab"] }, run: () => commands.duplicateSelected() },
     { entry: { id: "split", title: "Add Split View", keywords: ["split screen", "side by side"] }, run: () => commands.addSplitPane() },
     { entry: { id: "library", title: "Open Library", keywords: ["archive", "archived tabs"] }, run: () => commands.openLibrary() },
+    { entry: { id: "task-manager", title: "Task Manager", keywords: ["memory", "cpu", "activity", "slow"] }, run: () => commands.openTaskManager() },
+    { entry: { id: "sleep-other-tabs", title: "Sleep Other Tabs", keywords: ["free memory", "discard tabs", "unload"] }, run: () => commands.sleepOtherTabs() },
     { entry: { id: "find", title: "Find in Page", keywords: ["search page"] }, run: () => commands.openFind() },
     { entry: { id: "edit-boost", title: "Edit Boost for This Site", keywords: ["boost", "custom css", "style"] }, run: () => host.runAction({ type: "openBoostEditor" }) },
     { entry: { id: "zap", title: "Zap Elements", keywords: ["boost", "hide element", "remove element"] }, run: () => commands.zapElements() },

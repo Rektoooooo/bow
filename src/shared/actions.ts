@@ -130,6 +130,11 @@ export type BrowserAction =
   | { type: "setShowFullUrls"; isOn: boolean }
   | { type: "setSnapshots"; isOn: boolean }
   | { type: "revealBackups" }
+  | { type: "sleepTab"; tabId: ItemId }
+  | { type: "sleepOtherTabs" }
+  | { type: "setSiteKeptAwake"; site: string; isKeptAwake: boolean }
+  | { type: "setFavoritesKeptAwake"; isOn: boolean }
+  | { type: "openTaskManager" }
   | { type: "chooseSyncFolder" }
   | { type: "stopSyncing" }
   | { type: "revealSyncFolder" }
@@ -243,6 +248,11 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setShowFullUrls",
   "setSnapshots",
   "revealBackups",
+  "sleepTab",
+  "sleepOtherTabs",
+  "setSiteKeptAwake",
+  "setFavoritesKeptAwake",
+  "openTaskManager",
   "chooseSyncFolder",
   "stopSyncing",
   "revealSyncFolder",

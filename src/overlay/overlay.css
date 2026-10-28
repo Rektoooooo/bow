@@ -709,6 +709,27 @@ body.dark .command-info-button {
   font-size: 12px;
 }
 
+/* Library › Task Manager: the numbers line up on the right, the Sleep button after them. */
+.task-numbers {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-sleep:disabled {
+  opacity: 0.4;
+}
+
+/* Library › Settings › Sites kept awake: one chip per site, wrapping on the right. */
+.keep-awake-sites {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  max-width: 55%;
+}
+
 .library-line-button {
   border: 0;
   border-radius: 7px;
@@ -729,7 +750,8 @@ body.dark .command-info-button {
   padding: 16px 10px 16px 14px;
 }
 
-.library-extensions {
+.library-extensions,
+.library-tasks {
   padding: 12px 8px 12px 10px;
 }
 

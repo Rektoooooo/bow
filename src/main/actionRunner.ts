@@ -35,6 +35,8 @@ import { reapplyBoostsToAllPages } from "./boostPages";
 import { importFromArc } from "./arcImportController";
 import { exportBackup, restoreBackup, revealBackupsFolder } from "./backupController";
 import { chooseSyncFolder, revealSyncFolder, stopSyncing } from "./syncController";
+import { setFavoritesKeptAwake, setSiteKeptAwake } from "./tabSleep";
+import { canSleepNow, sleepOtherTabsNow, sleepTabNow } from "./tabSleepController";
 import { importFromBrowser } from "./browserImportController";
 import { applyCosmeticFilters, ensureFilterLists } from "./adBlock";
 import { applyAppIcon } from "./appIcon";
@@ -125,6 +127,7 @@ export const menuHost: MenuHost = {
   sendSidebarCommand: (command) => sendSidebarCommand(command),
   openInNewTab: (url, inBackground) => openLinkInNewTab(url, inBackground ? "background" : "foreground"),
   isTabLoaded: (tabId) => getTabContents(tabId) !== null,
+  canTabSleep: (tabId) => canSleepNow(tabId),
 };
 
 /**
@@ -427,6 +430,18 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => setSnapshots(state, action.isOn));
     case "revealBackups":
       return revealBackupsFolder();
+    case "sleepTab":
+      sleepTabNow(action.tabId);
+      return;
+    case "sleepOtherTabs":
+      sleepOtherTabsNow();
+      return;
+    case "setSiteKeptAwake":
+      return applyChange((state) => setSiteKeptAwake(state, action.site, action.isKeptAwake));
+    case "setFavoritesKeptAwake":
+      return applyChange((state) => setFavoritesKeptAwake(state, action.isOn));
+    case "openTaskManager":
+      return openLibrary("tasks");
     case "chooseSyncFolder":
       chooseSyncFolder().catch((error) => console.error("Starting sync failed:", error));
       return;

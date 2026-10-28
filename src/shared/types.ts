@@ -186,6 +186,8 @@ export interface BrowserSettings {
    * means on.
    */
   areSnapshotsOn?: boolean;
+  /** Favorites never go to sleep by themselves (main/tabSleep.ts). Optional: missing means on. */
+  areFavoritesKeptAwake?: boolean;
   /** The first-start tour was finished or skipped (overlay/welcome.ts). Optional: missing means not yet. */
   hasSeenWelcome?: boolean;
   /**
@@ -328,6 +330,8 @@ export interface BrowserState {
   developerModeSites?: Record<string, boolean>;
   /** Sites where ad blocking is turned off (Control Center). Optional, so files saved before it existed still load. */
   adBlockOffSites?: string[];
+  /** Sites whose pages never go to sleep by themselves (main/tabSleep.ts). Optional, like the lists above. */
+  keepAwakeSites?: string[];
 }
 
 /**
@@ -399,6 +403,8 @@ export interface RuntimeState {
   extensionsBeingAdded: ExtensionBeingAdded[];
   /** A new version of Bow that has downloaded and starts with the next restart (appUpdates.ts), or null. */
   updateReadyVersion: string | null;
+  /** Tabs whose page went to sleep (tabSleep.ts): the sidebar dims them until they wake. */
+  sleepingTabIds: ItemId[];
 }
 
 /** A profile waiting for a Web Store extension's download (RuntimeState.extensionsBeingAdded). */

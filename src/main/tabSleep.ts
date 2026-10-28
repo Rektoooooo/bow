@@ -7,15 +7,19 @@
  *
  * Data source:
  *   The state (each tab's lastActiveAt, which auto-archive refreshes every minute while a tab is in use; the
- *   Favorites; the "Sleep unused tabs after" setting), the tabs that have a page now, and the ones in use (on
- *   screen, playing sound, in picture-in-picture, or using the camera, microphone or a screen share; activity.ts).
+ *   Favorites; the sites kept awake; the "Sleep unused tabs after" and "Keep Favorites awake" settings), the tabs
+ *   that have a page now, and the ones in use (on screen, playing sound, in picture-in-picture, or using the camera,
+ *   microphone or a screen share; activity.ts).
  *
  * Data flow:
  *   main.ts every minute → findTabsToSleep(state, awakeTabIds, inUseTabIds, now) → tabViews.sleepTabView(tabId)
+ *   Sleep Other Tabs → findTabsAllowedToSleep(state, awakeTabIds, inUseTabIds) → tabViews.sleepTabView(tabId)
  *
- * Rules: pure; Favorites never sleep (they are usually apps such as mail and chat, whose unread counts should keep
- * coming, our choice).
+ * Rules: pure. Favorites stay awake unless the user turns that off (they are usually apps such as mail and chat,
+ * whose unread counts should keep coming, our choice); pinned tabs sleep like Today tabs (Arc's choice too); a site
+ * on the Keep Awake list never sleeps by itself.
  */
+import { getSiteKey } from "../shared/siteKey";
 import { DEFAULT_TAB_SLEEP_AFTER_MS } from "../shared/settings";
 import type { BrowserSettings, BrowserState, ItemId } from "../shared/types";
 
@@ -30,21 +34,49 @@ export function readTabSleepAfter(settings: BrowserSettings): number | null {
 }
 
 /**
- * The awake pages that may sleep now: not in use, not a Favorite, and unused for longer than the setting allows.
+ * Whether Favorites stay awake ("Keep Favorites awake" in Library › Settings, on unless turned off).
+ */
+export function areFavoritesKeptAwake(settings: BrowserSettings): boolean {
+  return settings.areFavoritesKeptAwake !== false;
+}
+
+/**
+ * Whether a page's site is on the Keep Awake list (Control Center, a tab's menu, Library › Settings).
+ */
+export function isKeptAwake(state: BrowserState, url: string): boolean {
+  const site = getSiteKey(url);
+  return site !== null && (state.keepAwakeSites ?? []).includes(site);
+}
+
+/**
+ * The awake pages that may sleep at all: not in use, not on the Keep Awake list, and not a Favorite while Favorites
+ * stay awake. Sleep Other Tabs puts all of them to sleep; the timer only those unused for long enough.
+ */
+export function findTabsAllowedToSleep(state: BrowserState, awakeTabIds: ItemId[], inUseTabIds: ItemId[]): ItemId[] {
+  const inUse = new Set(inUseTabIds);
+  const favoriteIds = areFavoritesKeptAwake(state.settings) ? state.profiles.flatMap((profile) => profile.favoriteIds) : [];
+  const keptFavoriteIds = new Set(favoriteIds);
+  return awakeTabIds.filter((tabId) => {
+    const item = state.items[tabId];
+    if (item === undefined || item.kind !== "tab" || inUse.has(tabId) || keptFavoriteIds.has(tabId)) {
+      return false;
+    }
+    return !isKeptAwake(state, item.url);
+  });
+}
+
+/**
+ * The awake pages that may sleep now: allowed to (findTabsAllowedToSleep) and unused for longer than the setting.
  */
 export function findTabsToSleep(state: BrowserState, awakeTabIds: ItemId[], inUseTabIds: ItemId[], now: number): ItemId[] {
   const sleepAfterMs = readTabSleepAfter(state.settings);
   if (sleepAfterMs === null) {
     return [];
   }
-  const inUse = new Set(inUseTabIds);
-  const favoriteIds = new Set(state.profiles.flatMap((profile) => profile.favoriteIds));
-  return awakeTabIds.filter((tabId) => {
+  const allowedTabIds = findTabsAllowedToSleep(state, awakeTabIds, inUseTabIds);
+  return allowedTabIds.filter((tabId) => {
     const item = state.items[tabId];
-    if (item === undefined || item.kind !== "tab" || inUse.has(tabId) || favoriteIds.has(tabId)) {
-      return false;
-    }
-    return now - item.lastActiveAt >= sleepAfterMs;
+    return item !== undefined && item.kind === "tab" && now - item.lastActiveAt >= sleepAfterMs;
   });
 }
 
@@ -56,4 +88,26 @@ export function setTabSleepAfter(state: BrowserState, tabSleepAfterMs: number | 
     return state;
   }
   return { ...state, settings: { ...state.settings, tabSleepAfterMs: tabSleepAfterMs } };
+}
+
+/**
+ * Puts a site on the Keep Awake list, or takes it off.
+ */
+export function setSiteKeptAwake(state: BrowserState, site: string, isKeptAwake: boolean): BrowserState {
+  const keptSites = state.keepAwakeSites ?? [];
+  if (keptSites.includes(site) === isKeptAwake) {
+    return state;
+  }
+  const changedSites = isKeptAwake ? [...keptSites, site] : keptSites.filter((keptSite) => keptSite !== site);
+  return { ...state, keepAwakeSites: changedSites };
+}
+
+/**
+ * Changes "Keep Favorites awake".
+ */
+export function setFavoritesKeptAwake(state: BrowserState, isOn: boolean): BrowserState {
+  if (areFavoritesKeptAwake(state.settings) === isOn) {
+    return state;
+  }
+  return { ...state, settings: { ...state.settings, areFavoritesKeptAwake: isOn } };
 }

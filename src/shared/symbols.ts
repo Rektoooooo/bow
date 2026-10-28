@@ -85,6 +85,9 @@ export const SYMBOL_NAMES = {
   minus: "minus",
   // Library › Spaces: each Space's column has a pencil to edit it, like Arc's.
   pencil: "pencil",
+  // Tab sleeping: Keep Awake in the Control Center, and Library › Task Manager.
+  sleep: "moon.zzz",
+  taskManager: "cpu",
 } as const;
 
 /** An icon drawn from an SF Symbol. */

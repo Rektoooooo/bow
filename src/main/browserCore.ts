@@ -39,6 +39,7 @@ import {
   forgetWindow,
   getEditorTabIdsHere,
   getShownTabIds,
+  getSleepingTabIds,
   getTabIdsShownElsewhere,
   layoutShownTabViews,
   requestTabsMoveToWindow,
@@ -250,6 +251,13 @@ export function getLayoutOptions(windowId: WindowId = currentState.focusedWindow
 export function getLibraryWidth(windowId: WindowId = currentState.focusedWindowId): number {
   const contentWidth = getMainWindow(windowId)?.getContentSize()[0] ?? 0;
   return computeLibraryWidth(librarySection, currentState.spaces.length, contentWidth);
+}
+
+/**
+ * The section the Library shows (or showed last).
+ */
+export function getLibrarySection(): LibrarySection {
+  return librarySection;
 }
 
 /**
@@ -563,6 +571,7 @@ export function collectRuntimeState(windowId: WindowId = currentState.focusedWin
     isPeekOpen: peekWindowId === windowId,
     faviconAccents: getFaviconAccents(),
     updateReadyVersion: updateReadyVersion,
+    sleepingTabIds: getSleepingTabIds(),
   };
 }
 

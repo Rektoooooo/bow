@@ -243,6 +243,7 @@ function buildTabRow(tab: TabItem, location: ItemLocation, index: number, depth:
   row.tabIndex = 0;
   row.classList.toggle("is-selected", isSelected);
   row.classList.toggle("is-loaded", isLoaded);
+  row.classList.toggle("is-asleep", context.runtime.sleepingTabIds.includes(tab.id));
   if (isSelected) {
     row.setAttribute("aria-current", "page");
   }
@@ -583,6 +584,7 @@ export function renderFavoriteTile(tab: TabItem, location: ItemLocation, index: 
   const isSelected = tab.id === context.selectedTabId;
   tile.classList.toggle("is-selected", isSelected);
   tile.classList.toggle("is-loaded", context.runtime.tabs[tab.id] !== undefined);
+  tile.classList.toggle("is-asleep", context.runtime.sleepingTabIds.includes(tab.id));
   // Arc borders the selected Favorite in its icon's colour (main/faviconAccents.ts finds it).
   const iconAddress = getFaviconAddress(tab.faviconUrl, tab.url);
   const iconColor = pickVisibleAccent(iconAddress === null ? undefined : context.runtime.faviconAccents[iconAddress]);

@@ -16,7 +16,7 @@ import { getSyncStatus } from "./syncController";
 import { app, clipboard, ipcMain, Menu, nativeTheme, net, ShareMenu } from "electron";
 import type { IpcMainInvokeEvent, MenuItemConstructorOptions, Rectangle, WebContents } from "electron";
 import { LIBRARY_SECTIONS, OVERLAY_CHANNELS } from "../shared/overlay";
-import type { CommandBarLine, CommandBarMode, LibraryData, LibrarySection, LibrarySpaceItem, OverlayPanel, OverlayRect, SiteCommand, SiteInfo, SwitcherTab } from "../shared/overlay";
+import type { CommandBarLine, CommandBarMode, LibraryData, LibrarySection, LibrarySpaceItem, OverlayPanel, OverlayRect, SiteCommand, SiteInfo, SwitcherTab, TaskListData } from "../shared/overlay";
 import { getSnapshot } from "./tabSnapshots";
 import { copyPngToClipboard, listCaptures, runCaptureCommand, saveCapture } from "./captures";
 import { describeCaptureSource } from "./liveCaptures";
@@ -30,6 +30,7 @@ import {
   getState,
   getWindow,
   sendSidebarCommand,
+  getLibrarySection,
   setLibrarySection,
   setLibraryWindow,
   setNewTabPending,
@@ -56,6 +57,7 @@ import {
   FOLDER_LIST_SEARCH_HEIGHT_PX,
   FOLDER_LIST_WIDTH_PX,
   SIDEBAR_WIDTH_PX,
+  TASK_MANAGER_REFRESH_MS,
 } from "../shared/settings";
 import { buildFolderList } from "./folderList";
 import type { Bounds } from "./layout";
@@ -64,7 +66,8 @@ import { closePeek, finishPeekCloseOf, finishPeekGrow, isPeekClosing, isPeekOpen
 import { toggleDevTools, translatePage, zoomPage } from "./pageCommands";
 import { splitTabs } from "./split";
 import { getSelectedTabId, openTab, selectTab } from "./state";
-import { readTabSleepAfter } from "./tabSleep";
+import { areFavoritesKeptAwake, isKeptAwake, readTabSleepAfter } from "./tabSleep";
+import { collectTaskList } from "./tabSleepController";
 import { loadUrlInTab, openLinkInNewTab, setMuted } from "./tabActions";
 import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
 import { showToast } from "./statusBubble";
@@ -86,6 +89,9 @@ const SUGGESTION_TIMEOUT_MS = 1500;
 
 /** Most history lines sent to the Library at once. */
 const LIBRARY_HISTORY_LIMIT = 300;
+
+/** The Task Manager's numbers are measured only while it is shown. */
+const EMPTY_TASK_LIST: TaskListData = { lines: [], pagesMemoryMb: 0, bowMemoryMb: 0, sleepingCount: 0 };
 
 /** Size of the Find bar, which sits in the top-right corner of the page card. Our choice. */
 const FIND_BAR_WIDTH_PX = 380;
@@ -276,6 +282,9 @@ function buildLibraryData(state: BrowserState): LibraryData {
     showsFullUrls: state.settings.showsFullUrls === true,
     areSnapshotsOn: state.settings.areSnapshotsOn !== false,
     sync: getSyncStatus(),
+    areFavoritesKeptAwake: areFavoritesKeptAwake(state.settings),
+    keepAwakeSites: state.keepAwakeSites ?? [],
+    tasks: getLibrarySection() === "tasks" ? collectTaskList() : EMPTY_TASK_LIST,
     adBlock: describeAdBlock(state),
     routingRules: state.routingRules ?? [],
     extensions: (state.extensions ?? []).map((extension) => ({
@@ -337,6 +346,7 @@ function buildSiteInfo(state: BrowserState): SiteInfo | null {
     origin: origin,
     permissions: permissions,
     isDeveloperMode: isDeveloperModeOn(state, tab.url),
+    isKeptAwake: isKeptAwake(state, tab.url),
     adBlock: state.settings.isAdBlockOn === true ? { isOnForSite: isAdBlockActiveFor(state, tab.url), blockedCount: contents === null ? 0 : getBlockedCount(contents) } : null,
     extensions: listExtensionTiles(state, profileId),
   };
@@ -1113,7 +1123,17 @@ function isShortText(value: unknown): value is string {
 /**
  * Registers the overlay page's IPC handlers. Every handler ignores messages from anyone but the overlay.
  */
+/**
+ * While the Library shows the Task Manager, its numbers are measured again every TASK_MANAGER_REFRESH_MS.
+ */
+function refreshTaskManager(): void {
+  if (shownPanel?.kind === "library" && getLibrarySection() === "tasks") {
+    sendToOverlay(OVERLAY_CHANNELS.libraryUpdate, buildLibraryData(getState()));
+  }
+}
+
 export function registerOverlayIpc(): void {
+  setInterval(refreshTaskManager, TASK_MANAGER_REFRESH_MS);
   ipcMain.handle(OVERLAY_CHANNELS.query, (event, text: unknown, mode: unknown) => {
     if (!isFromOverlay(event) || !isShortText(text) || !isMode(mode)) {
       return [];

@@ -168,6 +168,17 @@ function collectSettingLines(site: SiteInfo): SettingLine[] {
       run: () => dispatch({ type: "setAdBlockForSite", site: adBlockSite, isOn: !adBlock.isOnForSite }),
     });
   }
+  const keepAwakeSite = site.site;
+  if (keepAwakeSite !== null) {
+    lines.push({
+      icon: "sleep",
+      title: "Keep Awake",
+      state: site.isKeptAwake ? "On" : "Off",
+      isOn: site.isKeptAwake,
+      hint: site.isKeptAwake ? "Let this site's pages sleep again when unused" : "This site's pages never go to sleep by themselves",
+      run: () => dispatch({ type: "setSiteKeptAwake", site: keepAwakeSite, isKeptAwake: !site.isKeptAwake }),
+    });
+  }
   if (site.zoomPercent !== 100) {
     lines.push({ icon: "zoomIn", title: "Zoom", state: `${site.zoomPercent}%`, isOn: true, hint: "Back to 100%", run: () => window.overlayApi.siteCommand("zoomReset") });
   }

@@ -515,7 +515,7 @@ function checkSettings(raw: unknown): BrowserSettings {
   if (typeof source.searchEngine === "string" && (SEARCH_ENGINE_IDS as readonly string[]).includes(source.searchEngine)) {
     settings.searchEngine = source.searchEngine as BrowserSettings["searchEngine"];
   }
-  const flags = ["isAdBlockOn", "areTitlesTidy", "showsFullUrls", "hasSeenWelcome", "areSnapshotsOn"] as const;
+  const flags = ["isAdBlockOn", "areTitlesTidy", "showsFullUrls", "hasSeenWelcome", "areSnapshotsOn", "areFavoritesKeptAwake"] as const;
   for (const flag of flags) {
     if (typeof source[flag] === "boolean") {
       settings[flag] = source[flag] as boolean;
@@ -617,6 +617,9 @@ export function checkBackupState(raw: BrowserState, counter: CheckCounter): Brow
   }
   if (Array.isArray(raw.adBlockOffSites)) {
     checked.adBlockOffSites = raw.adBlockOffSites.filter((site): site is string => typeof site === "string" && SITE_PATTERN.test(site));
+  }
+  if (Array.isArray(raw.keepAwakeSites)) {
+    checked.keepAwakeSites = raw.keepAwakeSites.filter((site): site is string => typeof site === "string" && SITE_PATTERN.test(site));
   }
   return repairSelections(checked);
 }
