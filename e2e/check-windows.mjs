@@ -3,7 +3,8 @@
 // "Open in another window" in the second one (and Move to This Window takes the page over); ⌘W on a Pinned tab puts
 // its page away in every window that selected it; the Command Bar opens in
 // the focused window; menus act on the focused window; closing one window keeps the other; a restart opens both
-// again where they were; and the app quits with the last window, which the next start opens again.
+// again where they were; and the app quits with the last window, which the next start opens again. Each window's card
+// corners run in its sidebar's process, and a sidebar whose process is gone loads again with them.
 // usage: npm run build && node e2e/check-windows.mjs      (uses a throwaway --user-data-dir)
 import "./background.mjs";
 import { _electron } from "playwright-core";
@@ -211,6 +212,36 @@ async function dragAcrossWindows(fromSidebar, itemId, toSidebar, targetSelector,
   await fromSidebar.mouse.up();
   await toSidebar.waitForTimeout(500);
   return isAccepted;
+}
+
+/** Every main window's sidebar process, its card corners' processes and whether they draw, and whether its sidebar draws its Space. */
+function describeCornerProcesses(app) {
+  return app.evaluate(async ({ BrowserWindow }) => {
+    const isMainWindow = (candidate) => !candidate.isDestroyed() && !candidate.webContents.isDestroyed() && candidate.webContents.getURL().endsWith("/renderer/index.html");
+    const described = [];
+    for (const window of BrowserWindow.getAllWindows().filter(isMainWindow)) {
+      const corners = window.contentView.children.filter((child) => child.webContents && !child.webContents.isDestroyed() && child.webContents.getURL().endsWith("/corner/corner.html"));
+      // A sidebar whose process is gone cannot be asked (Electron logs an error) and answers only once it has loaded again.
+      const answer = window.webContents.isCrashed() ? false : window.webContents.executeJavaScript("document.querySelector('.space-title') !== null").catch(() => false);
+      const drawsSpaceTitle = await Promise.race([answer, new Promise((resolve) => setTimeout(() => resolve(false), 500))]);
+      // A corner draws once it got its place and the frame (corner.ts sets the replica's size).
+      const askCorner = (corner) => (corner.webContents.isCrashed() ? false : corner.webContents.executeJavaScript("document.getElementById('frame-replica').style.width !== ''").catch(() => false));
+      const cornerDraws = await Promise.all(corners.map(askCorner));
+      described.push({ sidebarPid: window.webContents.getOSProcessId(), cornerPids: corners.map((corner) => corner.webContents.getOSProcessId()), cornerDraws, drawsSpaceTitle });
+    }
+    return described;
+  });
+}
+
+/** Waits until a condition on the corner processes holds (the sidebar page opens the corners after its first page). */
+async function waitForCornerProcesses(app, condition, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  let described = await describeCornerProcesses(app).catch(() => []);
+  while (!condition(described) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    described = await describeCornerProcesses(app).catch(() => []);
+  }
+  return described;
 }
 
 /** Whether the "Open in another window" card shows in a sidebar page. */
@@ -564,6 +595,15 @@ check(
   JSON.stringify(windows.map((window) => window.pageX)),
 );
 
+// Each window's two card corners run in that window's sidebar process (cornerMasks.ts), not in processes of their own.
+const isSharedAndDrawing = (window) => window.cornerPids.length === 2 && window.cornerPids.every((pid) => pid === window.sidebarPid) && window.cornerDraws.every((draws) => draws);
+let cornerProcesses = await waitForCornerProcesses(app, (list) => list.length === 2 && list.every(isSharedAndDrawing));
+check(
+  "each window's two card corners run in its sidebar's process, not in two of their own, and draw",
+  cornerProcesses.length === 2 && cornerProcesses.every(isSharedAndDrawing),
+  JSON.stringify(cornerProcesses),
+);
+
 // "Restart to Update" (Electron's quitAndInstall) closes every window before it quits: they must all come back.
 const exitedForUpdate = new Promise((resolve) => app.process().once("exit", () => resolve(true)));
 const updateRunLog = mainLog.join("");
@@ -600,6 +640,23 @@ sidebars = await waitForSidebars(app, 1);
 await sidebars[0].waitForTimeout(1000);
 const lastState = await getState(sidebars[0]);
 check("the next start opens the last closed window", app.windows().filter(isSidebarPage).length === 1 && lastState.otherWindows.length === 0);
+// A sidebar whose process is gone loads again, and the card's corners (in the same process) come back with it.
+await dispatch(sidebars[0], { type: "openTab", typedText: urlOf("crash-test") });
+cornerProcesses = await waitForCornerProcesses(app, (list) => list[0] !== undefined && isSharedAndDrawing(list[0]));
+const sidebarPidBefore = cornerProcesses[0]?.sidebarPid;
+// Returns once main has heard of the crash, so the next look at the sidebar sees it gone or loading again.
+await app.evaluate(({ BrowserWindow }) => new Promise((resolve) => {
+  const window = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  window.webContents.once("render-process-gone", () => resolve());
+  window.webContents.forcefullyCrashRenderer();
+}));
+const isBackAgain = (window) => window !== undefined && window.sidebarPid !== sidebarPidBefore && window.drawsSpaceTitle && isSharedAndDrawing(window);
+cornerProcesses = await waitForCornerProcesses(app, (list) => isBackAgain(list[0]), 15000);
+check(
+  "a sidebar whose process is gone loads again, and its card corners come back in its new process and draw",
+  isBackAgain(cornerProcesses[0]),
+  JSON.stringify({ sidebarPidBefore, cornerProcesses }),
+);
 const thirdRunLog = mainLog.join("");
 await app.close();
 server.close();

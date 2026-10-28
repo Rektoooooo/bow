@@ -108,8 +108,9 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   microphone, location, notifications and clipboard reading go to a prompt (`permissionPrompts.ts`, answers in
   `BrowserState.sitePermissions` per profile and origin; private windows never save), screen sharing goes to
   macOS's sharing picker (`setDisplayMediaRequestHandler` with `useSystemPicker`), everything else and anything
-  from our own pages is refused. Our pages block `will-navigate` and `window.open`. `e2e/permission-check.mjs`
-  proves it. Keep it passing.
+  from our own pages is refused. Our pages block `will-navigate` and `window.open`, with one exception: a window's
+  sidebar page opens the card's two corner pages main asks it for (`cornerMasks.ts`, allowed by window name and
+  address only), so they share its process. `e2e/permission-check.mjs` proves it. Keep it passing.
 - **Updates** (`appUpdates.ts`): Electron's Squirrel.Mac reads `update-darwin-<arch>.json` from the newest published
   GitHub release (`releases/latest/download/…`, so drafts are invisible to installed apps), downloads the zip, checks
   its SHA-256, size and Developer ID signature, and installs on quit or "Restart to Update". Off for builds from

@@ -169,3 +169,8 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   Verify with the frontmost-app watcher, not by reasoning: `/private/tmp/claude-501/bin/watch-front.sh <log> <stop>
   <check log>` logs every change of `lsappinfo front` with the check that had just passed. Any new window: make it
   with `show: false`.
+
+- Never `cd` out of the worktree in a Bash call (2026-10-28, twice: once into the main checkout, once into
+  `/private/tmp/...` to build an old commit). The harness resets the shell to the main checkout and the session's
+  working directory moves there. For another folder, use `npm --prefix <dir> run build` or a subshell
+  `(cd <dir> && …)`, and absolute paths.

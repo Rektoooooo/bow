@@ -337,7 +337,12 @@ M about a day, L several days.
       before quit, restored the first time each tab is shown; a killed app comes back scrolled where it was. Not for
       private windows or profiles that forget site data. The sidebar: saved within 0.5 s, hourly snapshots from item 1)
       Crash-proof restore: scroll positions come back; snapshots from item 1 cover the sidebar (S)
-- [ ] 21. Less memory for Bow's own helper views (70–90 MB each per window) (M)
+- [x] 21. (The card's two corner pages are opened by the window's sidebar page (window.open, allowed for exactly those
+      pages), so they run in its process: two processes fewer per window. Measured with macOS's footprint: 1 window
+      300 → 257 MB, 2 windows 447 → 369 MB; the "70–90 MB" were working sets, which count shared memory. A sidebar
+      whose process is gone now loads again and its corners come back. Overlay and status bubble stay on their own:
+      one each for the whole app, not per window)
+      Less memory for Bow's own helper views (70–90 MB each per window) (M)
 - [x] 22. The Control Center no longer rebuilds when nothing changed (an unclickable panel under bursts of
       refreshes, found 2026-10-27; the fix is uncommitted in the main checkout's src/overlay/siteControls.ts) (S)
 

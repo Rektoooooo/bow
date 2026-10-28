@@ -473,7 +473,7 @@ export function handOverDrop(fromWindowId: WindowId, itemId: ItemId, screenX: nu
     }
     window.focus();
     flushStatePush();
-    window.webContents.send(IPC_CHANNELS.sidebarCommand, { kind: "dropItemFromOtherWindow", itemId: itemId, clientX: screenX - bounds.x, clientY: screenY - bounds.y });
+    sendToSidebar(window, IPC_CHANNELS.sidebarCommand, { kind: "dropItemFromOtherWindow", itemId: itemId, clientX: screenX - bounds.x, clientY: screenY - bounds.y });
     return;
   }
 }
@@ -638,11 +638,22 @@ function flushStatePush(): void {
 }
 
 /**
+ * Sends a message to a window's sidebar page, unless its process is gone: it loads again and asks for the state itself
+ * (mainWindows.ts), and Electron would log an error for a page that cannot receive.
+ */
+function sendToSidebar(window: BrowserWindow, channel: string, message: unknown): void {
+  if (window.webContents.isCrashed()) {
+    return;
+  }
+  window.webContents.send(channel, message);
+}
+
+/**
  * Sends the current state to every main window's sidebar page, as that window shows it, so it can redraw.
  */
 export function pushStateToSidebar(): void {
   for (const { windowId, window } of listMainWindows()) {
-    window.webContents.send(IPC_CHANNELS.stateChanged, getStateForWindow(windowId));
+    sendToSidebar(window, IPC_CHANNELS.stateChanged, getStateForWindow(windowId));
   }
 }
 
@@ -759,7 +770,7 @@ export function scheduleRuntimePush(): void {
     runtimePushTimer = null;
     for (const { windowId, window } of listMainWindows()) {
       updateWindowButtons(windowId, window);
-      window.webContents.send(IPC_CHANNELS.runtimeChanged, collectRuntimeState(windowId));
+      sendToSidebar(window, IPC_CHANNELS.runtimeChanged, collectRuntimeState(windowId));
     }
   }, RUNTIME_PUSH_DELAY_MS);
 }
@@ -803,7 +814,7 @@ export function sendSidebarCommand(command: SidebarCommand): void {
     return;
   }
   flushStatePush();
-  window.webContents.send(IPC_CHANNELS.sidebarCommand, command);
+  sendToSidebar(window, IPC_CHANNELS.sidebarCommand, command);
 }
 
 /**
@@ -812,6 +823,6 @@ export function sendSidebarCommand(command: SidebarCommand): void {
 export function sendSidebarCommandToAllWindows(command: SidebarCommand): void {
   flushStatePush();
   for (const entry of listMainWindows()) {
-    entry.window.webContents.send(IPC_CHANNELS.sidebarCommand, command);
+    sendToSidebar(entry.window, IPC_CHANNELS.sidebarCommand, command);
   }
 }

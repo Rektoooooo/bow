@@ -240,6 +240,20 @@ export function getShownTabIdsInWindow(windowId: WindowId): ItemId[] {
 }
 
 /**
+ * Returns the page views in one window (a corner mask that arrives late goes right above them).
+ */
+export function listShownPageViews(windowId: WindowId): WebContentsView[] {
+  const views: WebContentsView[] = [];
+  for (const tabId of getShownTabIdsInWindow(windowId)) {
+    const view = tabViews.get(tabId);
+    if (view !== undefined) {
+      views.push(view);
+    }
+  }
+  return views;
+}
+
+/**
  * Returns the window that has a tab's page on screen, or null.
  */
 export function findWindowShowingTab(tabId: ItemId): WindowId | null {

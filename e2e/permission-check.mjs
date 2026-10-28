@@ -157,6 +157,10 @@ await page.evaluate(() => {
 });
 await sleep(1500);
 check("the sidebar page cannot be navigated away", page.url() === sidebarUrlBefore);
+// The sidebar page opens only the card's corner pages main asked it for (cornerMasks.ts): not a site, and not a corner
+// page under a name main did not give.
+const sidebarRefused = await page.evaluate(() => [window.open("https://example.org", "_blank") === null, window.open(new URL("../corner/corner.html", location.href).href, "bow-corner-0") === null]);
+check("the sidebar page cannot open windows of its own", sidebarRefused.every((isRefused) => isRefused), JSON.stringify(sidebarRefused));
 
 // Screen sharing: a site's request opens macOS's sharing picker (the promise waits for the user's choice there; in a
 // background run a stand-in that waits the same way, so the system's picker never takes the keyboard);

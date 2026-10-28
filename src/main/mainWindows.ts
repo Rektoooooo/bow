@@ -12,12 +12,15 @@
  *   ⌘N → openNewWindow() → openWindow(state, id) → its sidebar asks for the state as it shows it → Command Bar
  *   a main window gets the focus → floating panels close → focusWindow(state, id)
  *   a main window closes → its pages leave it → closeWindow(state, id) (not while quitting) → quit after the last
+ *   the sidebar page opens a window → only the card's corner pages are allowed (cornerMasks.ts)
+ *   the sidebar's process goes away → reloadSidebarAfterCrash() → it loads again (cornerMasks.ts reopens the corners)
  */
 import { app, autoUpdater, BrowserWindow } from "electron";
 import type { Rectangle } from "electron";
 import * as path from "node:path";
 import type { WindowId } from "../shared/types";
 import { applyChange, attachWindow, detachWindow, getMainWindow, getState, getWindow, isLibraryOpenIn, listMainWindows, relayoutWindow, scheduleRuntimePush } from "./browserCore";
+import { answerSidebarWindowOpen } from "./cornerMasks";
 import { closeOverlay, openCommandBar, relayoutOverlay } from "./overlayController";
 import { leaveWindow as overlayLeaveWindow } from "./overlay";
 import { closePeekIn, refreshPeekFrame, relayoutPeek } from "./peek";
@@ -43,6 +46,12 @@ const NEW_WINDOW_OFFSET_PX = 22;
  * the user's Arc (1 px per pt): the close button's center is at 19, 22.5 pt.
  */
 const TRAFFIC_LIGHT_POSITION = { x: 12, y: 16 };
+
+/**
+ * A sidebar whose process goes away again this soon after it was reloaded stays as it is: no endless reload loop.
+ * Our choice.
+ */
+const SIDEBAR_RELOAD_GUARD_MS = 10_000;
 
 /** True once the app is quitting (⌘Q): closing windows then keeps them in the saved list for the next start. */
 let isQuitting = false;
@@ -84,6 +93,22 @@ function handleWindowClose(windowId: WindowId, window: BrowserWindow): void {
 }
 
 /**
+ * A sidebar page whose process went away (a crash; the card's corners in the same process go with it) loads again,
+ * and asks for the state as it does at start. Not when it already went away right after the last reload.
+ */
+function reloadSidebarAfterCrash(window: BrowserWindow): void {
+  let lastReloadAt = 0;
+  window.webContents.on("render-process-gone", (_event, details) => {
+    const isTooSoon = Date.now() - lastReloadAt < SIDEBAR_RELOAD_GUARD_MS;
+    if (details.reason === "clean-exit" || isTooSoon || window.isDestroyed()) {
+      return;
+    }
+    lastReloadAt = Date.now();
+    window.webContents.reload();
+  });
+}
+
+/**
  * Creates one main window (hidden; the caller shows it): sidebar page on the left, hidden title bar with the
  * traffic-light buttons inset, the sidebar's preload script attached, and listeners for resizing, moving, the focus
  * and closing.
@@ -111,15 +136,15 @@ function createMainWindow(windowId: WindowId, bounds: Rectangle | null): Browser
     },
   });
 
-  // The sidebar page holds the bridge to Electron, so it must never navigate away or open windows.
+  // The sidebar page holds the bridge to Electron, so it must never navigate away or open windows: the only pages it
+  // opens are the card's corners main asks it for (cornerMasks.ts), which then share its process.
   // Without this, dropping a link onto the sidebar would load that website with the bridge attached.
   window.webContents.on("will-navigate", (event) => {
     event.preventDefault();
   });
-  window.webContents.setWindowOpenHandler(() => {
-    return { action: "deny" };
-  });
+  window.webContents.setWindowOpenHandler((details) => answerSidebarWindowOpen(windowId, details));
 
+  reloadSidebarAfterCrash(window);
   window.loadFile(sidebarPagePath);
   window.on("resize", () => {
     relayoutWindow(windowId);
