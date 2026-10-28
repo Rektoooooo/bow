@@ -1499,6 +1499,29 @@ const WIKI_HTML = `<!doctype html><html><head><title>Paper boat - Wikipedia</tit
   </main>
   <footer><p>This footer stands in for the page's license text and links, which Reader view leaves out of the article.</p></footer>
 </body></html>`;
+/**
+ * A made-up newsletter page wrapped in one form, the way old ASP.NET WebForms sites are built (<form id="aspnetForm">
+ * around the whole body, the paragraphs straight inside it), where Reader view once found no article: it left forms
+ * out wherever they were.
+ */
+const WEBFORMS_PARAGRAPH = "This paragraph of a made-up town newsletter sits inside the form that wraps the whole page. ";
+const WEBFORMS_HTML = `<!doctype html><title>Harbour news - Town Hall</title>
+  <form method="post" action="./news.aspx" id="aspnetForm">
+    <div class="aspNetHidden"><input type="hidden" name="__VIEWSTATE" value="made-up"></div>
+    <div id="header"><a href="/">Town Hall</a> <input type="text" name="search" aria-label="Search"> <input type="submit" value="Search"></div>
+    <h1>Harbour news</h1>
+    <p>${WEBFORMS_PARAGRAPH.repeat(4)}</p><p>${WEBFORMS_PARAGRAPH.repeat(4)}</p><p>${WEBFORMS_PARAGRAPH.repeat(4)}</p>
+  </form>`;
+/**
+ * A made-up article with a comment form inside it, whose long paragraph is not the article's. (A form cannot sit
+ * inside another one: the HTML parser drops the inner <form>, so this is its own page.)
+ */
+const COMMENTS_HTML = `<!doctype html><title>A story with comments - Basics</title>
+  <article><h1>A story with comments</h1>
+    <p>${ARTICLE_PARAGRAPH.repeat(4)}</p><p>${ARTICLE_PARAGRAPH.repeat(4)}</p><p>${ARTICLE_PARAGRAPH.repeat(4)}</p>
+    <form class="comments" action="/comment"><h2>Leave a comment</h2>
+      <p>Comment rules: ${ARTICLE_PARAGRAPH.repeat(3)}</p><textarea name="comment" aria-label="Comment"></textarea><button>Post comment</button></form>
+  </article>`;
 const basicsServer = http.createServer((request, response) => {
   if (request.url === "/article") {
     response.writeHead(200, { "Content-Type": "text/html" });
@@ -1508,6 +1531,16 @@ const basicsServer = http.createServer((request, response) => {
   if (request.url === "/wiki/Paper_boat") {
     response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     response.end(WIKI_HTML);
+    return;
+  }
+  if (request.url === "/news.aspx") {
+    response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    response.end(WEBFORMS_HTML);
+    return;
+  }
+  if (request.url === "/story-with-comments") {
+    response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    response.end(COMMENTS_HTML);
     return;
   }
   if (request.url === "/notes.txt") {
@@ -1832,6 +1865,43 @@ check(
   "and leaves out the languages, contents, infobox, navigation box, link lists, hidden parts and style sheet text",
   wikiReader !== null && wikiLeaks.length === 0 && JSON.stringify(wikiReader.headings) === JSON.stringify(["History", "Folding", "References"]) && wikiReader.items.length === 4,
   JSON.stringify({ leaks: wikiLeaks, headings: wikiReader?.headings, items: wikiReader?.items }),
+);
+await sidebar.press(".reader-view", "Escape", { timeout: 5000 }).catch(() => undefined);
+await sidebar.waitForTimeout(400);
+
+// Reader view on a page wrapped in one form (old ASP.NET WebForms sites): the form holds the article, so the page is
+// offered Reader view and its paragraphs are read. A form inside the article (a comment form) is still left out.
+await dispatch({ type: "openTab", typedText: `${basicsOrigin}/news.aspx` });
+await waitForSelectedUrl("/news.aspx");
+await sidebar.waitForSelector(".reader-toggle", { timeout: 10000 }).catch(() => undefined);
+const offersReaderInForm = (await sidebar.$(".reader-toggle")) !== null;
+await sidebar.click(".reader-toggle").catch(() => undefined);
+await sidebar.waitForSelector(".reader-view", { timeout: 5000 }).catch(() => undefined);
+const formReader = await sidebar.evaluate(() => {
+  const view = document.querySelector(".reader-view");
+  return view === null ? null : { title: view.querySelector(".reader-title")?.textContent, paragraphs: view.querySelectorAll(".reader-paragraph").length, text: view.textContent };
+});
+check(
+  "a page wrapped in one form (ASP.NET WebForms) is offered Reader view, which reads its paragraphs",
+  offersReaderInForm && formReader?.title === "Harbour news" && formReader.paragraphs === 3 && formReader.text.includes("made-up town newsletter"),
+  JSON.stringify({ offersReaderInForm, title: formReader?.title, paragraphs: formReader?.paragraphs }),
+);
+await sidebar.press(".reader-view", "Escape", { timeout: 5000 }).catch(() => undefined);
+await sidebar.waitForTimeout(400);
+await dispatch({ type: "openTab", typedText: `${basicsOrigin}/story-with-comments` });
+await waitForSelectedUrl("/story-with-comments");
+await sidebar.waitForSelector(".reader-toggle", { timeout: 10000 }).catch(() => undefined);
+await sidebar.click(".reader-toggle").catch(() => undefined);
+await sidebar.waitForSelector(".reader-view", { timeout: 5000 }).catch(() => undefined);
+const commentsReader = await sidebar.evaluate(() => {
+  const view = document.querySelector(".reader-view");
+  return view === null ? null : { title: view.querySelector(".reader-title")?.textContent, paragraphs: view.querySelectorAll(".reader-paragraph").length, text: view.textContent };
+});
+const commentLeaks = ["Leave a comment", "Comment rules", "Post comment"].filter((text) => commentsReader?.text.includes(text));
+check(
+  "and a comment form inside an article stays out of it, its long paragraph too",
+  commentsReader?.title === "A story with comments" && commentsReader.paragraphs === 3 && commentLeaks.length === 0,
+  JSON.stringify({ title: commentsReader?.title, paragraphs: commentsReader?.paragraphs, leaks: commentLeaks }),
 );
 await sidebar.press(".reader-view", "Escape", { timeout: 5000 }).catch(() => undefined);
 await sidebar.waitForTimeout(400);

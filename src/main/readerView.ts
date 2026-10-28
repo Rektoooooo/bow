@@ -3,9 +3,10 @@
  *   Reader view: an article without the site around it (menus, ads, sidebars), in a calm column of text. A script in
  *   the page finds the part of the page that holds the most paragraph text and reads it as plain blocks (headings,
  *   paragraphs, list items, quotes, code, images), leaving out what is not the article: navigation and menus (lists
- *   that are mostly links too: languages, contents, categories), sidebars, footers, tables inside the article
- *   (infoboxes) and whatever the page hides. checkReaderArticle() shows the title once and drops headings left with
- *   nothing under them; the sidebar page draws the blocks in the card (renderer/readerView.ts).
+ *   that are mostly links too: languages, contents, categories), sidebars, footers, tables and forms inside the
+ *   article (infoboxes, comment forms) and whatever the page hides. checkReaderArticle() shows the title once and
+ *   drops headings left with nothing under them; the sidebar page draws the blocks in the card
+ *   (renderer/readerView.ts).
  *   Our own rules, not a library: the page's text comes out as text only, never as markup.
  *
  * Data source:
@@ -51,7 +52,8 @@ const TITLE_SEPARATORS = [" - ", " – ", " — ", " | ", " · "] as const;
 
 /**
  * What Reader view leaves out wherever it is on the page: navigation and menus, sidebars, the site's header and
- * footer, forms and buttons, code and style sheets, and parts hidden from everyone.
+ * footer, buttons, code and style sheets, and parts hidden from everyone. Forms are left out only inside the article
+ * (INSIDE_ARTICLE_LEFT_OUT_SELECTOR).
  */
 const LEFT_OUT_SELECTOR = [
   "nav",
@@ -63,7 +65,6 @@ const LEFT_OUT_SELECTOR = [
   "[role='banner']",
   "footer",
   "[role='contentinfo']",
-  "form",
   "button",
   "script",
   "style",
@@ -72,6 +73,14 @@ const LEFT_OUT_SELECTOR = [
   "[aria-hidden='true']",
   "[hidden]",
 ].join(", ");
+
+/**
+ * What Reader view leaves out only inside the chosen container: tables (infoboxes, data tables, navigation boxes) and
+ * forms (a comment form, a search box). Reader view draws text, not tables or fields. A page laid out with a table, or
+ * wrapped in one form (old ASP.NET WebForms pages put <form id="aspnetForm"> around everything), holds the container
+ * instead, and stays.
+ */
+const INSIDE_ARTICLE_LEFT_OUT_SELECTOR = ["table", "form"].join(", ");
 
 /**
  * Runs in the page: whether it looks like an article (enough real paragraphs that are shown, outside menus and
@@ -95,13 +104,14 @@ export const READER_PROBE_SCRIPT = `(() => {
 /**
  * Runs in the page: the article as plain data. The container is the article or main element with the most
  * paragraph text, else the element whose own paragraphs hold the most text; its blocks are read in document order,
- * a block inside another (a paragraph in a quote) only once. Left out: menus, sidebars, forms, hidden parts (also
- * by style: display none, visibility hidden), lists that are mostly links, and tables inside the container. The text
- * is read as shown (innerText: no style sheet text, nothing hidden). The page's og:title and its own heading come
- * back as they are; checkReaderArticle() picks the title from them.
+ * a block inside another (a paragraph in a quote) only once. Left out: menus, sidebars, buttons, hidden parts (also
+ * by style: display none, visibility hidden), lists that are mostly links, and tables and forms inside the
+ * container. The text is read as shown (innerText: no style sheet text, nothing hidden). The page's og:title and its
+ * own heading come back as they are; checkReaderArticle() picks the title from them.
  */
 export const READER_EXTRACT_SCRIPT = `(() => {
   const leftOut = ${JSON.stringify(LEFT_OUT_SELECTOR)};
+  const insideArticleLeftOut = ${JSON.stringify(INSIDE_ARTICLE_LEFT_OUT_SELECTOR)};
   const clean = (text) => text.replace(/\\s+/g, " ").trim();
   const lengthWithoutSpaces = (text) => text.replace(/\\s+/g, "").length;
   const isLinkListByList = new Map();
@@ -121,16 +131,18 @@ export const READER_EXTRACT_SCRIPT = `(() => {
     const list = element.closest("ul, ol, menu");
     return list !== null && isLinkList(list);
   };
-  // A table inside the container is an infobox or a data table: Reader view draws text, not tables. (A page laid out
-  // with a table holds the container instead, and stays.)
-  const isInTable = (element, container) => {
-    const table = element.closest("table");
-    return table !== null && container.contains(table);
+  // A table or form inside the container is an infobox or a comment form, not the article. One that holds the
+  // container (a layout table, a form around the whole page) stays, and so does a form that is the container itself
+  // (paragraphs straight inside a page-wide form): contains() is true for the container too. The nearest table or
+  // form is enough: when it is outside the container, every one further out is too.
+  const isInTableOrForm = (element, container) => {
+    const part = element.closest(insideArticleLeftOut);
+    return part !== null && part !== container && container.contains(part);
   };
   const paragraphText = (container) => {
     let total = 0;
     for (const paragraph of container.querySelectorAll("p")) {
-      if (isLeftOut(paragraph) || isInTable(paragraph, container)) continue;
+      if (isLeftOut(paragraph) || isInTableOrForm(paragraph, container)) continue;
       const length = clean(paragraph.innerText).length;
       if (length >= ${READER_COUNTED_PARAGRAPH_LENGTH}) total += length;
     }
@@ -179,7 +191,7 @@ export const READER_EXTRACT_SCRIPT = `(() => {
   const blocks = [];
   for (const element of best.querySelectorAll("h1, h2, h3, h4, p, li, blockquote, pre, img, figcaption")) {
     if (blocks.length >= ${MAX_BLOCKS}) break;
-    if (isLeftOut(element) || isInTable(element, best)) continue;
+    if (isLeftOut(element) || isInTableOrForm(element, best)) continue;
     const block = readBlock(element);
     if (block !== null) blocks.push(block);
   }
