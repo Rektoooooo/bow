@@ -70,7 +70,7 @@ import { getOverlayContents, hideOverlay, sendToOverlay, setOverlayBounds, showO
 import { closePeek, finishPeekCloseOf, finishPeekGrow, isPeekClosing, isPeekOpen, navigatePeek, openPeekAsTab, openPeekInSplit } from "./peek";
 import { toggleDevTools, translatePage, zoomPage } from "./pageCommands";
 import { splitTabs } from "./split";
-import { getSelectedTabId, openTab, selectTab } from "./state";
+import { getSelectedTabId, openTab, restoreArchivedTab, selectTab } from "./state";
 import { areFavoritesKeptAwake, isKeptAwake, readTabSleepAfter } from "./tabSleep";
 import { collectTaskList } from "./tabSleepController";
 import { loadUrlInTab, openLinkInNewTab, openOrSwitchToTab, setMuted } from "./tabActions";
@@ -926,6 +926,12 @@ function handleChoose(resultId: string | null, typedText: string, mode: CommandB
   }
   if (result.kind === "action" && result.actionId !== null && actionRegistry !== null) {
     actionRegistry.run(result.actionId);
+    return;
+  }
+  // A tab you closed comes back where it was; in ⌘L or a split pane its page opens there instead.
+  if (result.kind === "closed" && result.tabId !== null && mode === "newTab") {
+    const archivedTabId = result.tabId;
+    applyChange((state) => restoreArchivedTab(state, archivedTabId, Date.now()));
     return;
   }
   if (result.kind === "answer" && result.copyText !== undefined) {

@@ -15,6 +15,9 @@ export const MINUTE_MS = 60 * 1000;
 export const HOUR_MS = 60 * MINUTE_MS;
 export const DAY_MS = 24 * HOUR_MS;
 
+/** The day a week starts on, as Date.getDay() numbers it (0 = Sunday): Monday, as ISO 8601 weeks do. Our choice. */
+export const WEEK_START_DAY = 1;
+
 /** One entry in the "Archive tabs after" menu. A null value means never archive. */
 export interface ArchiveThresholdOption {
   label: string;

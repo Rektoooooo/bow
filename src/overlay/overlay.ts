@@ -49,6 +49,7 @@ const LINE_HINTS: Record<CommandBarLine["kind"], string> = {
   search: "Search",
   action: "Run",
   answer: "Copy",
+  closed: "Reopen",
 };
 
 /** Icon for lines that have no favicon, by kind. */
@@ -59,6 +60,7 @@ const LINE_ICONS: Record<CommandBarLine["kind"], IconName> = {
   search: "search",
   action: "sliders",
   answer: "calculator",
+  closed: "reset",
 };
 
 /** What the info button lists: things the Command Bar does that a first look does not show. Our own wording. */
@@ -131,7 +133,7 @@ function createCommandLine(line: CommandBarLine, index: number): HTMLElement {
   row.classList.toggle("is-highlighted", index === highlightedIndex);
 
   const iconSlot = createElement("span", "command-line-icon");
-  const hasPage = line.url !== null && (line.kind === "tab" || line.kind === "history" || line.kind === "navigate");
+  const hasPage = line.url !== null && (line.kind === "tab" || line.kind === "history" || line.kind === "navigate" || line.kind === "closed");
   if (line.faviconUrl !== null || hasPage) {
     iconSlot.append(createFavicon(line.faviconUrl, line.url ?? ""));
   } else {

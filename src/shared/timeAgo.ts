@@ -51,7 +51,7 @@ const WEEKDAY_NAME_DAYS = 6;
 /**
  * The start of a time's calendar day, in the Mac's own time zone.
  */
-function startOfDay(time: number): number {
+export function startOfDay(time: number): number {
   const date = new Date(time);
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }

@@ -1511,6 +1511,37 @@ const boostMessages = await app.evaluate(() => globalThis.boostMessages);
 check("Import… asks before replacing the site's Boost, then puts the file's in place", importedBoost?.css === "body { outline: 2px solid tomato }" && boostMessages.some((message) => message.startsWith("Replace your Boost for localhost?")), boostMessages.join(" / "));
 check("and its JavaScript arrives switched off, which Bow says", importedBoost?.isJavaScriptOn === false && boostMessages.some((message) => message.includes("arrives switched off")) && (await sidebar.locator(".boost-script-badge").count()) === 0);
 await dispatch({ type: "deleteBoost", site: "localhost" });
+
+// The Command Bar lists the tabs you closed when nothing is typed; Return reopens one where it was. A time in the
+// query ("today") lists that day's history with the time of each visit.
+await dispatch({ type: "openTab", typedText: `${basicsOrigin}/closed-page` });
+await waitForSelectedUrl("/closed-page");
+await sidebar.waitForTimeout(800);
+const closedPageTabId = selectedTab(await getState()).id;
+await dispatch({ type: "closeTab", tabId: closedPageTabId });
+await sidebar.waitForTimeout(400);
+await dispatch({ type: "openCommandBar", mode: "newTab" });
+await overlay.waitForSelector(".command-input", { timeout: 5000 });
+await overlay.waitForSelector('.command-line[data-kind="closed"]', { timeout: 5000 }).catch(() => undefined);
+const closedLineTexts = await overlay.$$eval('.command-line[data-kind="closed"]', (lines) =>
+  lines.map((line) => `${line.querySelector(".command-line-title")?.textContent} | ${line.querySelector(".command-line-hint")?.textContent}`),
+);
+check("with nothing typed, the Command Bar lists the tab you just closed, to reopen", closedLineTexts[0]?.startsWith("Basics: /closed-page | Reopen"), closedLineTexts.join(" / "));
+await overlay.click('.command-line[data-kind="closed"]');
+await sidebar.waitForTimeout(600);
+const reopenedState = await getState();
+check(
+  "choosing it brings the tab back out of the Archive and selects it",
+  selectedTab(reopenedState)?.url === `${basicsOrigin}/closed-page` && !reopenedState.archive.some((entry) => entry.tab.url === `${basicsOrigin}/closed-page`),
+  selectedTab(reopenedState)?.url,
+);
+await dispatch({ type: "openCommandBar", mode: "newTab" });
+await overlay.waitForSelector(".command-input", { timeout: 5000 });
+await overlay.fill(".command-input", "today basics");
+await overlay.waitForTimeout(600);
+const todaySubtitle = await overlay.textContent(".command-line.is-highlighted .command-line-subtitle").catch(() => null);
+check("typing a day and words lists that day's matching pages first, with the time of the visit", /^Today, \d\d:\d\d · 127\.0\.0\.1:\d+$/.test(todaySubtitle ?? ""), String(todaySubtitle));
+await overlay.press(".command-input", "Escape");
 basicsServer.close();
 
 await app.close();

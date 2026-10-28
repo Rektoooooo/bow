@@ -5,8 +5,8 @@
  *   boosts (docs/research/arc-findings.md §3, "Command Bar"); this is our own, simpler version of that idea.
  *
  * Data source:
- *   The typed query, the BrowserState (open tabs, Favorites), browsing history, search suggestions, the action list,
- *   the current page's address and the recently used tabs.
+ *   The typed query, the BrowserState (open tabs, Favorites, the tabs you closed in the Archive), browsing history,
+ *   search suggestions, the action list, the current page's address and the recently used tabs.
  *
  * Data flow:
  *   overlay sends a query → main.ts → rankCommandBarResults() → up to RESULTS_LIMIT results → overlay shows them
@@ -18,10 +18,16 @@
  *   penalty: the page you are on −50 (Arc also ranks the current page down)
  *   what you typed: an address scores 75, a search 70, so only strong matches (prefix or better) beat it
  *   an answer (a sum or a unit conversion) 150: above everything, the search for the same text stays below it
+ *   a tab you closed: its match +20 (what history can earn at most), so it reopens rather than loads anew
+ *   a time in the query ("yesterday github"): that time's history, newest first, 90 each, at most 6 lines
+ *   ties: an open tab, then a closed one, then the rest; a closed page open again is only "Switch to Tab"
+ * Nothing typed: the 5 most recently used tabs, then the 3 tabs you closed last.
  */
 import type { CommandBarResultKind } from "../shared/overlay";
 import { DAY_MS } from "../shared/settings";
-import type { BrowserState, ItemId, TabItem } from "../shared/types";
+import { describeDay, describeTimeAgo } from "../shared/timeAgo";
+import type { ArchivedTab, BrowserState, ItemId, TabItem } from "../shared/types";
+import { readDatePhrase } from "./historyDates";
 import type { HistoryEntry } from "./history";
 import { looksLikeWebAddress, normalizeTypedInput } from "./urls";
 import { buildSearchUrl, findSearchEngine } from "../shared/searchEngines";
@@ -77,6 +83,15 @@ export const TAB_SEARCH_LIMIT = 100;
 /** Open tabs listed when nothing is typed yet. The user's Arc lists five lines (shot 3). */
 const EMPTY_QUERY_TAB_COUNT = 5;
 
+/** Closed tabs listed below them; together they fill RESULTS_LIMIT. Our choice. */
+const EMPTY_QUERY_CLOSED_COUNT = RESULTS_LIMIT - EMPTY_QUERY_TAB_COUNT;
+
+/** The newest closed tabs a query searches. Our choice: older ones are in the Library's Archive. */
+const CLOSED_SEARCH_LIMIT = 50;
+
+/** Most lines a time in the query lists, so what you typed still fits below them. Our choice. */
+const DATED_HISTORY_LIMIT = 6;
+
 const OPEN_TAB_BOOST = 15;
 const FAVORITE_BOOST = 10;
 const RECENT_TAB_MAX_BOOST = 10;
@@ -89,6 +104,11 @@ const TYPED_SEARCH_SCORE = 70;
 const SUGGESTION_BASE_SCORE = 25;
 const ACTION_BOOST = 5;
 const ANSWER_SCORE = 150;
+const CLOSED_BOOST = VISIT_COUNT_MAX_BOOST + RECENT_VISIT_BOOST_DAY;
+const DATED_HISTORY_SCORE = 90;
+
+/** Which line stays when two lead to the same page with the same score: higher wins. */
+const KIND_PRECEDENCE: Partial<Record<CommandBarResultKind, number>> = { tab: 2, closed: 1 };
 const WEEK_MS = 7 * DAY_MS;
 
 /** A result with its score, before sorting. */
@@ -371,20 +391,114 @@ function scoreTypedAndSuggestions(input: CommandBarInput): ScoredResult[] {
 }
 
 /**
- * Keeps the best-scoring result per destination. An open tab wins a tie against history, because switching to a
- * tab you have is better than opening the page again.
+ * Keeps the best-scoring result per destination. On a tie an open tab wins, then a closed one: switching to a tab you
+ * have is better than reopening one, and reopening better than loading the page anew.
  */
 function removeDuplicates(scored: ScoredResult[]): ScoredResult[] {
   const bestByKey = new Map<string, ScoredResult>();
   for (const candidate of scored) {
     const existing = bestByKey.get(candidate.dedupeKey);
-    const candidateWins =
-      existing === undefined || candidate.score > existing.score || (candidate.score === existing.score && candidate.result.kind === "tab");
+    const candidatePrecedence = KIND_PRECEDENCE[candidate.result.kind] ?? 0;
+    const existingPrecedence = existing === undefined ? 0 : (KIND_PRECEDENCE[existing.result.kind] ?? 0);
+    const candidateWins = existing === undefined || candidate.score > existing.score || (candidate.score === existing.score && candidatePrecedence > existingPrecedence);
     if (candidateWins) {
       bestByKey.set(candidate.dedupeKey, candidate);
     }
   }
   return Array.from(bestByKey.values());
+}
+
+/**
+ * The tabs you closed (the ones ⇧⌘T reopens; not those the sweep or Clear archived), newest first, one per page, and
+ * none whose page is open again in a tab.
+ */
+function listClosedTabs(input: CommandBarInput): ArchivedTab[] {
+  const openTabs = listAllTabs(input.state);
+  const seenKeys = new Set(openTabs.map((entry) => toDedupeKey(entry.tab.url)));
+  const closed: ArchivedTab[] = [];
+  for (const entry of input.state.archive) {
+    const key = toDedupeKey(entry.tab.url);
+    if (entry.reason !== "manual" || seenKeys.has(key)) {
+      continue;
+    }
+    seenKeys.add(key);
+    closed.push(entry);
+  }
+  return closed;
+}
+
+/**
+ * A closed tab's line: Return reopens it where it was (newTab mode) or opens its page.
+ */
+function createClosedResult(entry: ArchivedTab, now: number): CommandBarResult {
+  const tab = entry.tab;
+  const title = tab.customTitle ?? tab.title;
+  const closedAgo = describeTimeAgo(entry.archivedAt, now).toLowerCase();
+  return {
+    id: `closed:${tab.id}`,
+    kind: "closed",
+    title: title === "" ? tab.url : title,
+    subtitle: `${getHost(tab.url)} · closed ${closedAgo}`,
+    url: tab.url,
+    tabId: tab.id,
+    actionId: null,
+    faviconUrl: tab.faviconUrl,
+  };
+}
+
+/**
+ * Scores the tabs you closed against the query.
+ */
+function scoreClosedTabs(input: CommandBarInput, now: number): ScoredResult[] {
+  const scored: ScoredResult[] = [];
+  const closedTabs = listClosedTabs(input).slice(0, CLOSED_SEARCH_LIMIT);
+  for (const entry of closedTabs) {
+    const title = entry.tab.customTitle ?? entry.tab.title;
+    const matchScore = Math.max(scoreTextMatch(title, input.query), scoreAddressMatch(entry.tab.url, input.query));
+    if (matchScore > 0) {
+      scored.push({ result: createClosedResult(entry, now), score: matchScore + CLOSED_BOOST, dedupeKey: toDedupeKey(entry.tab.url) });
+    }
+  }
+  return scored;
+}
+
+/**
+ * A time of day as a line shows it: "14:32".
+ */
+function describeClockTime(time: number): string {
+  return new Date(time).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
+/**
+ * When the query names a time ("yesterday", "last week github"): the pages last visited then that match its other
+ * words, newest first.
+ */
+function scoreDatedHistory(input: CommandBarInput, now: number): ScoredResult[] {
+  const dated = readDatePhrase(input.query, now);
+  if (dated === null) {
+    return [];
+  }
+  const visitedThen = input.history.filter((entry) => {
+    const isInRange = entry.lastVisitAt >= dated.range.start && entry.lastVisitAt < dated.range.end;
+    const matchesWords = dated.words === "" || Math.max(scoreTextMatch(entry.title, dated.words), scoreAddressMatch(entry.url, dated.words)) > 0;
+    return isInRange && matchesWords;
+  });
+  visitedThen.sort((first, second) => second.lastVisitAt - first.lastVisitAt);
+  const scored: ScoredResult[] = [];
+  for (const entry of visitedThen.slice(0, DATED_HISTORY_LIMIT)) {
+    const result: CommandBarResult = {
+      id: `history:${entry.url}`,
+      kind: "history",
+      title: entry.title === "" ? entry.url : entry.title,
+      subtitle: `${describeDay(entry.lastVisitAt, now)}, ${describeClockTime(entry.lastVisitAt)} · ${getHost(entry.url)}`,
+      url: entry.url,
+      tabId: null,
+      actionId: null,
+      faviconUrl: null,
+    };
+    scored.push({ result: result, score: DATED_HISTORY_SCORE, dedupeKey: toDedupeKey(entry.url) });
+  }
+  return scored;
 }
 
 /**
@@ -404,9 +518,19 @@ function listRecentTabs(input: CommandBarInput): CommandBarResult[] {
  */
 export function rankCommandBarResults(input: CommandBarInput, now: number): CommandBarResult[] {
   if (input.query.trim() === "") {
-    return listRecentTabs(input);
+    const closedTabs = listClosedTabs(input).slice(0, EMPTY_QUERY_CLOSED_COUNT);
+    const closedResults = closedTabs.map((entry) => createClosedResult(entry, now));
+    return [...listRecentTabs(input), ...closedResults];
   }
-  const allScored = [...scoreAnswer(input), ...scoreTypedAndSuggestions(input), ...scoreTabs(input), ...scoreHistory(input, now), ...scoreActions(input)];
+  const allScored = [
+    ...scoreAnswer(input),
+    ...scoreDatedHistory(input, now),
+    ...scoreTypedAndSuggestions(input),
+    ...scoreTabs(input),
+    ...scoreClosedTabs(input, now),
+    ...scoreHistory(input, now),
+    ...scoreActions(input),
+  ];
   const uniqueScored = removeDuplicates(allScored);
   // A stable sort keeps the order above (typed first) between equal scores.
   uniqueScored.sort((first, second) => second.score - first.score);

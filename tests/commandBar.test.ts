@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { rankCommandBarResults, scoreAddressMatch, scoreTextMatch } from "../src/main/commandBar";
 import type { CommandBarInput } from "../src/main/commandBar";
 import { HISTORY_LIMIT, recordVisit, searchHistory, updateHistoryTitle } from "../src/main/history";
-import { addToFavorites, createInitialState, setSearchEngine, updateTabPage } from "../src/main/state";
+import { addToFavorites, closeTab, createInitialState, setSearchEngine, updateTabPage } from "../src/main/state";
 import { HOUR_MS } from "../src/shared/settings";
 import type { BrowserState, ItemId } from "../src/shared/types";
 import { ONE_PM, openTabs } from "./builders";
@@ -138,3 +138,65 @@ describe("answers", () => {
     expect(results.some((result) => result.kind === "answer")).toBe(false);
   });
 });
+
+describe("closed tabs", () => {
+  /** Three tabs opened, then the first two closed by the user (newest close last). */
+  function closeTwo(): BrowserState {
+    const { state, tabIds } = openTabs(["https://docs.example/guide", "https://news.example/today", "https://mail.example/"]);
+    const closedOnce = closeTab(state, tabIds[0] as ItemId, ONE_PM + 1000);
+    return closeTab(closedOnce, tabIds[1] as ItemId, ONE_PM + 2000);
+  }
+
+  it("list the tabs you closed below the recent ones when nothing is typed, newest first", () => {
+    const results = rankCommandBarResults(makeInput("", closeTwo()), ONE_PM + 2000 + 60 * 1000);
+    const closedLines = results.filter((result) => result.kind === "closed");
+    expect(closedLines.map((result) => result.url)).toEqual(["https://news.example/today", "https://docs.example/guide"]);
+    expect(closedLines[0]?.subtitle).toBe("news.example · closed 1 minute ago");
+    expect(results.length).toBeLessThanOrEqual(8);
+  });
+
+  it("offer a closed tab that matches what you type, ahead of the same page in history", () => {
+    const history = recordVisit([], "https://docs.example/guide", "Guide", ONE_PM);
+    const results = rankCommandBarResults(makeInput("docs", closeTwo(), { history: history }), ONE_PM + 60 * 1000);
+    const docsLines = results.filter((result) => result.url === "https://docs.example/guide");
+    expect(docsLines.map((result) => result.kind)).toEqual(["closed"]);
+  });
+
+  it("show a closed page that is open again only as Switch to Tab", () => {
+    const reopened = openTabs(["https://docs.example/guide"], closeTwo()).state;
+    const results = rankCommandBarResults(makeInput("docs", reopened), ONE_PM + 60 * 1000);
+    const docsLines = results.filter((result) => result.url === "https://docs.example/guide");
+    expect(docsLines.map((result) => result.kind)).toEqual(["tab"]);
+    const emptyQuery = rankCommandBarResults(makeInput("", reopened), ONE_PM + 60 * 1000);
+    expect(emptyQuery.some((result) => result.kind === "closed" && result.url === "https://docs.example/guide")).toBe(false);
+  });
+});
+
+describe("history by date", () => {
+  /** Wednesday 28 October 2026, 14:00 local time. */
+  const NOW = new Date(2026, 9, 28, 14, 0).getTime();
+
+  it("list the pages of the named day, newest first, with the search still below", () => {
+    const yesterdayMorning = new Date(2026, 9, 27, 9, 5).getTime();
+    const yesterdayEvening = new Date(2026, 9, 27, 21, 40).getTime();
+    let history = recordVisit([], "https://docs.example/a", "Morning read", yesterdayMorning);
+    history = recordVisit(history, "https://news.example/b", "Evening news", yesterdayEvening);
+    history = recordVisit(history, "https://today.example/c", "Today's page", NOW - 60 * 1000);
+    const state = createInitialState(NOW);
+    const results = rankCommandBarResults(makeInput("yesterday", state, { history: history }), NOW);
+    expect(results.slice(0, 2).map((result) => result.title)).toEqual(["Evening news", "Morning read"]);
+    expect(results[0]?.subtitle).toBe("Yesterday, 21:40 · news.example");
+    expect(results.some((result) => result.kind === "search" && result.title === "yesterday")).toBe(true);
+    expect(results.some((result) => result.title === "Today's page")).toBe(false);
+  });
+
+  it("narrow the day by the other words", () => {
+    const yesterday = new Date(2026, 9, 27, 10, 0).getTime();
+    let history = recordVisit([], "https://docs.example/a", "Morning read", yesterday);
+    history = recordVisit(history, "https://news.example/b", "Evening news", yesterday + 1000);
+    const results = rankCommandBarResults(makeInput("docs yesterday", createInitialState(NOW), { history: history }), NOW);
+    const historyTitles = results.filter((result) => result.kind === "history").map((result) => result.title);
+    expect(historyTitles).toEqual(["Morning read"]);
+  });
+});
+
