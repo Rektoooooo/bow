@@ -25,7 +25,8 @@ npm run e2e          # build + drive the real app: check-app, check-overlay, che
                      # check-motion (layout changes glide instead of jumping), check-live-folders (local feed + fake
                      # GitHub via --github-origin), check-performance (331-tab sidebar redraws within a frame),
                      # check-windows (⌘N, a Space and selection per window, restart restores every window),
-                     # check-tab-sleep (a page off screen sleeps, its renderer ends, it wakes scrolled where it was)
+                     # check-tab-sleep (a page off screen sleeps, its renderer ends, it wakes scrolled where it was),
+                     # check-backup (export, restore by replacing or adding, unsafe files refused)
 node e2e/window-shot.mjs --open  # after npm run package: Bow on the sample profile, for the README's hand-taken
                                  # screenshots (docs/screenshot-*.png); without --open: the views → e2e/output/readme-shots
 node e2e/arc-compare.mjs   # side-by-side crops with the user's Arc screenshots (reference/, local only) → e2e/output

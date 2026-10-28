@@ -838,6 +838,16 @@ export function setShowFullUrls(state: BrowserState, isOn: boolean): BrowserStat
 }
 
 /**
+ * Turns the automatic hourly copies of the setup on or off (backupController.ts).
+ */
+export function setSnapshots(state: BrowserState, isOn: boolean): BrowserState {
+  if ((state.settings.areSnapshotsOn ?? true) === isOn) {
+    return state;
+  }
+  return { ...state, settings: { ...state.settings, areSnapshotsOn: isOn } };
+}
+
+/**
  * Turns tidy titles for pinned tabs on or off.
  */
 export function setTidyTitles(state: BrowserState, isOn: boolean): BrowserState {

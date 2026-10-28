@@ -33,6 +33,7 @@ import { addRoutingRule, removeRoutingRule } from "./routing";
 import { deleteBoost, setBoostCss, setBoostEnabled, setBoostJavaScript, setBoostStyle } from "./boosts";
 import { reapplyBoostsToAllPages } from "./boostPages";
 import { importFromArc } from "./arcImportController";
+import { exportBackup, restoreBackup, revealBackupsFolder } from "./backupController";
 import { importFromBrowser } from "./browserImportController";
 import { applyCosmeticFilters, ensureFilterLists } from "./adBlock";
 import { applyAppIcon } from "./appIcon";
@@ -85,6 +86,7 @@ import {
   setAppIcon,
   setTidyTitles,
   setShowFullUrls,
+  setSnapshots,
   createNote,
   createEasel,
   finishWelcome,
@@ -354,6 +356,12 @@ export function runAction(action: BrowserAction): void {
     case "importFromArc":
       importFromArc().catch((error) => console.error("Import from Arc failed:", error));
       return;
+    case "exportBackup":
+      exportBackup().catch((error) => console.error("Exporting a backup failed:", error));
+      return;
+    case "restoreBackup":
+      restoreBackup().catch((error) => console.error("Restoring a backup failed:", error));
+      return;
     case "showExtensionsMenu":
       return showExtensionsMenu(action.anchor);
     case "answerPermissionPrompt":
@@ -414,6 +422,10 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => setTidyTitles(state, action.isOn));
     case "setShowFullUrls":
       return applyChange((state) => setShowFullUrls(state, action.isOn));
+    case "setSnapshots":
+      return applyChange((state) => setSnapshots(state, action.isOn));
+    case "revealBackups":
+      return revealBackupsFolder();
     case "showTabTooltip":
       return showTabTooltip(action.title, action.showsRenameHint, action.frame);
     case "hideTabTooltip":

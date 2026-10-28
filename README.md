@@ -62,6 +62,14 @@ browsing history and your Chrome Web Store extensions (copied, so they survive A
 Arc). Running it twice adds nothing twice. Chrome, Brave, Edge, Vivaldi, Firefox and Safari can be imported too
 (Library › Settings).
 
+**Never locked in.** **File › Export Bow Backup…** writes everything that makes your setup yours (Spaces, pinned tabs
+and folders, Favorites, Today tabs, Notes, Easels, Boosts, Air Traffic Control rules and settings) to one open JSON file
+([format](docs/backup-format.md)). **File › Restore from Backup…** puts a backup in place of your setup (Bow keeps a
+copy of the current one first) or adds its Spaces next to yours. A restored file is checked like untrusted input:
+only web, note and easel addresses get in, and JavaScript Boosts arrive switched off. While Bow is in use, it also
+keeps automatic copies every hour (the last 12 hours, then one a day for a week) in its Backups folder, where Restore…
+opens; Library › Settings › Backup turns them off.
+
 Bow keeps itself up to date: a few times a day it looks for a new release here on GitHub, downloads it in the
 background, and the sidebar says **Update ready**. Click **Restart**, or just quit Bow; the new version is there the
 next time it opens. **Bow › Check for Updates…** looks right away. The check downloads a small file from this

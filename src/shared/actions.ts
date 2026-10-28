@@ -104,6 +104,8 @@ export type BrowserAction =
   | { type: "removeExtension"; profileId: string; extensionId: string }
   | { type: "loadUnpackedExtension" }
   | { type: "importFromArc" }
+  | { type: "exportBackup" }
+  | { type: "restoreBackup" }
   | { type: "showExtensionsMenu"; anchor: { x: number; y: number; width: number; height: number } }
   | { type: "answerPermissionPrompt"; requestId: string; isAllowed: boolean }
   | { type: "removeSitePermission"; profileId: string; origin: string; kind: SitePermissionKind }
@@ -124,6 +126,8 @@ export type BrowserAction =
   | { type: "fadeHoverPanel" }
   | { type: "setTidyTitles"; isOn: boolean }
   | { type: "setShowFullUrls"; isOn: boolean }
+  | { type: "setSnapshots"; isOn: boolean }
+  | { type: "revealBackups" }
   | { type: "createNote" }
   | { type: "createEasel" }
   | { type: "finishWelcome" }
@@ -210,6 +214,8 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "removeExtension",
   "loadUnpackedExtension",
   "importFromArc",
+  "exportBackup",
+  "restoreBackup",
   "showExtensionsMenu",
   "answerPermissionPrompt",
   "removeSitePermission",
@@ -230,6 +236,8 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "fadeHoverPanel",
   "setTidyTitles",
   "setShowFullUrls",
+  "setSnapshots",
+  "revealBackups",
   "createNote",
   "createEasel",
   "finishWelcome",

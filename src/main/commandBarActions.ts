@@ -74,6 +74,8 @@ function buildFixedActions(host: CommandActionHost): FixedAction[] {
     { entry: { id: "little-window", title: "New Little Window", keywords: ["little arc", "small window"] }, run: () => commands.openLittleWindow() },
     { entry: { id: "private-window", title: "New Private Window", keywords: ["incognito", "private browsing"] }, run: () => commands.openPrivateWindow() },
     { entry: { id: "import-arc", title: "Import from Arc", keywords: ["arc", "migrate"] }, run: () => commands.importFromArc() },
+    { entry: { id: "export-backup", title: "Export Bow Backup", keywords: ["backup", "export", "save setup"] }, run: () => commands.exportBackup() },
+    { entry: { id: "restore-backup", title: "Restore from Backup", keywords: ["backup", "restore", "import backup"] }, run: () => commands.restoreBackup() },
     { entry: { id: "default-browser", title: "Set as Default Browser", keywords: ["default browser", "open links"] }, run: () => commands.setAsDefaultBrowser() },
     { entry: { id: "check-updates", title: "Check for Updates", keywords: ["update", "new version", "upgrade"] }, run: () => commands.checkForUpdates() },
   ];

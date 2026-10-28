@@ -273,6 +273,7 @@ function buildLibraryData(state: BrowserState): LibraryData {
     appIcon: state.settings.appIcon ?? DEFAULT_APP_ICON_ID,
     areTitlesTidy: state.settings.areTitlesTidy !== false,
     showsFullUrls: state.settings.showsFullUrls === true,
+    areSnapshotsOn: state.settings.areSnapshotsOn !== false,
     adBlock: describeAdBlock(state),
     routingRules: state.routingRules ?? [],
     extensions: (state.extensions ?? []).map((extension) => ({

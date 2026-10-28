@@ -781,7 +781,29 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
       createTextButton("Import…", "library-chip", () => dispatch({ type: "showMenu", request: { menu: "import" } })),
     ),
   ]);
-  settings.append(tabs, browsing, appearance, importing, renderRoutingSettings(data));
+  const backup = createSettingGroup("Backup", [
+    createSettingRow(
+      "Export a backup",
+      "Everything that makes this setup yours (Spaces, pinned tabs, folders, Favorites, Notes, Easels, Boosts, rules and settings) in one open file you can keep or move to another Mac.",
+      createTextButton("Export…", "library-chip", () => dispatch({ type: "exportBackup" })),
+    ),
+    createSettingRow(
+      "Restore from a backup",
+      "Put a backup in place of this setup (Bow keeps a copy of it first) or add its Spaces next to yours.",
+      createTextButton("Restore…", "library-chip", () => dispatch({ type: "restoreBackup" })),
+    ),
+    createSettingRow(
+      "Automatic backups",
+      "While Bow is in use, it keeps a copy every hour: the last 12 hours, then one a day for a week. Restore… opens the folder they're in.",
+      createSwitch(data.areSnapshotsOn, "Automatic backups", (isOn) => dispatch({ type: "setSnapshots", isOn: isOn })),
+    ),
+    createSettingRow(
+      "Bow's backups folder",
+      "The automatic copies and the ones kept before a restore.",
+      createTextButton("Show in Finder", "library-chip", () => dispatch({ type: "revealBackups" })),
+    ),
+  ]);
+  settings.append(tabs, browsing, appearance, importing, backup, renderRoutingSettings(data));
   body.replaceChildren(settings);
 }
 

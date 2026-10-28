@@ -64,6 +64,7 @@ import { createOverlayView, getOverlayContents } from "./overlay";
 import { openWelcome, refreshOpenPanel, registerOverlayIpc, setCommandActionRegistry } from "./overlayController";
 import { startHandoff } from "./handoff";
 import { noticeVisitedPage, startLiveFolderRefreshing } from "./liveFolderRefresher";
+import { markSnapshotNeeded, startAutomaticSnapshots } from "./backupController";
 import { getProfileSession, onProfileSessionCreated, restrictWebPermissions, useChromeUserAgent } from "./profiles";
 import { retakeCapture } from "./liveCaptures";
 import { linkNativeMessagingHosts, listOtherBrowserHostFolders } from "./nativeMessagingHosts";
@@ -327,12 +328,14 @@ async function handleAppReady(): Promise<void> {
     },
     readNote: (noteId) => readNote(noteId),
     saveNote: (noteId, html, title) => {
+      markSnapshotNeeded();
       if (writeNote(noteId, html)) {
         applyChange((state) => setNoteTitle(state, createNoteUrl(noteId), title));
       }
     },
     readEasel: (easelId) => readEasel(easelId),
     saveEasel: (easelId, json) => {
+      markSnapshotNeeded();
       writeEasel(easelId, json);
     },
     listCaptures: () =>
@@ -381,6 +384,7 @@ async function handleAppReady(): Promise<void> {
   startAppUpdates(() => installAppMenu(appMenuCommands));
   offerMoveToApplications().catch((error) => console.error("Moving to Applications failed:", error));
   startLiveFolderRefreshing();
+  startAutomaticSnapshots();
   startHandoff();
   const firstWindow = getWindow();
   if (isFirstStart && getState().settings.hasSeenWelcome !== true && firstWindow !== null) {

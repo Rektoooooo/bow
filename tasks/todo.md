@@ -256,7 +256,8 @@ Vivaldi, Edge, Orion). Done one at a time: build, unit + e2e tests, full suite g
 M about a day, L several days.
 
 ### 4.1 Top five
-- [ ] 1. Backup and export of everything (Spaces, pins, folders, Live Folders, Boosts, rules, settings, Notes,
+- [ ] 1. (a done: Export / Restore with replace or add, docs/backup-format.md, e2e/check-backup.mjs; b done: hourly
+      snapshots, 12 hourly + 7 daily kept, a switch in Settings; c folder sync next) Backup and export of everything (Spaces, pins, folders, Live Folders, Boosts, rules, settings, Notes,
       Easels) to an open, documented file; restore with a preview (merge or replace); rolling automatic snapshots;
       account-free sync through a folder such as iCloud Drive (L)
 - [ ] 2. Smarter tab sleeping: per-site Keep Awake list (Settings, Control Center, tab menu), a decision for

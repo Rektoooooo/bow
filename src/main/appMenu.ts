@@ -50,6 +50,9 @@ export interface AppMenuCommands {
   /** File › Close Window (⇧⌘W): the window in front. */
   closeWindow(): void;
   importFromArc(): void;
+  /** File › Export Bow Backup… and Restore from Backup… (backupController.ts). */
+  exportBackup(): void;
+  restoreBackup(): void;
   newNote(): void;
   newEasel(): void;
   /** The import menu's items (Arc first); the File menu shows the browser part. */
@@ -139,6 +142,8 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
         { type: "separator" },
         { label: "Import from Arc…", click: () => commands.importFromArc() },
         { label: "Import From Browser", submenu: commands.buildImportMenu().slice(2) },
+        { label: "Export Bow Backup…", click: () => commands.exportBackup() },
+        { label: "Restore from Backup…", click: () => commands.restoreBackup() },
         { type: "separator" },
         { label: "Print…", accelerator: "CommandOrControl+P", click: () => commands.printPage() },
       ],

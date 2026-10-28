@@ -141,6 +141,8 @@ export const appMenuCommands: AppMenuCommands = {
   importFromArc: () => {
     importFromArc().catch((error) => console.error("Import from Arc failed:", error));
   },
+  exportBackup: () => menuHost.runAction({ type: "exportBackup" }),
+  restoreBackup: () => menuHost.runAction({ type: "restoreBackup" }),
   openUrlInNewTab: (url) => openLinkInNewTab(url, "foreground"),
   openPeekAsTab: () => openPeekAsTab(),
   openPrivateWindow: () => openLittleWindow(null, { isPrivate: true }),

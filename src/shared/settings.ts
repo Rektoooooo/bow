@@ -275,3 +275,16 @@ export const FOLDER_LIST_MAX_HEIGHT_PX = 316;
 export const FOLDER_LIST_EDGE_PX = 18;
 export const FOLDER_LIST_DELAY_MS = 500;
 export const FOLDER_LIST_CLOSE_DELAY_MS = 300;
+
+/** Bow keeps an automatic copy of the setup this often while it changes (backupController.ts). Our choice. */
+export const SNAPSHOT_INTERVAL_MS = 60 * 60 * 1000;
+
+/**
+ * Automatic copies kept: the newest this many, then one per day for this many days. Our choice: half a day of hourly
+ * undo and a week of daily ones, about 20 files.
+ */
+export const SNAPSHOTS_HOURLY_KEPT = 12;
+export const SNAPSHOTS_DAILY_KEPT = 7;
+
+/** Copies kept from before a restore (each restore makes one). Our choice. */
+export const BEFORE_RESTORE_SNAPSHOTS_KEPT = 5;

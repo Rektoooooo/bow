@@ -200,6 +200,8 @@ export interface LibraryData {
   appIcon: string;
   areTitlesTidy: boolean;
   showsFullUrls: boolean;
+  /** Automatic hourly copies of the setup (backupController.ts). */
+  areSnapshotsOn: boolean;
   adBlock: { isOn: boolean; status: "off" | "loading" | "ready" | "failed"; filterCount: number };
   routingRules: RoutingRule[];
   extensions: ExtensionLine[];

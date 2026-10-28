@@ -181,6 +181,11 @@ export interface BrowserSettings {
    * (its toolbarShowFullURLsEnabledPreference). Optional: missing means off, like Arc.
    */
   showsFullUrls?: boolean;
+  /**
+   * Bow keeps an automatic copy of the setup every hour while it changes (backupController.ts). Optional: missing
+   * means on.
+   */
+  areSnapshotsOn?: boolean;
   /** The first-start tour was finished or skipped (overlay/welcome.ts). Optional: missing means not yet. */
   hasSeenWelcome?: boolean;
   /**
