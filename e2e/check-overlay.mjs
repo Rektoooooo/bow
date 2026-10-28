@@ -1613,6 +1613,44 @@ await overlay.click(".chain-delete");
 await sidebar.waitForTimeout(400);
 check("and its trash button deletes it", ((await getState()).commandChains ?? []).length === 0 && (await getState()).settings.isSidebarVisible === true);
 await overlay.press("body", "Escape");
+
+// Space templates: save the Space as one (Space menu › Save as Template), make a new Space from it in
+// Library › Spaces, then delete the template there.
+const templateSourceState = await getState();
+const templateSourceSpace = activeSpace(templateSourceState);
+await dispatch({ type: "saveSpaceAsTemplate", spaceId: templateSourceSpace.id });
+await sidebar.waitForTimeout(300);
+const savedTemplate = ((await getState()).spaceTemplates ?? [])[0];
+const sourceHomes = templateSourceSpace.pinnedIds
+  .map((itemId) => templateSourceState.items[itemId])
+  .filter((item) => item?.kind === "tab" && /^https?:/.test(item.homeUrl ?? item.url))
+  .map((item) => item.homeUrl ?? item.url);
+check("Save as Template keeps the Space's name and its pinned pages", savedTemplate?.name === templateSourceSpace.name && savedTemplate.pinned.filter((item) => item.kind === "tab").length === sourceHomes.length, JSON.stringify(savedTemplate));
+await dispatch({ type: "openLibrary" });
+await overlay.waitForSelector(".library-tab[data-section='spaces']", { timeout: 5000 });
+await overlay.click(".library-tab[data-section='spaces']");
+await overlay.waitForSelector(".space-template-make", { timeout: 5000 });
+await overlay.click(".space-template-make");
+await sidebar.waitForTimeout(600);
+const madeState = await getState();
+const madeSpace = activeSpace(madeState);
+const madeHomes = madeSpace.pinnedIds
+  .map((itemId) => madeState.items[itemId])
+  .filter((item) => item?.kind === "tab")
+  .map((item) => item.homeUrl);
+check(
+  "Library › Spaces makes a new Space from the template, with fresh tabs at the same pages",
+  madeState.spaces.length === templateSourceState.spaces.length + 1 && madeSpace.id !== templateSourceSpace.id && madeSpace.name === templateSourceSpace.name && JSON.stringify(madeHomes) === JSON.stringify(sourceHomes),
+  `${madeState.spaces.length} Spaces / ${JSON.stringify(madeHomes)} vs ${JSON.stringify(sourceHomes)}`,
+);
+await overlay.waitForSelector(".space-template-delete", { timeout: 5000 });
+await overlay.click(".space-template-delete");
+await sidebar.waitForTimeout(400);
+check("and the template's delete button deletes it", ((await getState()).spaceTemplates ?? []).length === 0);
+await overlay.press("body", "Escape");
+await dispatch({ type: "deleteSpace", spaceId: madeSpace.id });
+await dispatch({ type: "switchSpace", spaceId: templateSourceSpace.id });
+await sidebar.waitForTimeout(300);
 basicsServer.close();
 
 await app.close();

@@ -505,6 +505,7 @@ function buildSpaceMenu(host: MenuHost, space: Space): MenuItemConstructorOption
     { label: "Archive Today Tabs After", submenu: buildSpaceArchiveMenu(host, space) },
     { label: "Search Engine", submenu: buildSpaceSearchMenu(host, space) },
     { label: "New Tab Opens", submenu: buildSpaceNewTabMenu(host, space) },
+    { label: "Save as Template", click: () => host.runAction({ type: "saveSpaceAsTemplate", spaceId: space.id }) },
     { type: "separator" },
     { label: "Move Left", enabled: spaceIndex > 0, click: () => host.runAction({ type: "moveSpace", spaceId: space.id, index: spaceIndex - 1 }) },
     {
@@ -560,10 +561,25 @@ function buildPlusMenu(host: MenuHost): MenuItemConstructorOptions[] {
       label: "New Space",
       click: () => host.runAction({ type: "createSpace", name: "New Space", icon: "✦", theme: newTheme }),
     },
+    { label: "New Space from Template", submenu: buildTemplateMenu(host) },
     { type: "separator" },
     { label: activeSpace === undefined ? "Space" : `${describeSpaceIconAsText(activeSpace.icon)}  ${activeSpace.name}`, enabled: false },
     ...(activeSpace === undefined ? [] : buildSpaceMenu(host, activeSpace)),
   ];
+}
+
+/**
+ * The + menu's New Space from Template: each template, or how to make one.
+ */
+function buildTemplateMenu(host: MenuHost): MenuItemConstructorOptions[] {
+  const templates = host.getState().spaceTemplates ?? [];
+  if (templates.length === 0) {
+    return [{ label: "No templates yet: Space menu › Save as Template", enabled: false }];
+  }
+  return templates.map((template) => ({
+    label: `${describeSpaceIconAsText(template.icon)}  ${template.name}`,
+    click: () => host.runAction({ type: "createSpaceFromTemplate", templateId: template.id }),
+  }));
 }
 
 /**

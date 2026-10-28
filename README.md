@@ -140,6 +140,10 @@ source never updates itself.
 - Each Space can have its own defaults (Space menu): **Search Engine** (Work searches with Google, the rest with
   DuckDuckGo) and **New Tab Opens** a page of its own (Use Current Page) instead of the Command Bar; ⌘L still opens
   the Command Bar there. They stay on each Mac, like the Space's archive timing.
+- **Space templates**: Space menu › Save as Template keeps the Space's icon, theme, Pinned tabs and folders (a live
+  folder keeps its source and fills itself again) and its own defaults; + › New Space from Template (or the Command
+  Bar, or Library › Spaces) makes a new Space like it with fresh tabs. Notes and Easels are left out; templates are
+  in backups and sync between your Macs.
 - Private windows (⇧⌘N) keep nothing: an in-memory session, no history, no archive.
 
 **Windows**

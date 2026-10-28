@@ -57,6 +57,7 @@ import type {
 import { upgradeToCurrentVersion } from "./migrate";
 import { GITHUB_LIVE_LISTS } from "./gitHubLists";
 import { checkCommandChains } from "./commandChains";
+import { checkSpaceTemplates } from "./spaceTemplates";
 import { MAX_NOTE_LENGTH } from "./notesStore";
 import { MAX_EASEL_LENGTH } from "./easelsStore";
 import { repairSelections } from "./state";
@@ -263,7 +264,7 @@ function checkTab(raw: unknown, expectedId: string | null): TabItem | null {
 /**
  * A live folder's source and hidden list, or undefined when malformed (the folder then stays a plain folder).
  */
-function checkLiveFolder(raw: unknown): LiveFolderData | undefined {
+export function checkLiveFolder(raw: unknown): LiveFolderData | undefined {
   if (!isRecord(raw) || !isRecord(raw.source) || !Array.isArray(raw.hiddenUrls)) {
     return undefined;
   }
@@ -326,7 +327,7 @@ function checkItem(key: string, raw: unknown): SidebarItem | null {
 /**
  * A Space theme, or Bow's neutral one when malformed.
  */
-function checkTheme(raw: unknown): SpaceTheme {
+export function checkTheme(raw: unknown): SpaceTheme {
   const neutral: SpaceTheme = { colors: ["#000000"], appearance: "auto", grain: 0 };
   if (!isRecord(raw) || !Array.isArray(raw.colors)) {
     return neutral;
@@ -664,6 +665,11 @@ export function checkBackupState(raw: BrowserState, counter: CheckCounter): Brow
     const checkedChains = checkCommandChains(raw.commandChains);
     counter.leftOut += checkedChains.leftOut;
     checked.commandChains = checkedChains.chains;
+  }
+  if (Array.isArray(raw.spaceTemplates)) {
+    const checkedTemplates = checkSpaceTemplates(raw.spaceTemplates);
+    counter.leftOut += checkedTemplates.leftOut;
+    checked.spaceTemplates = checkedTemplates.templates;
   }
   return repairSelections(checked);
 }

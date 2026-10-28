@@ -113,6 +113,9 @@ export function createCommandActionRegistry(host: CommandActionHost): CommandAct
     for (const preset of THEME_PRESETS) {
       entries.push({ id: `theme:${preset.label}`, title: `Theme: ${preset.label}`, keywords: ["color", "space theme"] });
     }
+    for (const template of state.spaceTemplates ?? []) {
+      entries.push({ id: `template:${template.id}`, title: `New Space from Template: ${template.name}`, keywords: ["template", "new space", template.name] });
+    }
     for (const chain of state.commandChains ?? []) {
       entries.push({ id: toChainActionId(chain.id), title: `Run ${chain.name}`, keywords: ["chain", chain.name] });
     }
@@ -187,7 +190,7 @@ async function runChain(host: CommandActionHost, chainId: string, run: (actionId
 }
 
 /**
- * Runs an entry made from data: "space:<id>", "archive-after:<ms|null>" or "theme:<label>".
+ * Runs an entry made from data: "space:<id>", "template:<id>", "archive-after:<ms|null>" or "theme:<label>".
  */
 function runGeneratedAction(host: CommandActionHost, actionId: string): void {
   const separatorIndex = actionId.indexOf(":");
@@ -196,6 +199,10 @@ function runGeneratedAction(host: CommandActionHost, actionId: string): void {
 
   if (prefix === "space") {
     host.runAction({ type: "switchSpace", spaceId: value });
+    return;
+  }
+  if (prefix === "template") {
+    host.runAction({ type: "createSpaceFromTemplate", templateId: value });
     return;
   }
   if (prefix === "archive-after") {

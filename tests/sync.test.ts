@@ -221,12 +221,13 @@ describe("folder sync", () => {
 });
 
 describe("command chains", () => {
-  it("Macs updated to a Bow with chains agree on the empty list, with no conflict", () => {
+  it("Macs updated to a Bow with chains and templates agree on the empty lists, with no conflict", () => {
     const { macA, macB } = sharedMacs();
-    // Before the update neither Mac had a "chains" unit; each stamps it on its first change after the update.
+    // Before the update neither Mac had these units; each stamps them on its first change after the update.
     const withoutChainsUnit = (mac: Mac): Mac => {
       const stamps = { ...mac.meta.stamps };
       delete stamps.chains;
+      delete stamps.templates;
       return { ...mac, meta: { ...mac.meta, stamps: stamps } };
     };
     const aUpdated = stamp(withoutChainsUnit(macA), ONE_PM + MINUTE_MS);
@@ -237,6 +238,15 @@ describe("command chains", () => {
     expect(aAfter.conflicts).toEqual([]);
     expect(aAfter.state.commandChains ?? []).toEqual([]);
     expect(bAfter.state.commandChains ?? []).toEqual([]);
+    expect(bAfter.state.spaceTemplates ?? []).toEqual([]);
+  });
+
+  it("a Space template saved on one Mac reaches the other", () => {
+    const { macA, macB } = sharedMacs();
+    const template = { id: "template-1-1", name: "Client", icon: "💼", theme: { colors: ["#000000"], appearance: "dark" as const, grain: 0 }, pinned: [{ kind: "tab" as const, url: "https://docs.example/", title: "Docs" }] };
+    const withTemplate = stamp({ ...macA, state: { ...macA.state, spaceTemplates: [template] } }, ONE_PM + MINUTE_MS);
+    const bAfter = receive(macB, fileOf(withTemplate, ONE_PM + 2 * MINUTE_MS), ONE_PM + 2 * MINUTE_MS);
+    expect(bAfter.state.spaceTemplates).toEqual([template]);
   });
 
   it("a chain made on one Mac reaches the other, and so does its deletion", () => {

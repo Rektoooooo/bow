@@ -12,13 +12,13 @@ folder every Mac can reach (iCloud Drive, Dropbox, a shared drive); Bow makes a 
 | Pinned tabs, folders and split views (address, names, home address) | Where a tab has browsed to since it was pinned |
 | Favorites and profile names | Windows, sidebar width, which folders are open |
 | Notes and Easels that pinned tabs or Favorites show | Extensions, site permissions, settings |
-| Boosts (JavaScript arrives switched off), Air Traffic Control rules and command chains | A live folder's items (each Mac fills them from the source) |
+| Boosts (JavaScript arrives switched off), Air Traffic Control rules, command chains and Space templates | A live folder's items (each Mac fills them from the source) |
 
 ## How changes merge
 
 The setup is cut into small units: a tab, a folder, a split view, a Space's name and look, a Space's Pinned order, the
-Space order, a profile's Favorites, a Boost, the rules, the command chains, a Note, an Easel. Each Mac records a fingerprint of every unit
-and when it last changed there (`src/main/sync.ts`). When another Mac's file changes:
+Space order, a profile's Favorites, a Boost, the rules, the command chains, the Space templates, a Note, an Easel.
+Each Mac records a fingerprint of every unit and when it last changed there (`src/main/sync.ts`). When another Mac's file changes:
 
 - A unit changed later on the other Mac takes its version. Units this Mac doesn't have are added.
 - A deletion wins over an older edit or one made at the same moment; an edit made after a deletion brings the unit

@@ -153,6 +153,10 @@ export type BrowserAction =
   | { type: "setSpaceSearchEngine"; spaceId: SpaceId; engineId: SearchEngineId | "default" }
   /** The page ⌘T opens in a Space (http or https), or the Command Bar again (null). */
   | { type: "setSpaceNewTabUrl"; spaceId: SpaceId; url: string | null }
+  /** Space templates (main/spaceTemplates.ts): save a Space as one, make a Space from one, delete one. */
+  | { type: "saveSpaceAsTemplate"; spaceId: SpaceId }
+  | { type: "createSpaceFromTemplate"; templateId: string }
+  | { type: "deleteSpaceTemplate"; templateId: string }
   | { type: "runNoticeAction" }
   | { type: "dismissNotice" }
   | { type: "closeDuplicateTabs" }
@@ -296,6 +300,9 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setSpaceArchiveAfter",
   "setSpaceSearchEngine",
   "setSpaceNewTabUrl",
+  "saveSpaceAsTemplate",
+  "createSpaceFromTemplate",
+  "deleteSpaceTemplate",
   "runNoticeAction",
   "dismissNotice",
   "closeDuplicateTabs",

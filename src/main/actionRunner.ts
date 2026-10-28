@@ -73,7 +73,8 @@ import { openDeveloperTool, translatePage } from "./pageCommands";
 import { setAsDefaultBrowser } from "./defaultBrowser";
 import { setTabSleepAfter } from "./tabSleep";
 import { restartToUpdate } from "./appUpdates";
-import { createFeedLiveFolderFromPage, createGitHubLiveFolder, createIssuesLiveFolderFromPage, createPresetFeedLiveFolder, openLiveFolderSource, refreshLiveFolder } from "./liveFolderRefresher";
+import { createFeedLiveFolderFromPage, createGitHubLiveFolder, createIssuesLiveFolderFromPage, createPresetFeedLiveFolder, openLiveFolderSource, refreshLiveFolder, refreshNewLiveFolders } from "./liveFolderRefresher";
+import { createSpaceFromTemplate, deleteSpaceTemplate, saveSpaceAsTemplate } from "./spaceTemplates";
 import type { FeedPresetId } from "./feedPresets";
 import { showHiddenLiveFolderItems } from "./liveFolders";
 import { equalizeSplit, setSplitOrientation, setSplitSizes, separateTabFromSplit, splitTabs, swapSplitPanes, unsplit } from "./split";
@@ -526,6 +527,14 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => setSpaceSearchEngine(state, action.spaceId, action.engineId));
     case "setSpaceNewTabUrl":
       return applyChange((state) => setSpaceNewTabUrl(state, action.spaceId, action.url));
+    case "saveSpaceAsTemplate":
+      return applyChange((state) => saveSpaceAsTemplate(state, action.spaceId, createId("template", Date.now())));
+    case "createSpaceFromTemplate":
+      applyChange((state) => createSpaceFromTemplate(state, action.templateId, Date.now()));
+      // Its live folders fill from their sources now, not at the next timer.
+      return refreshNewLiveFolders();
+    case "deleteSpaceTemplate":
+      return applyChange((state) => deleteSpaceTemplate(state, action.templateId));
     case "runNoticeAction":
       return runSidebarNoticeAction();
     case "dismissNotice":

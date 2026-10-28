@@ -1595,6 +1595,34 @@ body.dark .tab-tooltip-hint {
   overflow-y: hidden;
 }
 
+/* The templates under the columns: a chip per template that makes a Space, with its delete button. */
+.space-templates {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 0 14px 14px;
+}
+
+.space-templates-heading {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.space-templates-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.space-template {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .space-column {
   flex: none;
   display: flex;

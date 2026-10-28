@@ -492,7 +492,33 @@ function renderSpacesSection(body: HTMLElement, data: LibraryData): void {
     dispatch({ type: "createSpace", name: "New Space", icon: "✦", theme: data.newSpaceTheme }),
   );
   columns.append(addButton);
-  body.replaceChildren(columns);
+  body.replaceChildren(columns, createTemplateStrip(data));
+}
+
+/**
+ * The Space templates under the columns: each makes a new Space like it, or can be deleted.
+ */
+function createTemplateStrip(data: LibraryData): HTMLElement {
+  const strip = createElement("div", "space-templates");
+  strip.append(createElement("span", "space-templates-heading", "Templates"));
+  if (data.spaceTemplates.length === 0) {
+    strip.append(createElement("span", "space-templates-note", "A Space's menu › Save as Template keeps its look, Pinned tabs and defaults to make new Spaces from."));
+    return strip;
+  }
+  for (const template of data.spaceTemplates) {
+    const entry = createElement("span", "space-template");
+    entry.dataset.templateId = template.id;
+    const makeButton = createTextButton(`${describeSpaceIconAsText(template.icon)} ${template.name}`, "library-chip space-template-make", () =>
+      dispatch({ type: "createSpaceFromTemplate", templateId: template.id }),
+    );
+    makeButton.title = `New Space from this template (${template.itemCount} pinned)`;
+    const deleteButton = createIconButton("close", `Delete the ${template.name} template`, "library-line-icon-button space-template-delete", () =>
+      dispatch({ type: "deleteSpaceTemplate", templateId: template.id }),
+    );
+    entry.append(makeButton, deleteButton);
+    strip.append(entry);
+  }
+  return strip;
 }
 
 /**

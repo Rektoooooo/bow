@@ -178,6 +178,24 @@ export interface Profile {
   favoriteIds: ItemId[];
 }
 
+/** A Pinned item of a Space template: a page, or a folder of them (a live folder keeps only its source). */
+export type SpaceTemplateItem = { kind: "tab"; url: string; title: string } | { kind: "folder"; title: string; children: SpaceTemplateItem[]; live?: LiveFolderSource };
+
+/**
+ * A Space saved as a template (main/spaceTemplates.ts): its look, its Pinned tree and its own defaults. New Space from
+ * Template makes a Space like it, with fresh tabs.
+ */
+export interface SpaceTemplate {
+  id: string;
+  name: string;
+  icon: string;
+  theme: SpaceTheme;
+  pinned: SpaceTemplateItem[];
+  searchEngine?: SearchEngineId;
+  newTabUrl?: string;
+  archiveAfterMs?: number | null;
+}
+
 /** One step of a command chain: a Command Bar action (by its id), or a web page to open in a new tab. */
 export type CommandChainStep = { kind: "action"; actionId: string } | { kind: "open"; url: string };
 
@@ -395,6 +413,8 @@ export interface BrowserState {
   searchKeywords?: SearchKeyword[];
   /** Command chains (main/commandChains.ts). Optional, like the lists above. */
   commandChains?: CommandChain[];
+  /** Space templates (main/spaceTemplates.ts). Optional, like the lists above. */
+  spaceTemplates?: SpaceTemplate[];
 }
 
 /**

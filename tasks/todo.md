@@ -294,7 +294,10 @@ M about a day, L several days.
       of actions and pages, "Run <name>" in the Command Bar, in backups and sync)
       Command Bar: calculator and unit conversion, recently closed tabs and history by date, user-made action
       chains (M)
-- [ ] 11. Per-Space defaults (search engine, new-tab behaviour) and Space templates (M)
+- [x] 11. (Space menu › Search Engine and New Tab Opens (a page of the Space's own instead of the Command Bar), kept
+      per Mac; Save as Template / New Space from Template (+ menu, Command Bar, Library › Spaces) with the Pinned
+      tree, live folder sources and the defaults; templates in backups and sync)
+      Per-Space defaults (search engine, new-tab behaviour) and Space templates (M)
 - [ ] 12. Air Traffic Control by source app (links from Slack go to Work) and a "test this link" box (S)
 
 ### 4.3 Beyond Arc

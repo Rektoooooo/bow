@@ -252,9 +252,10 @@ function refreshAllLiveFolders(): void {
 }
 
 /**
- * Refreshes the live folders that have not been read in this run (a folder just made, or just imported).
+ * Refreshes the live folders that have not been read in this run (a folder just made, imported, or in a Space just
+ * made from a template).
  */
-function refreshNewLiveFolders(): void {
+export function refreshNewLiveFolders(): void {
   for (const target of listLiveFolders(getState())) {
     if (getLiveFolderStatuses()[target.folderId] === undefined) {
       refreshLiveFolder(target.folderId);

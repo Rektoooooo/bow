@@ -24,6 +24,15 @@ export const CHAIN_STEPS_LIMIT = 20;
 /** Most command chains kept. Our choice. */
 export const CHAINS_LIMIT = 50;
 
+/** Most Space templates kept. Our choice. */
+export const SPACE_TEMPLATES_LIMIT = 30;
+
+/** Most Pinned items (tabs and folders) one template keeps. Our choice: well above a busy Space's Pinned section. */
+export const SPACE_TEMPLATE_ITEMS_LIMIT = 300;
+
+/** Deepest folder nesting a template keeps. Our choice: deeper than anyone nests by hand. */
+export const SPACE_TEMPLATE_DEPTH_LIMIT = 8;
+
 /**
  * The pause between the steps of a command chain, so a step's new Space, window or tab is in place before the next
  * one acts on it. Our choice.

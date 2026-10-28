@@ -109,7 +109,7 @@ export function updateTab(state: BrowserState, tabId: ItemId, changes: Partial<T
 /**
  * Builds a new tab object. It is not in any list yet.
  */
-function createTab(url: string, now: number): TabItem {
+export function createTab(url: string, now: number): TabItem {
   return {
     kind: "tab",
     id: createId("tab", now),

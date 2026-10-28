@@ -20,7 +20,7 @@ import { getSnapshot } from "./tabSnapshots";
 import { copyPngToClipboard, listCaptures, runCaptureCommand, saveCapture } from "./captures";
 import { describeCaptureSource } from "./liveCaptures";
 import type { CaptureCommand } from "./captures";
-import type { BrowserState, ItemId, SitePermissionKind, SpaceTheme } from "../shared/types";
+import type { BrowserState, ItemId, SitePermissionKind, SpaceTemplateItem, SpaceTheme } from "../shared/types";
 import {
   applyChange,
   getLayoutOptions,
@@ -276,6 +276,17 @@ function shortenHomePath(folder: string): string {
 }
 
 /**
+ * How many Pinned items (tabs and folders, inside folders too) a template makes.
+ */
+function countTemplateItems(items: SpaceTemplateItem[]): number {
+  let count = 0;
+  for (const item of items) {
+    count += item.kind === "folder" ? 1 + countTemplateItems(item.children) : 1;
+  }
+  return count;
+}
+
+/**
  * Collects what the Library shows.
  */
 function buildLibraryData(state: BrowserState): LibraryData {
@@ -317,6 +328,7 @@ function buildLibraryData(state: BrowserState): LibraryData {
     sync: getSyncStatus(),
     searchKeywords: state.searchKeywords ?? [],
     commandChains: state.commandChains ?? [],
+    spaceTemplates: (state.spaceTemplates ?? []).map((template) => ({ id: template.id, name: template.name, icon: template.icon, itemCount: countTemplateItems(template.pinned) })),
     chainActions: listChainableActions(),
     downloadFolder: shortenHomePath(getDownloadFolder()),
     asksWhereToSave: state.settings.asksWhereToSave === true,

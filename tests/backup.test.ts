@@ -208,6 +208,12 @@ describe("backups", () => {
     expect(restored.state.spaces[1]?.newTabUrl).toBeUndefined();
   });
 
+  it("keep Space templates through a backup", () => {
+    const template = { id: "template-1-1", name: "Client", icon: "💼", theme: { colors: ["#000000"], appearance: "dark" as const, grain: 0 }, pinned: [{ kind: "tab" as const, url: "https://docs.example/", title: "Docs" }], searchEngine: "google" as const };
+    const restored = parseOrFail(backupText({ ...buildSetup().state, spaceTemplates: [template] }));
+    expect(restored.state.spaceTemplates).toEqual([template]);
+  });
+
   it("keep command chains, and drop a chain with a step that is not a web page or an action", () => {
     const morning = { id: "chain-1-1", name: "Morning", steps: [{ kind: "open", url: "https://news.example/" }, { kind: "action", actionId: "toggle-sidebar" }] };
     const crafted = { id: "chain-1-2", name: "Crafted", steps: [{ kind: "open", url: "javascript:alert(document.cookie)" }] };

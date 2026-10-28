@@ -417,6 +417,31 @@ check("an unknown ready-made feed is refused", liveFolders(await getState()).len
 await app.evaluate(({ session }) => session.fromPartition("persist:profile-default").protocol.unhandle("https"));
 
 await sidebar.screenshot({ path: path.join(outDir, "live-folders-sidebar.png") });
+
+// A Space template keeps a live folder's source; a Space made from it fills that folder right away (not at the next
+// timer). The original folder goes first: a live folder skips pages already open elsewhere.
+await dispatch({ type: "saveSpaceAsTemplate", spaceId: "space-a" });
+await sidebar.waitForTimeout(300);
+const liveTemplate = ((await getState()).spaceTemplates ?? [])[0];
+await dispatch({ type: "deleteItem", itemId: notificationsFolder.id });
+await dispatch({ type: "createSpaceFromTemplate", templateId: liveTemplate.id });
+state = await waitForState((current) => {
+  const madeSpace = current.spaces.find((space) => space.id === current.activeSpaceId);
+  const folders = (madeSpace?.pinnedIds ?? []).map((itemId) => current.items[itemId]);
+  return folders.some((item) => item?.kind === "folder" && item.live?.source.list === "notifications" && item.childIds.length === 2);
+}, 20000);
+const madeSpace = state.spaces.find((space) => space.id === state.activeSpaceId);
+const madeFolders = (madeSpace?.pinnedIds ?? []).map((itemId) => state.items[itemId]).filter((item) => item?.kind === "folder");
+const madeNotifications = madeFolders.find((folder) => folder.live?.source.list === "notifications");
+const templateLiveCount = liveTemplate.pinned.filter((item) => item.kind === "folder" && item.live !== undefined).length;
+const madeLiveCount = madeFolders.filter((folder) => folder.live !== undefined).length;
+check(
+  "a Space made from a template has its live folders, and fills them at once",
+  madeSpace?.id !== "space-a" && templateLiveCount > 0 && madeLiveCount === templateLiveCount && madeNotifications?.childIds.length === 2,
+  `${madeFolders.map((folder) => folder.title).join(", ")} / notifications ${madeNotifications?.childIds.length}`,
+);
+await dispatch({ type: "switchSpace", spaceId: "space-a" });
+await sidebar.waitForTimeout(300);
 const archiveBefore = (await getState()).archive.length;
 await dispatch({ type: "deleteItem", itemId: pullsFolder.id });
 state = await getState();
