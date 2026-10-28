@@ -178,6 +178,19 @@ export interface LibrarySpaceItem {
   depth: number;
 }
 
+/** What Library › Settings › Sync shows (syncController.ts). */
+export interface SyncStatusData {
+  /** The sync folder, or null when sync is off. */
+  folderPath: string | null;
+  deviceName: string;
+  /** The other Macs whose files were read. */
+  peerNames: string[];
+  lastSyncAt: number | null;
+  /** Changes made on two Macs too close in time to order, where this Mac's version stayed. */
+  conflicts: number;
+  problem: string | null;
+}
+
 /** A Boost as the Library lists it. */
 export interface LibraryBoost {
   site: string;
@@ -202,6 +215,7 @@ export interface LibraryData {
   showsFullUrls: boolean;
   /** Automatic hourly copies of the setup (backupController.ts). */
   areSnapshotsOn: boolean;
+  sync: SyncStatusData;
   adBlock: { isOn: boolean; status: "off" | "loading" | "ready" | "failed"; filterCount: number };
   routingRules: RoutingRule[];
   extensions: ExtensionLine[];

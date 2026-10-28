@@ -65,6 +65,7 @@ import { openWelcome, refreshOpenPanel, registerOverlayIpc, setCommandActionRegi
 import { startHandoff } from "./handoff";
 import { noticeVisitedPage, startLiveFolderRefreshing } from "./liveFolderRefresher";
 import { markSnapshotNeeded, startAutomaticSnapshots } from "./backupController";
+import { flushSyncNow, markEaselSaved, markNoteSaved, startSync } from "./syncController";
 import { getProfileSession, onProfileSessionCreated, restrictWebPermissions, useChromeUserAgent } from "./profiles";
 import { retakeCapture } from "./liveCaptures";
 import { linkNativeMessagingHosts, listOtherBrowserHostFolders } from "./nativeMessagingHosts";
@@ -329,6 +330,7 @@ async function handleAppReady(): Promise<void> {
     readNote: (noteId) => readNote(noteId),
     saveNote: (noteId, html, title) => {
       markSnapshotNeeded();
+      markNoteSaved(noteId, html);
       if (writeNote(noteId, html)) {
         applyChange((state) => setNoteTitle(state, createNoteUrl(noteId), title));
       }
@@ -336,6 +338,7 @@ async function handleAppReady(): Promise<void> {
     readEasel: (easelId) => readEasel(easelId),
     saveEasel: (easelId, json) => {
       markSnapshotNeeded();
+      markEaselSaved(easelId, json);
       writeEasel(easelId, json);
     },
     listCaptures: () =>
@@ -385,6 +388,8 @@ async function handleAppReady(): Promise<void> {
   offerMoveToApplications().catch((error) => console.error("Moving to Applications failed:", error));
   startLiveFolderRefreshing();
   startAutomaticSnapshots();
+  // The Library's Sync row shows how the last read or write went.
+  startSync(() => refreshOpenPanel());
   startHandoff();
   const firstWindow = getWindow();
   if (isFirstStart && getState().settings.hasSeenWelcome !== true && firstWindow !== null) {
@@ -448,7 +453,10 @@ function startApp(): void {
   app.whenReady().then(handleAppReady);
   app.on("before-quit", () => saveHistoryNow());
   // After the windows have closed (closing one changes the state), so the last change reaches the file.
-  app.on("will-quit", () => saveStateNow());
+  app.on("will-quit", () => {
+    saveStateNow();
+    flushSyncNow();
+  });
   app.on("window-all-closed", () => {
     app.quit();
   });

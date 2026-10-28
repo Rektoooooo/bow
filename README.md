@@ -70,6 +70,12 @@ only web, note and easel addresses get in, and JavaScript Boosts arrive switched
 keeps automatic copies every hour (the last 12 hours, then one a day for a week) in its Backups folder, where Restore…
 opens; Library › Settings › Backup turns them off.
 
+**Sync without an account.** Library › Settings › Sync › Choose Folder… syncs Spaces, pinned tabs, folders,
+Favorites, Notes, Easels, Boosts and rules between your Macs through a folder they all reach, such as iCloud Drive or
+Dropbox. Each Mac keeps one file there and reads the others'; a change merges piece by piece, so renaming a tab on one
+Mac and pinning a page on another keeps both. Today tabs, the Archive and settings stay on each Mac
+([how it works](docs/sync.md)).
+
 Bow keeps itself up to date: a few times a day it looks for a new release here on GitHub, downloads it in the
 background, and the sidebar says **Update ready**. Click **Restart**, or just quit Bow; the new version is there the
 next time it opens. **Bow › Check for Updates…** looks right away. The check downloads a small file from this

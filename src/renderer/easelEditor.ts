@@ -643,6 +643,19 @@ function parseBoard(json: string): EaselBoard {
 }
 
 /**
+ * Another Mac changed these easels (sync): an open one is read again, unless a change made here waits to be saved
+ * (it is newer and wins on the other Mac too).
+ */
+export function reloadEaselIfShown(slot: HTMLElement, easelIds: string[]): void {
+  const easelId = openBoard?.easelId ?? null;
+  if (easelId === null || !easelIds.includes(easelId) || pendingSave !== null) {
+    return;
+  }
+  showEaselEditor(slot, null);
+  showEaselEditor(slot, easelId);
+}
+
+/**
  * Shows the board of an easel in the page card (keeping it while the same easel stays open), or removes it for null.
  */
 export function showEaselEditor(slot: HTMLElement, easelId: string | null): void {

@@ -34,6 +34,7 @@ import { deleteBoost, setBoostCss, setBoostEnabled, setBoostJavaScript, setBoost
 import { reapplyBoostsToAllPages } from "./boostPages";
 import { importFromArc } from "./arcImportController";
 import { exportBackup, restoreBackup, revealBackupsFolder } from "./backupController";
+import { chooseSyncFolder, revealSyncFolder, stopSyncing } from "./syncController";
 import { importFromBrowser } from "./browserImportController";
 import { applyCosmeticFilters, ensureFilterLists } from "./adBlock";
 import { applyAppIcon } from "./appIcon";
@@ -426,6 +427,13 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => setSnapshots(state, action.isOn));
     case "revealBackups":
       return revealBackupsFolder();
+    case "chooseSyncFolder":
+      chooseSyncFolder().catch((error) => console.error("Starting sync failed:", error));
+      return;
+    case "stopSyncing":
+      return stopSyncing();
+    case "revealSyncFolder":
+      return revealSyncFolder();
     case "showTabTooltip":
       return showTabTooltip(action.title, action.showsRenameHint, action.frame);
     case "hideTabTooltip":

@@ -26,7 +26,8 @@ npm run e2e          # build + drive the real app: check-app, check-overlay, che
                      # GitHub via --github-origin), check-performance (331-tab sidebar redraws within a frame),
                      # check-windows (⌘N, a Space and selection per window, restart restores every window),
                      # check-tab-sleep (a page off screen sleeps, its renderer ends, it wakes scrolled where it was),
-                     # check-backup (export, restore by replacing or adding, unsafe files refused)
+                     # check-backup (export, restore by replacing or adding, unsafe files refused),
+                     # check-sync (two copies of Bow sync through one folder: join, both ways, stop)
 node e2e/window-shot.mjs --open  # after npm run package: Bow on the sample profile, for the README's hand-taken
                                  # screenshots (docs/screenshot-*.png); without --open: the views → e2e/output/readme-shots
 node e2e/arc-compare.mjs   # side-by-side crops with the user's Arc screenshots (reference/, local only) → e2e/output
@@ -47,7 +48,8 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
 ## Architecture rules (keep them)
 
 - **Pure core.** `state.ts`, `spaces.ts`, `split.ts`, `tree.ts`, `windows.ts`, `autoArchive.ts`, `commandBar.ts`,
-  `history.ts`, `layout.ts`, `migrate.ts` and the Arc importers take data in and return a changed copy. No Electron, no
+  `history.ts`, `layout.ts`, `migrate.ts`, `backup.ts`, `sync.ts` and the Arc importers take data in and return a
+  changed copy. No Electron, no
   `Date.now()` inside; `now` is a parameter. Return the *same object* when nothing changed.
 - **Data model** (`src/shared/types.ts`, version 4) follows Arc's: every sidebar object is an item; order lives only
   in ordered id lists (profile Favorites, Space Pinned / Today, folder and split children). No parent pointers.

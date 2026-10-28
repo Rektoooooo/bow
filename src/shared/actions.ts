@@ -40,7 +40,9 @@ export type SidebarCommand =
   | { kind: "dropItemFromOtherWindow"; itemId: ItemId; clientX: number; clientY: number }
   | { kind: "beginRename"; itemId: ItemId }
   | { kind: "beginSpaceRename"; spaceId: SpaceId }
-  | { kind: "beginSpaceIconEdit"; spaceId: SpaceId };
+  | { kind: "beginSpaceIconEdit"; spaceId: SpaceId }
+  /** Notes and Easels another Mac changed (syncController.ts): an editor showing one reads it again. */
+  | { kind: "reloadFiles"; noteIds: string[]; easelIds: string[] };
 
 export type BrowserAction =
   | { type: "openTab"; typedText: string }
@@ -128,6 +130,9 @@ export type BrowserAction =
   | { type: "setShowFullUrls"; isOn: boolean }
   | { type: "setSnapshots"; isOn: boolean }
   | { type: "revealBackups" }
+  | { type: "chooseSyncFolder" }
+  | { type: "stopSyncing" }
+  | { type: "revealSyncFolder" }
   | { type: "createNote" }
   | { type: "createEasel" }
   | { type: "finishWelcome" }
@@ -238,6 +243,9 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setShowFullUrls",
   "setSnapshots",
   "revealBackups",
+  "chooseSyncFolder",
+  "stopSyncing",
+  "revealSyncFolder",
   "createNote",
   "createEasel",
   "finishWelcome",

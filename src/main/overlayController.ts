@@ -12,6 +12,7 @@
  *   ⌘T → openCommandBar() → showOverlay → overlay types → "overlay:query" → rankCommandBarResults → lines
  *   (suggestions arrive later as "overlay:results") → "overlay:choose" → close overlay → run the result
  */
+import { getSyncStatus } from "./syncController";
 import { app, clipboard, ipcMain, Menu, nativeTheme, net, ShareMenu } from "electron";
 import type { IpcMainInvokeEvent, MenuItemConstructorOptions, Rectangle, WebContents } from "electron";
 import { LIBRARY_SECTIONS, OVERLAY_CHANNELS } from "../shared/overlay";
@@ -274,6 +275,7 @@ function buildLibraryData(state: BrowserState): LibraryData {
     areTitlesTidy: state.settings.areTitlesTidy !== false,
     showsFullUrls: state.settings.showsFullUrls === true,
     areSnapshotsOn: state.settings.areSnapshotsOn !== false,
+    sync: getSyncStatus(),
     adBlock: describeAdBlock(state),
     routingRules: state.routingRules ?? [],
     extensions: (state.extensions ?? []).map((extension) => ({

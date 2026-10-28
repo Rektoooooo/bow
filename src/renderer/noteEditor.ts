@@ -252,6 +252,19 @@ function buildEditor(noteId: string): HTMLElement {
 }
 
 /**
+ * Another Mac changed these notes (sync): an open one is read again. Not while a change typed here waits to be saved:
+ * that change is newer, so it wins on the other Mac too, and the other Mac keeps its own text as a copy.
+ */
+export function reloadNoteIfShown(slot: HTMLElement, noteIds: string[]): void {
+  if (openNoteId === null || !noteIds.includes(openNoteId) || pendingSave !== null) {
+    return;
+  }
+  const noteId = openNoteId;
+  showNoteEditor(slot, null);
+  showNoteEditor(slot, noteId);
+}
+
+/**
  * Shows the editor of a note in the page card (keeping it while the same note stays open), or removes it for null.
  */
 export function showNoteEditor(slot: HTMLElement, noteId: string | null): void {

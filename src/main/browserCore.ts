@@ -687,3 +687,13 @@ export function sendSidebarCommand(command: SidebarCommand): void {
   flushStatePush();
   window.webContents.send(IPC_CHANNELS.sidebarCommand, command);
 }
+
+/**
+ * Sends a request to every window's sidebar page (a Note another Mac changed may be open in any of them).
+ */
+export function sendSidebarCommandToAllWindows(command: SidebarCommand): void {
+  flushStatePush();
+  for (const entry of listMainWindows()) {
+    entry.window.webContents.send(IPC_CHANNELS.sidebarCommand, command);
+  }
+}

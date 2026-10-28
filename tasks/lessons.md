@@ -126,6 +126,13 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 - Playwright's mouse never moves the system pointer: `screen.getCursorScreenPoint()` is wherever the real mouse is.
   Code that needs "what was clicked" should ask the page (by address, focus) and use the pointer only as a hint.
 
+- An e2e seed must not start on a page that fails to load (an `.invalid` address selected at launch): Chromium swaps
+  in its error page while Playwright attaches, and `_electron.launch` can hang until its timeout (seen 3 times in
+  check-backup / check-sync on 2026-10-28; suites that start on a note, about:blank or nothing never hung).
+- `check-extensions`' native messaging, `check-tab-sleep`'s renderer count and `check-performance`'s redraw time fail
+  under concurrent e2e load and pass alone: run suites in a quiet window (no other session's e2e) before treating one
+  of them as a regression.
+
 ## Dependencies
 - Check a package's license **per version** and diff a just-published release against the previous one before
   adding it (electron-chrome-extensions 4.9 was GPL with a runtime license check; 4.10, one day old, is MIT and only

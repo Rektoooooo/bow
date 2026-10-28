@@ -288,3 +288,15 @@ export const SNAPSHOTS_DAILY_KEPT = 7;
 
 /** Copies kept from before a restore (each restore makes one). Our choice. */
 export const BEFORE_RESTORE_SNAPSHOTS_KEPT = 5;
+
+/** Sync writes this Mac's file this long after the last change (changes come in bursts). Our choice. */
+export const SYNC_WRITE_DELAY_MS = 2000;
+
+/** Sync reads the folder this long after it changed (a file is often written in several steps). Our choice. */
+export const SYNC_READ_DELAY_MS = 500;
+
+/** Sync also reads the folder this often, for network drives that don't report changes. Our choice. */
+export const SYNC_POLL_MS = 60 * 1000;
+
+/** A file operation on the sync folder that takes longer than this is given up (a drive that stopped answering). */
+export const SYNC_FILE_TIMEOUT_MS = 10 * 1000;

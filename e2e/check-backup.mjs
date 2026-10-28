@@ -51,7 +51,8 @@ fs.writeFileSync(
       { id: "space-home", name: "Home", icon: "🏠", theme: { colors: ["#e9d8d4"], appearance: "auto", grain: 0 }, profileId: "profile-default", pinnedIds: [], todayIds: ["tab-home"], isPinnedOpen: true },
     ],
     activeSpaceId: "space-work",
-    selectedTabIdBySpace: { "space-work": "tab-news", "space-home": "tab-home" },
+    // A note is on screen at start: a page that fails to load during launch can hang Playwright's attach.
+    selectedTabIdBySpace: { "space-work": "tab-note", "space-home": "tab-home" },
     archive: [],
     settings: { archiveAfterMs: 43200000, isSidebarVisible: true },
     boosts: [{ id: "boost-1", site: "news.example.invalid", css: "body { color: teal }", zappedSelectors: [], isEnabled: true, javascript: "document.title = 'boosted'", isJavaScriptOn: true }],

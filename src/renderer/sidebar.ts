@@ -33,9 +33,9 @@ import { applySpaceTheme, onSystemAppearanceChange } from "./theme.js";
 import { createNavigationButtons, renderToolbar } from "./toolbar.js";
 import { installFolderListHover } from "./folderListHover.js";
 import { installTabTooltipHover } from "./tabTooltipHover.js";
-import { showNoteEditor } from "./noteEditor.js";
+import { reloadNoteIfShown, showNoteEditor } from "./noteEditor.js";
 import { createSpaceIcon } from "./spaceIcon.js";
-import { showEaselEditor } from "./easelEditor.js";
+import { reloadEaselIfShown, showEaselEditor } from "./easelEditor.js";
 import { getEaselId } from "../shared/easels.js";
 import { getNoteId } from "../shared/notes.js";
 import { isDeveloperModeOn } from "../shared/developerMode.js";
@@ -716,6 +716,14 @@ function handleSidebarCommand(command: SidebarCommand): void {
   }
   if (command.kind === "beginSpaceIconEdit") {
     openSpaceIconPicker(command.spaceId);
+    return;
+  }
+  if (command.kind === "reloadFiles") {
+    const cardSlot = document.getElementById("card-slot");
+    if (cardSlot !== null) {
+      reloadNoteIfShown(cardSlot, command.noteIds);
+      reloadEaselIfShown(cardSlot, command.easelIds);
+    }
     return;
   }
   renderAll();

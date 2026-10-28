@@ -12,7 +12,7 @@
  * Data flow:
  *   "overlay:show" (library) → renderLibrary() → a section → click Restore → dispatch restoreArchivedTab → close
  */
-import type { ExtensionLine, HistoryLine, LibraryBoost, LibraryData, LibrarySection, LibrarySpace, LibrarySpaceItem, MediaCommand, MediaLine } from "../shared/overlay";
+import type { ExtensionLine, HistoryLine, LibraryBoost, LibraryData, LibrarySection, LibrarySpace, LibrarySpaceItem, MediaCommand, MediaLine, SyncStatusData } from "../shared/overlay";
 import { computeFramePalette } from "../shared/themePalette.js";
 import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS, TAB_SLEEP_OPTIONS } from "../shared/settings.js";
 import { APP_ICON_VARIANTS, buildAppIconSvg } from "../shared/appIconDrawing.js";
@@ -803,8 +803,74 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
       createTextButton("Show in Finder", "library-chip", () => dispatch({ type: "revealBackups" })),
     ),
   ]);
-  settings.append(tabs, browsing, appearance, importing, backup, renderRoutingSettings(data));
+  settings.append(tabs, browsing, appearance, importing, backup, renderSyncSettings(data.sync), renderRoutingSettings(data));
   body.replaceChildren(settings);
+}
+
+/** The part of an iCloud Drive path that names it (Finder shows that folder as "iCloud Drive"). */
+const ICLOUD_DRIVE_PATH_PART = "/Mobile Documents/com~apple~CloudDocs";
+
+/** The folder Bow makes inside the one the user picks (syncController.ts). */
+const SYNC_FOLDER_NAME = "Bow Sync";
+
+/**
+ * The sync folder as people know it: "iCloud Drive", or the folder they picked ("Dropbox").
+ */
+function describeSyncFolder(folderPath: string): string {
+  if (folderPath.includes(ICLOUD_DRIVE_PATH_PART)) {
+    return "iCloud Drive";
+  }
+  const parts = folderPath.split("/").filter((part) => part !== "");
+  const folderName = parts.at(-1) ?? folderPath;
+  return folderName === SYNC_FOLDER_NAME ? (parts.at(-2) ?? folderName) : folderName;
+}
+
+/**
+ * What sync last did, in words: a problem first, else the other Macs, the last sync and changes kept from both.
+ */
+function describeSyncStatus(sync: SyncStatusData): string {
+  if (sync.problem !== null) {
+    return sync.problem;
+  }
+  const sentences = [sync.peerNames.length === 0 ? "No other Mac has synced here yet." : `With ${sync.peerNames.join(", ")}.`];
+  if (sync.lastSyncAt !== null) {
+    const time = new Date(sync.lastSyncAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    sentences.push(`Last synced at ${time}.`);
+  }
+  if (sync.conflicts === 1) {
+    sentences.push("1 change made on two Macs at the same moment kept this Mac's version.");
+  }
+  if (sync.conflicts > 1) {
+    sentences.push(`${sync.conflicts} changes made on two Macs at the same moment kept this Mac's version.`);
+  }
+  return sentences.join(" ");
+}
+
+/**
+ * The Sync group: off, what it does and Choose Folder…; on, where it syncs, how it went, and Stop Syncing.
+ */
+function renderSyncSettings(sync: SyncStatusData): HTMLElement {
+  if (sync.folderPath === null) {
+    return createSettingGroup("Sync", [
+      createSettingRow(
+        "Sync between your Macs",
+        "Bow keeps one file per Mac in a folder you choose, like iCloud Drive or Dropbox, and reads the others: Spaces, pinned tabs, folders, Favorites, Notes, Easels, Boosts and rules. No account, no server. Today tabs, the Archive and settings stay on each Mac.",
+        createTextButton("Choose Folder…", "library-chip", () => dispatch({ type: "chooseSyncFolder" })),
+      ),
+    ]);
+  }
+  return createSettingGroup("Sync", [
+    createSettingRow(
+      `Syncing through ${describeSyncFolder(sync.folderPath)}`,
+      describeSyncStatus(sync),
+      createTextButton("Show in Finder", "library-chip", () => dispatch({ type: "revealSyncFolder" })),
+    ),
+    createSettingRow(
+      "Stop syncing",
+      "This Mac stops sending and receiving changes. Its setup stays as it is; the other Macs go on syncing.",
+      createTextButton("Stop Syncing", "library-chip", () => dispatch({ type: "stopSyncing" })),
+    ),
+  ]);
 }
 
 /**
