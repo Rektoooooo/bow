@@ -5,6 +5,7 @@
 // that finished is played to the updater, so the sidebar's notice and the app menu's restart are checked too).
 // usage: npm run package && node e2e/check-package.mjs
 // Uses a throwaway --user-data-dir folder and never changes the default browser.
+import "./background.mjs";
 import { _electron } from "playwright-core";
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
