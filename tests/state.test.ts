@@ -11,6 +11,7 @@ import {
   createFolder,
   createInitialState,
   setGlobalShortcut,
+  setProfileForgetsSiteData,
   deleteItem,
   duplicateTab,
   findNeighbourTabId,
@@ -571,6 +572,18 @@ describe("the shortcut from any app", () => {
     expect(off.settings.globalShortcut).toBeUndefined();
     expect(off.settings.globalShortcutOpens).toBe("littleWindow");
     expect(setGlobalShortcut(state, null, "commandBar")).toBe(state);
+  });
+});
+
+describe("forgetting a profile's site data on quit", () => {
+  it("is turned on and off per profile, and an unknown profile changes nothing", () => {
+    const state = createInitialState(ONE_PM);
+    const profileId = state.profiles[0]?.id as string;
+    const on = setProfileForgetsSiteData(state, profileId, true);
+    expect(on.profiles[0]?.forgetsSiteDataOnQuit).toBe(true);
+    expect(setProfileForgetsSiteData(on, profileId, true)).toBe(on);
+    expect(setProfileForgetsSiteData(on, profileId, false).profiles[0]?.forgetsSiteDataOnQuit).toBeUndefined();
+    expect(setProfileForgetsSiteData(state, "profile-missing", true)).toBe(state);
   });
 });
 

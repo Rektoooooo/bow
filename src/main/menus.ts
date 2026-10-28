@@ -486,7 +486,19 @@ function buildSpaceMenu(host: MenuHost, space: Space): MenuItemConstructorOption
     checked: space.profileId === profile.id,
     click: () => host.runAction({ type: "setSpaceProfile", spaceId: space.id, profileId: profile.id }),
   }));
-  profileMenu.push({ type: "separator" }, { label: "New Profile", click: () => host.runAction({ type: "createProfileForSpace", spaceId: space.id }) });
+  const spaceProfile = state.profiles.find((profile) => profile.id === space.profileId);
+  const forgetsSiteData = spaceProfile?.forgetsSiteDataOnQuit === true;
+  profileMenu.push(
+    { type: "separator" },
+    { label: "New Profile", click: () => host.runAction({ type: "createProfileForSpace", spaceId: space.id }) },
+    { type: "separator" },
+    {
+      label: "Forget Site Data on Quit",
+      type: "checkbox",
+      checked: forgetsSiteData,
+      click: () => host.runAction({ type: "setForgetSiteDataOnQuit", profileId: space.profileId, isOn: !forgetsSiteData }),
+    },
+  );
 
   return [
     { label: "Rename Space…", click: () => host.sendSidebarCommand({ kind: "beginSpaceRename", spaceId: space.id }) },

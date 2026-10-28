@@ -176,6 +176,11 @@ export interface Profile {
   name: string;
   /** Favorite tabs (the tiles at the top of the sidebar), in order. Only tab ids. */
   favoriteIds: ItemId[];
+  /**
+   * Forget Site Data on Quit (main/siteDataCleaner.ts): cookies, sign-ins and site storage go every time Bow quits.
+   * Optional: missing means kept. Stays on each Mac (sync's profile unit is the name only).
+   */
+  forgetsSiteDataOnQuit?: boolean;
 }
 
 /** A Pinned item of a Space template: a page, or a folder of them (a live folder keeps only its source). */

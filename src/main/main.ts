@@ -65,6 +65,7 @@ import { startGlobalShortcut } from "./globalShortcutController";
 import { handleBowUrl } from "./bowUrlController";
 import { loadPrivacyReport, savePrivacyReportNow } from "./privacyReportStore";
 import { noticeLoadFailed } from "./httpsOnlyController";
+import { clearForgettingProfiles, clearSiteDataOnQuit } from "./siteDataCleaner";
 import { getReaderArticle, noticeReaderPageChanged, probeReaderPage } from "./readerController";
 import type { LinkSourceApp } from "../shared/routingRules";
 import { showPageContextMenu } from "./menus";
@@ -389,6 +390,10 @@ async function handleAppReady(): Promise<void> {
   installAppMenu(appMenuCommands);
   // Hosts that password managers registered for other Chromium browsers (Arc, Brave, …) are found by extensions here.
   linkHostsOfOtherBrowsers();
+  // Profiles that forget their site data start clean, even after a crash or an update restart skipped the quit's
+  // clearing; before extensions and pages, so nothing reads the old data first.
+  await clearForgettingProfiles();
+  clearSiteDataOnQuit();
   // Extensions load before the first page, so their content scripts reach the pages restored at startup.
   initializeExtensionHost(tabViewEvents);
   await prepareExtensions();

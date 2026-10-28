@@ -232,6 +232,9 @@ source never updates itself.
   says so in the sidebar, with "Open with HTTP" (allowed until Bow quits); a typed https:// address is never taken
   down to http, and local names and IP addresses stay as they are. Little Windows and Peek show the browser's error
   page instead of the offer.
+- **Forget site data on quit**, per profile (Space menu › Profile, or Library › Privacy): cookies, sign-ins and what
+  sites store are cleared every time Bow quits, and again at the next start should it crash. Extensions keep their own
+  data; you sign in again each time.
 - **Air Traffic Control**: rules such as "address contains github.com → Work" or "link comes from Slack → Work" send
   links from other apps to a Space (Library › Settings, which lists your running apps). The sender is the app in front
   when the link arrives, read with macOS's own `lsappinfo` (no permission needed). **Test a link** there shows where

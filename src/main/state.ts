@@ -15,7 +15,7 @@
  *   - `now` is always a parameter; nothing here reads the clock.
  */
 import { ARCHIVE_LIMIT, DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_LIMIT, FIRST_WINDOW_ID, LIVE_FOLDER_HIDDEN_LIMIT, SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX } from "../shared/settings";
-import type { ArchiveReason, ArchivedTab, BrowserState, FolderItem, GlobalShortcutTarget, ItemId, ItemLocation, LiveFolderData, SearchKeyword, Space, SpaceId, TabItem } from "../shared/types";
+import type { ArchivedTab, ArchiveReason, BrowserState, FolderItem, GlobalShortcutTarget, ItemId, ItemLocation, LiveFolderData, Profile, ProfileId, SearchKeyword, Space, SpaceId, TabItem } from "../shared/types";
 import { createNoteUrl, NEW_NOTE_TITLE } from "../shared/notes";
 import { DEFAULT_SEARCH_ENGINE_ID } from "../shared/searchEngines";
 import { DEFAULT_APP_ICON_ID } from "../shared/appIconDrawing";
@@ -982,6 +982,23 @@ export function setSnapshots(state: BrowserState, isOn: boolean): BrowserState {
     return state;
   }
   return { ...state, settings: { ...state.settings, areSnapshotsOn: isOn } };
+}
+
+/**
+ * Forget Site Data on Quit on or off for a profile (siteDataCleaner.ts). Same state for an unknown profile.
+ */
+export function setProfileForgetsSiteData(state: BrowserState, profileId: ProfileId, isOn: boolean): BrowserState {
+  const profile = state.profiles.find((candidate) => candidate.id === profileId);
+  if (profile === undefined || (profile.forgetsSiteDataOnQuit === true) === isOn) {
+    return state;
+  }
+  const changed: Profile = { ...profile };
+  if (isOn) {
+    changed.forgetsSiteDataOnQuit = true;
+  } else {
+    delete changed.forgetsSiteDataOnQuit;
+  }
+  return { ...state, profiles: state.profiles.map((candidate) => (candidate.id === profileId ? changed : candidate)) };
 }
 
 /**

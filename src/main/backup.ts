@@ -386,7 +386,11 @@ function checkProfiles(raw: unknown): Profile[] {
       continue;
     }
     seenIds.add(entry.id);
-    profiles.push({ id: entry.id.slice(0, MAX_TEXT_LENGTH), name: readText(entry.name, "Profile"), favoriteIds: readIdList(entry.favoriteIds) });
+    const profile: Profile = { id: entry.id.slice(0, MAX_TEXT_LENGTH), name: readText(entry.name, "Profile"), favoriteIds: readIdList(entry.favoriteIds) };
+    if (entry.forgetsSiteDataOnQuit === true) {
+      profile.forgetsSiteDataOnQuit = true;
+    }
+    profiles.push(profile);
   }
   if (profiles.length === 0) {
     profiles.push({ id: DEFAULT_PROFILE_ID, name: "Default", favoriteIds: [] });

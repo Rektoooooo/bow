@@ -40,6 +40,7 @@ import { isChainableActionId } from "./commandChains";
 import { listKnownSourceApps, refreshRunningApps } from "./linkSourceApps";
 import { getGlobalShortcutStatus } from "./globalShortcutController";
 import { getPrivacySummary } from "./privacyReportStore";
+import { describeSpaceIconAsText } from "../shared/spaceIcons";
 import { RESTART_TO_UPDATE_ID } from "./commandBarActions";
 import { focusMainWindow } from "./mainWindows";
 import type { CommandBarResult } from "./commandBar";
@@ -279,6 +280,23 @@ function shortenHomePath(folder: string): string {
 }
 
 /**
+ * Library › Privacy's profiles: each with the Spaces that use it and its Forget Site Data on Quit choice.
+ */
+function listPrivacyProfiles(state: BrowserState): LibraryData["privacy"]["profiles"] {
+  const profiles: LibraryData["privacy"]["profiles"] = [];
+  for (const profile of state.profiles) {
+    const spaceNames: string[] = [];
+    for (const space of state.spaces) {
+      if (space.profileId === profile.id) {
+        spaceNames.push(`${describeSpaceIconAsText(space.icon)} ${space.name}`);
+      }
+    }
+    profiles.push({ id: profile.id, name: profile.name, spaces: spaceNames.join(", "), forgetsSiteDataOnQuit: profile.forgetsSiteDataOnQuit === true });
+  }
+  return profiles;
+}
+
+/**
  * How many Pinned items (tabs and folders, inside folders too) a template makes.
  */
 function countTemplateItems(items: SpaceTemplateItem[]): number {
@@ -332,7 +350,12 @@ function buildLibraryData(state: BrowserState): LibraryData {
     searchKeywords: state.searchKeywords ?? [],
     commandChains: state.commandChains ?? [],
     linkSourceApps: listKnownSourceApps(),
-    privacy: { summary: getPrivacySummary(Date.now()), isAdBlockOn: state.settings.isAdBlockOn === true, isHttpsOnly: state.settings.isHttpsOnly === true },
+    privacy: {
+      summary: getPrivacySummary(Date.now()),
+      isAdBlockOn: state.settings.isAdBlockOn === true,
+      isHttpsOnly: state.settings.isHttpsOnly === true,
+      profiles: listPrivacyProfiles(state),
+    },
     globalShortcut: state.settings.globalShortcut ?? null,
     globalShortcutOpens: state.settings.globalShortcutOpens ?? "commandBar",
     globalShortcutStatus: getGlobalShortcutStatus(),

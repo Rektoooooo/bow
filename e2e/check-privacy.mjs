@@ -5,6 +5,8 @@
 //     upgraded page fails its TLS handshake like a site without https: the sidebar offers "Open with HTTP", which
 //     loads it and allows the site until Bow quits. A typed https:// address that fails gets no offer; IP addresses
 //     are never upgraded.
+//   - Forget site data on quit: a cookie in each of two profiles; one profile forgets; after a quit and a new start
+//     with the same data folder, only that profile's cookie is gone.
 // usage: npm run build && node e2e/check-privacy.mjs      (uses a throwaway --user-data-dir)
 import "./background.mjs";
 import { _electron } from "playwright-core";
@@ -67,6 +69,7 @@ await sidebar.waitForSelector(".space-title");
 const overlay = await findPage("/overlay/overlay.html");
 const dispatch = (action) => sidebar.evaluate((value) => window.browserApi.dispatch(value), action);
 const getState = () => sidebar.evaluate(() => window.browserApi.getState());
+let state = null;
 const selectedUrl = async () => {
   const state = await getState();
   return state.items[state.selectedTabIdBySpace[state.activeSpaceId]]?.url ?? "";
@@ -154,11 +157,51 @@ await sidebar.waitForTimeout(1500);
 check("an IP address is never upgraded", httpRequests.includes(`127.0.0.1:${port}/local`) && (await selectedUrl()).startsWith("http://127.0.0.1"));
 await dispatch({ type: "setHttpsOnly", isOn: false });
 
+// ---------- Forget site data on quit ----------
+
+state = await getState();
+await dispatch({ type: "createProfileForSpace", spaceId: state.spaces[1].id });
+await sidebar.waitForTimeout(400);
+const profiles = (await getState()).profiles;
+const forgettingProfileId = profiles[0].id;
+const keepingProfileId = profiles[1]?.id;
+const setCookie = (profileId, name) =>
+  app.evaluate(
+    async ({ session }, details) =>
+      session.fromPartition(`persist:${details.profileId}`).cookies.set({ url: "https://cookie.example/", name: details.name, value: "1", expirationDate: Math.floor(Date.now() / 1000) + 86400 }),
+    { profileId, name },
+  );
+await setCookie(forgettingProfileId, "forgotten");
+await setCookie(keepingProfileId, "kept");
+await openPrivacy();
+await overlay.click(`[role="switch"][aria-label="Forget site data of ${profiles[0].name} on quit"]`);
+await sidebar.waitForTimeout(400);
+check("Privacy's switch marks a profile to forget its site data on quit", (await getState()).profiles[0].forgetsSiteDataOnQuit === true && profiles.length === 2);
+await overlay.press("body", "Escape");
+
 // The report reaches its file a few seconds after a block (privacyReportStore.ts SAVE_DELAY_MS), and at quit.
 await app.close();
 const savedReport = JSON.parse(fs.readFileSync(path.join(userDataDir, "privacy-report.json"), "utf8"));
 const savedSites = savedReport.days.at(-1)?.sites ?? {};
 check("the report is saved with counts only (no page addresses)", savedSites["127.0.0.1"] >= 1 && !JSON.stringify(savedReport).includes("/story"), JSON.stringify(savedReport));
+
+const secondRun = await _electron.launch({
+  executablePath: createRequire(import.meta.url)("electron"),
+  args: [`--user-data-dir=${userDataDir}`, "--skip-welcome", appDir],
+  timeout: 30000,
+});
+let secondSidebar;
+while (!secondSidebar) {
+  secondSidebar = secondRun.windows().find((candidate) => candidate.url().endsWith("/renderer/index.html"));
+  if (!secondSidebar) await new Promise((resolve) => setTimeout(resolve, 150));
+}
+await secondSidebar.waitForSelector(".space-title");
+const cookiesAfter = await secondRun.evaluate(async ({ session }, profileIds) => {
+  const read = async (profileId) => (await session.fromPartition(`persist:${profileId}`).cookies.get({ url: "https://cookie.example/" })).map((cookie) => cookie.name);
+  return { forgetting: await read(profileIds[0]), keeping: await read(profileIds[1]) };
+}, [forgettingProfileId, keepingProfileId]);
+check("after a quit, the forgetting profile's cookie is gone and the other profile's stays", cookiesAfter.forgetting.length === 0 && cookiesAfter.keeping.includes("kept"), JSON.stringify(cookiesAfter));
+await secondRun.close();
 
 server.close();
 const failed = results.filter((result) => !result.ok).length;

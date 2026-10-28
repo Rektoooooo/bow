@@ -218,6 +218,13 @@ describe("backups", () => {
     expect(crafted.state.settings.readerTextSize).toBeUndefined();
   });
 
+  it("keep a profile's Forget Site Data on Quit", () => {
+    const setup = buildSetup().state;
+    const profiles = setup.profiles.map((profile) => ({ ...profile, forgetsSiteDataOnQuit: true }));
+    const restored = parseOrFail(backupText({ ...setup, profiles: profiles }));
+    expect(restored.state.profiles[0]?.forgetsSiteDataOnQuit).toBe(true);
+  });
+
   it("keep app rules with a bundle id, and drop one without", () => {
     const text = craftedBackupText((backup) => {
       const spaceId = backup.state.spaces[0]?.id as string;

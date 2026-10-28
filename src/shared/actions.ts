@@ -11,7 +11,7 @@
  *   sidebar.ts → window.browserApi.dispatch(action) → preload → ipc.ts parseAction() → main.ts runAction()
  */
 import type { SearchEngineId } from "./searchEngines";
-import type { CommandChain, GitHubLiveList, GlobalShortcutTarget, ItemId, ItemLocation, RoutingMatchType, SitePermissionKind, SpaceId, SpaceTheme, SplitOrientation } from "./types";
+import type { CommandChain, GitHubLiveList, GlobalShortcutTarget, ItemId, ItemLocation, ProfileId, RoutingMatchType, SitePermissionKind, SpaceId, SpaceTheme, SplitOrientation } from "./types";
 
 /** Toolbar and keyboard navigation commands for the page on screen. */
 export type NavigationCommand = "back" | "forward" | "reload" | "stop" | "hardReload" | "emptyCacheAndReload";
@@ -102,6 +102,8 @@ export type BrowserAction =
   | { type: "setGlobalShortcut"; accelerator: string | null; opens: GlobalShortcutTarget }
   /** Library › Privacy: HTTPS-Only Mode. */
   | { type: "setHttpsOnly"; isOn: boolean }
+  /** Forget Site Data on Quit for a profile (Space menu › Profile, Library › Privacy). */
+  | { type: "setForgetSiteDataOnQuit"; profileId: ProfileId; isOn: boolean }
   | { type: "setSidebarWidth"; width: number; isFinal: boolean }
   | { type: "setSpaceProfile"; spaceId: SpaceId; profileId: string }
   | { type: "createProfileForSpace"; spaceId: SpaceId }
@@ -263,6 +265,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setReaderTextSize",
   "setGlobalShortcut",
   "setHttpsOnly",
+  "setForgetSiteDataOnQuit",
   "setSidebarWidth",
   "setSpaceProfile",
   "createProfileForSpace",

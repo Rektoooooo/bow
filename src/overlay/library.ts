@@ -1363,7 +1363,17 @@ function renderBody(data: LibraryData): void {
         createSwitch(data.privacy.isHttpsOnly, "HTTPS-Only Mode", (isOn) => dispatch({ type: "setHttpsOnly", isOn: isOn })),
       ),
     ]);
-    renderPrivacySection(body, data, emptyState, [connections]);
+    const siteData = createSettingGroup(
+      "Forget site data on quit",
+      data.privacy.profiles.map((profile) =>
+        createSettingRow(
+          `${profile.name}${profile.spaces === "" ? "" : `: ${profile.spaces}`}`,
+          "Cookies, sign-ins and what sites store in this profile are cleared every time Bow quits (and at the next start, should it crash). You sign in again each time; live folders that read GitHub ask too. Extensions keep their own data.",
+          createSwitch(profile.forgetsSiteDataOnQuit, `Forget site data of ${profile.name} on quit`, (isOn) => dispatch({ type: "setForgetSiteDataOnQuit", profileId: profile.id, isOn: isOn })),
+        ),
+      ),
+    );
+    renderPrivacySection(body, data, emptyState, [connections, siteData]);
   }
   if (section === "chains") {
     const emptyState = createEmptyState("chains", "No chains yet", "A chain runs several Command Bar actions and pages in one go. Build one here, then type its name in the Command Bar.");

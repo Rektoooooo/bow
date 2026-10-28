@@ -320,7 +320,10 @@ M about a day, L several days.
       commands in integrations/raycast with no dependencies. Not done: a full Raycast store extension with its own
       tab list, which needs @raycast/api and publishing: ask first)
       `bow://` URL scheme and a Raycast extension (search tabs, open in a Space, switch Spaces) (M)
-- [ ] 17. Privacy report (trackers blocked per site and week), HTTPS-only mode, per-Space "forget cookies on quit" (M)
+- [x] 17. (Library › Privacy: the blocker's week (total, bars, top sites and trackers, 30 days kept, counts only);
+      HTTPS-Only Mode with "Open with HTTP" only for loads Bow upgraded; Forget Site Data on Quit per profile (a
+      Space's profile, from the Space menu), cleared at quit and again at start, extensions' storage kept)
+      Privacy report (trackers blocked per site and week), HTTPS-only mode, per-Space "forget cookies on quit" (M)
 - [ ] 18. Tab notes: attach a Note to a tab or folder (S)
 - [ ] 19. Shortcut editor (M)
 
