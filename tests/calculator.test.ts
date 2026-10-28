@@ -36,7 +36,7 @@ describe("calculator", () => {
   });
 
   it("gives no answer for what is not a sum", () => {
-    for (const query of ["", "42", "-5", "(5)", "pi", "github", "log", "2026-10-28", "555-1234", "192.168.1.1", "localhost:3000", "1e5", "2pi", "1,5 + 2", "(1 + 2", "1 +", "1/0", "sqrt(-1)"]) {
+    for (const query of ["", "42", "-5", "(5)", "pi", "github", "log", "2026-10-28", "555-1234", "192.168.1.1", "localhost:3000", "1e5", "2pi", "1,5 + 2", "(1 + 2", "1 +", "1/0", "sqrt(-1)", "constructor(1) + 1", "valueOf + 1", "__proto__ * 2"]) {
       expect(calculate(query), query).toBeNull();
     }
   });
@@ -67,7 +67,7 @@ describe("unit conversion", () => {
   });
 
   it("gives no answer for units of different kinds, unknown units or other text", () => {
-    for (const query of ["5 km in kg", "5 parsecs in km", "3 tons in kg", "km in mi", "how to cook rice", "5 km"]) {
+    for (const query of ["5 km in kg", "5 parsecs in km", "3 tons in kg", "km in mi", "how to cook rice", "5 km", "5 constructor in constructor", "1 tostring to valueof", "2 __proto__ in km"]) {
       expect(convertUnits(query), query).toBeNull();
     }
   });

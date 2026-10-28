@@ -128,7 +128,11 @@ addUnit("speed", NAUTICAL_MILE_M / 3600, "kn", ["knot", "knots"]);
 function findUnit(typed: string): Unit | undefined {
   const compact = typed.toLowerCase().replace(/\s+/g, "");
   const withoutDegree = compact.startsWith("°") ? compact.slice(1) : compact;
-  return UNITS[compact] ?? UNITS[withoutDegree];
+  // Own names only: "constructor" or "toString" must not find what every object inherits.
+  if (Object.hasOwn(UNITS, compact)) {
+    return UNITS[compact];
+  }
+  return Object.hasOwn(UNITS, withoutDegree) ? UNITS[withoutDegree] : undefined;
 }
 
 /**

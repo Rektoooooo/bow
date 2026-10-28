@@ -93,7 +93,7 @@ function buildFixedActions(host: CommandActionHost): FixedAction[] {
 }
 
 /** The Command Bar entry that appears once a new version has downloaded. */
-const RESTART_TO_UPDATE_ID = "restart-to-update";
+export const RESTART_TO_UPDATE_ID = "restart-to-update";
 
 /**
  * Builds the registry. list() is rebuilt on each query, so per-Space and per-theme entries are always current.

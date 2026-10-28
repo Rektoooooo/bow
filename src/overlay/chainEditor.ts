@@ -13,7 +13,7 @@
  *   updates
  */
 import type { LibraryData } from "../shared/overlay";
-import { CHAIN_STEPS_LIMIT } from "../shared/settings.js";
+import { CHAIN_NAME_MAX_LENGTH, CHAIN_STEPS_LIMIT } from "../shared/settings.js";
 import type { CommandChain, CommandChainStep } from "../shared/types";
 import { createElement, createIconButton, createTextButton, dispatch } from "../renderer/dom.js";
 
@@ -140,6 +140,8 @@ function createChainCard(chain: CommandChain, data: LibraryData): HTMLElement {
   const nameInput = document.createElement("input");
   nameInput.className = "library-search chain-name";
   nameInput.value = chain.name;
+  // Main refuses a longer name, so the field never holds one it could not save.
+  nameInput.maxLength = CHAIN_NAME_MAX_LENGTH;
   nameInput.setAttribute("aria-label", "Chain name");
   // Saved when the field is left or Return is pressed; an empty name keeps the old one.
   nameInput.addEventListener("change", () => {

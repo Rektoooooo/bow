@@ -37,6 +37,7 @@ import {
 } from "./browserCore";
 import { rankCommandBarResults, rankTabSearchResults } from "./commandBar";
 import { isChainableActionId } from "./commandChains";
+import { RESTART_TO_UPDATE_ID } from "./commandBarActions";
 import { focusMainWindow } from "./mainWindows";
 import type { CommandBarResult } from "./commandBar";
 import type { CommandActionRegistry } from "./commandBarActions";
@@ -172,11 +173,12 @@ export function runCommandBarAction(actionId: string): void {
 }
 
 /**
- * The actions a chain step may run (Library › Chains): the Command Bar's, without the chains themselves.
+ * The actions a chain step may run (Library › Chains): the Command Bar's, without the chains themselves and without
+ * Restart to Update (a restart would cut the chain short).
  */
 function listChainableActions(): { id: string; title: string }[] {
   const actions = actionRegistry === null ? [] : actionRegistry.list();
-  const chainable = actions.filter((action) => isChainableActionId(action.id));
+  const chainable = actions.filter((action) => isChainableActionId(action.id) && action.id !== RESTART_TO_UPDATE_ID);
   return chainable.map((action) => ({ id: action.id, title: action.title }));
 }
 

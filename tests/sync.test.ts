@@ -221,6 +221,24 @@ describe("folder sync", () => {
 });
 
 describe("command chains", () => {
+  it("Macs updated to a Bow with chains agree on the empty list, with no conflict", () => {
+    const { macA, macB } = sharedMacs();
+    // Before the update neither Mac had a "chains" unit; each stamps it on its first change after the update.
+    const withoutChainsUnit = (mac: Mac): Mac => {
+      const stamps = { ...mac.meta.stamps };
+      delete stamps.chains;
+      return { ...mac, meta: { ...mac.meta, stamps: stamps } };
+    };
+    const aUpdated = stamp(withoutChainsUnit(macA), ONE_PM + MINUTE_MS);
+    const bUpdated = stamp(withoutChainsUnit(macB), ONE_PM + MINUTE_MS + 1000);
+    const bAfter = receive(bUpdated, fileOf(aUpdated, ONE_PM + 2 * MINUTE_MS), ONE_PM + 2 * MINUTE_MS);
+    const aAfter = receive(aUpdated, fileOf(stamp(bAfter, ONE_PM + 2 * MINUTE_MS), ONE_PM + 3 * MINUTE_MS), ONE_PM + 3 * MINUTE_MS);
+    expect(bAfter.conflicts).toEqual([]);
+    expect(aAfter.conflicts).toEqual([]);
+    expect(aAfter.state.commandChains ?? []).toEqual([]);
+    expect(bAfter.state.commandChains ?? []).toEqual([]);
+  });
+
   it("a chain made on one Mac reaches the other, and so does its deletion", () => {
     const { macA, macB } = sharedMacs();
     const chain = { id: "chain-1-1", name: "Morning", steps: [{ kind: "open" as const, url: "https://news.example/" }] };

@@ -81,7 +81,8 @@ function readTokens(query: string): Token[] | null {
     const nameMatch = NAME_PATTERN.exec(rest);
     if (nameMatch !== null) {
       const name = nameMatch[0].toLowerCase();
-      if (!(name in FUNCTIONS) && !(name in CONSTANTS)) {
+      // Own names only: "constructor" or "valueOf" must not find what every object inherits.
+      if (!Object.hasOwn(FUNCTIONS, name) && !Object.hasOwn(CONSTANTS, name)) {
         return null;
       }
       tokens.push({ kind: "name", name: name });
@@ -193,7 +194,7 @@ class SumReader {
     if (token.kind === "symbol" && token.symbol === "(") {
       return this.readBracket();
     }
-    if (token.kind === "name" && token.name in CONSTANTS) {
+    if (token.kind === "name" && Object.hasOwn(CONSTANTS, token.name)) {
       return CONSTANTS[token.name] as number;
     }
     if (token.kind === "name" && this.peekSymbol() === "(") {
