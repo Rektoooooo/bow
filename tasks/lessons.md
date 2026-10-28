@@ -11,6 +11,10 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 - Push in its own command, only after reading the suite's summary. Never chain `git push` after a command that
   merely prints the results: on 2026-10-27 a grep of an e2e log (3 FAIL lines, exit 1) and the push ran in one call,
   and a red run went to GitHub. Read the summary, then push.
+- A push gets a command of its own too, and its result is read before anything builds on it: on 2026-10-28
+  `git push … | tail -1 && npm run release` built and notarized a commit GitHub had refused (the owner had edited the
+  README on github.com meanwhile), and the release could not point at it. `git fetch` first, and check
+  `git merge-base --is-ancestor <commit> origin/main` before a release or a tag.
 - The same for the personal-data grep: run it alone, read it, then push. On 2026-10-28 the grep printed two hits (the
   signing team's id and company name in a handoff's runbook) in the same call as the push, and they went public.
   Team ids, certificate names and Apple IDs never go into the repo, not even in docs: write placeholders.
