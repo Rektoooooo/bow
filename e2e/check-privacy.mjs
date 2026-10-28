@@ -1,6 +1,10 @@
 // End-to-end check of Library › Privacy against a local server:
 //   - the privacy report: a page's blocked ad script is counted for its site and the tracker's host, and the Library
 //     shows the week's total, bars and lists; with blocking off it offers to turn it on.
+//   - HTTPS-Only Mode: made-up names map to the local plain-http server (Chromium's --host-resolver-rules), so an
+//     upgraded page fails its TLS handshake like a site without https: the sidebar offers "Open with HTTP", which
+//     loads it and allows the site until Bow quits. A typed https:// address that fails gets no offer; IP addresses
+//     are never upgraded.
 // usage: npm run build && node e2e/check-privacy.mjs      (uses a throwaway --user-data-dir)
 import "./background.mjs";
 import { _electron } from "playwright-core";
@@ -26,7 +30,10 @@ function check(name, ok, detail = "") {
 
 // ---------- The local server: a page with an ad script ----------
 
+/** Plain-http page requests the server answered, by host and path ("insecure.example:1234/plain"). */
+const httpRequests = [];
 const server = http.createServer((request, response) => {
+  httpRequests.push(`${request.headers.host}${request.url}`);
   if (request.url === "/ads/banner.js") {
     response.writeHead(200, { "Content-Type": "text/javascript" });
     response.end("window.adScriptRan = true;");
@@ -40,9 +47,10 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 
 // ---------- The app ----------
 
+const hostRules = "MAP insecure.example 127.0.0.1, MAP other.example 127.0.0.1";
 const app = await _electron.launch({
   executablePath: createRequire(import.meta.url)("electron"),
-  args: [`--user-data-dir=${userDataDir}`, "--skip-welcome", appDir],
+  args: [`--user-data-dir=${userDataDir}`, "--skip-welcome", `--host-resolver-rules=${hostRules}`, appDir],
   timeout: 30000,
 });
 async function findPage(suffix, timeoutMs = 15000) {
@@ -102,11 +110,55 @@ check(
 );
 await overlay.press("body", "Escape");
 
+// ---------- HTTPS-Only Mode ----------
+
+const port = server.address().port;
+const getRuntime = () => sidebar.evaluate(() => window.browserApi.getRuntimeState());
+async function waitForNotice(timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  let notice = (await getRuntime()).notice;
+  while (notice === null && Date.now() < deadline) {
+    await sidebar.waitForTimeout(200);
+    notice = (await getRuntime()).notice;
+  }
+  return notice;
+}
+await openPrivacy();
+await overlay.click('[role="switch"][aria-label="HTTPS-Only Mode"]');
+await sidebar.waitForTimeout(400);
+check("Privacy's switch turns HTTPS-Only Mode on", (await getState()).settings.isHttpsOnly === true);
+await overlay.press("body", "Escape");
+await dispatch({ type: "openTab", typedText: `http://insecure.example:${port}/plain` });
+const notice = await waitForNotice();
+// The upgraded load fails (the server speaks no TLS), so nothing reached the server over http, the icon guess
+// included (it goes over https too).
+const plainRequests = httpRequests.filter((request) => request.startsWith("insecure.example"));
+check(
+  "an http page is asked for over https; a site without it gets the Open with HTTP offer",
+  notice?.message === `insecure.example:${port} has no secure version` && notice.buttonLabel === "Open with HTTP" && plainRequests.length === 0,
+  `${JSON.stringify(notice)} / ${httpRequests.join(" ")}`,
+);
+await sidebar.click(".sidebar-notice-button");
+await waitForSelectedUrl(`http://insecure.example:${port}/plain`);
+await sidebar.waitForTimeout(800);
+check("Open with HTTP loads the page over http", httpRequests.includes(`insecure.example:${port}/plain`) && (await selectedUrl()).startsWith("http://insecure.example"), await selectedUrl());
+await dispatch({ type: "openTab", typedText: `http://insecure.example:${port}/again` });
+await sidebar.waitForTimeout(1500);
+check("and the site stays allowed over http", httpRequests.includes(`insecure.example:${port}/again`), httpRequests.join(" "));
+await dispatch({ type: "dismissNotice" });
+await dispatch({ type: "openTab", typedText: `https://other.example:${port}/typed` });
+await sidebar.waitForTimeout(2500);
+check("a typed https:// address that fails gets no offer to go down to http", (await getRuntime()).notice === null && !httpRequests.includes(`other.example:${port}/typed`));
+await dispatch({ type: "openTab", typedText: `http://127.0.0.1:${port}/local` });
+await sidebar.waitForTimeout(1500);
+check("an IP address is never upgraded", httpRequests.includes(`127.0.0.1:${port}/local`) && (await selectedUrl()).startsWith("http://127.0.0.1"));
+await dispatch({ type: "setHttpsOnly", isOn: false });
+
 // The report reaches its file a few seconds after a block (privacyReportStore.ts SAVE_DELAY_MS), and at quit.
 await app.close();
 const savedReport = JSON.parse(fs.readFileSync(path.join(userDataDir, "privacy-report.json"), "utf8"));
 const savedSites = savedReport.days.at(-1)?.sites ?? {};
-check("the report is saved with counts only (no page addresses)", savedSites["127.0.0.1"] === 1 && !JSON.stringify(savedReport).includes("/story"), JSON.stringify(savedReport));
+check("the report is saved with counts only (no page addresses)", savedSites["127.0.0.1"] >= 1 && !JSON.stringify(savedReport).includes("/story"), JSON.stringify(savedReport));
 
 server.close();
 const failed = results.filter((result) => !result.ok).length;

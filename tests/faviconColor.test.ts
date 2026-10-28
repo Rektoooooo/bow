@@ -71,5 +71,7 @@ describe("a favicon's address", () => {
     expect(getFaviconAddress("https://cdn.example/icon.png", "https://example.com/a")).toBe("https://cdn.example/icon.png");
     expect(getFaviconAddress(null, "https://example.com/a/b")).toBe("https://example.com/favicon.ico");
     expect(getFaviconAddress(null, "about:blank")).toBeNull();
+    expect(getFaviconAddress(null, "http://example.com/a")).toBe("https://example.com/favicon.ico");
+    expect(getFaviconAddress(null, "http://localhost:3000/")).toBe("http://localhost:3000/favicon.ico");
   });
 });

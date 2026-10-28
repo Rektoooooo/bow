@@ -100,6 +100,8 @@ export type BrowserAction =
   | { type: "setReaderTextSize"; size: number }
   /** Library › Settings: the shortcut from any app (null: off) and what it opens. */
   | { type: "setGlobalShortcut"; accelerator: string | null; opens: GlobalShortcutTarget }
+  /** Library › Privacy: HTTPS-Only Mode. */
+  | { type: "setHttpsOnly"; isOn: boolean }
   | { type: "setSidebarWidth"; width: number; isFinal: boolean }
   | { type: "setSpaceProfile"; spaceId: SpaceId; profileId: string }
   | { type: "createProfileForSpace"; spaceId: SpaceId }
@@ -260,6 +262,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "toggleReaderView",
   "setReaderTextSize",
   "setGlobalShortcut",
+  "setHttpsOnly",
   "setSidebarWidth",
   "setSpaceProfile",
   "createProfileForSpace",

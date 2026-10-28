@@ -274,6 +274,8 @@ export interface BrowserSettings {
    */
   globalShortcut?: string;
   globalShortcutOpens?: GlobalShortcutTarget;
+  /** HTTPS-Only Mode (Library › Privacy): pages asked for over http load over https (main/httpsOnly.ts). */
+  isHttpsOnly?: boolean;
   /** Reader view's text size in pixels (READER_TEXT_SIZES). Optional: missing means READER_DEFAULT_TEXT_SIZE. */
   readerTextSize?: number;
   /** The engine that searches typed words (shared/searchEngines.ts). Optional: missing means DuckDuckGo. */

@@ -73,6 +73,8 @@ export interface TabViewEvents {
   onDomReady(tabId: ItemId, contents: WebContents): void;
   /** The page finished loading (Reader view looks whether it is an article). */
   onLoadFinished(tabId: ItemId, contents: WebContents): void;
+  /** The page, or a frame in it, failed to load (HTTPS-Only Mode offers http when the secure version is missing). */
+  onLoadFailed(tabId: ItemId, contents: WebContents, errorCode: number, validatedUrl: string, isMainFrame: boolean): void;
   /** The pointer moved onto a link in a tab's page (its address) or off it (""). */
   onLinkHover(tabId: ItemId, url: string): void;
 }
@@ -412,6 +414,7 @@ function watchTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvent
   });
   contents.on("dom-ready", () => events.onDomReady(tabId, contents));
   contents.on("did-finish-load", () => events.onLoadFinished(tabId, contents));
+  contents.on("did-fail-load", (_event, errorCode, _description, validatedUrl, isMainFrame) => events.onLoadFailed(tabId, contents, errorCode, validatedUrl, isMainFrame));
   contents.on("did-start-loading", () => events.onRuntimeChanged());
   contents.on("did-stop-loading", () => {
     events.onRuntimeChanged();

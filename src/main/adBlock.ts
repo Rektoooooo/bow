@@ -25,6 +25,7 @@ import { getSiteKey } from "../shared/siteKey";
 import { getCosmeticCss, parseFilterList, shouldBlockRequest } from "./adBlockEngine";
 import type { FilterSet } from "./adBlockEngine";
 import { noteBlockedRequest } from "./privacyReportStore";
+import { decideMainFrameRequest } from "./httpsOnlyController";
 
 /** The lists we use. Both are public and free to download; we fetch them, we do not ship them. */
 const FILTER_LISTS = [
@@ -73,6 +74,12 @@ function handleRequest(details: Electron.OnBeforeRequestListenerDetails, callbac
   const contents = details.webContents;
   if (details.resourceType === "mainFrame" && contents !== undefined) {
     blockedCounts.delete(contents.id);
+    // HTTPS-Only Mode shares this handler (a session has one): a page asked for over http goes to https.
+    const httpsUrl = decideMainFrameRequest(contents.id, details.url);
+    if (httpsUrl !== null) {
+      callback({ redirectURL: httpsUrl });
+      return;
+    }
   }
   const isWebRequest = details.url.startsWith("http:") || details.url.startsWith("https:") || details.url.startsWith("ws");
   if (filterSet === null || contents === undefined || !isWebRequest || details.resourceType === "mainFrame") {

@@ -228,6 +228,10 @@ source never updates itself.
 - **Privacy report** (Library › Privacy): how many trackers the blocker stopped in the last 7 days, a bar per day, and
   the sites and tracker hosts with the most blocks, like Safari's report. Counts only, kept 30 days, never from
   private windows.
+- **HTTPS-Only Mode** (Library › Privacy): pages asked for over http load over https. A site without a secure version
+  says so in the sidebar, with "Open with HTTP" (allowed until Bow quits); a typed https:// address is never taken
+  down to http, and local names and IP addresses stay as they are. Little Windows and Peek show the browser's error
+  page instead of the offer.
 - **Air Traffic Control**: rules such as "address contains github.com → Work" or "link comes from Slack → Work" send
   links from other apps to a Space (Library › Settings, which lists your running apps). The sender is the app in front
   when the link arrives, read with macOS's own `lsappinfo` (no permission needed). **Test a link** there shows where

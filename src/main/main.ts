@@ -64,6 +64,7 @@ import { readFrontApp } from "./linkSourceApps";
 import { startGlobalShortcut } from "./globalShortcutController";
 import { handleBowUrl } from "./bowUrlController";
 import { loadPrivacyReport, savePrivacyReportNow } from "./privacyReportStore";
+import { noticeLoadFailed } from "./httpsOnlyController";
 import { getReaderArticle, noticeReaderPageChanged, probeReaderPage } from "./readerController";
 import type { LinkSourceApp } from "../shared/routingRules";
 import { showPageContextMenu } from "./menus";
@@ -147,6 +148,7 @@ const tabViewEvents: TabViewEvents = {
   },
   onContextMenu: (tabId, contents, params) => showPageContextMenu(menuHost, contents, params, getExtensionMenuItems(contents, params), tabId),
   onLoadFinished: (tabId, contents) => probeReaderPage(tabId, contents),
+  onLoadFailed: (_tabId, contents, errorCode, validatedUrl, isMainFrame) => noticeLoadFailed(contents, errorCode, validatedUrl, isMainFrame),
   onDomReady: (_tabId, contents) => {
     applySiteZoom(contents);
     applyBoostToPage(contents, getState()).catch(() => undefined);

@@ -985,6 +985,16 @@ export function setSnapshots(state: BrowserState, isOn: boolean): BrowserState {
 }
 
 /**
+ * HTTPS-Only Mode on or off (httpsOnlyController.ts).
+ */
+export function setHttpsOnly(state: BrowserState, isOn: boolean): BrowserState {
+  if ((state.settings.isHttpsOnly ?? false) === isOn) {
+    return state;
+  }
+  return { ...state, settings: { ...state.settings, isHttpsOnly: isOn } };
+}
+
+/**
  * Turns tidy titles for pinned tabs on or off.
  */
 export function setTidyTitles(state: BrowserState, isOn: boolean): BrowserState {

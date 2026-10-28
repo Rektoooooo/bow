@@ -1356,7 +1356,14 @@ function renderBody(data: LibraryData): void {
   }
   if (section === "privacy") {
     const emptyState = createEmptyState("privacy", "Blocking is off", "Turn on blocking of ads and trackers to see what Bow stops, site by site.");
-    renderPrivacySection(body, data, emptyState, []);
+    const connections = createSettingGroup("Connections", [
+      createSettingRow(
+        "HTTPS-Only Mode",
+        "Pages asked for over http load over https, so nobody on the network can read or change them. A site without a secure version can still be opened over http when you choose. Local names and IP addresses stay as they are.",
+        createSwitch(data.privacy.isHttpsOnly, "HTTPS-Only Mode", (isOn) => dispatch({ type: "setHttpsOnly", isOn: isOn })),
+      ),
+    ]);
+    renderPrivacySection(body, data, emptyState, [connections]);
   }
   if (section === "chains") {
     const emptyState = createEmptyState("chains", "No chains yet", "A chain runs several Command Bar actions and pages in one go. Build one here, then type its name in the Command Bar.");

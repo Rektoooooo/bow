@@ -418,6 +418,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   runSiteCommand: { command: isToolbarSiteCommand },
   importFromBrowser: { sourceId: isImportSource },
   setAdBlock: { isOn: isBoolean },
+  setHttpsOnly: { isOn: isBoolean },
   setAdBlockForSite: { site: isSite, isOn: isBoolean },
   setAppIcon: { variantId: isAppIconVariant },
   showTabTooltip: { title: isText, showsRenameHint: isBoolean, frame: isAnchor },

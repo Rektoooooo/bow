@@ -43,6 +43,9 @@ export const READER_TEXT_SIZES = [15, 17, 19, 21, 24] as const;
 /** Reader view's text size until the user changes it. Our choice. */
 export const READER_DEFAULT_TEXT_SIZE = 19;
 
+/** How long the "no secure version · Open with HTTP" offer stays. Our choice: time to read and decide. */
+export const HTTPS_FALLBACK_NOTICE_MS = 30 * 1000;
+
 /** Most Space templates kept. Our choice. */
 export const SPACE_TEMPLATES_LIMIT = 30;
 

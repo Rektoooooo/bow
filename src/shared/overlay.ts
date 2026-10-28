@@ -253,7 +253,7 @@ export interface LibraryData {
   commandChains: CommandChain[];
   chainActions: { id: string; title: string }[];
   /** Library › Privacy: the blocker's week (main/privacyReport.ts), and whether blocking is on at all. */
-  privacy: { summary: PrivacySummary; isAdBlockOn: boolean };
+  privacy: { summary: PrivacySummary; isAdBlockOn: boolean; isHttpsOnly: boolean };
   /** The shortcut from any app (main/globalShortcutController.ts): its keys (null: off), what it opens, its state. */
   globalShortcut: string | null;
   globalShortcutOpens: GlobalShortcutTarget;

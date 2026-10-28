@@ -12,6 +12,7 @@
  *   main/faviconAccents.ts decodes the icon → pickAccentColor() → RuntimeState.faviconAccents[getFaviconAddress()]
  *   → sidebar draws the selected tile's border and tint in it
  */
+import { isLocalHost } from "./localNames.js";
 
 /** Pixels more transparent than this are left out (the icon's soft edge and empty corners). */
 const MIN_ALPHA = 128;
@@ -46,20 +47,26 @@ interface ColorGroup {
 
 /**
  * The address a page's icon is loaded from: the one the page reported, or the site's /favicon.ico (null for pages
- * that are not on the web).
- * Examples: ("data:image/png;…", any) → that address; (null, "https://example.com/a") → "https://example.com/favicon.ico"
+ * that are not on the web). The guess goes over https, even for an http page (local names keep their own scheme):
+ * a guess over http would tell the network which site you have open, which HTTPS-Only Mode exists to prevent.
+ * Examples: ("data:image/png;…", any) → that address; (null, "http://example.com/a") → "https://example.com/favicon.ico"
  */
 export function getFaviconAddress(faviconUrl: string | null, pageUrl: string): string | null {
   if (faviconUrl !== null) {
     return faviconUrl;
   }
+  let parsedUrl: URL;
   try {
-    const parsedUrl = new URL(pageUrl);
-    const isWebPage = parsedUrl.protocol === "https:" || parsedUrl.protocol === "http:";
-    return isWebPage ? `${parsedUrl.origin}/favicon.ico` : null;
+    parsedUrl = new URL(pageUrl);
   } catch {
     return null;
   }
+  const isWebPage = parsedUrl.protocol === "https:" || parsedUrl.protocol === "http:";
+  if (!isWebPage) {
+    return null;
+  }
+  const keepsScheme = parsedUrl.protocol === "https:" || isLocalHost(parsedUrl.hostname);
+  return keepsScheme ? `${parsedUrl.origin}/favicon.ico` : `https://${parsedUrl.host}/favicon.ico`;
 }
 
 /**

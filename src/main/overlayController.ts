@@ -332,7 +332,7 @@ function buildLibraryData(state: BrowserState): LibraryData {
     searchKeywords: state.searchKeywords ?? [],
     commandChains: state.commandChains ?? [],
     linkSourceApps: listKnownSourceApps(),
-    privacy: { summary: getPrivacySummary(Date.now()), isAdBlockOn: state.settings.isAdBlockOn === true },
+    privacy: { summary: getPrivacySummary(Date.now()), isAdBlockOn: state.settings.isAdBlockOn === true, isHttpsOnly: state.settings.isHttpsOnly === true },
     globalShortcut: state.settings.globalShortcut ?? null,
     globalShortcutOpens: state.settings.globalShortcutOpens ?? "commandBar",
     globalShortcutStatus: getGlobalShortcutStatus(),
