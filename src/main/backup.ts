@@ -27,6 +27,7 @@ import {
   SPLIT_PANES_LIMIT,
 } from "../shared/settings";
 import { SEARCH_ENGINE_IDS } from "../shared/searchEngines";
+import { isValidSearchKeyword } from "../shared/searchKeywords";
 import { createNoteUrl, getNoteId, isNoteId } from "../shared/notes";
 import { createEaselUrl, getEaselId, isEaselId } from "../shared/easels";
 import type {
@@ -43,6 +44,7 @@ import type {
   RoutingRule,
   SidebarItem,
   SitePermission,
+  SearchKeyword,
   Space,
   SpaceId,
   SpaceTheme,
@@ -524,7 +526,7 @@ function checkSettings(raw: unknown): BrowserSettings {
   if (typeof source.searchEngine === "string" && (SEARCH_ENGINE_IDS as readonly string[]).includes(source.searchEngine)) {
     settings.searchEngine = source.searchEngine as BrowserSettings["searchEngine"];
   }
-  const flags = ["isAdBlockOn", "areTitlesTidy", "showsFullUrls", "hasSeenWelcome", "areSnapshotsOn", "areFavoritesKeptAwake"] as const;
+  const flags = ["isAdBlockOn", "areTitlesTidy", "showsFullUrls", "hasSeenWelcome", "areSnapshotsOn", "areFavoritesKeptAwake", "asksWhereToSave"] as const;
   for (const flag of flags) {
     if (typeof source[flag] === "boolean") {
       settings[flag] = source[flag] as boolean;
@@ -630,7 +632,49 @@ export function checkBackupState(raw: BrowserState, counter: CheckCounter): Brow
   if (Array.isArray(raw.keepAwakeSites)) {
     checked.keepAwakeSites = raw.keepAwakeSites.filter((site): site is string => typeof site === "string" && SITE_PATTERN.test(site));
   }
+  if (isRecord(raw.siteZooms)) {
+    checked.siteZooms = checkSiteZooms(raw.siteZooms);
+  }
+  if (Array.isArray(raw.searchKeywords)) {
+    checked.searchKeywords = checkSearchKeywords(raw.searchKeywords, counter);
+  }
   return repairSelections(checked);
+}
+
+/**
+ * Search keywords: whole entries that pass the same check as adding one (a web address with %s), each keyword once.
+ */
+function checkSearchKeywords(raw: unknown[], counter: CheckCounter): SearchKeyword[] {
+  const keywords: SearchKeyword[] = [];
+  for (const entry of raw) {
+    const isEntry = isRecord(entry) && typeof entry.keyword === "string" && typeof entry.name === "string" && typeof entry.url === "string";
+    const candidate = isEntry ? { keyword: entry.keyword as string, name: entry.name as string, url: entry.url as string } : null;
+    const isUsable = candidate !== null && isValidSearchKeyword(candidate) && !keywords.some((kept) => kept.keyword === candidate.keyword);
+    if (!isUsable) {
+      counter.leftOut += 1;
+      continue;
+    }
+    keywords.push(candidate);
+  }
+  return keywords;
+}
+
+/** The zoom range Bow's zoom steps cover (pageCommands.ts): 25% to 500%. */
+const MIN_SITE_ZOOM = 0.25;
+const MAX_SITE_ZOOM = 5;
+
+/**
+ * Remembered zooms: hosts as Bow writes them, factors within the zoom steps' range.
+ */
+function checkSiteZooms(raw: Record<string, unknown>): Record<string, number> {
+  const zooms: Record<string, number> = {};
+  for (const [host, factor] of Object.entries(raw)) {
+    const isFactor = isFiniteNumber(factor) && factor >= MIN_SITE_ZOOM && factor <= MAX_SITE_ZOOM;
+    if (SITE_PATTERN.test(host) && isFactor) {
+      zooms[host] = factor;
+    }
+  }
+  return zooms;
 }
 
 /**
@@ -743,6 +787,10 @@ export function replaceFromBackup(current: BrowserState, restored: BrowserState)
   };
   if (current.newWindowSidebar !== undefined) {
     replaced.newWindowSidebar = current.newWindowSidebar;
+  }
+  // This Mac's download folder stays (a backup never carries one: backup.ts leaves it out on reading).
+  if (current.settings.downloadFolder !== undefined) {
+    replaced.settings = { ...replaced.settings, downloadFolder: current.settings.downloadFolder };
   }
   return repairOtherWindows(repairSelections(replaced));
 }

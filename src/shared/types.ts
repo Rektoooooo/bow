@@ -155,6 +155,13 @@ export interface Profile {
   favoriteIds: ItemId[];
 }
 
+/** A search keyword (shared/searchKeywords.ts): typing "<keyword> words" opens `url` with the words for %s. */
+export interface SearchKeyword {
+  keyword: string;
+  name: string;
+  url: string;
+}
+
 /** Why a tab ended up in the archive. */
 export type ArchiveReason = "auto" | "manual" | "clear-button";
 
@@ -198,6 +205,13 @@ export interface BrowserSettings {
   areSnapshotsOn?: boolean;
   /** Favorites never go to sleep by themselves (main/tabSleep.ts). Optional: missing means on. */
   areFavoritesKeptAwake?: boolean;
+  /**
+   * The folder downloads are saved in (an absolute path on this Mac), or missing for the Mac's Downloads folder.
+   * Never taken from a backup file: a crafted file could point downloads into a folder that runs what lands there.
+   */
+  downloadFolder?: string;
+  /** Each download asks where to save it (main/downloads.ts). Optional: missing means off. */
+  asksWhereToSave?: boolean;
   /** The first-start tour was finished or skipped (overlay/welcome.ts). Optional: missing means not yet. */
   hasSeenWelcome?: boolean;
   /**
@@ -342,6 +356,10 @@ export interface BrowserState {
   adBlockOffSites?: string[];
   /** Sites whose pages never go to sleep by themselves (main/tabSleep.ts). Optional, like the lists above. */
   keepAwakeSites?: string[];
+  /** Zoom remembered per host, when not 100% (main/siteZoom.ts). Optional, like the lists above. */
+  siteZooms?: Record<string, number>;
+  /** Search keywords: "yt cats" searches YouTube (shared/searchKeywords.ts). Optional, like the lists above. */
+  searchKeywords?: SearchKeyword[];
 }
 
 /**

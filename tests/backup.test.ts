@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { addSpacesFromBackup, BACKUP_FORMAT_VERSION, chooseSnapshotsToDelete, createBackup, isRestorableUrl, parseBackup, replaceFromBackup } from "../src/main/backup";
 import type { BowBackup, SnapshotFile } from "../src/main/backup";
-import { createFolder, createInitialState, createNote, moveItem } from "../src/main/state";
+import { createFolder, createInitialState, createNote, moveItem, setDownloadFolder } from "../src/main/state";
 import { openWindow } from "../src/main/windows";
 import { createNoteUrl } from "../src/shared/notes";
 import { BEFORE_RESTORE_SNAPSHOTS_KEPT, FAVORITES_LIMIT, SNAPSHOTS_DAILY_KEPT, SNAPSHOTS_HOURLY_KEPT } from "../src/shared/settings";
@@ -30,6 +30,8 @@ function buildSetup(): { state: BrowserState; noteId: string } {
     boosts: [{ id: "boost-1", site: "news.example", css: "body { color: red }", zappedSelectors: [], isEnabled: true, javascript: "console.log(1)", isJavaScriptOn: true }],
     routingRules: [{ id: "rule-1", matchType: "contains", value: "mail.example", spaceId: withNote.activeSpaceId }],
     keepAwakeSites: ["mail.example"],
+    siteZooms: { "docs.example": 1.25 },
+    searchKeywords: [{ keyword: "w", name: "Wiki", url: "https://wiki.example/search?q=%s" }],
     settings: { ...withNote.settings, areFavoritesKeptAwake: false },
   };
   return { state: state, noteId: noteId };
@@ -83,6 +85,8 @@ describe("backups", () => {
     expect(restored.state.items).toEqual(state.items);
     expect(restored.state.profiles).toEqual(state.profiles);
     expect(restored.state.keepAwakeSites).toEqual(["mail.example"]);
+    expect(restored.state.siteZooms).toEqual({ "docs.example": 1.25 });
+    expect(restored.state.searchKeywords).toEqual([{ keyword: "w", name: "Wiki", url: "https://wiki.example/search?q=%s" }]);
     expect(restored.state.settings.areFavoritesKeptAwake).toBe(false);
     expect(restored.notes).toEqual({ [noteId]: "<p>Hello</p>" });
     expect(restored.report).toMatchObject({ spaces: 2, pinnedTabs: 2, todayTabs: 2, folders: 1, notes: 1, boosts: 1, leftOut: 0, appVersion: APP_VERSION });
@@ -96,6 +100,17 @@ describe("backups", () => {
     expect(backup.state.otherWindows).toEqual([]);
     expect(backup.state.extensions?.[0]?.path).toBe("");
     expect(parseOrFail(JSON.stringify(backup)).report.extensionNames).toEqual(["Notes Helper"]);
+  });
+
+  it("never take a download folder from a file, and keep this Mac's on replacing", () => {
+    const crafted = craftedBackupText((backup) => {
+      backup.state.settings = { ...backup.state.settings, downloadFolder: "/Users/someone/Library/LaunchAgents", asksWhereToSave: true };
+    });
+    const restored = parseOrFail(crafted).state;
+    expect(restored.settings.downloadFolder).toBeUndefined();
+    expect(restored.settings.asksWhereToSave).toBe(true);
+    const current = setDownloadFolder(createInitialState(), "/Users/someone/Desktop");
+    expect(replaceFromBackup(current, restored).settings.downloadFolder).toBe("/Users/someone/Desktop");
   });
 
   it("refuse files that are not Bow backups, or from a newer Bow", () => {

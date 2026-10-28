@@ -12,7 +12,6 @@
  *   ⌘T → openCommandBar() → showOverlay → overlay types → "overlay:query" → rankCommandBarResults → lines
  *   (suggestions arrive later as "overlay:results") → "overlay:choose" → close overlay → run the result
  */
-import { getSyncStatus } from "./syncController";
 import { app, clipboard, ipcMain, Menu, nativeTheme, net, ShareMenu } from "electron";
 import type { IpcMainInvokeEvent, MenuItemConstructorOptions, Rectangle, WebContents } from "electron";
 import { LIBRARY_SECTIONS, OVERLAY_CHANNELS } from "../shared/overlay";
@@ -38,7 +37,11 @@ import {
 import { rankCommandBarResults } from "./commandBar";
 import type { CommandBarResult } from "./commandBar";
 import type { CommandActionRegistry } from "./commandBarActions";
-import { getDownloads, showDownloadInFolder } from "./downloads";
+import * as os from "node:os";
+import { getDownloadFolder, getDownloads, showDownloadInFolder } from "./downloads";
+import { getSyncStatus } from "./syncController";
+import { collectShortcutGroups } from "./shortcutSheet";
+import { matchSearchKeyword } from "../shared/searchKeywords";
 import { activateExtensionOfActiveProfile, getExtensionIconUrl, getExtensionLoadError, listExtensionTiles } from "./extensionHost";
 import { searchHistory } from "./history";
 import { clearHistory, getHistory } from "./historyStore";
@@ -243,6 +246,14 @@ function listSpaceItems(state: BrowserState, itemIds: ItemId[], depth: number, i
 }
 
 /**
+ * A path as Finder people read it: the home folder as "~" ("~/Downloads").
+ */
+function shortenHomePath(folder: string): string {
+  const home = os.homedir();
+  return folder === home || folder.startsWith(`${home}/`) ? `~${folder.slice(home.length)}` : folder;
+}
+
+/**
  * Collects what the Library shows.
  */
 function buildLibraryData(state: BrowserState): LibraryData {
@@ -282,6 +293,9 @@ function buildLibraryData(state: BrowserState): LibraryData {
     showsFullUrls: state.settings.showsFullUrls === true,
     areSnapshotsOn: state.settings.areSnapshotsOn !== false,
     sync: getSyncStatus(),
+    searchKeywords: state.searchKeywords ?? [],
+    downloadFolder: shortenHomePath(getDownloadFolder()),
+    asksWhereToSave: state.settings.asksWhereToSave === true,
     areFavoritesKeptAwake: areFavoritesKeptAwake(state.settings),
     keepAwakeSites: state.keepAwakeSites ?? [],
     tasks: getLibrarySection() === "tasks" ? collectTaskList() : EMPTY_TASK_LIST,
@@ -453,6 +467,13 @@ export function openWelcome(): void {
   const state = getState();
   const presets = THEME_PRESETS.map((preset) => ({ label: preset.label, colors: preset.colors, appearance: preset.appearance }));
   openPanel({ kind: "welcome", spaceId: state.activeSpaceId, importSources: listImportSources(), presets: presets });
+}
+
+/**
+ * Help › Keyboard Shortcuts (⌘/): the app menu's shortcuts on one sheet.
+ */
+export function openShortcutSheet(): void {
+  openPanel({ kind: "shortcuts", groups: collectShortcutGroups() });
 }
 
 export function openLibrary(section: LibrarySection = "archive"): void {
@@ -813,7 +834,9 @@ async function fetchSuggestions(query: string): Promise<string[]> {
 function handleQuery(query: string, mode: CommandBarMode): CommandBarLine[] {
   latestQuery = query;
   const lines = toLines(rankForQuery(query, mode, []));
-  const wantsSuggestions = query.trim() !== "" && !looksLikeWebAddress(query.trim());
+  // A keyword search ("yt cats") goes to its own page: the default engine's suggestions would not fit it.
+  const isKeywordSearch = matchSearchKeyword(query, getState().searchKeywords ?? []) !== null;
+  const wantsSuggestions = query.trim() !== "" && !looksLikeWebAddress(query.trim()) && !isKeywordSearch;
   if (wantsSuggestions) {
     fetchSuggestions(query.trim()).then((suggestions) => {
       if (suggestions.length === 0 || latestQuery !== query || shownPanel?.kind !== "commandBar") {
@@ -856,8 +879,9 @@ function handleChoose(resultId: string | null, typedText: string, mode: CommandB
   if (result === undefined) {
     const text = typedText.trim();
     if (text !== "") {
-      const searchEngine = findSearchEngine(getState().settings.searchEngine);
-      openAddress(normalizeTypedInput(text, searchEngine), mode);
+      const state = getState();
+      const searchEngine = findSearchEngine(state.settings.searchEngine);
+      openAddress(normalizeTypedInput(text, searchEngine, state.searchKeywords), mode);
     }
     return;
   }

@@ -29,6 +29,7 @@ import { offerMoveToApplications, startAppUpdates } from "./appUpdates";
 import { appMenuCommands } from "./appMenuCommands";
 import { findTabsArchivingSoon, findTabsToArchive, pruneArchive } from "./autoArchive";
 import { archiveUnusedTabsWithUndo } from "./archiveUndoController";
+import { applySiteZoom } from "./pageCommands";
 import {
   applyChange,
   collectRuntimeState,
@@ -135,6 +136,7 @@ const tabViewEvents: TabViewEvents = {
   },
   onContextMenu: (_tabId, contents, params) => showPageContextMenu(menuHost, contents, params, getExtensionMenuItems(contents, params)),
   onDomReady: (_tabId, contents) => {
+    applySiteZoom(contents);
     applyBoostToPage(contents, getState()).catch(() => undefined);
     runBoostJavaScript(contents, getState());
     applyCosmeticFilters(contents).catch(() => undefined);
@@ -327,10 +329,13 @@ async function handleAppReady(): Promise<void> {
   // Ad blocking checks requests in every profile session; the lists load now when it is on.
   initializeAdBlocking(app.getPath("userData"), getState, () => refreshOpenPanel());
   onProfileSessionCreated(installAdBlocker);
-  startTrackingDownloads(() => {
-    scheduleRuntimePush();
-    refreshOpenPanel();
-  });
+  startTrackingDownloads(
+    () => {
+      scheduleRuntimePush();
+      refreshOpenPanel();
+    },
+    () => getState().settings,
+  );
   registerIpcHandlers({
     isTrustedSender: (sender) => findMainWindowIdOf(sender) !== null || sender === getOverlayContents(),
     // The overlay is always in the focused window, so it gets the focused window's state.

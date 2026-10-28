@@ -17,6 +17,7 @@ import { computeFramePalette } from "../shared/themePalette.js";
 import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS, TAB_SLEEP_OPTIONS } from "../shared/settings.js";
 import { APP_ICON_VARIANTS, buildAppIconSvg } from "../shared/appIconDrawing.js";
 import { isSearchEngineId, SEARCH_ENGINE_IDS, SEARCH_ENGINES } from "../shared/searchEngines.js";
+import { isValidSearchKeyword } from "../shared/searchKeywords.js";
 import type { ArchiveReason, ArchivedTab } from "../shared/types";
 import { createElement, createFavicon, createIconButton, createTextButton, dispatch, getDisplayHost } from "../renderer/dom.js";
 import { createIcon } from "../renderer/icons.js";
@@ -855,6 +856,12 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
   ]);
   const browsing = createSettingGroup("Browsing", [
     createSettingRow("Search engine", "Searches what you type in the address field and the Command Bar, and suggests as you type.", createSearchEngineSelect(data)),
+    createSettingRow("Downloads", `Saved in ${data.downloadFolder}.`, createTextButton("Change…", "library-chip", () => dispatch({ type: "chooseDownloadFolder" }))),
+    createSettingRow(
+      "Ask where to save each download",
+      "A save dialog opens for every download, starting in the folder above.",
+      createSwitch(data.asksWhereToSave, "Ask where to save each download", (isOn) => dispatch({ type: "setAskWhereToSave", isOn: isOn })),
+    ),
     createSettingRow("Block ads and trackers", describeAdBlockStatus(data.adBlock), createSwitch(data.adBlock.isOn, "Block ads and trackers", (isOn) => dispatch({ type: "setAdBlock", isOn: isOn }))),
   ]);
   const appearance = createSettingGroup("Appearance", [
@@ -894,7 +901,7 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
       createTextButton("Show in Finder", "library-chip", () => dispatch({ type: "revealBackups" })),
     ),
   ]);
-  settings.append(tabs, browsing, appearance, importing, backup, renderSyncSettings(data.sync), renderRoutingSettings(data));
+  settings.append(tabs, browsing, renderSearchKeywordSettings(data), appearance, importing, backup, renderSyncSettings(data.sync), renderRoutingSettings(data));
   body.replaceChildren(settings);
 }
 
@@ -962,6 +969,59 @@ function renderSyncSettings(sync: SyncStatusData): HTMLElement {
       createTextButton("Stop Syncing", "library-chip", () => dispatch({ type: "stopSyncing" })),
     ),
   ]);
+}
+
+/**
+ * Search keywords: the ones there are, each with a remove button, and a form to add one ("yt", "YouTube",
+ * "https://www.youtube.com/results?search_query=%s").
+ */
+function renderSearchKeywordSettings(data: LibraryData): HTMLElement {
+  const section = createElement("div", "library-routing search-keywords");
+  section.append(createElement("h2", "library-setting-heading", "Search keywords"));
+  section.append(createElement("p", "library-setting-note", "Type a keyword, a space and your words in the address field or the Command Bar to search that site: “yt cats”."));
+  for (const entry of data.searchKeywords) {
+    const line = createElement("div", "library-line search-keyword");
+    line.dataset.keyword = entry.keyword;
+    const text = createElement("span", "library-line-text");
+    text.append(createElement("span", "library-line-title", `${entry.keyword} → ${entry.name}`), createElement("span", "library-line-meta", entry.url));
+    line.append(text, createIconButton("trash", "Remove keyword", "library-line-icon-button", () => dispatch({ type: "removeSearchKeyword", keyword: entry.keyword })));
+    section.append(line);
+  }
+  const form = document.createElement("form");
+  form.className = "routing-form keyword-form";
+  const keywordInput = createFormInput("yt", "Keyword");
+  keywordInput.classList.add("keyword-input");
+  const nameInput = createFormInput("YouTube", "Name");
+  const urlInput = createFormInput("https://www.youtube.com/results?search_query=%s", "Search address, with %s for the words");
+  urlInput.classList.add("keyword-url-input");
+  const addButton = document.createElement("button");
+  addButton.type = "submit";
+  addButton.className = "library-chip is-active";
+  addButton.textContent = "Add Keyword";
+  const problem = createElement("p", "library-setting-note keyword-problem");
+  form.append(keywordInput, nameInput, urlInput, addButton);
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const entry = { keyword: keywordInput.value.trim().toLowerCase(), name: nameInput.value.trim(), url: urlInput.value.trim() };
+    if (!isValidSearchKeyword(entry)) {
+      problem.textContent = "Use one short word as the keyword, a name, and a web address with %s where the words go.";
+      return;
+    }
+    dispatch({ type: "addSearchKeyword", keyword: entry.keyword, name: entry.name, url: entry.url });
+  });
+  section.append(form, problem);
+  return section;
+}
+
+/**
+ * A text field of a Settings form, with its example as placeholder.
+ */
+function createFormInput(example: string, label: string): HTMLInputElement {
+  const input = document.createElement("input");
+  input.className = "library-search";
+  input.placeholder = example;
+  input.setAttribute("aria-label", label);
+  return input;
 }
 
 /**

@@ -13,11 +13,11 @@ import type { AppMenuCommands } from "./appMenu";
 import { importFromArc } from "./arcImportController";
 import { setAsDefaultBrowser } from "./defaultBrowser";
 import { checkForUpdatesNow, getReadyUpdateVersion, restartToUpdate } from "./appUpdates";
-import { applyChange, getState } from "./browserCore";
+import { applyChange, getState, getWindow } from "./browserCore";
 import { openLittleWindow } from "./littleWindow";
 import { closeFrontWindow, openNewWindow } from "./mainWindows";
-import { findNextMatch, openCommandBar, openFind, openLibrary, openTabSwitcher, runSiteCommand } from "./overlayController";
-import { copyTabUrl, toggleDevTools, zoomPage } from "./pageCommands";
+import { findNextMatch, openCommandBar, openFind, openLibrary, openShortcutSheet, openTabSwitcher, runSiteCommand } from "./overlayController";
+import { copyTabUrl, exportPageAsPdf, savePageAs, toggleDevTools, zoomPage } from "./pageCommands";
 import { closePeek, getPeekContents, isPeekClosing, isPeekOpen, openPeekAsTab } from "./peek";
 import { buildImportMenu, showMenuRequest } from "./menus";
 import { menuHost } from "./actionRunner";
@@ -132,6 +132,8 @@ export const appMenuCommands: AppMenuCommands = {
   openFind: () => openFind(),
   findNext: (forward) => findNextMatch(forward),
   openLibrary: () => openLibrary(),
+  openSettings: () => openLibrary("settings"),
+  openShortcutSheet: () => openShortcutSheet(),
   sleepOtherTabs: () => menuHost.runAction({ type: "sleepOtherTabs" }),
   openTaskManager: () => menuHost.runAction({ type: "openTaskManager" }),
   openLittleWindow: () => openLittleWindow(null),
@@ -150,6 +152,18 @@ export const appMenuCommands: AppMenuCommands = {
   openPrivateWindow: () => openLittleWindow(null, { isPrivate: true }),
   zapElements: () => runSiteCommand("zap"),
   printPage: () => getFocusedContents()?.print(),
+  savePageAs: () => {
+    const contents = getFocusedContents();
+    if (contents !== null) {
+      savePageAs(contents, getWindow()).catch((error) => console.error("Saving the page failed:", error));
+    }
+  },
+  exportPdf: () => {
+    const contents = getFocusedContents();
+    if (contents !== null) {
+      exportPageAsPdf(contents, getWindow()).catch((error) => console.error("Exporting the page as PDF failed:", error));
+    }
+  },
   checkForUpdates: () => {
     checkForUpdatesNow().catch((error) => console.error("Checking for updates failed:", error));
   },

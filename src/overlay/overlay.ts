@@ -28,6 +28,7 @@ import { handleSwitcherKey, installSwitcherMessages, renderSwitcher } from "./sw
 import { renderFolderList } from "./folderList.js";
 import { renderTabTooltip } from "./tabTooltip.js";
 import { renderWelcome } from "./welcome.js";
+import { renderShortcutSheet } from "./shortcutSheet.js";
 import { buildSiteSearchUrl, findSiteSearch } from "../shared/siteSearch.js";
 import type { SiteSearch } from "../shared/siteSearch.js";
 import { findInlineCompletion } from "../shared/inlineCompletion.js";
@@ -506,6 +507,9 @@ function showPanel(message: OverlayShowMessage): void {
   }
   if (message.panel.kind === "welcome") {
     renderWelcome(host, message.panel);
+  }
+  if (message.panel.kind === "shortcuts") {
+    renderShortcutSheet(host, message.panel);
   }
 }
 

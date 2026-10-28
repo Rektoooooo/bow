@@ -26,6 +26,8 @@ import {
   restoreArchivedTab,
   restoreLastArchivedTab,
   setTabNeverArchived,
+  setAskWhereToSave,
+  setDownloadFolder,
   selectTab,
   setSidebarWidth,
   toggleFolder,
@@ -514,5 +516,23 @@ describe("ad blocking and app icon settings", () => {
 
     expect(setAppIcon(state, "glass")).toBe(state);
     expect(setAppIcon(state, "pixel").settings.appIcon).toBe("pixel");
+  });
+});
+
+describe("download settings", () => {
+  const initialState = createInitialState();
+
+  it("a chosen folder replaces the Mac's Downloads folder until set back, and repeats change nothing", () => {
+    const chosen = setDownloadFolder(initialState, "/Users/someone/Desktop");
+    expect(chosen.settings.downloadFolder).toBe("/Users/someone/Desktop");
+    expect(setDownloadFolder(chosen, "/Users/someone/Desktop")).toBe(chosen);
+    expect(setDownloadFolder(chosen, null).settings.downloadFolder).toBeUndefined();
+    expect(setDownloadFolder(initialState, null)).toBe(initialState);
+  });
+
+  it("asking where to save is off until turned on", () => {
+    const asking = setAskWhereToSave(initialState, true);
+    expect(asking.settings.asksWhereToSave).toBe(true);
+    expect(setAskWhereToSave(initialState, false)).toBe(initialState);
   });
 });

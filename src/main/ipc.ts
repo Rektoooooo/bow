@@ -24,6 +24,7 @@ import type { BrowserAction } from "../shared/actions";
 import { BROWSER_ACTION_TYPES } from "../shared/actions";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
 import { ARCHIVE_THRESHOLD_OPTIONS, TAB_SLEEP_OPTIONS } from "../shared/settings";
+import { isValidKeywordUrl, MAX_KEYWORD_NAME_LENGTH, SEARCH_KEYWORD_PATTERN } from "../shared/searchKeywords";
 import { isSearchEngineId } from "../shared/searchEngines";
 import type { BrowserState, RuntimeState } from "../shared/types";
 
@@ -74,6 +75,19 @@ function isScreenCoordinate(value: unknown): boolean {
  */
 function isAllowedArchiveAfter(value: unknown): boolean {
   return ARCHIVE_THRESHOLD_OPTIONS.some((option) => option.valueMs === value);
+}
+
+/** A search keyword's parts (shared/searchKeywords.ts; state.ts checks the whole entry again). */
+function isSearchKeywordText(value: unknown): boolean {
+  return typeof value === "string" && SEARCH_KEYWORD_PATTERN.test(value.trim().toLowerCase());
+}
+
+function isSearchKeywordName(value: unknown): boolean {
+  return typeof value === "string" && value.trim() !== "" && value.length <= MAX_KEYWORD_NAME_LENGTH;
+}
+
+function isSearchKeywordUrl(value: unknown): boolean {
+  return typeof value === "string" && isValidKeywordUrl(value.trim());
 }
 
 /**
@@ -330,6 +344,10 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   setShowFullUrls: { isOn: isBoolean },
   setSnapshots: { isOn: isBoolean },
   revealBackups: {},
+  addSearchKeyword: { keyword: isSearchKeywordText, name: isSearchKeywordName, url: isSearchKeywordUrl },
+  removeSearchKeyword: { keyword: isSearchKeywordText },
+  chooseDownloadFolder: {},
+  setAskWhereToSave: { isOn: isBoolean },
   setTabNeverArchived: { tabId: isText, isNeverArchived: isBoolean },
   setSpaceArchiveAfter: { spaceId: isText, archiveAfterMs: isSpaceArchiveAfter },
   undoArchive: {},

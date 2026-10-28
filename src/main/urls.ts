@@ -11,7 +11,9 @@
  */
 import { buildSearchUrl } from "../shared/searchEngines";
 import type { SearchEngine } from "../shared/searchEngines";
+import { matchSearchKeyword } from "../shared/searchKeywords";
 import { getSiteKey } from "../shared/siteKey";
+import type { SearchKeyword } from "../shared/types";
 
 /**
  * Decides whether the typed text looks like a web address (has a dot and no spaces, or a scheme).
@@ -38,9 +40,15 @@ export function looksLikeWebAddress(typedText: string): boolean {
  * Only http and https come out of this function, so typed text can never open file: or javascript: URLs.
  * Example: "example.com" → "https://example.com"
  * Example: ("best pizza", Google) → "https://www.google.com/search?q=best%20pizza"
+ * Example: ("yt cats", Google, [yt → YouTube]) → "https://www.youtube.com/results?search_query=cats"
  */
-export function normalizeTypedInput(typedText: string, searchEngine: SearchEngine): string {
+export function normalizeTypedInput(typedText: string, searchEngine: SearchEngine, searchKeywords: SearchKeyword[] = []): string {
   const text = typedText.trim();
+  // "yt cats" with a "yt" keyword searches there.
+  const keywordMatch = matchSearchKeyword(text, searchKeywords);
+  if (keywordMatch !== null) {
+    return keywordMatch.url;
+  }
   if (!looksLikeWebAddress(text)) {
     return buildSearchUrl(searchEngine, text);
   }

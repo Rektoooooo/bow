@@ -24,6 +24,7 @@ import type { BrowserState, ItemId, TabItem } from "../shared/types";
 import type { HistoryEntry } from "./history";
 import { looksLikeWebAddress, normalizeTypedInput } from "./urls";
 import { buildSearchUrl, findSearchEngine } from "../shared/searchEngines";
+import { matchSearchKeyword } from "../shared/searchKeywords";
 
 /** One line in the Command Bar. */
 export interface CommandBarResult {
@@ -274,14 +275,16 @@ function scoreTypedAndSuggestions(input: CommandBarInput): ScoredResult[] {
   const query = input.query.trim();
   const scored: ScoredResult[] = [];
   const searchEngine = findSearchEngine(input.state.settings.searchEngine);
-  const typedUrl = normalizeTypedInput(query, searchEngine);
-  const isAddress = looksLikeWebAddress(query);
+  const keywordMatch = matchSearchKeyword(query, input.state.searchKeywords ?? []);
+  const typedUrl = normalizeTypedInput(query, searchEngine, input.state.searchKeywords);
+  const isAddress = keywordMatch === null && looksLikeWebAddress(query);
+  const searchName = keywordMatch === null ? searchEngine.name : keywordMatch.keyword.name;
   scored.push({
     result: {
       id: `typed:${typedUrl}`,
       kind: isAddress ? "navigate" : "search",
       title: query,
-      subtitle: isAddress ? "Open address" : `Search ${searchEngine.name}`,
+      subtitle: isAddress ? "Open address" : `Search ${searchName}`,
       url: typedUrl,
       tabId: null,
       actionId: null,

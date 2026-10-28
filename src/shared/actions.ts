@@ -130,6 +130,10 @@ export type BrowserAction =
   | { type: "setShowFullUrls"; isOn: boolean }
   | { type: "setSnapshots"; isOn: boolean }
   | { type: "revealBackups" }
+  | { type: "addSearchKeyword"; keyword: string; name: string; url: string }
+  | { type: "removeSearchKeyword"; keyword: string }
+  | { type: "chooseDownloadFolder" }
+  | { type: "setAskWhereToSave"; isOn: boolean }
   | { type: "setTabNeverArchived"; tabId: ItemId; isNeverArchived: boolean }
   | { type: "setSpaceArchiveAfter"; spaceId: SpaceId; archiveAfterMs: number | null | "default" }
   | { type: "undoArchive" }
@@ -252,6 +256,10 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setShowFullUrls",
   "setSnapshots",
   "revealBackups",
+  "addSearchKeyword",
+  "removeSearchKeyword",
+  "chooseDownloadFolder",
+  "setAskWhereToSave",
   "setTabNeverArchived",
   "setSpaceArchiveAfter",
   "undoArchive",

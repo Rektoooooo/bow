@@ -44,6 +44,9 @@ export interface AppMenuCommands {
   openFind(): void;
   findNext(forward: boolean): void;
   openLibrary(): void;
+  /** Bow › Settings… (⌘,): Library › Settings. Help › Keyboard Shortcuts (⌘/): the sheet of the menu's shortcuts. */
+  openSettings(): void;
+  openShortcutSheet(): void;
   /** Tabs › Sleep Other Tabs and Task Manager (tabSleepController.ts, Library › Task Manager). */
   sleepOtherTabs(): void;
   openTaskManager(): void;
@@ -66,6 +69,9 @@ export interface AppMenuCommands {
   zapElements(): void;
   setAsDefaultBrowser(): void;
   printPage(): void;
+  /** File › Save Page As… (⇧⌘S; ⌘S is the sidebar, like Arc) and Export as PDF… for the page on screen. */
+  savePageAs(): void;
+  exportPdf(): void;
   /** Bow › Check for Updates…: checks now and says what it found. */
   checkForUpdates(): void;
   /** Quits and starts the version that has downloaded. */
@@ -116,6 +122,8 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
         { role: "about" },
         buildUpdateItem(commands),
         { type: "separator" },
+        { label: "Settings…", accelerator: "CommandOrControl+,", click: () => commands.openSettings() },
+        { type: "separator" },
         { label: "Set as Default Browser…", click: () => commands.setAsDefaultBrowser() },
         { type: "separator" },
         { role: "services" },
@@ -148,6 +156,8 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
         { label: "Export Bow Backup…", click: () => commands.exportBackup() },
         { label: "Restore from Backup…", click: () => commands.restoreBackup() },
         { type: "separator" },
+        { label: "Save Page As…", accelerator: "CommandOrControl+Shift+S", click: () => commands.savePageAs() },
+        { label: "Export as PDF…", click: () => commands.exportPdf() },
         { label: "Print…", accelerator: "CommandOrControl+P", click: () => commands.printPage() },
       ],
     },
@@ -233,7 +243,14 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
       ],
     },
     { role: "windowMenu" },
-    { role: "help", submenu: [{ label: "Bow on GitHub", click: () => commands.openUrlInNewTab(PROJECT_URL) }] },
+    {
+      role: "help",
+      submenu: [
+        { label: "Keyboard Shortcuts", accelerator: "CommandOrControl+/", click: () => commands.openShortcutSheet() },
+        { type: "separator" },
+        { label: "Bow on GitHub", click: () => commands.openUrlInNewTab(PROJECT_URL) },
+      ],
+    },
   ];
 }
 

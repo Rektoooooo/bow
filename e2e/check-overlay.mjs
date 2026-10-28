@@ -1289,6 +1289,117 @@ await dispatch({ type: "closeTab", tabId: embedTabId });
 await sidebar.waitForTimeout(300);
 videoServer.close();
 
+// ---------- Everyday basics: shortcuts sheet, ⌘, Settings, search keywords, downloads, zoom, save page, PDF ----------
+const basicsDir = path.join(outDir, "overlay-basics");
+fs.rmSync(basicsDir, { recursive: true, force: true });
+fs.mkdirSync(path.join(basicsDir, "downloads"), { recursive: true });
+const basicsServer = http.createServer((request, response) => {
+  if (request.url === "/notes.txt") {
+    response.writeHead(200, { "Content-Type": "application/octet-stream", "Content-Disposition": 'attachment; filename="notes.txt"' });
+    response.end("made-up notes");
+    return;
+  }
+  response.writeHead(200, { "Content-Type": "text/html" });
+  response.end(`<!doctype html><title>Basics: ${request.url}</title><p>Basics page ${request.url}</p>`);
+});
+await new Promise((resolve) => basicsServer.listen(0, "127.0.0.1", resolve));
+const basicsOrigin = `http://127.0.0.1:${basicsServer.address().port}`;
+
+await findMenuItemByLabel("Keyboard Shortcuts");
+await overlay.waitForSelector(".shortcut-sheet", { timeout: 5000 }).catch(() => undefined);
+const sheetText = (await overlay.textContent(".shortcut-sheet").catch(() => null)) ?? "";
+check("Help › Keyboard Shortcuts lists the menu's shortcuts, read from the menu", sheetText.includes("⇧⌘TReopen Closed Tab") && sheetText.includes("⌘1 – ⌘9"), sheetText.slice(0, 160));
+await overlay.press("body", "Escape");
+await sidebar.waitForTimeout(300);
+
+await findMenuItemByLabel("Settings…");
+await overlay.waitForSelector(".library-tab.is-active[data-section='settings']", { timeout: 5000 }).catch(() => undefined);
+check("Bow › Settings… (⌘,) opens Library › Settings", (await overlay.$(".library-tab.is-active[data-section='settings']")) !== null);
+await overlay.fill(".keyword-form .keyword-input", "bk");
+await overlay.fill(".keyword-form input[aria-label='Name']", "Basics");
+await overlay.fill(".keyword-form .keyword-url-input", `${basicsOrigin}/search?q=%s`);
+await overlay.click(".keyword-form button[type='submit']");
+await sidebar.waitForTimeout(400);
+check("a search keyword can be added in Settings", ((await getState()).searchKeywords ?? []).some((entry) => entry.keyword === "bk"));
+await app.evaluate(({ dialog }, folder) => {
+  dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [folder] });
+}, path.join(basicsDir, "downloads"));
+await dispatch({ type: "chooseDownloadFolder" });
+await sidebar.waitForTimeout(400);
+check("Settings › Downloads › Change… picks the download folder", (await getState()).settings.downloadFolder === path.join(basicsDir, "downloads"));
+await overlay.press("body", "Escape");
+await sidebar.waitForTimeout(300);
+
+await dispatch({ type: "openCommandBar", mode: "newTab" });
+await overlay.waitForSelector(".command-input", { timeout: 5000 });
+await overlay.fill(".command-input", "bk hello world");
+await overlay.waitForTimeout(500);
+const keywordLine = await overlay.textContent(".command-line.is-highlighted .command-line-subtitle").catch(() => null);
+check("typing a keyword and words offers to search that site", keywordLine === "Search Basics", String(keywordLine));
+await overlay.press(".command-input", "Enter");
+await waitForSelectedUrl("/search?q=hello%20world");
+check("and Enter opens the site's search with the words", selectedTab(await getState())?.url === `${basicsOrigin}/search?q=hello%20world`, selectedTab(await getState())?.url);
+
+// A download goes to the chosen folder (started from the search page, once it has loaded).
+const startDownload = () =>
+  app.evaluate(({ webContents }, origin) => {
+    const page = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith(origin));
+    page?.downloadURL(`${origin}/notes.txt`);
+    return page !== undefined;
+  }, basicsOrigin);
+for (let attempt = 0; attempt < 25 && !(await startDownload()); attempt += 1) {
+  await sidebar.waitForTimeout(200);
+}
+const downloadedPath = path.join(basicsDir, "downloads", "notes.txt");
+for (let attempt = 0; attempt < 25 && !fs.existsSync(downloadedPath); attempt += 1) {
+  await sidebar.waitForTimeout(200);
+}
+check("downloads are saved in the chosen folder", fs.existsSync(downloadedPath) && fs.readFileSync(downloadedPath, "utf8") === "made-up notes");
+
+// Zoom is remembered per host: another page of the same host opens at that zoom.
+await findMenuItemByLabel("Zoom In");
+await sidebar.waitForTimeout(400);
+const basicsHost = new URL(basicsOrigin).hostname;
+const rememberedZoom = (await getState()).siteZooms?.[basicsHost];
+check("⌘+ remembers the zoom for the site's host", rememberedZoom !== undefined && rememberedZoom > 1, String(rememberedZoom));
+await dispatch({ type: "openTab", typedText: `${basicsOrigin}/other` });
+await waitForSelectedUrl("/other");
+await sidebar.waitForTimeout(800);
+const otherPageZoom = await app.evaluate(({ webContents }, origin) => webContents.getAllWebContents().find((contents) => contents.getURL() === `${origin}/other`)?.getZoomFactor(), basicsOrigin);
+check("a page of the same host opens at the remembered zoom", Math.abs((otherPageZoom ?? 0) - (rememberedZoom ?? -1)) < 0.01, `${otherPageZoom} vs ${rememberedZoom}`);
+await findMenuItemByLabel("Actual Size");
+await sidebar.waitForTimeout(400);
+check("⌘0 forgets it", (await getState()).siteZooms?.[basicsHost] === undefined);
+// A zoom saved earlier (as after a restart) is applied by Bow: localhost was never zoomed in this run, so Chromium's
+// own per-host zoom cannot be what sets it. Saved through the app's own modules (the instances the app uses).
+const localhostUrl = `http://localhost:${new URL(basicsOrigin).port}/saved-zoom`;
+await app.evaluate((_electron, { mainFolder, url }) => {
+  const browserCore = process.mainModule.require(`${mainFolder}/browserCore.js`);
+  const siteZoom = process.mainModule.require(`${mainFolder}/siteZoom.js`);
+  browserCore.applyChange((state) => siteZoom.setSiteZoom(state, url, 1.25));
+}, { mainFolder: path.join(appDir, "dist", "node", "main"), url: localhostUrl });
+await dispatch({ type: "openTab", typedText: localhostUrl });
+await waitForSelectedUrl("/saved-zoom");
+await sidebar.waitForTimeout(1000);
+const savedZoomApplied = await app.evaluate(({ webContents }, url) => webContents.getAllWebContents().find((contents) => contents.getURL() === url)?.getZoomFactor(), localhostUrl);
+check("a page opens at its host's saved zoom", Math.abs((savedZoomApplied ?? 0) - 1.25) < 0.01, String(savedZoomApplied));
+
+// Save Page As… and Export as PDF… write where the save dialog says.
+const savedPagePath = path.join(basicsDir, "Saved page.html");
+const pdfPath = path.join(basicsDir, "Page.pdf");
+await app.evaluate(({ dialog }, paths) => {
+  const queue = [...paths];
+  dialog.showSaveDialog = async () => ({ canceled: false, filePath: queue.shift() });
+}, [savedPagePath, pdfPath]);
+await findMenuItemByLabel("Save Page As…");
+await findMenuItemByLabel("Export as PDF…");
+for (let attempt = 0; attempt < 25 && !(fs.existsSync(savedPagePath) && fs.existsSync(pdfPath)); attempt += 1) {
+  await sidebar.waitForTimeout(200);
+}
+check("File › Save Page As… saves the page", fs.existsSync(savedPagePath) && fs.readFileSync(savedPagePath, "utf8").includes("Basics page /saved-zoom"));
+check("File › Export as PDF… writes a PDF", fs.existsSync(pdfPath) && fs.readFileSync(pdfPath).subarray(0, 4).toString() === "%PDF");
+basicsServer.close();
+
 await app.close();
 const failed = results.filter((result) => !result.ok).length;
 console.log(`\n${results.length - failed}/${results.length} overlay checks passed.`);

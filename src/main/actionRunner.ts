@@ -38,6 +38,7 @@ import { chooseSyncFolder, revealSyncFolder, stopSyncing } from "./syncControlle
 import { setFavoritesKeptAwake, setSiteKeptAwake } from "./tabSleep";
 import { canSleepNow, sleepOtherTabsNow, sleepTabNow } from "./tabSleepController";
 import { clearTodayTabsWithUndo, dismissArchiveUndo, undoLastArchive } from "./archiveUndoController";
+import { askForDownloadFolder } from "./downloads";
 import { importFromBrowser } from "./browserImportController";
 import { applyCosmeticFilters, ensureFilterLists } from "./adBlock";
 import { applyAppIcon } from "./appIcon";
@@ -73,6 +74,10 @@ import { showHiddenLiveFolderItems } from "./liveFolders";
 import { setSplitOrientation, separateTabFromSplit, splitTabs, unsplit } from "./split";
 import {
   addToFavorites,
+  addSearchKeyword,
+  removeSearchKeyword,
+  setAskWhereToSave,
+  setDownloadFolder,
   setSpaceArchiveAfter,
   setTabNeverArchived,
   createFolder,
@@ -225,8 +230,9 @@ export function runAction(action: BrowserAction): void {
       if (action.typedText.trim() === "") {
         return;
       }
-      const searchEngine = findSearchEngine(getState().settings.searchEngine);
-      const url = normalizeTypedInput(action.typedText, searchEngine);
+      const settingsState = getState();
+      const searchEngine = findSearchEngine(settingsState.settings.searchEngine);
+      const url = normalizeTypedInput(action.typedText, searchEngine, settingsState.searchKeywords);
       applyChange((state) => openTab(state, url, now));
       return;
     }
@@ -432,6 +438,21 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => setSnapshots(state, action.isOn));
     case "revealBackups":
       return revealBackupsFolder();
+    case "addSearchKeyword":
+      return applyChange((state) => addSearchKeyword(state, { keyword: action.keyword, name: action.name, url: action.url }));
+    case "removeSearchKeyword":
+      return applyChange((state) => removeSearchKeyword(state, action.keyword));
+    case "chooseDownloadFolder":
+      askForDownloadFolder(getWindow())
+        .then((folder) => {
+          if (folder !== null) {
+            applyChange((state) => setDownloadFolder(state, folder));
+          }
+        })
+        .catch((error) => console.error("Choosing the download folder failed:", error));
+      return;
+    case "setAskWhereToSave":
+      return applyChange((state) => setAskWhereToSave(state, action.isOn));
     case "setTabNeverArchived":
       return applyChange((state) => setTabNeverArchived(state, action.tabId, action.isNeverArchived));
     case "setSpaceArchiveAfter":

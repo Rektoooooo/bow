@@ -15,12 +15,13 @@
  *   - `now` is always a parameter; nothing here reads the clock.
  */
 import { ARCHIVE_LIMIT, DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_LIMIT, FIRST_WINDOW_ID, LIVE_FOLDER_HIDDEN_LIMIT, SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX } from "../shared/settings";
-import type { ArchiveReason, ArchivedTab, BrowserState, FolderItem, ItemId, ItemLocation, LiveFolderData, Space, SpaceId, TabItem } from "../shared/types";
+import type { ArchiveReason, ArchivedTab, BrowserState, FolderItem, ItemId, ItemLocation, LiveFolderData, SearchKeyword, Space, SpaceId, TabItem } from "../shared/types";
 import { createNoteUrl, NEW_NOTE_TITLE } from "../shared/notes";
 import { DEFAULT_SEARCH_ENGINE_ID } from "../shared/searchEngines";
 import { DEFAULT_APP_ICON_ID } from "../shared/appIconDrawing";
 import type { SearchEngineId } from "../shared/searchEngines";
 import { createEaselUrl, NEW_EASEL_TITLE } from "../shared/easels";
+import { isValidSearchKeyword } from "../shared/searchKeywords";
 import {
   collectTabIds,
   collectTabIdsInList,
@@ -745,6 +746,53 @@ export function listClearableTodayTabIds(state: BrowserState): ItemId[] {
  */
 export function clearTodayTabs(state: BrowserState, now: number): BrowserState {
   return moveTabsToArchive(state, listClearableTodayTabIds(state), now, "clear-button");
+}
+
+/**
+ * Adds a search keyword, or replaces the one with the same keyword. Entries that are not valid are refused.
+ */
+export function addSearchKeyword(state: BrowserState, entry: SearchKeyword): BrowserState {
+  const cleaned: SearchKeyword = { keyword: entry.keyword.trim().toLowerCase(), name: entry.name.trim(), url: entry.url.trim() };
+  if (!isValidSearchKeyword(cleaned)) {
+    return state;
+  }
+  const others = (state.searchKeywords ?? []).filter((existing) => existing.keyword !== cleaned.keyword);
+  return { ...state, searchKeywords: [...others, cleaned] };
+}
+
+/**
+ * Removes a search keyword.
+ */
+export function removeSearchKeyword(state: BrowserState, keyword: string): BrowserState {
+  const keywords = state.searchKeywords ?? [];
+  const remaining = keywords.filter((existing) => existing.keyword !== keyword);
+  return remaining.length === keywords.length ? state : { ...state, searchKeywords: remaining };
+}
+
+/**
+ * Chooses the folder downloads are saved in; null goes back to the Mac's Downloads folder.
+ */
+export function setDownloadFolder(state: BrowserState, folder: string | null): BrowserState {
+  if ((state.settings.downloadFolder ?? null) === folder) {
+    return state;
+  }
+  const settings = { ...state.settings };
+  if (folder === null) {
+    delete settings.downloadFolder;
+  } else {
+    settings.downloadFolder = folder;
+  }
+  return { ...state, settings: settings };
+}
+
+/**
+ * "Ask where to save each download".
+ */
+export function setAskWhereToSave(state: BrowserState, isOn: boolean): BrowserState {
+  if ((state.settings.asksWhereToSave === true) === isOn) {
+    return state;
+  }
+  return { ...state, settings: { ...state.settings, asksWhereToSave: isOn } };
 }
 
 /**

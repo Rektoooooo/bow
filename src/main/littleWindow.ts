@@ -243,8 +243,9 @@ export function registerLittleWindowIpc(): void {
     if (little === undefined || typeof typedText !== "string" || typedText.trim() === "" || typedText.length > MAX_TEXT_LENGTH) {
       return;
     }
-    const searchEngine = findSearchEngine(getState().settings.searchEngine);
-    little.pageView.webContents.loadURL(normalizeTypedInput(typedText, searchEngine)).catch(() => undefined);
+    const state = getState();
+    const searchEngine = findSearchEngine(state.settings.searchEngine);
+    little.pageView.webContents.loadURL(normalizeTypedInput(typedText, searchEngine, state.searchKeywords)).catch(() => undefined);
   });
   ipcMain.handle(LITTLE_CHANNELS.moveToSpace, (event) => {
     const little = findSender(event);

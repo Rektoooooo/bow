@@ -12,8 +12,9 @@
  *   overlay.ts → overlayApi.query / choose / siteCommand / find → main.ts
  */
 import type { SearchEngineId } from "./searchEngines";
+import type { ShortcutGroup } from "./shortcuts";
 import type { SymbolImage } from "./symbols";
-import type { ArchivedTab, ItemId, RoutingRule, SitePermissionKind, SpaceTheme, ThemeAppearance } from "./types";
+import type { ArchivedTab, ItemId, RoutingRule, SearchKeyword, SitePermissionKind, SpaceTheme, ThemeAppearance } from "./types";
 
 /** What a Command Bar line does when chosen. */
 export type CommandBarResultKind = "navigate" | "search" | "tab" | "history" | "action";
@@ -62,7 +63,9 @@ export type OverlayPanel =
   | { kind: "folderList"; frame: OverlayRect; folderTitle: string; entries: FolderListEntry[] }
   /** Arc's tab tooltip; the frame (window coordinates) is the box itself, sized by the sidebar. */
   | { kind: "tabTooltip"; frame: OverlayRect; title: string; showsRenameHint: boolean }
-  | { kind: "welcome"; spaceId: string; importSources: { id: string; label: string }[]; presets: { label: string; colors: string[]; appearance: ThemeAppearance }[] };
+  | { kind: "welcome"; spaceId: string; importSources: { id: string; label: string }[]; presets: { label: string; colors: string[]; appearance: ThemeAppearance }[] }
+  /** Help › Keyboard Shortcuts, read from the app menu (main/shortcutSheet.ts). */
+  | { kind: "shortcuts"; groups: ShortcutGroup[] };
 
 /** One tab in the list a closed folder shows on hover (main/folderList.ts). */
 export interface FolderListEntry {
@@ -241,6 +244,11 @@ export interface LibraryData {
   /** Automatic hourly copies of the setup (backupController.ts). */
   areSnapshotsOn: boolean;
   sync: SyncStatusData;
+  /** Search keywords ("yt cats" searches YouTube; shared/searchKeywords.ts). */
+  searchKeywords: SearchKeyword[];
+  /** Where downloads go ("~/Downloads"), and whether each one asks (main/downloads.ts). */
+  downloadFolder: string;
+  asksWhereToSave: boolean;
   /** "Keep Favorites awake" and the sites kept awake (main/tabSleep.ts). */
   areFavoritesKeptAwake: boolean;
   keepAwakeSites: string[];
