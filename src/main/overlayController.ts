@@ -36,6 +36,7 @@ import {
   setNewTabPending,
 } from "./browserCore";
 import { rankCommandBarResults, rankTabSearchResults } from "./commandBar";
+import { isChainableActionId } from "./commandChains";
 import { focusMainWindow } from "./mainWindows";
 import type { CommandBarResult } from "./commandBar";
 import type { CommandActionRegistry } from "./commandBarActions";
@@ -160,6 +161,23 @@ let actionRegistry: CommandActionRegistry | null = null;
  */
 export function setCommandActionRegistry(registry: CommandActionRegistry): void {
   actionRegistry = registry;
+}
+
+/**
+ * Runs a Command Bar action from elsewhere (Library › Chains' Run), the panel closed first so it acts on the page.
+ */
+export function runCommandBarAction(actionId: string): void {
+  closeOverlay();
+  actionRegistry?.run(actionId);
+}
+
+/**
+ * The actions a chain step may run (Library › Chains): the Command Bar's, without the chains themselves.
+ */
+function listChainableActions(): { id: string; title: string }[] {
+  const actions = actionRegistry === null ? [] : actionRegistry.list();
+  const chainable = actions.filter((action) => isChainableActionId(action.id));
+  return chainable.map((action) => ({ id: action.id, title: action.title }));
 }
 
 /**
@@ -296,6 +314,8 @@ function buildLibraryData(state: BrowserState): LibraryData {
     areSnapshotsOn: state.settings.areSnapshotsOn !== false,
     sync: getSyncStatus(),
     searchKeywords: state.searchKeywords ?? [],
+    commandChains: state.commandChains ?? [],
+    chainActions: listChainableActions(),
     downloadFolder: shortenHomePath(getDownloadFolder()),
     asksWhereToSave: state.settings.asksWhereToSave === true,
     areFavoritesKeptAwake: areFavoritesKeptAwake(state.settings),

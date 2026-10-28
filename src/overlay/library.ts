@@ -1,7 +1,7 @@
 /**
  * WHY this file exists:
  *   The Library, like Arc's: the Archive (every closed, cleared and auto-archived tab, searchable and restorable),
- *   browsing History, Media, Downloads, Spaces, Boosts, Extensions and the settings. Like Arc's it takes the sidebar
+ *   browsing History, Media, Downloads, Spaces, Boosts, command Chains (chainEditor.ts), Extensions and the settings. Like Arc's it takes the sidebar
  *   column, which widens for it (LIBRARY_COLUMN_WIDTH_PX): a rail of sections with the list beside it. The overlay is
  *   exactly that column and draws see-through, so the sidebar's own frame shows behind it.
  *
@@ -25,6 +25,7 @@ import type { IconName } from "../renderer/icons";
 import { createSpaceIcon } from "../renderer/spaceIcon.js";
 import { describeSpaceIconAsText } from "../shared/spaceIcons.js";
 import { describeDay } from "../shared/timeAgo.js";
+import { haveChainsChanged, renderChainsSection } from "./chainEditor.js";
 
 /** How long a Media tile says what its button did: as long as Copy URL's toast (statusBubble.ts TOAST_SHOWN_MS). */
 const MEDIA_FEEDBACK_MS = 1600;
@@ -48,6 +49,7 @@ const SECTIONS: { id: LibrarySection; label: string; icon: IconName }[] = [
   { id: "downloads", label: "Downloads", icon: "download" },
   { id: "spaces", label: "Spaces", icon: "spaces" },
   { id: "boosts", label: "Boosts", icon: "boost" },
+  { id: "chains", label: "Chains", icon: "chains" },
   { id: "archive", label: "Archived Tabs", icon: "archiveOutline" },
   { id: "history", label: "History", icon: "clock" },
   { id: "extensions", label: "Extensions", icon: "puzzle" },
@@ -1138,6 +1140,10 @@ function renderBody(data: LibraryData): void {
   if (section === "boosts") {
     renderBoostsSection(body, data);
   }
+  if (section === "chains") {
+    const emptyState = createEmptyState("chains", "No chains yet", "A chain runs several Command Bar actions and pages in one go. Build one here, then type its name in the Command Bar.");
+    renderChainsSection(body, data, emptyState);
+  }
   if (section === "extensions") {
     renderExtensionsSection(body, data);
   }
@@ -1203,6 +1209,10 @@ function handleLibraryUpdate(updated: LibraryData): void {
     drawArchiveLines(updated);
   }
   if (section === "downloads" || section === "settings" || section === "media" || section === "spaces" || section === "boosts") {
+    renderBody(updated);
+  }
+  // Chains have text fields: drawn again only when the chains changed (an edit was saved), not on every update.
+  if (section === "chains" && haveChainsChanged(updated)) {
     renderBody(updated);
   }
 }

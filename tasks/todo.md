@@ -288,7 +288,11 @@ M about a day, L several days.
       Feed from This Page falls back to a subreddit's /.rss. Checked against local fakes, not the real services)
       Live Folders: GitHub notifications and issues, Linear and Jira through the user's sign-in, ready-made feed
       presets (Hacker News, subreddits) (M)
-- [ ] 10. Command Bar: calculator and unit conversion, recently closed tabs and history by date, user-made action
+- [x] 10. (Sums and unit conversions with Return to copy, no currencies (they need a server); the 3 tabs you closed
+      last below the recent ones and "Reopen" for matches; "yesterday", "monday", "3 days ago", "last week" + words
+      list that time's history (last visit only: history keeps one per page); Library › Chains builds command chains
+      of actions and pages, "Run <name>" in the Command Bar, in backups and sync)
+      Command Bar: calculator and unit conversion, recently closed tabs and history by date, user-made action
       chains (M)
 - [ ] 11. Per-Space defaults (search engine, new-tab behaviour) and Space templates (M)
 - [ ] 12. Air Traffic Control by source app (links from Slack go to Work) and a "test this link" box (S)

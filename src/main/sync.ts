@@ -3,11 +3,11 @@
  *   Sync between the user's own Macs without an account or a server: Bow keeps one file per Mac in a folder the user
  *   picks (iCloud Drive, Dropbox, a NAS) and reads the other Macs' files. This file is the pure part. The sidebar is
  *   cut into small units (a tab, a folder, a split view, a Space's name and look, a Space's Pinned order, the Space
- *   order, a profile's Favorites, a Boost, the Air Traffic Control rules, a Note, an Easel), each with a fingerprint
- *   and the time it last changed on the Mac that changed it. Merging goes unit by unit: the newer change wins, a
- *   deletion wins over older edits and ties, and a unit changed on both Macs too close in time to tell which came
- *   first (clocks differ) is counted as a conflict and decided the same way on both Macs, so they always end up
- *   alike. So renaming a tab on one Mac and pinning a page on the other keeps both.
+ *   order, a profile's Favorites, a Boost, the Air Traffic Control rules, the command chains, a Note, an Easel), each
+ *   with a fingerprint and the time it last changed on the Mac that changed it. Merging goes unit by unit: the newer
+ *   change wins, a deletion wins over older edits and ties, and a unit changed on both Macs too close in time to tell
+ *   which came first (clocks differ) is counted as a conflict and decided the same way on both Macs, so they always
+ *   end up alike. So renaming a tab on one Mac and pinning a page on the other keeps both.
  *   Today tabs, the Archive, windows, extensions and settings stay on each Mac; a live folder syncs its source and
  *   each Mac fills it.
  *
@@ -22,7 +22,7 @@
  * Same rules as state.ts: never change what is passed in, return the same objects when nothing changed, `now` is a
  * parameter.
  */
-import type { Boost, BrowserState, FolderItem, ItemId, ItemLocation, Profile, RoutingRule, SidebarItem, Space, SpaceTheme, SplitItem, TabItem } from "../shared/types";
+import type { Boost, BrowserState, CommandChain, FolderItem, ItemId, ItemLocation, Profile, RoutingRule, SidebarItem, Space, SpaceTheme, SplitItem, TabItem } from "../shared/types";
 import { getEaselId, isEaselId } from "../shared/easels";
 import { createNoteUrl, getNoteId, isNoteId } from "../shared/notes";
 import { checkBackupState } from "./backup";
@@ -224,6 +224,7 @@ export function collectUnits(state: BrowserState, notes: Record<string, string>,
     addUnit(units, `boost:${boost.site}`, boost);
   }
   addUnit(units, "rules", state.routingRules ?? []);
+  addUnit(units, "chains", state.commandChains ?? []);
   return units;
 }
 
@@ -327,7 +328,7 @@ function isRecord(value: unknown): value is RecordValue {
 }
 
 /** A unit key: a known kind and an id (or one of the keys without an id). */
-const UNIT_KEY_PATTERN = /^((item|space|pinned|profile|favorites|note|easel):[A-Za-z0-9._-]{1,200}|boost:[a-z0-9.-]{1,253}|order|rules)$/;
+const UNIT_KEY_PATTERN = /^((item|space|pinned|profile|favorites|note|easel):[A-Za-z0-9._-]{1,200}|boost:[a-z0-9.-]{1,253}|order|rules|chains)$/;
 
 /**
  * The stamps of a peer's file: valid keys, numeric times, text fingerprints.
@@ -600,7 +601,8 @@ function applyAdoptedUnits(state: BrowserState, payload: SyncPayload, keys: stri
   }
   const boosts = landBoosts(state.boosts ?? [], payload.state.boosts ?? [], keys);
   const routingRules: RoutingRule[] = keys.includes("rules") ? (payload.state.routingRules ?? []) : (state.routingRules ?? []);
-  return { ...state, items: items, spaces: spaces, profiles: profiles, boosts: boosts, routingRules: routingRules };
+  const commandChains: CommandChain[] = keys.includes("chains") ? (payload.state.commandChains ?? []) : (state.commandChains ?? []);
+  return { ...state, items: items, spaces: spaces, profiles: profiles, boosts: boosts, routingRules: routingRules, commandChains: commandChains };
 }
 
 /**

@@ -5,14 +5,17 @@
  *   one does when chosen. Some entries are made per Space, per archive setting and per theme.
  *
  * Data source:
- *   The menu commands (appMenu.ts), the state (Spaces, current theme), ARCHIVE_THRESHOLD_OPTIONS and THEME_PRESETS.
+ *   The menu commands (appMenu.ts), the state (Spaces, current theme, command chains), ARCHIVE_THRESHOLD_OPTIONS and
+ *   THEME_PRESETS.
  *
  * Data flow:
  *   overlayController.ts query → list() → commandBar.ts ranks them → user picks one → run(actionId)
+ *   "Run <chain>" → runChain() → each step: run(actionId) or open the page, COMMAND_CHAIN_STEP_DELAY_MS apart
  */
 import type { BrowserAction } from "../shared/actions";
-import { ARCHIVE_THRESHOLD_OPTIONS } from "../shared/settings";
-import type { BrowserState } from "../shared/types";
+import { ARCHIVE_THRESHOLD_OPTIONS, COMMAND_CHAIN_STEP_DELAY_MS } from "../shared/settings";
+import type { BrowserState, CommandChainStep } from "../shared/types";
+import { isChainableActionId, toChainActionId } from "./commandChains";
 import type { AppMenuCommands } from "./appMenu";
 import type { CommandBarAction } from "./commandBar";
 import { applyPreset, THEME_PRESETS } from "./themePresets";
@@ -110,6 +113,9 @@ export function createCommandActionRegistry(host: CommandActionHost): CommandAct
     for (const preset of THEME_PRESETS) {
       entries.push({ id: `theme:${preset.label}`, title: `Theme: ${preset.label}`, keywords: ["color", "space theme"] });
     }
+    for (const chain of state.commandChains ?? []) {
+      entries.push({ id: toChainActionId(chain.id), title: `Run ${chain.name}`, keywords: ["chain", chain.name] });
+    }
     const readyVersion = host.commands.readyUpdateVersion();
     if (readyVersion !== null) {
       entries.push({ id: RESTART_TO_UPDATE_ID, title: `Restart to Update to Bow ${readyVersion}`, keywords: ["update", "relaunch", "new version"] });
@@ -127,10 +133,57 @@ export function createCommandActionRegistry(host: CommandActionHost): CommandAct
       host.commands.restartToUpdate();
       return;
     }
+    if (!isChainableActionId(actionId)) {
+      const chainId = actionId.slice(toChainActionId("").length);
+      runChain(host, chainId, run).catch((error) => console.error("Running a command chain failed:", error));
+      return;
+    }
     runGeneratedAction(host, actionId);
   };
 
   return { list: list, run: run };
+}
+
+/** Chains running now: starting one again before it finished does nothing. */
+const runningChainIds = new Set<string>();
+
+/**
+ * Waits between two steps of a chain.
+ */
+function waitForNextStep(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, COMMAND_CHAIN_STEP_DELAY_MS));
+}
+
+/**
+ * One step: a page opens in a new tab (as if typed in the Command Bar); an action runs, unless it is a chain.
+ */
+function runChainStep(host: CommandActionHost, step: CommandChainStep, run: (actionId: string) => void): void {
+  if (step.kind === "open") {
+    host.runAction({ type: "openTab", typedText: step.url });
+    return;
+  }
+  if (isChainableActionId(step.actionId)) {
+    run(step.actionId);
+  }
+}
+
+/**
+ * Runs a chain's steps in order, a short pause apart. A step whose action is gone (a deleted Space) does nothing.
+ */
+async function runChain(host: CommandActionHost, chainId: string, run: (actionId: string) => void): Promise<void> {
+  const chain = (host.getState().commandChains ?? []).find((candidate) => candidate.id === chainId);
+  if (chain === undefined || runningChainIds.has(chainId)) {
+    return;
+  }
+  runningChainIds.add(chainId);
+  try {
+    for (const step of chain.steps) {
+      runChainStep(host, step, run);
+      await waitForNextStep();
+    }
+  } finally {
+    runningChainIds.delete(chainId);
+  }
 }
 
 /**

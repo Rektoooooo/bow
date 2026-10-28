@@ -15,6 +15,21 @@ export const MINUTE_MS = 60 * 1000;
 export const HOUR_MS = 60 * MINUTE_MS;
 export const DAY_MS = 24 * HOUR_MS;
 
+/** Longest command chain name. Our choice: a Command Bar line shows about this much. */
+export const CHAIN_NAME_MAX_LENGTH = 60;
+
+/** Most steps in one command chain. Our choice: a chain is a few things in a row, not a program. */
+export const CHAIN_STEPS_LIMIT = 20;
+
+/** Most command chains kept. Our choice. */
+export const CHAINS_LIMIT = 50;
+
+/**
+ * The pause between the steps of a command chain, so a step's new Space, window or tab is in place before the next
+ * one acts on it. Our choice.
+ */
+export const COMMAND_CHAIN_STEP_DELAY_MS = 250;
+
 /** The day a week starts on, as Date.getDay() numbers it (0 = Sunday): Monday, as ISO 8601 weeks do. Our choice. */
 export const WEEK_START_DAY = 1;
 

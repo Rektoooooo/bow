@@ -93,6 +93,14 @@ describe("parseAction", () => {
     expect(parseAction("selectTab")).toBeNull();
   });
 
+  it("takes a command chain only when every step may be kept", () => {
+    const chain = { id: "chain-1-1", name: "Morning", steps: [{ kind: "open", url: "https://news.example/" }] };
+    expect(parseAction({ type: "saveCommandChain", chain: chain })).not.toBeNull();
+    expect(parseAction({ type: "saveCommandChain", chain: { ...chain, steps: [{ kind: "open", url: "javascript:alert(1)" }] } })).toBeNull();
+    expect(parseAction({ type: "saveCommandChain", chain: { ...chain, steps: [{ kind: "action", actionId: "chain:chain-1-1" }] } })).toBeNull();
+    expect(parseAction({ type: "runCommandChain", chainId: "chain-1-1" })).not.toBeNull();
+  });
+
   it("takes only known live folder lists and ready-made feeds", () => {
     expect(parseAction({ type: "createGitHubLiveFolder", list: "notifications" })).not.toBeNull();
     expect(parseAction({ type: "createGitHubLiveFolder", list: "everything" })).toBeNull();

@@ -825,6 +825,61 @@ body.dark .command-info-button {
   display: none;
 }
 
+/* Library › Chains: a card per chain, its name and Run on top, numbered steps, then the forms that add a step. */
+.chain-card {
+  margin: 6px 0 14px;
+  padding: 10px 10px 12px;
+  border-radius: 12px;
+  background: var(--highlight);
+}
+
+.chain-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.chain-header .chain-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.chain-step {
+  min-height: 34px;
+  gap: 6px;
+  padding: 2px 4px 2px 8px;
+}
+
+.chain-step .library-line-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.chain-step-number {
+  flex: none;
+  width: 18px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.chain-add-action .library-select,
+.chain-add-page .library-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.chain-problem:empty {
+  display: none;
+}
+
+.library-chip:disabled,
+.library-line-icon-button:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
 .library-setting-note {
   margin: 12px 0 0;
   color: var(--muted);

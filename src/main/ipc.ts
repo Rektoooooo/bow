@@ -12,6 +12,7 @@
  */
 import { GITHUB_LIVE_LISTS } from "./gitHubLists";
 import { FEED_PRESETS } from "./feedPresets";
+import { checkCommandChain } from "./commandChains";
 import { APP_ICON_VARIANTS } from "../shared/appIconDrawing";
 import { BOOST_FONTS } from "../shared/boostFonts";
 import { isNoteId } from "../shared/notes";
@@ -150,6 +151,11 @@ function isAppIconVariant(value: unknown): boolean {
 /** The GitHub lists a live folder can show (types.ts GitHubLiveList). */
 function isGitHubLiveList(value: unknown): boolean {
   return GITHUB_LIVE_LISTS.includes(value as GitHubLiveList);
+}
+
+/** A whole command chain as the Library sends it: only what commandChains.ts would keep. */
+function isCommandChain(value: unknown): boolean {
+  return checkCommandChain(value) !== null;
 }
 
 /** A ready-made feed folder's id (feedPresets.ts). */
@@ -379,6 +385,10 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   revealBackups: {},
   addSearchKeyword: { keyword: isSearchKeywordText, name: isSearchKeywordName, url: isSearchKeywordUrl },
   removeSearchKeyword: { keyword: isSearchKeywordText },
+  createCommandChain: {},
+  saveCommandChain: { chain: isCommandChain },
+  deleteCommandChain: { chainId: isText },
+  runCommandChain: { chainId: isText },
   chooseDownloadFolder: {},
   setAskWhereToSave: { isOn: isBoolean },
   setTabNeverArchived: { tabId: isText, isNeverArchived: isBoolean },

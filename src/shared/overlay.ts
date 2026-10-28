@@ -14,7 +14,7 @@
 import type { SearchEngineId } from "./searchEngines";
 import type { ShortcutGroup } from "./shortcuts";
 import type { SymbolImage } from "./symbols";
-import type { ArchivedTab, ItemId, RoutingRule, SearchKeyword, SitePermissionKind, SpaceTheme, ThemeAppearance } from "./types";
+import type { ArchivedTab, CommandChain, ItemId, RoutingRule, SearchKeyword, SitePermissionKind, SpaceTheme, ThemeAppearance } from "./types";
 
 /** What a Command Bar line does when chosen. */
 /** "answer": a worked-out sum or unit conversion; Return copies it. "closed": a tab you closed; Return reopens it. */
@@ -23,7 +23,7 @@ export type CommandBarResultKind = "navigate" | "search" | "tab" | "history" | "
 /** "tabs" is tab search (⇧⌘A): only tabs, every Space. */
 export type CommandBarMode = "newTab" | "editUrl" | "splitWith" | "tabs";
 
-export const LIBRARY_SECTIONS = ["archive", "history", "media", "downloads", "spaces", "boosts", "extensions", "tasks", "settings"] as const;
+export const LIBRARY_SECTIONS = ["archive", "history", "media", "downloads", "spaces", "boosts", "chains", "extensions", "tasks", "settings"] as const;
 
 export type LibrarySection = (typeof LIBRARY_SECTIONS)[number];
 
@@ -248,6 +248,9 @@ export interface LibraryData {
   sync: SyncStatusData;
   /** Search keywords ("yt cats" searches YouTube; shared/searchKeywords.ts). */
   searchKeywords: SearchKeyword[];
+  /** Library › Chains: the chains, and the Command Bar actions a step may run (main/commandChains.ts). */
+  commandChains: CommandChain[];
+  chainActions: { id: string; title: string }[];
   /** Where downloads go ("~/Downloads"), and whether each one asks (main/downloads.ts). */
   downloadFolder: string;
   asksWhereToSave: boolean;

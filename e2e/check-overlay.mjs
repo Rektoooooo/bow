@@ -138,7 +138,7 @@ const libraryPlacement = await app.evaluate(({ BrowserWindow }) => {
 await sidebar.waitForFunction(() => document.body.classList.contains("library-open") && Math.round(document.getElementById("card").getBoundingClientRect().x) === 567, null, { timeout: 3000 }).catch(() => undefined);
 const sidebarColumn = await sidebar.evaluate(() => (document.body.classList.contains("library-open") ? Math.round(document.getElementById("card").getBoundingClientRect().x) - 7 : 0));
 const railSections = await overlay.$$eval(".library-rail .library-tab", (tabs) => tabs.map((tab) => tab.dataset.section).join(","));
-check("the Library takes the sidebar column, with Arc's rail of sections", libraryPlacement?.x === 0 && libraryPlacement?.width === 560 && sidebarColumn === 560 && railSections.startsWith("media,downloads,spaces,boosts,archive"), `${JSON.stringify(libraryPlacement)} column=${sidebarColumn} ${railSections}`);
+check("the Library takes the sidebar column, with Arc's rail of sections", libraryPlacement?.x === 0 && libraryPlacement?.width === 560 && sidebarColumn === 560 && railSections.startsWith("media,downloads,spaces,boosts,chains,archive"), `${JSON.stringify(libraryPlacement)} column=${sidebarColumn} ${railSections}`);
 await overlay.click(".library .library-line");
 await sidebar.waitForTimeout(500);
 state = await getState();
@@ -1542,6 +1542,46 @@ await overlay.waitForTimeout(600);
 const todaySubtitle = await overlay.textContent(".command-line.is-highlighted .command-line-subtitle").catch(() => null);
 check("typing a day and words lists that day's matching pages first, with the time of the visit", /^Today, \d\d:\d\d · 127\.0\.0\.1:\d+$/.test(todaySubtitle ?? ""), String(todaySubtitle));
 await overlay.press(".command-input", "Escape");
+
+// Library › Chains: build a chain of an action and a page, run it from the Command Bar, then delete it.
+await dispatch({ type: "openLibrary" });
+await overlay.waitForSelector(".library-tab[data-section='chains']", { timeout: 5000 });
+await overlay.click(".library-tab[data-section='chains']");
+await overlay.waitForSelector(".library-empty-state", { timeout: 5000 }).catch(() => undefined);
+const chainsEmptyText = await overlay.textContent(".library-empty-title").catch(() => null);
+await overlay.click(".chain-new");
+await overlay.waitForSelector(".chain-card", { timeout: 5000 });
+await overlay.fill(".chain-name", "Morning");
+await overlay.press(".chain-name", "Enter");
+await sidebar.waitForTimeout(300);
+await overlay.selectOption(".chain-action-select", { label: "Toggle Sidebar" });
+await overlay.click(".chain-add-action button");
+await overlay.waitForSelector(".chain-step", { timeout: 5000 });
+await overlay.fill(".chain-address-input", `${basicsOrigin}/chain-page`);
+await overlay.click(".chain-add-page button");
+await sidebar.waitForTimeout(500);
+const savedChain = ((await getState()).commandChains ?? [])[0];
+const stepTexts = await overlay.$$eval(".chain-step .library-line-title", (titles) => titles.map((title) => title.textContent));
+check(
+  "Library › Chains builds a chain: New Chain, a name, an action and a page, shown as numbered steps",
+  chainsEmptyText === "No chains yet" && savedChain?.name === "Morning" && JSON.stringify(savedChain.steps) === JSON.stringify([{ kind: "action", actionId: "toggle-sidebar" }, { kind: "open", url: `${basicsOrigin}/chain-page` }]) && stepTexts[0] === "Toggle Sidebar",
+  `${chainsEmptyText} / ${JSON.stringify(savedChain)} / ${stepTexts.join(", ")}`,
+);
+await overlay.press("body", "Escape");
+await sidebar.waitForTimeout(300);
+await commandBar("newTab", "morning", "Run Morning");
+await waitForSelectedUrl("/chain-page");
+const afterChain = await getState();
+check("“Run Morning” in the Command Bar runs the steps in order", afterChain.settings.isSidebarVisible === false && selectedTab(afterChain)?.url === `${basicsOrigin}/chain-page`, `${afterChain.settings.isSidebarVisible} / ${selectedTab(afterChain)?.url}`);
+await commandBar("newTab", "toggle sidebar", "Toggle Sidebar");
+await dispatch({ type: "openLibrary" });
+await overlay.waitForSelector(".library-tab[data-section='chains']", { timeout: 5000 });
+await overlay.click(".library-tab[data-section='chains']");
+await overlay.waitForSelector(".chain-delete", { timeout: 5000 });
+await overlay.click(".chain-delete");
+await sidebar.waitForTimeout(400);
+check("and its trash button deletes it", ((await getState()).commandChains ?? []).length === 0 && (await getState()).settings.isSidebarVisible === true);
+await overlay.press("body", "Escape");
 basicsServer.close();
 
 await app.close();

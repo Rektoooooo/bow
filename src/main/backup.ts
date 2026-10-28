@@ -56,6 +56,7 @@ import type {
 } from "../shared/types";
 import { upgradeToCurrentVersion } from "./migrate";
 import { GITHUB_LIVE_LISTS } from "./gitHubLists";
+import { checkCommandChains } from "./commandChains";
 import { MAX_NOTE_LENGTH } from "./notesStore";
 import { MAX_EASEL_LENGTH } from "./easelsStore";
 import { repairSelections } from "./state";
@@ -651,6 +652,11 @@ export function checkBackupState(raw: BrowserState, counter: CheckCounter): Brow
   }
   if (Array.isArray(raw.searchKeywords)) {
     checked.searchKeywords = checkSearchKeywords(raw.searchKeywords, counter);
+  }
+  if (Array.isArray(raw.commandChains)) {
+    const checkedChains = checkCommandChains(raw.commandChains);
+    counter.leftOut += checkedChains.leftOut;
+    checked.commandChains = checkedChains.chains;
   }
   return repairSelections(checked);
 }

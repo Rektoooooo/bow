@@ -62,6 +62,7 @@ import {
   openSiteControls,
   openSpaceIconPicker,
   openThemeEditor,
+  runCommandBarAction,
   runSiteCommand,
   setFolderListPointer,
   showFolderList,
@@ -127,6 +128,7 @@ import { takeItemIntoFocusedWindow } from "./windows";
 import { closeSplitByUser, closeTabByUser, navigateFocusedPage, openLinkInNewTab, openLinkInSplitView, openOrSwitchToTab, resetTabToHome, setMuted } from "./tabActions";
 import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
 import { createId } from "./tree";
+import { checkCommandChain, createCommandChain, deleteCommandChain, saveCommandChain, toChainActionId } from "./commandChains";
 import { openPeek } from "./peek";
 import { openLittleWindow } from "./littleWindow";
 import { normalizeTypedInput } from "./urls";
@@ -489,6 +491,20 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => addSearchKeyword(state, { keyword: action.keyword, name: action.name, url: action.url }));
     case "removeSearchKeyword":
       return applyChange((state) => removeSearchKeyword(state, action.keyword));
+    case "createCommandChain":
+      return applyChange((state) => createCommandChain(state, createId("chain", Date.now())));
+    case "saveCommandChain": {
+      // ipc.ts checked the chain; checking again gives its kept form (the name trimmed).
+      const chain = checkCommandChain(action.chain);
+      if (chain !== null) {
+        applyChange((state) => saveCommandChain(state, chain));
+      }
+      return;
+    }
+    case "deleteCommandChain":
+      return applyChange((state) => deleteCommandChain(state, action.chainId));
+    case "runCommandChain":
+      return runCommandBarAction(toChainActionId(action.chainId));
     case "chooseDownloadFolder":
       askForDownloadFolder(getWindow())
         .then((folder) => {

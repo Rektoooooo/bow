@@ -193,6 +193,17 @@ describe("backups", () => {
     expect(restored.state.items["live-3"]?.kind).toBe("folder");
   });
 
+  it("keep command chains, and drop a chain with a step that is not a web page or an action", () => {
+    const morning = { id: "chain-1-1", name: "Morning", steps: [{ kind: "open", url: "https://news.example/" }, { kind: "action", actionId: "toggle-sidebar" }] };
+    const crafted = { id: "chain-1-2", name: "Crafted", steps: [{ kind: "open", url: "javascript:alert(document.cookie)" }] };
+    const text = craftedBackupText((backup) => {
+      backup.state.commandChains = [morning, crafted] as BrowserState["commandChains"];
+    });
+    const restored = parseOrFail(text);
+    expect(restored.state.commandChains).toEqual([morning]);
+    expect(restored.report.leftOut).toBeGreaterThan(0);
+  });
+
   it("switch JavaScript Boosts off, and drop rules for Spaces that are not there", () => {
     const text = craftedBackupText((backup) => {
       backup.state.routingRules = [...(backup.state.routingRules ?? []), { id: "rule-2", matchType: "is", value: "x", spaceId: "space-gone" }];

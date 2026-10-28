@@ -11,7 +11,7 @@
  *   sidebar.ts → window.browserApi.dispatch(action) → preload → ipc.ts parseAction() → main.ts runAction()
  */
 import type { SearchEngineId } from "./searchEngines";
-import type { GitHubLiveList, ItemId, ItemLocation, RoutingMatchType, SitePermissionKind, SpaceId, SpaceTheme, SplitOrientation } from "./types";
+import type { CommandChain, GitHubLiveList, ItemId, ItemLocation, RoutingMatchType, SitePermissionKind, SpaceId, SpaceTheme, SplitOrientation } from "./types";
 
 /** Toolbar and keyboard navigation commands for the page on screen. */
 export type NavigationCommand = "back" | "forward" | "reload" | "stop" | "hardReload" | "emptyCacheAndReload";
@@ -140,6 +140,11 @@ export type BrowserAction =
   | { type: "revealBackups" }
   | { type: "addSearchKeyword"; keyword: string; name: string; url: string }
   | { type: "removeSearchKeyword"; keyword: string }
+  /** Library › Chains (main/commandChains.ts): a new empty chain, a changed one, delete one, run one. */
+  | { type: "createCommandChain" }
+  | { type: "saveCommandChain"; chain: CommandChain }
+  | { type: "deleteCommandChain"; chainId: string }
+  | { type: "runCommandChain"; chainId: string }
   | { type: "chooseDownloadFolder" }
   | { type: "setAskWhereToSave"; isOn: boolean }
   | { type: "setTabNeverArchived"; tabId: ItemId; isNeverArchived: boolean }
@@ -277,6 +282,10 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "revealBackups",
   "addSearchKeyword",
   "removeSearchKeyword",
+  "createCommandChain",
+  "saveCommandChain",
+  "deleteCommandChain",
+  "runCommandChain",
   "chooseDownloadFolder",
   "setAskWhereToSave",
   "setTabNeverArchived",

@@ -219,3 +219,18 @@ describe("folder sync", () => {
     expect(parseSyncPayload(JSON.stringify({ ...payload, formatVersion: 99 }))).toBeNull();
   });
 });
+
+describe("command chains", () => {
+  it("a chain made on one Mac reaches the other, and so does its deletion", () => {
+    const { macA, macB } = sharedMacs();
+    const chain = { id: "chain-1-1", name: "Morning", steps: [{ kind: "open" as const, url: "https://news.example/" }] };
+    const withChain = stamp({ ...macA, state: { ...macA.state, commandChains: [chain] } }, ONE_PM + MINUTE_MS);
+    const bWithChain = receive(macB, fileOf(withChain, ONE_PM + 2 * MINUTE_MS), ONE_PM + 2 * MINUTE_MS);
+    expect(bWithChain.state.commandChains).toEqual([chain]);
+
+    const deletedOnB = stamp({ ...bWithChain, state: { ...bWithChain.state, commandChains: [] } }, ONE_PM + 3 * MINUTE_MS);
+    const aAfter = receive(withChain, fileOf(deletedOnB, ONE_PM + 4 * MINUTE_MS), ONE_PM + 4 * MINUTE_MS);
+    expect(aAfter.state.commandChains).toEqual([]);
+  });
+});
+

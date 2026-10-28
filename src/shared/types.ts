@@ -168,6 +168,16 @@ export interface Profile {
   favoriteIds: ItemId[];
 }
 
+/** One step of a command chain: a Command Bar action (by its id), or a web page to open in a new tab. */
+export type CommandChainStep = { kind: "action"; actionId: string } | { kind: "open"; url: string };
+
+/** A chain the user made of Command Bar steps, run in order by one command, "Run <name>" (main/commandChains.ts). */
+export interface CommandChain {
+  id: string;
+  name: string;
+  steps: CommandChainStep[];
+}
+
 /** A search keyword (shared/searchKeywords.ts): typing "<keyword> words" opens `url` with the words for %s. */
 export interface SearchKeyword {
   keyword: string;
@@ -373,6 +383,8 @@ export interface BrowserState {
   siteZooms?: Record<string, number>;
   /** Search keywords: "yt cats" searches YouTube (shared/searchKeywords.ts). Optional, like the lists above. */
   searchKeywords?: SearchKeyword[];
+  /** Command chains (main/commandChains.ts). Optional, like the lists above. */
+  commandChains?: CommandChain[];
 }
 
 /**

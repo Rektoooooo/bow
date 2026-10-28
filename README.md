@@ -165,6 +165,9 @@ source never updates itself.
   that matches what you type is offered too. Return reopens it where it was (like ⇧⌘T, for any of them).
 - **History by date**: type "yesterday", "monday", "last friday", "3 days ago", "this week" or "last week", alone or
   with words ("yesterday github"), for the pages you visited then, newest first, with the time of each visit.
+- **Chains** (Library › Chains): several actions and pages in one command. Build "Morning" from "Switch to Work",
+  "Open github.com/notifications" and "Toggle Sidebar", then type "morning" in the Command Bar to run them in order.
+  A chain never runs another chain; chains are in backups and sync between your Macs.
 - **Answers**: a sum ("12*7", "(3+4)^2", "sqrt(2)", "15%") or a unit conversion ("5 km in mi", "350 f to c",
   "2 cups in ml", "1 GiB in MB", "100 km/h to mph") is worked out on top as you type; Return copies the answer.
   Worked out on your Mac, so the text is not sent to the search engine (no currencies: their rates would need a
