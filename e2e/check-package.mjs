@@ -1,6 +1,6 @@
-// Checks the packaged app (npm run package first): it starts, knows it is "Bow", declares http, https and bow
-// so macOS can make it the default browser, offers "Set as Default Browser…", opens a link from another app in a
-// Little Window, runs a Chrome extension (so the extension library and its preload made it into the package), and
+// Checks the packaged app (npm run package first): it starts, knows it is "Bow", declares http, https, bow and HTML
+// files so macOS lists it as a web browser, offers "Set as Default Browser…", opens a link and an HTML file from
+// another app in a Little Window, runs a Chrome extension (so the extension library and its preload made it into the package), and
 // asks its update feed for a new version (a local feed here, which says this version is the newest; a download
 // that finished is played to the updater, so the sidebar's notice and the app menu's restart are checked too).
 // usage: npm run package && node e2e/check-package.mjs
@@ -11,6 +11,7 @@ import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as http from "node:http";
 import * as path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const appDir = path.resolve(import.meta.dirname, "..");
 const outDir = process.env.E2E_OUTPUT_DIR || path.join(appDir, "e2e", "output");
@@ -35,6 +36,9 @@ function check(name, ok, detail = "") {
 const infoPlist = JSON.parse(execFileSync("plutil", ["-convert", "json", "-o", "-", path.join(bundlePath, "Contents", "Info.plist")]).toString());
 const schemes = (infoPlist.CFBundleURLTypes ?? []).flatMap((type) => type.CFBundleURLSchemes ?? []);
 check("Info.plist declares http, https and bow (bow:// addresses from other apps)", schemes.includes("http") && schemes.includes("https") && schemes.includes("bow"), schemes.join(", "));
+// macOS lists an app under Default web browser only when it opens HTML files as well as http and https links.
+const documentTypes = (infoPlist.CFBundleDocumentTypes ?? []).flatMap((type) => type.LSItemContentTypes ?? []);
+check("Info.plist declares HTML and XHTML files (what makes System Settings list Bow as a browser)", documentTypes.includes("public.html") && documentTypes.includes("public.xhtml"), documentTypes.join(", "));
 check("Info.plist names the app", infoPlist.CFBundleName === "Bow", infoPlist.CFBundleName);
 // macOS ties the default-browser choice and website permissions to the bundle id, so it kept the first name.
 check("the bundle id stays the same after the rename", infoPlist.CFBundleIdentifier === "io.github.rektoooooo.sidebar-browser", infoPlist.CFBundleIdentifier);
@@ -111,6 +115,25 @@ while ((await windowCount()) === windowsBefore && Date.now() < littleDeadline) {
   await new Promise((resolve) => setTimeout(resolve, 200));
 }
 check("a link from another app opens a Little Window", (await windowCount()) === windowsBefore + 1);
+// An HTML file opened from Finder arrives as open-file and opens like a link from another app.
+const htmlFilePath = path.join(outDir, "package-open-file.html");
+fs.writeFileSync(htmlFilePath, "<!doctype html><title>Opened from Finder</title><p>A page on disk</p>");
+await app.evaluate(({ app }, filePath) => app.emit("open-file", { preventDefault() {} }, filePath), htmlFilePath);
+const fileUrl = pathToFileURL(htmlFilePath).href;
+const littleTitle = () =>
+  app.evaluate(({ webContents }, url) => webContents.getAllWebContents().find((contents) => contents.getURL() === url)?.getTitle() ?? null, fileUrl);
+const fileDeadline = Date.now() + 10000;
+while ((await littleTitle()) !== "Opened from Finder" && Date.now() < fileDeadline) {
+  await new Promise((resolve) => setTimeout(resolve, 200));
+}
+check("an HTML file opened from Finder opens in a Little Window", (await littleTitle()) === "Opened from Finder" && (await windowCount()) === windowsBefore + 2, `${await littleTitle()}, ${await windowCount()} Little Windows`);
+// Launch Services read the bundle when it started: it counts Bow as a web browser now (the role it derives from the
+// declared links and HTML files, as for Safari and Chrome).
+const lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
+const registrations = execFileSync(lsregister, ["-dump"], { maxBuffer: 512 * 1024 * 1024 }).toString().split(/\n-{20,}\n/);
+const ownRegistration = registrations.find((block) => block.split("\n").some((line) => line.startsWith("path:") && line.includes(`${bundlePath} (`))) ?? "";
+const claimedTypesLine = ownRegistration.split("\n").find((line) => line.startsWith("claimed UTIs:")) ?? "";
+check("macOS counts the packaged app as a web browser", claimedTypesLine.includes("com.apple.default-app.web-browser"), claimedTypesLine.trim() || "not registered");
 // The synthetic test extension: Load Unpacked (dialog answered), then its content script must mark a page.
 const fixtureDir = path.join(appDir, "e2e", "fixtures", "extension-marker");
 await app.evaluate(({ dialog }, folder) => {

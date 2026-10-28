@@ -343,6 +343,9 @@ M about a day, L several days.
       whose process is gone now loads again and its corners come back. Overlay and status bubble stay on their own:
       one each for the whole app, not per window)
       Less memory for Bow's own helper views (70–90 MB each per window) (M)
+- [x] Bow shows up in System Settings › Desktop & Dock › Default web browser (the user, 2026-10-28: it could not be
+      picked there). macOS lists apps that open HTML files as well as http/https links: the Info.plist declares
+      public.html and public.xhtml, and an HTML file from Finder (open-file) opens like a link from another app.
 - [x] 22. The Control Center no longer rebuilds when nothing changed (an unclickable panel under bursts of
       refreshes, found 2026-10-27; the fix is uncommitted in the main checkout's src/overlay/siteControls.ts) (S)
 

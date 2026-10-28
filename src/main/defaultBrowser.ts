@@ -5,8 +5,8 @@
  *
  * Data source:
  *   macOS Launch Services, through Electron's app.isDefaultProtocolClient / app.setAsDefaultProtocolClient. The
- *   packaged app declares http and https in its Info.plist (build/extend-info.plist); that is what makes macOS list
- *   it as a web browser at all.
+ *   packaged app declares http, https and HTML files in its Info.plist (build/extend-info.plist); that is what makes
+ *   macOS list it as a web browser at all (also in System Settings › Desktop & Dock).
  *
  * Data flow:
  *   menu → setAsDefaultBrowser() → macOS asks the user to confirm → links arrive as "open-url" (main.ts)

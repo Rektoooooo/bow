@@ -2,7 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <!-- http and https: this is what makes macOS list the app as a web browser and send it links. -->
+  <!-- http and https: macOS sends the app web links. With the HTML documents below, this is what makes macOS list
+       it as a web browser (System Settings › Desktop & Dock › Default web browser). -->
   <key>CFBundleURLTypes</key>
   <array>
     <dict>
@@ -25,6 +26,31 @@
       <key>CFBundleURLSchemes</key>
       <array>
         <string>bow</string>
+      </array>
+    </dict>
+  </array>
+  <!-- HTML pages on disk. macOS counts an app as a web browser only when it opens these as well as web links (other
+       browsers declare the same); Finder then also offers Bow for .html files (main.ts open-file). -->
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>HTML document</string>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>public.html</string>
+      </array>
+    </dict>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>XHTML document</string>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>public.xhtml</string>
       </array>
     </dict>
   </array>

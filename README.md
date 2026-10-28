@@ -54,7 +54,8 @@ word for an arc.)
 2. Open the disk image and drag **Bow** to **Applications**. Bow is signed and notarized by Apple, so it opens
    without warnings.
 3. To make it your everyday browser, choose **Bow › Set as Default Browser…** (or type "default" in the Command
-   Bar). Links from other apps then open in a Little Window, or in a Space when an Air Traffic Control rule matches.
+   Bar), or pick Bow in System Settings › Desktop & Dock › Default web browser. Links and HTML files from other apps
+   then open in a Little Window, or in a Space when an Air Traffic Control rule matches.
 
 **Coming from Arc?** **File › Import from Arc…** reads Arc's files on this Mac (read-only) and adds your Spaces,
 Favorites, pinned folders and tabs, Today tabs, Space themes, Arc's cached icons, your archive (newest 250), your

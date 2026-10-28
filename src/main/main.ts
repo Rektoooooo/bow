@@ -9,10 +9,12 @@
  * Data flow:
  *   app ready → initializeState() → registerIpcHandlers() → restoreMainWindows() → createOverlayView() → timers
  *   page events → tabViewEvents → applyChange() / history / menus
+ *   a link or an HTML file from another app (open-url / open-file) → handleExternalUrl() → Little Window or a Space
  */
 import { app, session } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   ARCHIVE_PRUNE_INTERVAL_MS,
   ARCHIVE_SWEEP_INTERVAL_MS,
@@ -524,6 +526,13 @@ function startApp(): void {
       return;
     }
     // The app in front sent the link: read it before Bow comes forward, so Air Traffic Control can route by app.
+    readFrontApp().then((sourceApp) => receiveExternalUrl(url, sourceApp));
+  });
+  // An HTML file opened from Finder (or dropped on the Dock icon) comes like a link from another app: macOS sends
+  // it to the default browser, and lists Bow as one only because it declares HTML files (build/extend-info.plist).
+  app.on("open-file", (event, filePath) => {
+    event.preventDefault();
+    const url = pathToFileURL(filePath).href;
     readFrontApp().then((sourceApp) => receiveExternalUrl(url, sourceApp));
   });
   app.whenReady().then(handleAppReady);
