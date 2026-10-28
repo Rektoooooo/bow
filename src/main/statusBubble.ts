@@ -32,10 +32,14 @@ const BUBBLE_MARGIN_PX = 6;
 /** Longest address shown; the rest ends in "…". */
 const MAX_SHOWN_LENGTH = 300;
 
-/** A confirmation's size and distance from the card's bottom. Our choice. */
+/**
+ * A confirmation's view and its distance from the card's bottom. Our choice. The view is taller than the pill
+ * (about 32 px) so the pill's soft shadow (status.css) ends inside it: cut off at the view's edge it showed as a grey
+ * box. The pill sits where it did with a 40 px view and a 14 px margin.
+ */
 const TOAST_WIDTH_PX = 260;
-const TOAST_HEIGHT_PX = 40;
-const TOAST_MARGIN_PX = 14;
+const TOAST_HEIGHT_PX = 64;
+const TOAST_MARGIN_PX = 2;
 
 /** How long a confirmation stays, and how long it takes to fade (= toast-out in status.css). Our choice. */
 const TOAST_SHOWN_MS = 1600;

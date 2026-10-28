@@ -12,6 +12,9 @@
   --panel: #fbfbfb;
   --panel-border: rgba(0, 0, 0, 0.12);
   --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.1);
+  /* For panels whose overlay is only as big as the panel plus 4 px (Find, a permission prompt): a shadow must end
+     inside those 4 px (1 px down + 3 px blur), or the view's edge cuts it into a grey box over the page. */
+  --compact-panel-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   --ink: rgba(0, 0, 0, 0.88);
   --ink-soft: rgba(0, 0, 0, 0.7);
   --muted: rgba(0, 0, 0, 0.45);
@@ -36,6 +39,7 @@ body.dark {
   --panel: #18191a;
   --panel-border: rgba(255, 255, 255, 0.2);
   --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --compact-panel-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   --ink: rgba(255, 255, 255, 0.92);
   --ink-soft: rgba(255, 255, 255, 0.75);
   --muted: rgba(255, 255, 255, 0.42);
@@ -2390,6 +2394,7 @@ body.is-closing .peek-buttons {
   gap: 4px;
   padding: 0 6px 0 12px;
   border-radius: 12px;
+  box-shadow: var(--compact-panel-shadow);
 }
 
 .find-input {
@@ -2440,6 +2445,7 @@ body.is-closing .peek-buttons {
   justify-content: space-between;
   padding: 14px 14px 12px;
   border-radius: 12px;
+  box-shadow: var(--compact-panel-shadow);
 }
 
 .permission-text {

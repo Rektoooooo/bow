@@ -47,7 +47,8 @@ body.is-toast .status {
   border-radius: 999px;
   font-size: 13px;
   font-weight: 500;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  /* Ends 13 px below the pill and 9 px above it, inside the view's 16 px of room (statusBubble.ts TOAST_HEIGHT_PX). */
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
   animation: toast-in 180ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
 
