@@ -46,6 +46,7 @@ function readFocusedWindow(state: BrowserState): ParkedWindow {
     selectedTabIdBySpace: state.selectedTabIdBySpace,
     isSidebarVisible: state.settings.isSidebarVisible,
     sidebarWidth: state.settings.sidebarWidth,
+    isToolbarVisible: state.settings.isToolbarVisible,
     collapsedPinnedSpaceIds: collapsedSpaces.map((space) => space.id),
     openFolderIds: listOpenFolderIds(state),
   };
@@ -90,7 +91,7 @@ function withWindowChoices(state: BrowserState, choices: ParkedWindow): BrowserS
     ...state,
     activeSpaceId: choices.activeSpaceId,
     selectedTabIdBySpace: choices.selectedTabIdBySpace,
-    settings: { ...state.settings, isSidebarVisible: choices.isSidebarVisible, sidebarWidth: choices.sidebarWidth },
+    settings: { ...state.settings, isSidebarVisible: choices.isSidebarVisible, sidebarWidth: choices.sidebarWidth, isToolbarVisible: choices.isToolbarVisible },
     spaces: applyCollapsedPinnedSections(state.spaces, choices.collapsedPinnedSpaceIds),
     items: applyOpenFolders(state.items, choices.openFolderIds),
   };
@@ -158,6 +159,7 @@ export function openWindow(state: BrowserState, windowId: WindowId): BrowserStat
     selectedTabIdBySpace: nothingSelected,
     isSidebarVisible: sidebar.isSidebarVisible,
     sidebarWidth: sidebar.sidebarWidth,
+    isToolbarVisible: sidebar.isToolbarVisible,
   };
   return {
     ...withWindowChoices(state, newWindow),
@@ -177,7 +179,7 @@ export function closeWindow(state: BrowserState, windowId: WindowId): BrowserSta
     return state;
   }
   const closing = parked ?? readFocusedWindow(state);
-  const closingSidebar: WindowSidebar = { isSidebarVisible: closing.isSidebarVisible, sidebarWidth: closing.sidebarWidth };
+  const closingSidebar: WindowSidebar = { isSidebarVisible: closing.isSidebarVisible, sidebarWidth: closing.sidebarWidth, isToolbarVisible: closing.isToolbarVisible };
   if (parked !== undefined) {
     const remaining = state.otherWindows.filter((candidate) => candidate.id !== windowId);
     return { ...state, otherWindows: remaining, newWindowSidebar: closingSidebar };
@@ -192,7 +194,10 @@ export function closeWindow(state: BrowserState, windowId: WindowId): BrowserSta
     };
   }
   const remembered = state.newWindowSidebar;
-  const isSameSidebar = remembered?.isSidebarVisible === closingSidebar.isSidebarVisible && remembered?.sidebarWidth === closingSidebar.sidebarWidth;
+  const isSameSidebar =
+    remembered?.isSidebarVisible === closingSidebar.isSidebarVisible &&
+    remembered?.sidebarWidth === closingSidebar.sidebarWidth &&
+    remembered?.isToolbarVisible === closingSidebar.isToolbarVisible;
   return isSameSidebar ? state : { ...state, newWindowSidebar: closingSidebar };
 }
 

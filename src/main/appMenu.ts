@@ -44,6 +44,10 @@ export interface AppMenuCommands {
   newSpace(): void;
   newFolder(): void;
   toggleSidebar(): void;
+  /** View › Toggle Toolbar, Compact Mode (sidebar and toolbar hidden) and Focus Mode (the page only). */
+  toggleToolbar(): void;
+  toggleCompactMode(): void;
+  toggleFocusMode(): void;
   toggleFullUrls(): void;
   navigate(command: NavigationCommand): void;
   forceReload(): void;
@@ -193,6 +197,9 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
       label: "View",
       submenu: [
         { label: "Toggle Sidebar", accelerator: "CommandOrControl+S", click: () => commands.toggleSidebar() },
+        { label: "Toggle Toolbar", accelerator: "CommandOrControl+Shift+D", click: () => commands.toggleToolbar() },
+        { label: "Compact Mode", accelerator: "CommandOrControl+Alt+S", click: () => commands.toggleCompactMode() },
+        { label: "Focus Mode", accelerator: "CommandOrControl+Shift+F", click: () => commands.toggleFocusMode() },
         { label: "Toggle Full URLs", click: () => commands.toggleFullUrls() },
         { type: "separator" },
         { label: "Reload Page", accelerator: "CommandOrControl+R", click: () => commands.navigate("reload") },

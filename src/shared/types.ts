@@ -232,6 +232,11 @@ export interface BrowserSettings {
   /** False after ⌘S hides the focused window's sidebar (each window has its own, like Arc's sidebarMode). */
   isSidebarVisible: boolean;
   /**
+   * False after Toggle Toolbar (⇧⌘D) or Compact Mode hides the focused window's toolbar; touching the window's top edge
+   * slides it in. Each window has its own. Optional: missing means shown.
+   */
+  isToolbarVisible?: boolean;
+  /**
    * The focused window's sidebar width in pixels, set by dragging its edge (each window has its own). Optional:
    * missing means SIDEBAR_WIDTH_PX.
    */
@@ -348,6 +353,8 @@ export interface WindowSidebar {
   isSidebarVisible: boolean;
   /** Missing means SIDEBAR_WIDTH_PX. */
   sidebarWidth?: number;
+  /** The window's toolbar (Toggle Toolbar, Compact Mode). Missing means shown. */
+  isToolbarVisible?: boolean;
 }
 
 /**
@@ -443,6 +450,10 @@ export interface RuntimeState {
   activeDownloadCount: number;
   /** True while the hidden sidebar is shown because the mouse touched the window's left edge. */
   isSidebarPeeking: boolean;
+  /** The hidden toolbar is showing for a moment (pointer at the window's top edge). */
+  isToolbarPeeking: boolean;
+  /** Focus Mode (⇧⌘F): only the page, filling the window. */
+  isFocusMode: boolean;
   /** A tab playing (or paused) media in the background, shown as a small player above the bottom bar. */
   media: MediaInfo | null;
   /** True while the Command Bar is open to make a new tab: "New Tab" is highlighted instead of the tab, like Arc. */

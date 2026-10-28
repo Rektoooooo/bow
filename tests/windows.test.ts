@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { deleteSpace, switchSpace } from "../src/main/spaces";
-import { closeTab, createFolder, createInitialState, deleteItem, getSelectedTabId, selectTab, setPinnedSectionOpen, setSidebarVisible, setSidebarWidth, toggleFolder, updateTabPage } from "../src/main/state";
+import { closeTab, createFolder, createInitialState, deleteItem, getSelectedTabId, isCompactMode, selectTab, setCompactMode, setPinnedSectionOpen, setSidebarVisible, setSidebarWidth, setToolbarVisible, toggleFolder, updateTabPage } from "../src/main/state";
 import {
   closeWindow,
   collectSelectedTabIdsOfAllWindows,
@@ -184,6 +184,22 @@ describe("each window's own sidebar, Pinned sections and folders (Arc's Storable
     expect(firstFocused.settings.sidebarWidth).toBeUndefined();
     expect(projectStateForWindow(firstFocused, SECOND_WINDOW_ID).settings).toMatchObject({ isSidebarVisible: false, sidebarWidth: 300 });
     expect(focusWindow(firstFocused, SECOND_WINDOW_ID).settings).toMatchObject({ isSidebarVisible: false, sidebarWidth: 300 });
+  });
+
+  it("hides the toolbar (Compact Mode) in the focused window only, and a new window takes the last one closed's", () => {
+    const { state } = buildTwoWindows();
+    const secondCompact = setCompactMode(state, true);
+
+    const firstFocused = focusWindow(secondCompact, FIRST_WINDOW_ID);
+    const secondClosed = closeWindow(firstFocused, SECOND_WINDOW_ID);
+    const thirdWindow = openWindow(secondClosed, "window-third");
+
+    expect(isCompactMode(secondCompact)).toBe(true);
+    expect(firstFocused.settings.isToolbarVisible).toBeUndefined();
+    expect(projectStateForWindow(firstFocused, SECOND_WINDOW_ID).settings).toMatchObject({ isSidebarVisible: false, isToolbarVisible: false });
+    expect(isCompactMode(thirdWindow)).toBe(true);
+    expect(setCompactMode(setCompactMode(state, true), false).settings.isToolbarVisible).toBeUndefined();
+    expect(setToolbarVisible(state, true)).toBe(state);
   });
 
   it("collapses a Pinned section and closes a folder in the focused window only", () => {

@@ -1049,6 +1049,36 @@ export function setSidebarVisible(state: BrowserState, isVisible: boolean): Brow
 }
 
 /**
+ * Shows or hides the focused window's toolbar (Toggle Toolbar).
+ */
+export function setToolbarVisible(state: BrowserState, isVisible: boolean): BrowserState {
+  if ((state.settings.isToolbarVisible ?? true) === isVisible) {
+    return state;
+  }
+  const settings = { ...state.settings };
+  if (isVisible) {
+    delete settings.isToolbarVisible;
+  } else {
+    settings.isToolbarVisible = false;
+  }
+  return { ...state, settings: settings };
+}
+
+/**
+ * Whether the focused window is in Compact Mode: sidebar and toolbar hidden, both sliding in from their edge.
+ */
+export function isCompactMode(state: BrowserState): boolean {
+  return !state.settings.isSidebarVisible && state.settings.isToolbarVisible === false;
+}
+
+/**
+ * Compact Mode on (sidebar and toolbar hidden) or off (both shown).
+ */
+export function setCompactMode(state: BrowserState, isOn: boolean): BrowserState {
+  return setToolbarVisible(setSidebarVisible(state, !isOn), !isOn);
+}
+
+/**
  * Returns the tabs in the order the sidebar shows them for the active Space: Favorites, then Pinned (open folders
  * only), then Today. ⌘1–9 and ⌥⌘↑/↓ walk this list.
  */

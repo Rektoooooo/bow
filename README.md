@@ -110,6 +110,9 @@ source never updates itself.
 - Bottom bar: Library, the Space switcher (emoji for the active Space, dots for the others), and a **+** menu.
 - ⌘S hides the sidebar; touching the window's left edge shows it again for a moment, as a floating panel like Arc's.
   Drag its edge to resize it. Icons fade while the window is in the background, text does not (Arc's look).
+- **Compact Mode** (⌥⌘S) hides the sidebar and the toolbar (⇧⌘D hides only the toolbar): touching the window's left
+  edge slides the sidebar in, its top edge the toolbar. **Focus Mode** (⇧⌘F) shows only the page, filling the
+  window, until ⇧⌘F again. Each window has its own.
 - A dot on a Pinned tab or Favorite whose page changed while you were elsewhere (a new mail count), like Arc.
 - A small player for a tab playing sound in the background.
 - Rest the pointer on a tab for Arc's tooltip (its title; "Double-click to rename" on the selected tab); ⌃Tab shows

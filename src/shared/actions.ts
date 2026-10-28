@@ -89,6 +89,12 @@ export type BrowserAction =
   | { type: "setSearchEngine"; engineId: SearchEngineId }
   | { type: "setSidebarVisible"; isVisible: boolean }
   | { type: "setSidebarPeek"; isPeeking: boolean }
+  /** The hidden toolbar slides in from the top edge, or out again. */
+  | { type: "setToolbarPeek"; isPeeking: boolean }
+  /** View › Toggle Toolbar, Compact Mode, Focus Mode (the focused window). */
+  | { type: "toggleToolbar" }
+  | { type: "toggleCompactMode" }
+  | { type: "toggleFocusMode" }
   | { type: "setSidebarWidth"; width: number; isFinal: boolean }
   | { type: "setSpaceProfile"; spaceId: SpaceId; profileId: string }
   | { type: "createProfileForSpace"; spaceId: SpaceId }
@@ -242,6 +248,10 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setSearchEngine",
   "setSidebarVisible",
   "setSidebarPeek",
+  "setToolbarPeek",
+  "toggleToolbar",
+  "toggleCompactMode",
+  "toggleFocusMode",
   "setSidebarWidth",
   "setSpaceProfile",
   "createProfileForSpace",

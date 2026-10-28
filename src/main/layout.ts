@@ -40,6 +40,10 @@ export interface CardLayoutOptions {
   isToolbarVisible: boolean;
   /** The hidden sidebar is showing for a moment (mouse at the left edge): the card slides right without resizing. */
   isSidebarPeeking?: boolean;
+  /** The hidden toolbar is showing for a moment (mouse at the top edge): the page slides down without resizing. */
+  isToolbarPeeking?: boolean;
+  /** Focus Mode: the page fills the window, no sidebar, toolbar or frame (unless the Library is open). */
+  isFocusMode?: boolean;
   /** The sidebar's width; SIDEBAR_WIDTH_PX when not given. */
   sidebarWidth?: number;
   /** The selected page's site is in Developer Mode: its toolbar is taller. */
@@ -54,11 +58,15 @@ export interface CardLayoutOptions {
 
 /**
  * Returns where the web page goes inside the card: below the card's toolbar, inset from the window edges, right of
- * the sidebar. With the sidebar hidden the card fills the window minus the inset.
+ * the sidebar. With the sidebar hidden the card fills the window minus the inset; with the toolbar hidden the page
+ * starts at the top inset; in Focus Mode the page fills the window.
  * Sizes never go below zero, because Electron rejects negative sizes.
  * Example: content 1280×820, sidebar and toolbar visible → { x: 254, y: 43, width: 1016, height: 767 }
  */
 export function computeCardBounds(contentWidth: number, contentHeight: number, options: CardLayoutOptions): Bounds {
+  if (options.isFocusMode === true && options.isLibraryOpen !== true) {
+    return { x: 0, y: 0, width: Math.max(contentWidth, 0), height: Math.max(contentHeight, 0) };
+  }
   const sidebarWidth = options.sidebarWidth ?? SIDEBAR_WIDTH_PX;
   const sidebarLeft = options.isSidebarVisible ? sidebarWidth + CARD_GAP_PX : CARD_INSET_PX;
   const libraryWidth = options.libraryWidth ?? LIBRARY_COLUMN_WIDTH_PX;
@@ -70,7 +78,9 @@ export function computeCardBounds(contentWidth: number, contentHeight: number, o
   // Sliding instead of shrinking keeps the page from re-laying out while the sidebar is only peeking.
   const isPeekSliding = !options.isSidebarVisible && options.isSidebarPeeking === true && options.isLibraryOpen !== true;
   const peekOffset = isPeekSliding ? sidebarWidth : 0;
-  return { x: left + peekOffset, y: top, width: Math.max(width, 0), height: Math.max(height, 0) };
+  const isToolbarSliding = !options.isToolbarVisible && options.isToolbarPeeking === true;
+  const toolbarOffset = isToolbarSliding ? toolbarHeight : 0;
+  return { x: left + peekOffset, y: top + toolbarOffset, width: Math.max(width, 0), height: Math.max(height, 0) };
 }
 
 /**

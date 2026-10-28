@@ -36,6 +36,25 @@ describe("computeCardBounds", () => {
     expect(peeking.width).toBe(hidden.width);
   });
 
+  it("starts the page at the top inset with the toolbar hidden, and slides it down while the toolbar peeks", () => {
+    const hidden = computeCardBounds(1280, 820, { isSidebarVisible: false, isToolbarVisible: false });
+    const peeking = computeCardBounds(1280, 820, { isSidebarVisible: false, isToolbarVisible: false, isToolbarPeeking: true });
+    const shown = computeCardBounds(1280, 820, { isSidebarVisible: false, isToolbarVisible: true, isToolbarPeeking: true });
+
+    expect(hidden.y).toBe(CARD_INSET_PX);
+    expect(peeking.y).toBe(CARD_INSET_PX + TOOLBAR_HEIGHT_PX);
+    expect(peeking.height).toBe(hidden.height);
+    expect(shown.y).toBe(CARD_INSET_PX + TOOLBAR_HEIGHT_PX);
+  });
+
+  it("fills the whole window in Focus Mode, unless the Library is open", () => {
+    const focus = computeCardBounds(1280, 820, { isSidebarVisible: true, isToolbarVisible: true, isFocusMode: true, isSidebarPeeking: true });
+    const withLibrary = computeCardBounds(1280, 820, { isSidebarVisible: true, isToolbarVisible: true, isFocusMode: true, isLibraryOpen: true });
+
+    expect(focus).toEqual({ x: 0, y: 0, width: 1280, height: 820 });
+    expect(withLibrary.x).toBeGreaterThan(0);
+  });
+
   it("fills the window when the sidebar is hidden, and never goes negative", () => {
     const card = computeCardBounds(1280, 820, { isSidebarVisible: false, isToolbarVisible: false });
     const tiny = computeCardBounds(10, 10, { isSidebarVisible: true, isToolbarVisible: true });

@@ -26,9 +26,13 @@ import {
   handOverDrop,
   scheduleRuntimePush,
   sendSidebarCommand,
+  setFocusMode,
   setSidebarPeek,
+  setToolbarPeek,
+  isFocusModeOn,
 } from "./browserCore";
 import { focusMainWindow } from "./mainWindows";
+import { showToast } from "./statusBubble";
 import { dismissMedia, toggleMediaPlayback } from "./media";
 import { addRoutingRule, removeRoutingRule } from "./routing";
 import { deleteBoost, setBoostCss, setBoostEnabled, setBoostJavaScript, setBoostStyle } from "./boosts";
@@ -110,6 +114,9 @@ import {
   finishWelcome,
   setPinnedSectionOpen,
   setSidebarVisible,
+  setToolbarVisible,
+  setCompactMode,
+  isCompactMode,
   setSidebarWidth,
   toggleFolder,
   unpinTab,
@@ -219,7 +226,19 @@ function reapplyCosmeticFiltersToAllPages(): void {
  * Actions that come from the pointer moving (the edge of a hidden sidebar, a tab row's tooltip). The pointer also moves
  * over background windows, so these never bring a window forward.
  */
-const POINTER_ACTION_TYPES: BrowserAction["type"][] = ["setSidebarPeek", "showTabTooltip", "hideTabTooltip", "showFolderList", "hideFolderList", "folderListPointer", "fadeHoverPanel"];
+const POINTER_ACTION_TYPES: BrowserAction["type"][] = ["setSidebarPeek", "setToolbarPeek", "showTabTooltip", "hideTabTooltip", "showFolderList", "hideFolderList", "folderListPointer", "fadeHoverPanel"];
+
+/**
+ * Focus Mode on or off in the focused window; turning it on says once how to get the rest back.
+ */
+function toggleFocusMode(): void {
+  const windowId = getState().focusedWindowId;
+  const isTurningOn = !isFocusModeOn(windowId);
+  setFocusMode(windowId, isTurningOn);
+  if (isTurningOn) {
+    showToast("Focus Mode: ⇧⌘F shows everything again").catch(() => undefined);
+  }
+}
 
 /**
  * Runs an action from a page: the sidebar of a main window (windowId), or the overlay (null, it is always in the
@@ -249,6 +268,10 @@ export function runActionFromWindow(action: BrowserAction, windowId: WindowId | 
   }
   if (windowId !== null && action.type === "setSidebarPeek") {
     setSidebarPeek(windowId, action.isPeeking);
+    return;
+  }
+  if (windowId !== null && action.type === "setToolbarPeek") {
+    setToolbarPeek(windowId, action.isPeeking);
     return;
   }
   if (isFromBackgroundWindow && POINTER_ACTION_TYPES.includes(action.type)) {
@@ -358,6 +381,14 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => setSidebarVisible(state, action.isVisible));
     case "setSidebarPeek":
       return setSidebarPeek(getState().focusedWindowId, action.isPeeking);
+    case "setToolbarPeek":
+      return setToolbarPeek(getState().focusedWindowId, action.isPeeking);
+    case "toggleToolbar":
+      return applyChange((state) => setToolbarVisible(state, state.settings.isToolbarVisible === false));
+    case "toggleCompactMode":
+      return applyChange((state) => setCompactMode(state, !isCompactMode(state)));
+    case "toggleFocusMode":
+      return toggleFocusMode();
     case "setSidebarWidth":
       return resizeSidebar(action.width, action.isFinal);
     case "setSpaceProfile":

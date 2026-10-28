@@ -550,6 +550,9 @@ function checkSettings(raw: unknown): BrowserSettings {
     archiveAfterMs = source.archiveAfterMs;
   }
   const settings: BrowserSettings = { archiveAfterMs: archiveAfterMs, isSidebarVisible: source.isSidebarVisible !== false };
+  if (source.isToolbarVisible === false) {
+    settings.isToolbarVisible = false;
+  }
   if (isFiniteNumber(source.sidebarWidth)) {
     settings.sidebarWidth = source.sidebarWidth;
   }

@@ -304,7 +304,10 @@ M about a day, L several days.
       Air Traffic Control by source app (links from Slack go to Work) and a "test this link" box (S)
 
 ### 4.3 Beyond Arc
-- [ ] 13. Compact mode (sidebar and toolbar hidden, both slide in from the edge) and Focus mode (page only) (M)
+- [x] 13. (View › Toggle Toolbar ⇧⌘D, Compact Mode ⌥⌘S, Focus Mode ⇧⌘F, also in the Command Bar; the hidden toolbar
+      slides in from the top edge like the sidebar from the left, the page moving without resizing; the toolbar's
+      setting is per window like the sidebar's; Focus Mode is per window and not saved)
+      Compact mode (sidebar and toolbar hidden, both slide in from the edge) and Focus mode (page only) (M)
 - [ ] 14. Reader view (M)
 - [ ] 15. System-wide shortcut: Command Bar or a Little Window from any app (S)
 - [ ] 16. `bow://` URL scheme and a Raycast extension (search tabs, open in a Space, switch Spaces) (M)

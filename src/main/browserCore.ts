@@ -76,6 +76,12 @@ let recentTabIds: ItemId[] = [];
 /** The windows whose hidden sidebar shows because the mouse is at the window's left edge. Not saved. */
 const peekingWindowIds = new Set<WindowId>();
 
+/** The windows whose hidden toolbar shows because the mouse is at the window's top edge. Not saved. */
+const toolbarPeekingWindowIds = new Set<WindowId>();
+
+/** The windows in Focus Mode (⇧⌘F): only the page. Not saved: like full screen, it ends with the app. */
+const focusModeWindowIds = new Set<WindowId>();
+
 /** The window whose sidebar column shows the Library (the overlay is in one window at a time), or null. */
 let libraryWindowId: WindowId | null = null;
 
@@ -155,6 +161,8 @@ export function attachWindow(windowId: WindowId, window: BrowserWindow): void {
 export function detachWindow(windowId: WindowId): void {
   mainWindows.delete(windowId);
   peekingWindowIds.delete(windowId);
+  toolbarPeekingWindowIds.delete(windowId);
+  focusModeWindowIds.delete(windowId);
   forgetWindow(windowId);
 }
 
@@ -240,8 +248,10 @@ export function getLayoutOptions(windowId: WindowId = currentState.focusedWindow
   const isDeveloperToolbar = selectedTab !== undefined && isDeveloperModeOn(windowState, selectedTab.url);
   return {
     isSidebarVisible: windowState.settings.isSidebarVisible,
-    isToolbarVisible: true,
+    isToolbarVisible: windowState.settings.isToolbarVisible !== false,
     isSidebarPeeking: peekingWindowIds.has(windowId),
+    isToolbarPeeking: toolbarPeekingWindowIds.has(windowId),
+    isFocusMode: focusModeWindowIds.has(windowId),
     sidebarWidth: sidebarWidth,
     isDeveloperToolbar: isDeveloperToolbar,
     isLibraryOpen: libraryWindowId === windowId,
@@ -373,7 +383,7 @@ export function setLibraryWindow(windowId: WindowId | null): void {
  * aside.
  */
 export function setSidebarPeek(windowId: WindowId, isPeeking: boolean): void {
-  const canPeek = !getStateForWindow(windowId).settings.isSidebarVisible;
+  const canPeek = !getStateForWindow(windowId).settings.isSidebarVisible && !focusModeWindowIds.has(windowId);
   const newValue = isPeeking && canPeek;
   const isPeekingNow = peekingWindowIds.has(windowId);
   if (newValue === isPeekingNow || getMainWindow(windowId) === null) {
@@ -386,6 +396,52 @@ export function setSidebarPeek(windowId: WindowId, isPeeking: boolean): void {
   }
   updateAllWindowButtons();
   // The page slides aside (and back) together with the sidebar sliding in.
+  relayoutWindow(windowId, true);
+  scheduleRuntimePush();
+}
+
+/**
+ * The hidden toolbar slides in (pointer at the window's top edge) or out again. Nothing while it is shown, or in
+ * Focus Mode.
+ */
+export function setToolbarPeek(windowId: WindowId, isPeeking: boolean): void {
+  const isToolbarHidden = getStateForWindow(windowId).settings.isToolbarVisible === false;
+  const newValue = isPeeking && isToolbarHidden && !focusModeWindowIds.has(windowId);
+  if (newValue === toolbarPeekingWindowIds.has(windowId) || getMainWindow(windowId) === null) {
+    return;
+  }
+  if (newValue) {
+    toolbarPeekingWindowIds.add(windowId);
+  } else {
+    toolbarPeekingWindowIds.delete(windowId);
+  }
+  // The page slides down (and back up) together with the toolbar sliding in.
+  relayoutWindow(windowId, true);
+  scheduleRuntimePush();
+}
+
+/**
+ * Whether a window is in Focus Mode.
+ */
+export function isFocusModeOn(windowId: WindowId = currentState.focusedWindowId): boolean {
+  return focusModeWindowIds.has(windowId);
+}
+
+/**
+ * Focus Mode on or off for a window: the page fills it, with no sidebar, toolbar or frame. Peeks end with it on.
+ */
+export function setFocusMode(windowId: WindowId, isOn: boolean): void {
+  if (isOn === focusModeWindowIds.has(windowId) || getMainWindow(windowId) === null) {
+    return;
+  }
+  if (isOn) {
+    focusModeWindowIds.add(windowId);
+    peekingWindowIds.delete(windowId);
+    toolbarPeekingWindowIds.delete(windowId);
+  } else {
+    focusModeWindowIds.delete(windowId);
+  }
+  updateAllWindowButtons();
   relayoutWindow(windowId, true);
   scheduleRuntimePush();
 }
@@ -530,10 +586,15 @@ export function applyChange(change: (state: BrowserState) => BrowserState): void
   }
 
   currentState = newState;
-  // A window whose sidebar is shown again has nothing to peek.
+  // A window whose sidebar or toolbar is shown again has nothing to peek.
   for (const windowId of Array.from(peekingWindowIds)) {
     if (getStateForWindow(windowId).settings.isSidebarVisible) {
       peekingWindowIds.delete(windowId);
+    }
+  }
+  for (const windowId of Array.from(toolbarPeekingWindowIds)) {
+    if (getStateForWindow(windowId).settings.isToolbarVisible !== false) {
+      toolbarPeekingWindowIds.delete(windowId);
     }
   }
   rememberSelectedTab();
@@ -595,6 +656,8 @@ export function collectRuntimeState(windowId: WindowId = currentState.focusedWin
     tabs: tabs,
     activeDownloadCount: getActiveDownloadCount(),
     isSidebarPeeking: peekingWindowIds.has(windowId),
+    isToolbarPeeking: toolbarPeekingWindowIds.has(windowId),
+    isFocusMode: focusModeWindowIds.has(windowId),
     media: findMediaInfo(tabs, getShownTabIds()),
     // The Command Bar opens in the focused window, so only its "New Tab" row lights up.
     isNewTabPending: isNewTabPending && isFocused,
@@ -717,7 +780,10 @@ function updateAllWindowButtons(): void {
  */
 function updateWindowButtons(windowId: WindowId, window: BrowserWindow): void {
   const isSidebarVisible = getStateForWindow(windowId).settings.isSidebarVisible;
-  const isShown = isSidebarVisible || peekingWindowIds.has(windowId) || libraryWindowId === windowId;
+  const isLibraryHere = libraryWindowId === windowId;
+  // Focus Mode is the page only: the lights would sit on it.
+  const isPageOnly = focusModeWindowIds.has(windowId) && !isLibraryHere;
+  const isShown = !isPageOnly && (isSidebarVisible || peekingWindowIds.has(windowId) || isLibraryHere);
   if (windowButtonsShown.get(window) === isShown || process.platform !== "darwin") {
     return;
   }

@@ -208,6 +208,12 @@ describe("backups", () => {
     expect(restored.state.spaces[1]?.newTabUrl).toBeUndefined();
   });
 
+  it("keep a hidden toolbar", () => {
+    const setup = buildSetup().state;
+    const restored = parseOrFail(backupText({ ...setup, settings: { ...setup.settings, isToolbarVisible: false } }));
+    expect(restored.state.settings.isToolbarVisible).toBe(false);
+  });
+
   it("keep app rules with a bundle id, and drop one without", () => {
     const text = craftedBackupText((backup) => {
       const spaceId = backup.state.spaces[0]?.id as string;

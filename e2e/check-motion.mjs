@@ -1,5 +1,5 @@
-// End-to-end check that layout changes move, not jump: hiding the sidebar (⌘S), showing it again, and the hidden
-// sidebar peeking in. The page view's place is sampled every few milliseconds while it moves; it must pass through
+// End-to-end check that layout changes move, not jump: hiding the sidebar (⌘S), showing it again, the hidden
+// sidebar peeking in, Compact Mode with its toolbar peeking in from the top edge, and Focus Mode. The page view's place is sampled every few milliseconds while it moves; it must pass through
 // in-between places and arrive where the layout says. The sidebar page's own card must move along (its grid column
 // eases with the same duration). Also checks that a window resize does not animate.
 // usage: npm run build && node e2e/check-motion.mjs      (uses a throwaway --user-data-dir)
@@ -21,6 +21,7 @@ const CARD_GAP = 7;
 const CARD_INSET = 10;
 const LAYOUT_MOTION_MS = 260;
 const LIBRARY_COLUMN_WIDTH = 560; // = LIBRARY_COLUMN_WIDTH_PX
+const TOOLBAR_HEIGHT = 32; // = TOOLBAR_HEIGHT_PX
 
 const results = [];
 function check(name, ok, detail = "") {
@@ -125,6 +126,53 @@ await dispatch({ type: "setSidebarPeek", isPeeking: false });
 await sidebar.waitForTimeout(LAYOUT_MOTION_MS + 200);
 await dispatch({ type: "setSidebarVisible", isVisible: true });
 await sidebar.waitForTimeout(LAYOUT_MOTION_MS + 200);
+
+// Compact Mode (⌥⌘S): sidebar and toolbar hidden, the page at the card's top-left inset. Pointing at the window's top
+// edge slides the toolbar in (the page moves down without resizing); moving down onto the page slides it out again.
+// Focus Mode (⇧⌘F): the page fills the window; leaving it brings Compact Mode's layout back.
+const pageBounds = () =>
+  app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+    const view = win.contentView.children.find((child) => child.webContents && child.webContents !== win.webContents && !child.webContents.getURL().includes("overlay") && !child.webContents.getURL().startsWith("file:"));
+    const [width, height] = win.getContentSize();
+    return { ...view.getBounds(), windowWidth: width, windowHeight: height };
+  });
+await dispatch({ type: "toggleCompactMode" });
+await sidebar.waitForTimeout(LAYOUT_MOTION_MS + 300);
+const compact = await pageBounds();
+const compactToolbarShown = await sidebar.evaluate(() => getComputedStyle(document.querySelector(".toolbar")).display !== "none");
+check("Compact Mode hides the sidebar and the toolbar: the page starts at the card's top-left inset", compact.x === CARD_INSET && compact.y === CARD_INSET && !compactToolbarShown, `${JSON.stringify(compact)} toolbar ${compactToolbarShown}`);
+const edgeX = Math.round(compact.windowWidth / 2);
+await sidebar.mouse.move(edgeX, CARD_INSET + 200);
+await sidebar.mouse.move(edgeX, 3);
+await sidebar.waitForTimeout(LAYOUT_MOTION_MS + 300);
+const toolbarPeeking = await pageBounds();
+const peekingToolbar = await sidebar.evaluate(() => {
+  const toolbar = document.querySelector(".toolbar").getBoundingClientRect();
+  return { top: Math.round(toolbar.top), height: Math.round(toolbar.height) };
+});
+check(
+  "pointing at the top edge slides the toolbar in and the page down, without resizing it",
+  toolbarPeeking.y === CARD_INSET + TOOLBAR_HEIGHT && toolbarPeeking.height === compact.height && peekingToolbar.top === CARD_INSET && peekingToolbar.height >= TOOLBAR_HEIGHT - 1,
+  `${JSON.stringify(toolbarPeeking)} toolbar ${JSON.stringify(peekingToolbar)}`,
+);
+await sidebar.mouse.move(edgeX, CARD_INSET + TOOLBAR_HEIGHT + 200);
+await sidebar.waitForTimeout(LAYOUT_MOTION_MS + 600);
+const toolbarGone = await pageBounds();
+check("moving down onto the page slides it out again", toolbarGone.y === CARD_INSET, JSON.stringify(toolbarGone));
+const enteringFocus = await sampleWhile(() => dispatch({ type: "toggleFocusMode" }), LAYOUT_MOTION_MS + 250);
+const focus = await pageBounds();
+check("Focus Mode: the page fills the window, gliding there", focus.x === 0 && focus.y === 0 && focus.width === focus.windowWidth && focus.height === focus.windowHeight && distinct(enteringFocus.views).length >= 3, `${JSON.stringify(focus)} / ${distinct(enteringFocus.views).join(" ")}`);
+await sidebar.mouse.move(edgeX, 3);
+await sidebar.waitForTimeout(LAYOUT_MOTION_MS + 200);
+check("and nothing peeks in Focus Mode", (await pageBounds()).y === 0);
+await dispatch({ type: "toggleFocusMode" });
+await sidebar.waitForTimeout(LAYOUT_MOTION_MS + 300);
+const leftFocus = await pageBounds();
+await dispatch({ type: "toggleCompactMode" });
+await sidebar.waitForTimeout(LAYOUT_MOTION_MS + 300);
+const normalAgain = await pageBounds();
+check("leaving Focus Mode, then Compact Mode, brings each layout back", leftFocus.x === CARD_INSET && leftFocus.y === CARD_INSET && normalAgain.x === shownLeft && normalAgain.y === CARD_INSET + TOOLBAR_HEIGHT, `${JSON.stringify(leftFocus)} / ${JSON.stringify(normalAgain)}`);
 
 // The Library takes the sidebar column, like Arc's: the page glides aside to make room for it, and back when it closes.
 const libraryLeft = LIBRARY_COLUMN_WIDTH + CARD_GAP;

@@ -54,6 +54,8 @@ let currentRuntime: RuntimeState = {
   tabs: {},
   activeDownloadCount: 0,
   isSidebarPeeking: false,
+  isToolbarPeeking: false,
+  isFocusMode: false,
   media: null,
   isNewTabPending: false,
   liveFolders: {},
@@ -97,6 +99,9 @@ let draggedSidebarWidth: number | null = null;
 
 /** A pending "hide the peeking sidebar", cancelled when the pointer comes back in time. */
 let peekHideTimer: number | null = null;
+
+/** The toolbar's pending slide-out after the pointer left it. */
+let toolbarPeekHideTimer: number | null = null;
 
 /** Accumulated horizontal wheel distance of the current swipe, and when the last swipe fired. */
 let swipeDistance = 0;
@@ -557,6 +562,9 @@ function renderAll(): void {
   const context = createRowContext(state);
   document.body.classList.toggle("sidebar-hidden", !state.settings.isSidebarVisible);
   document.body.classList.toggle("sidebar-peeking", currentRuntime.isSidebarPeeking);
+  document.body.classList.toggle("toolbar-hidden", state.settings.isToolbarVisible === false);
+  document.body.classList.toggle("toolbar-peeking", currentRuntime.isToolbarPeeking);
+  document.body.classList.toggle("focus-mode", currentRuntime.isFocusMode);
   document.body.classList.toggle("library-open", currentRuntime.isLibraryOpen);
   document.body.classList.toggle("peek-open", currentRuntime.isPeekOpen);
   // Library › Spaces widens the column (main: computeLibraryWidth); sidebar.css glides it there.
@@ -689,6 +697,49 @@ function setUpSidebarPeek(): void {
     scheduleHide();
   });
   // Moving onto the web page leaves this page altogether.
+  document.documentElement.addEventListener("mouseleave", scheduleHide);
+}
+
+/**
+ * With the toolbar hidden: touching the window's top edge slides it in (the page slides down); leaving it, onto the
+ * page or below it, slides it out again after a short delay, like the sidebar's peek.
+ */
+function setUpToolbarPeek(): void {
+  const edge = document.getElementById("reveal-top-edge");
+  const toolbar = document.getElementById("toolbar");
+  if (edge === null || toolbar === null) {
+    return;
+  }
+  const cancelHide = (): void => {
+    if (toolbarPeekHideTimer !== null) {
+      window.clearTimeout(toolbarPeekHideTimer);
+      toolbarPeekHideTimer = null;
+    }
+  };
+  edge.addEventListener("mouseenter", () => {
+    cancelHide();
+    dispatch({ type: "setToolbarPeek", isPeeking: true });
+  });
+  const scheduleHide = (): void => {
+    if (!currentRuntime.isToolbarPeeking || toolbarPeekHideTimer !== null) {
+      return;
+    }
+    toolbarPeekHideTimer = window.setTimeout(() => {
+      toolbarPeekHideTimer = null;
+      dispatch({ type: "setToolbarPeek", isPeeking: false });
+    }, PEEK_HIDE_DELAY_MS);
+  };
+  // As with the sidebar: the pointer's place decides. On the toolbar (or above it) keeps it; below it hides it.
+  document.addEventListener("mousemove", (event) => {
+    if (!currentRuntime.isToolbarPeeking) {
+      return;
+    }
+    if (event.clientY <= toolbar.getBoundingClientRect().bottom) {
+      cancelHide();
+      return;
+    }
+    scheduleHide();
+  });
   document.documentElement.addEventListener("mouseleave", scheduleHide);
 }
 
@@ -856,6 +907,7 @@ async function startSidebar(): Promise<void> {
     installSidebarEvents(toolbar, callbacks);
   }
   setUpSidebarPeek();
+  setUpToolbarPeek();
   setUpSidebarResizer();
   installSplitDividers();
   document.getElementById("move-here-button")?.addEventListener("click", () => dispatch({ type: "moveTabToThisWindow" }));

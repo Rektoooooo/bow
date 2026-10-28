@@ -307,6 +307,45 @@ body.library-open .sidebar > * {
   visibility: hidden;
 }
 
+/*
+  Toggle Toolbar and Compact Mode: the toolbar is gone and the page starts at the card's top. Touching the window's
+  top edge slides it back in; main.ts moves the page down by the toolbar's height without resizing it (layout.ts).
+*/
+body.toolbar-hidden .toolbar {
+  display: none;
+}
+
+body.toolbar-hidden.toolbar-peeking .toolbar {
+  display: grid;
+  animation: toolbar-slide-in var(--motion-layout) var(--motion-layout-ease);
+}
+
+@keyframes toolbar-slide-in {
+  from {
+    transform: translateY(-100%);
+  }
+}
+
+/* The strip that reveals a hidden toolbar: the card's top inset, where the page does not cover the window. */
+.reveal-top-edge {
+  display: none;
+}
+
+body.toolbar-hidden .reveal-top-edge {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--card-inset);
+  z-index: 3;
+  -webkit-app-region: no-drag;
+}
+
+body.toolbar-hidden.toolbar-peeking .reveal-top-edge {
+  display: none;
+}
+
 /* The strip that reveals a hidden sidebar: the card's left inset, where the page does not cover the window. */
 .reveal-edge {
   display: none;
@@ -1860,6 +1899,7 @@ body.peek-open .main-column {
   .space-content.slide-from-right,
   .space-content.slide-from-left,
   body.sidebar-hidden.sidebar-peeking .sidebar,
+  body.toolbar-hidden.toolbar-peeking .toolbar,
   .toolbar.is-loading::after {
     animation: none;
   }
