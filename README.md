@@ -206,6 +206,9 @@ source never updates itself.
   included, when you go back; its tab fades meanwhile. Pages on screen, playing sound, in a call or sharing the screen
   stay awake, and so do Favorites (a switch) and any site you keep awake (Control Center, a tab's menu). Sleep Tab and
   Sleep Other Tabs free memory at once; **Tabs › Task Manager** shows what each awake page uses.
+- **Back where you were after a restart or a crash**: each tab's Back list and scroll position are saved every few
+  seconds, so a page opens scrolled where you left it (not for profiles that forget their site data). The sidebar
+  itself is saved within half a second of every change, and Library › Settings keeps hourly copies.
 - **Little Window**: links from other apps (and ⌥⌘N) open in a small window; "Open in Space" moves the page into the
   sidebar. A Little Window left alone for 6 hours goes to the Archive.
 - **Shortcut from any app** (Library › Settings, off until you pick keys such as ⌥Space): brings up the Command Bar,

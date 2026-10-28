@@ -1,4 +1,5 @@
-// End-to-end check that a sleeping page frees its renderer and wakes where it was: a tab goes from page one to a long
+// End-to-end check that a sleeping page frees its renderer and wakes where it was, and that after a crash a page comes
+// back scrolled where it was: a tab goes from page one to a long
 // page two and scrolls down, another tab is selected, the page is put to sleep (what the minute timer does once the
 // tab has been unused for "Sleep unused tabs after"), and selecting the tab again shows page two at the same scroll
 // position with page one still behind Back. Also checks that a page on screen refuses to sleep, and that a page in a
@@ -178,7 +179,37 @@ await sidebar.waitForTimeout(1500);
 check("its Sleep button puts the page to sleep", (await inPage("/three", "location.href")) === null);
 await overlay.press("body", "Escape");
 
-await app.close();
+// A crash: the app is killed (no quit, nothing saved on the way out). Started again, a page comes back scrolled where
+// it was, from the back/forward lists Bow saves every few seconds (tabHistoryStore.ts).
+await dispatch({ type: "selectTab", tabId: "tab-local" });
+await sidebar.waitForTimeout(1500);
+await inPage("/local", `window.scrollTo(0, ${SCROLL_Y}); window.scrollY`);
+// Chromium commits the page state about a second after a scroll; the next save follows within 5 s.
+await sidebar.waitForTimeout(7500);
+app.process().kill("SIGKILL");
+await new Promise((resolve) => setTimeout(resolve, 1500));
+const afterCrash = await _electron.launch({
+  executablePath: createRequire(import.meta.url)("electron"),
+  args: [`--user-data-dir=${userDataDir}`, "--skip-welcome", appDir],
+  timeout: 30000,
+});
+let crashSidebar;
+while (!crashSidebar) {
+  crashSidebar = afterCrash.windows().find((page) => page.url().endsWith("/renderer/index.html"));
+  if (!crashSidebar) await new Promise((resolve) => setTimeout(resolve, 150));
+}
+await crashSidebar.waitForSelector(".space-title");
+await crashSidebar.evaluate(() => window.browserApi.dispatch({ type: "selectTab", tabId: "tab-local" }));
+let scrollAfterCrash = null;
+for (let attempt = 0; attempt < 30 && (scrollAfterCrash === null || scrollAfterCrash === 0); attempt += 1) {
+  await crashSidebar.waitForTimeout(300);
+  scrollAfterCrash = await afterCrash.evaluate(async ({ webContents }) => {
+    const page = webContents.getAllWebContents().find((contents) => contents.getURL().includes("/local"));
+    return page === undefined ? null : page.executeJavaScript("window.scrollY");
+  });
+}
+check("after a crash, a page comes back scrolled where it was", scrollAfterCrash !== null && Math.abs(scrollAfterCrash - SCROLL_Y) < 50, `scrollY ${scrollAfterCrash}`);
+await afterCrash.close();
 server.close();
 fs.rmSync(userDataDir, { recursive: true, force: true });
 const failed = results.filter((result) => !result.ok).length;

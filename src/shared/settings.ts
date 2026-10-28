@@ -49,6 +49,9 @@ export const HTTPS_FALLBACK_NOTICE_MS = 30 * 1000;
 /** Longest note on a tab or folder. Our choice: a sentence or two, shown on one line under the title. */
 export const ITEM_NOTE_MAX_LENGTH = 500;
 
+/** How often each tab's back/forward list (scroll included) is saved, so a crash loses at most this. Our choice. */
+export const TAB_HISTORY_SAVE_INTERVAL_MS = 5000;
+
 /** Most Space templates kept. Our choice. */
 export const SPACE_TEMPLATES_LIMIT = 30;
 

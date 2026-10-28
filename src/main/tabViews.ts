@@ -32,6 +32,8 @@ import type { BrowserWindow, ContextMenuParams, HandlerDetails, NavigationEntry,
 import { LAYOUT_MOTION_MS } from "../shared/settings";
 import type { BrowserState, ItemId, TabItem, TabRuntimeInfo, WindowId } from "../shared/types";
 import { computeCardBounds } from "./layout";
+import { trimHistory } from "./tabHistory";
+import type { SavedHistory } from "./tabHistory";
 import { computePaneBounds } from "../shared/splitLayout";
 import type { CardLayoutOptions } from "./layout";
 import { getProfileSession } from "./profiles";
@@ -105,6 +107,12 @@ interface SleepingHistory {
 
 /** Tabs whose page sleeps, with what it needs to wake where it was. */
 const sleepingHistories = new Map<ItemId, SleepingHistory>();
+
+/**
+ * Back/forward lists an earlier run saved (tabHistory.ts), used the first time each tab is shown: after a restart or
+ * a crash the page comes back scrolled where it was. Unlike sleeping pages, these tabs do not look asleep.
+ */
+const restoredHistories = new Map<ItemId, SavedHistory>();
 
 /** The profile whose session each loaded tab's page runs in. A tab moved to another profile must reload there. */
 const viewProfileIds = new Map<ItemId, string>();
@@ -463,10 +471,11 @@ export function createTabView(state: BrowserState, tab: TabItem, events: TabView
   });
   watchTabView(tab.id, view, events);
   view.webContents.setAudioMuted(tab.isMuted);
-  const sleepingHistory = sleepingHistories.get(tab.id);
+  const sleepingHistory = sleepingHistories.get(tab.id) ?? restoredHistories.get(tab.id);
   sleepingHistories.delete(tab.id);
-  // A page that slept wakes with its back/forward list, scroll and form values; unless the tab's address changed
-  // meanwhile (Reset to its pinned address), then that address loads.
+  restoredHistories.delete(tab.id);
+  // A page that slept, or one an earlier run saved, comes back with its back/forward list, scroll and form values;
+  // unless the tab's address changed meanwhile (Reset to its pinned address), then that address loads.
   const activeEntry = sleepingHistory?.entries[sleepingHistory.activeIndex];
   if (sleepingHistory !== undefined && activeEntry?.url === tab.url) {
     view.webContents.navigationHistory.restore({ entries: sleepingHistory.entries, index: sleepingHistory.activeIndex }).catch(ignoreLoadFailure);
@@ -499,6 +508,54 @@ export function sleepTabView(tabId: ItemId): boolean {
   viewProfileIds.delete(tabId);
   requestedMoves.delete(tabId);
   return true;
+}
+
+/**
+ * Hands over the back/forward lists an earlier run saved (tabHistoryStore.ts, at the start).
+ */
+export function setRestoredHistories(histories: Map<ItemId, SavedHistory>): void {
+  restoredHistories.clear();
+  for (const [tabId, history] of histories) {
+    restoredHistories.set(tabId, history);
+  }
+}
+
+/**
+ * Every tab's back/forward list worth saving: loaded pages (not private windows'), sleeping ones, and those saved by
+ * an earlier run that were not shown yet. Only tabs still in the sidebar, and not of a profile that forgets its site
+ * data.
+ */
+export function collectTabHistories(state: BrowserState): Record<ItemId, SavedHistory> {
+  const histories: Record<ItemId, SavedHistory> = {};
+  for (const [tabId, history] of restoredHistories) {
+    histories[tabId] = history;
+  }
+  for (const [tabId, history] of sleepingHistories) {
+    const trimmed = trimHistory(history.entries, history.activeIndex);
+    if (trimmed !== null) {
+      histories[tabId] = trimmed;
+    }
+  }
+  for (const [tabId, view] of tabViews) {
+    const contents = view.webContents;
+    if (contents.isDestroyed() || !contents.session.isPersistent()) {
+      continue;
+    }
+    const navigation = contents.navigationHistory;
+    const trimmed = trimHistory(navigation.getAllEntries(), navigation.getActiveIndex());
+    if (trimmed !== null) {
+      histories[tabId] = trimmed;
+    }
+  }
+  // Gone tabs go; so do tabs of a profile that forgets its site data (page state can hold form values).
+  for (const tabId of Object.keys(histories)) {
+    const profileId = findProfileIdOfItem(state, tabId) ?? DEFAULT_PROFILE_ID;
+    const forgets = state.profiles.find((profile) => profile.id === profileId)?.forgetsSiteDataOnQuit === true;
+    if (findTab(state, tabId) === undefined || forgets) {
+      delete histories[tabId];
+    }
+  }
+  return histories;
 }
 
 /**

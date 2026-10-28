@@ -66,6 +66,7 @@ import { loadPrivacyReport, savePrivacyReportNow } from "./privacyReportStore";
 import { noticeLoadFailed } from "./httpsOnlyController";
 import { clearForgettingProfiles, clearSiteDataOnQuit } from "./siteDataCleaner";
 import { reinstallAppMenu, startShortcutEditing } from "./shortcutEditor";
+import { loadTabHistories, saveTabHistoriesNow, startSavingTabHistories } from "./tabHistoryStore";
 import { getReaderArticle, noticeReaderPageChanged, probeReaderPage } from "./readerController";
 import type { LinkSourceApp } from "../shared/routingRules";
 import { showPageContextMenu } from "./menus";
@@ -327,6 +328,8 @@ async function handleAppReady(): Promise<void> {
   initializeState(getStateFilePath(), Date.now());
   loadHistory();
   loadPrivacyReport();
+  // Each tab's back/forward list from the last run (scroll positions included), used the first time it is shown.
+  loadTabHistories();
   loadToolbarColors(path.join(app.getPath("userData"), TOOLBAR_COLORS_FILE_NAME), scheduleRuntimePush);
   // The selected Favorite's border takes its icon's colour, like Arc's.
   initializeFaviconAccents(scheduleRuntimePush);
@@ -433,6 +436,7 @@ async function handleAppReady(): Promise<void> {
   offerMoveToApplications().catch((error) => console.error("Moving to Applications failed:", error));
   startLiveFolderRefreshing();
   startGlobalShortcut();
+  startSavingTabHistories();
   startAutomaticSnapshots();
   // The Library's Sync row shows how the last read or write went.
   startSync(() => refreshOpenPanel());
@@ -526,6 +530,8 @@ function startApp(): void {
   app.on("before-quit", () => {
     saveHistoryNow();
     savePrivacyReportNow();
+    // Before the windows close their pages, which takes the lists with them.
+    saveTabHistoriesNow();
   });
   // After the windows have closed (closing one changes the state), so the last change reaches the file.
   app.on("will-quit", () => {
