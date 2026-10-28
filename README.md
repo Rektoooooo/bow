@@ -38,7 +38,7 @@ word for an arc.)
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshot-command-bar.png" alt="The Command Bar over a light Space, offering the open tabs to switch to"><br><sub><b>Command Bar</b> (⌘T): open tabs, history, search and browser actions in one list.</sub></td>
+    <td width="50%"><img src="docs/screenshot-command-bar.png" alt="The Command Bar over a light Space, offering the open tabs to switch to"><br><sub><b>Command Bar</b> (⌘T): open tabs, history, search and browser actions.</sub></td>
     <td width="50%"><img src="docs/screenshot-split.png" alt="Split View: MDN and the Electron docs side by side, one row in the sidebar"><br><sub><b>Split View</b>: drop a tab on another tab to put them side by side.</sub></td>
   </tr>
   <tr>
