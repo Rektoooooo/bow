@@ -112,6 +112,13 @@ describe("parseAction", () => {
     expect(parseAction("selectTab")).toBeNull();
   });
 
+  it("takes only the offered shortcuts from any app, or off", () => {
+    expect(parseAction({ type: "setGlobalShortcut", accelerator: "Alt+Space", opens: "commandBar" })).not.toBeNull();
+    expect(parseAction({ type: "setGlobalShortcut", accelerator: null, opens: "littleWindow" })).not.toBeNull();
+    expect(parseAction({ type: "setGlobalShortcut", accelerator: "Command+Q", opens: "commandBar" })).toBeNull();
+    expect(parseAction({ type: "setGlobalShortcut", accelerator: "Alt+Space", opens: "terminal" })).toBeNull();
+  });
+
   it("takes an app rule only with a bundle id and a name", () => {
     expect(parseAction({ type: "addAppRoutingRule", bundleId: "com.example.chat", appName: "Example Chat", spaceId: "space-work" })).not.toBeNull();
     expect(parseAction({ type: "addAppRoutingRule", bundleId: "com.example.chat; rm -rf /", appName: "Example Chat", spaceId: "space-work" })).toBeNull();

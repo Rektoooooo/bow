@@ -260,6 +260,12 @@ export interface BrowserSettings {
    * missing means SIDEBAR_WIDTH_PX.
    */
   sidebarWidth?: number;
+  /**
+   * The shortcut that brings Bow up from any app (an accelerator from GLOBAL_SHORTCUT_CHOICES), and what it opens.
+   * Optional: missing means off, and the Command Bar.
+   */
+  globalShortcut?: string;
+  globalShortcutOpens?: GlobalShortcutTarget;
   /** Reader view's text size in pixels (READER_TEXT_SIZES). Optional: missing means READER_DEFAULT_TEXT_SIZE. */
   readerTextSize?: number;
   /** The engine that searches typed words (shared/searchEngines.ts). Optional: missing means DuckDuckGo. */
@@ -368,6 +374,9 @@ export interface SitePermission {
   kind: SitePermissionKind;
   isAllowed: boolean;
 }
+
+/** What the shortcut from any app opens: the Command Bar in the last window, or a new Little Window. */
+export type GlobalShortcutTarget = "commandBar" | "littleWindow";
 
 /** A window's sidebar: shown or hidden (⌘S) and its width. Arc keeps these per window (sidebarMode, sidebarWidth). */
 export interface WindowSidebar {

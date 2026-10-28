@@ -61,6 +61,7 @@ import { addVisit, loadHistory, saveHistoryNow, setVisitTitle } from "./historyS
 import { registerIpcHandlers } from "./ipc";
 import { archiveIdleLittleWindows, handleExternalUrl, registerLittleWindowIpc } from "./littleWindow";
 import { readFrontApp } from "./linkSourceApps";
+import { startGlobalShortcut } from "./globalShortcutController";
 import { getReaderArticle, noticeReaderPageChanged, probeReaderPage } from "./readerController";
 import type { LinkSourceApp } from "../shared/routingRules";
 import { showPageContextMenu } from "./menus";
@@ -412,6 +413,7 @@ async function handleAppReady(): Promise<void> {
   startAppUpdates(() => installAppMenu(appMenuCommands));
   offerMoveToApplications().catch((error) => console.error("Moving to Applications failed:", error));
   startLiveFolderRefreshing();
+  startGlobalShortcut();
   startAutomaticSnapshots();
   // The Library's Sync row shows how the last read or write went.
   startSync(() => refreshOpenPanel());

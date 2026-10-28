@@ -1697,6 +1697,36 @@ await waitForSelectedUrl("/not-an-article");
 await sidebar.waitForTimeout(1200);
 check("a page that is no article offers no Reader view", (await sidebar.$(".reader-toggle")) === null);
 
+// The shortcut from any app (Library › Settings): choosing keys registers them (in test runs a list stands in for the
+// system's, so a check never takes the keys of whoever uses the Mac); pressing them opens the Command Bar, or a
+// Little Window; Off lets them go.
+await dispatch({ type: "openLibrary" });
+await overlay.waitForSelector(".library-tab[data-section='settings']", { timeout: 5000 });
+await overlay.click(".library-tab[data-section='settings']");
+await overlay.waitForSelector(".global-shortcut-keys", { timeout: 5000 });
+await overlay.selectOption(".global-shortcut-keys", "Alt+Space");
+await sidebar.waitForTimeout(400);
+const isShortcutRegistered = () => app.evaluate(() => globalThis.bowTestShortcuts?.has("Alt+Space") === true);
+check("choosing keys for the shortcut from any app registers them", (await getState()).settings.globalShortcut === "Alt+Space" && (await isShortcutRegistered()));
+await overlay.press("body", "Escape");
+await sidebar.waitForTimeout(300);
+await app.evaluate(() => globalThis.bowTestShortcuts.get("Alt+Space")());
+await overlay.waitForSelector(".command-input", { timeout: 5000 }).catch(() => undefined);
+check("pressing them opens the Command Bar", await overlay.isVisible(".command-input").catch(() => false));
+await overlay.press(".command-input", "Escape").catch(() => undefined);
+// A new, empty Little Window's bar page has a query (little.html?empty=1…).
+const littleWindowCount = () => app.windows().filter((candidate) => candidate.url().includes("/little/little.html")).length;
+const littleBefore = littleWindowCount();
+await dispatch({ type: "setGlobalShortcut", accelerator: "Alt+Space", opens: "littleWindow" });
+await app.evaluate(() => globalThis.bowTestShortcuts.get("Alt+Space")());
+for (let attempt = 0; attempt < 25 && littleWindowCount() === littleBefore; attempt += 1) {
+  await sidebar.waitForTimeout(200);
+}
+check("or a Little Window, when that is what they open", littleWindowCount() === littleBefore + 1, `${littleBefore} → ${littleWindowCount()}`);
+await dispatch({ type: "setGlobalShortcut", accelerator: null, opens: "commandBar" });
+await sidebar.waitForTimeout(300);
+check("Off lets the keys go", !(await isShortcutRegistered()));
+
 // Space templates: save the Space as one (Space menu › Save as Template), make a new Space from it in
 // Library › Spaces, then delete the template there.
 const templateSourceState = await getState();

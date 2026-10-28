@@ -208,10 +208,14 @@ describe("backups", () => {
     expect(restored.state.spaces[1]?.newTabUrl).toBeUndefined();
   });
 
-  it("keep a hidden toolbar", () => {
+  it("keep a hidden toolbar, the shortcut from any app (an offered one only) and Reader view's text size", () => {
     const setup = buildSetup().state;
-    const restored = parseOrFail(backupText({ ...setup, settings: { ...setup.settings, isToolbarVisible: false } }));
-    expect(restored.state.settings.isToolbarVisible).toBe(false);
+    const settings = { ...setup.settings, isToolbarVisible: false, globalShortcut: "Alt+Space", globalShortcutOpens: "littleWindow" as const, readerTextSize: 21 };
+    const restored = parseOrFail(backupText({ ...setup, settings: settings }));
+    expect(restored.state.settings).toMatchObject({ isToolbarVisible: false, globalShortcut: "Alt+Space", globalShortcutOpens: "littleWindow", readerTextSize: 21 });
+    const crafted = parseOrFail(backupText({ ...setup, settings: { ...setup.settings, globalShortcut: "Command+Q", readerTextSize: 99 } }));
+    expect(crafted.state.settings.globalShortcut).toBeUndefined();
+    expect(crafted.state.settings.readerTextSize).toBeUndefined();
   });
 
   it("keep app rules with a bundle id, and drop one without", () => {

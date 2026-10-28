@@ -206,6 +206,8 @@ source never updates itself.
   Sleep Other Tabs free memory at once; **Tabs › Task Manager** shows what each awake page uses.
 - **Little Window**: links from other apps (and ⌥⌘N) open in a small window; "Open in Space" moves the page into the
   sidebar. A Little Window left alone for 6 hours goes to the Archive.
+- **Shortcut from any app** (Library › Settings, off until you pick keys such as ⌥Space): brings up the Command Bar,
+  or a Little Window, without switching to Bow first. If another app holds the keys, Settings says so.
 - **Boosts**: change a site's colors (shift them, or invert for a dark look) and font, Zap elements away, and add
   your own CSS and JavaScript (only once switched on). Turn a Boost off or reset it any time; Library › Boosts.
   Share one as a `.bowboost` file (Export…, Import…; imported JavaScript arrives switched off), and a "JS" badge in

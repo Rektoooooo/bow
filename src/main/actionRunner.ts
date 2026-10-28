@@ -117,6 +117,7 @@ import {
   setSidebarVisible,
   setToolbarVisible,
   setReaderTextSize,
+  setGlobalShortcut,
   setCompactMode,
   isCompactMode,
   setSidebarWidth,
@@ -396,6 +397,8 @@ export function runAction(action: BrowserAction): void {
       return;
     case "setReaderTextSize":
       return applyChange((state) => setReaderTextSize(state, action.size));
+    case "setGlobalShortcut":
+      return applyChange((state) => setGlobalShortcut(state, action.accelerator, action.opens));
     case "setSidebarWidth":
       return resizeSidebar(action.width, action.isFinal);
     case "setSpaceProfile":

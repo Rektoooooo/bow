@@ -27,7 +27,7 @@ import type { WebContents } from "electron";
 import type { BrowserAction } from "../shared/actions";
 import { BROWSER_ACTION_TYPES } from "../shared/actions";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
-import { ARCHIVE_THRESHOLD_OPTIONS, READER_TEXT_SIZES, SPLIT_PANES_LIMIT, TAB_SLEEP_OPTIONS } from "../shared/settings";
+import { ARCHIVE_THRESHOLD_OPTIONS, GLOBAL_SHORTCUT_CHOICES, READER_TEXT_SIZES, SPLIT_PANES_LIMIT, TAB_SLEEP_OPTIONS } from "../shared/settings";
 import { isValidKeywordUrl, MAX_KEYWORD_NAME_LENGTH, SEARCH_KEYWORD_PATTERN } from "../shared/searchKeywords";
 import { isSearchEngineId } from "../shared/searchEngines";
 import type { BrowserState, GitHubLiveList, ReaderArticle, RuntimeState } from "../shared/types";
@@ -171,6 +171,15 @@ function isGitHubLiveList(value: unknown): boolean {
 /** A whole command chain as the Library sends it: only what commandChains.ts would keep. */
 function isCommandChain(value: unknown): boolean {
   return checkCommandChain(value) !== null;
+}
+
+/** One of the shortcuts from any app (GLOBAL_SHORTCUT_CHOICES), or null for off. */
+function isGlobalShortcut(value: unknown): boolean {
+  return value === null || GLOBAL_SHORTCUT_CHOICES.some((choice) => choice.accelerator === value);
+}
+
+function isGlobalShortcutTarget(value: unknown): boolean {
+  return value === "commandBar" || value === "littleWindow";
 }
 
 /** One of Reader view's text sizes. */
@@ -371,6 +380,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   toggleFocusMode: {},
   toggleReaderView: {},
   setReaderTextSize: { size: isReaderTextSize },
+  setGlobalShortcut: { accelerator: isGlobalShortcut, opens: isGlobalShortcutTarget },
   setSidebarWidth: { width: isWholeNumber, isFinal: isBoolean },
   setSpaceProfile: { spaceId: isText, profileId: isText },
   createProfileForSpace: { spaceId: isText },

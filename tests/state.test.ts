@@ -10,6 +10,7 @@ import {
   closeTab,
   createFolder,
   createInitialState,
+  setGlobalShortcut,
   deleteItem,
   duplicateTab,
   findNeighbourTabId,
@@ -559,3 +560,17 @@ describe("download settings", () => {
     expect(setAskWhereToSave(initialState, false)).toBe(initialState);
   });
 });
+
+describe("the shortcut from any app", () => {
+  it("is set and turned off, keeping what it opens", () => {
+    const state = createInitialState(ONE_PM);
+    const on = setGlobalShortcut(state, "Alt+Space", "littleWindow");
+    expect(on.settings).toMatchObject({ globalShortcut: "Alt+Space", globalShortcutOpens: "littleWindow" });
+    expect(setGlobalShortcut(on, "Alt+Space", "littleWindow")).toBe(on);
+    const off = setGlobalShortcut(on, null, "littleWindow");
+    expect(off.settings.globalShortcut).toBeUndefined();
+    expect(off.settings.globalShortcutOpens).toBe("littleWindow");
+    expect(setGlobalShortcut(state, null, "commandBar")).toBe(state);
+  });
+});
+

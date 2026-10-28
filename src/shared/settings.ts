@@ -24,6 +24,19 @@ export const CHAIN_STEPS_LIMIT = 20;
 /** Most command chains kept. Our choice. */
 export const CHAINS_LIMIT = 50;
 
+/**
+ * The shortcuts that can bring Bow up from any app (Library › Settings), as Electron accelerators with how macOS
+ * writes them. Our choice: none is one of macOS's own (⌘Space is Spotlight, ⌃Space switches input sources); ⌥Space
+ * is also Alfred's and Raycast's, so the setting starts off.
+ */
+export const GLOBAL_SHORTCUT_CHOICES = [
+  { accelerator: "Alt+Space", label: "⌥Space" },
+  { accelerator: "Alt+Command+Space", label: "⌥⌘Space" },
+  { accelerator: "Control+Alt+Space", label: "⌃⌥Space" },
+  { accelerator: "Shift+Alt+Space", label: "⇧⌥Space" },
+  { accelerator: "Control+Alt+Command+B", label: "⌃⌥⌘B" },
+] as const;
+
 /** Reader view's text sizes (A− / A+ step through them), in pixels. Our choice: comfortable reading sizes. */
 export const READER_TEXT_SIZES = [15, 17, 19, 21, 24] as const;
 

@@ -11,7 +11,7 @@
  *   sidebar.ts → window.browserApi.dispatch(action) → preload → ipc.ts parseAction() → main.ts runAction()
  */
 import type { SearchEngineId } from "./searchEngines";
-import type { CommandChain, GitHubLiveList, ItemId, ItemLocation, RoutingMatchType, SitePermissionKind, SpaceId, SpaceTheme, SplitOrientation } from "./types";
+import type { CommandChain, GitHubLiveList, GlobalShortcutTarget, ItemId, ItemLocation, RoutingMatchType, SitePermissionKind, SpaceId, SpaceTheme, SplitOrientation } from "./types";
 
 /** Toolbar and keyboard navigation commands for the page on screen. */
 export type NavigationCommand = "back" | "forward" | "reload" | "stop" | "hardReload" | "emptyCacheAndReload";
@@ -98,6 +98,8 @@ export type BrowserAction =
   /** Reader view for the selected tab (main/readerController.ts), and its text size (READER_TEXT_SIZES). */
   | { type: "toggleReaderView" }
   | { type: "setReaderTextSize"; size: number }
+  /** Library › Settings: the shortcut from any app (null: off) and what it opens. */
+  | { type: "setGlobalShortcut"; accelerator: string | null; opens: GlobalShortcutTarget }
   | { type: "setSidebarWidth"; width: number; isFinal: boolean }
   | { type: "setSpaceProfile"; spaceId: SpaceId; profileId: string }
   | { type: "createProfileForSpace"; spaceId: SpaceId }
@@ -257,6 +259,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "toggleFocusMode",
   "toggleReaderView",
   "setReaderTextSize",
+  "setGlobalShortcut",
   "setSidebarWidth",
   "setSpaceProfile",
   "createProfileForSpace",

@@ -14,7 +14,7 @@
  */
 import type { ExtensionLine, HistoryLine, LibraryBoost, LibraryData, LibrarySection, LibrarySpace, LibrarySpaceItem, MediaCommand, MediaLine, SyncStatusData, TaskLine } from "../shared/overlay";
 import { computeFramePalette } from "../shared/themePalette.js";
-import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS, TAB_SLEEP_OPTIONS } from "../shared/settings.js";
+import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, GLOBAL_SHORTCUT_CHOICES, HOUR_MS, MINUTE_MS, TAB_SLEEP_OPTIONS } from "../shared/settings.js";
 import { APP_ICON_VARIANTS, buildAppIconSvg } from "../shared/appIconDrawing.js";
 import { isSearchEngineId, SEARCH_ENGINE_IDS, SEARCH_ENGINES } from "../shared/searchEngines.js";
 import { isValidSearchKeyword } from "../shared/searchKeywords.js";
@@ -763,6 +763,49 @@ function createSettingGroup(title: string, rows: HTMLElement[]): HTMLElement {
 }
 
 /**
+ * What the shortcut from any app does now, or why it does not.
+ */
+function describeGlobalShortcut(data: LibraryData): string {
+  if (data.globalShortcutStatus === "taken") {
+    return "Another app uses these keys. Pick others, or change them in that app.";
+  }
+  if (data.globalShortcutStatus === "on") {
+    return "Press it in any app to bring up Bow.";
+  }
+  return "Brings up the Command Bar or a Little Window from any app, without switching to Bow first.";
+}
+
+/**
+ * The shortcut from any app: its keys (or Off) and what it opens.
+ */
+function createGlobalShortcutControls(data: LibraryData): HTMLElement {
+  const controls = createElement("div", "global-shortcut");
+  const keysSelect = document.createElement("select");
+  keysSelect.className = "library-select global-shortcut-keys";
+  keysSelect.setAttribute("aria-label", "Shortcut");
+  keysSelect.append(new Option("Off", ""));
+  for (const choice of GLOBAL_SHORTCUT_CHOICES) {
+    keysSelect.append(new Option(choice.label, choice.accelerator));
+  }
+  keysSelect.value = data.globalShortcut ?? "";
+  const opensSelect = document.createElement("select");
+  opensSelect.className = "library-select global-shortcut-opens";
+  opensSelect.setAttribute("aria-label", "Opens");
+  opensSelect.append(new Option("Command Bar", "commandBar"), new Option("Little Window", "littleWindow"));
+  opensSelect.value = data.globalShortcutOpens;
+  opensSelect.disabled = data.globalShortcut === null;
+  const save = (): void => {
+    const accelerator = keysSelect.value === "" ? null : keysSelect.value;
+    const opens = opensSelect.value === "littleWindow" ? "littleWindow" : "commandBar";
+    dispatch({ type: "setGlobalShortcut", accelerator: accelerator, opens: opens });
+  };
+  keysSelect.addEventListener("change", save);
+  opensSelect.addEventListener("change", save);
+  controls.append(keysSelect, opensSelect);
+  return controls;
+}
+
+/**
  * The choice of how long Today tabs stay before they move to the Archive.
  */
 function createArchiveSelect(data: LibraryData): HTMLElement {
@@ -902,6 +945,7 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
       createSwitch(data.asksWhereToSave, "Ask where to save each download", (isOn) => dispatch({ type: "setAskWhereToSave", isOn: isOn })),
     ),
     createSettingRow("Block ads and trackers", describeAdBlockStatus(data.adBlock), createSwitch(data.adBlock.isOn, "Block ads and trackers", (isOn) => dispatch({ type: "setAdBlock", isOn: isOn }))),
+    createSettingRow("Shortcut from any app", describeGlobalShortcut(data), createGlobalShortcutControls(data)),
   ]);
   const appearance = createSettingGroup("Appearance", [
     createSettingRow(

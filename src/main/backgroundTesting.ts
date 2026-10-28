@@ -16,7 +16,7 @@
  *   main.ts startApp() → keepTestRunInBackground() → BrowserWindow's show / focus / blur / isFocused act without macOS
  *   → every new window is see-through and lets clicks pass
  */
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, globalShortcut } from "electron";
 
 /** The environment variable e2e/background.mjs sets. */
 const BACKGROUND_VARIABLE = "BOW_E2E_BACKGROUND";
@@ -85,6 +85,19 @@ export function keepTestRunInBackground(): void {
     return this === pretendFocusedWindow;
   };
   BrowserWindow.getFocusedWindow = () => (pretendFocusedWindow !== null && !pretendFocusedWindow.isDestroyed() ? pretendFocusedWindow : null);
+  // A shortcut registered system-wide would take the keys of whoever is using the Mac: the checks press it through
+  // this list instead (globalShortcutController.ts).
+  const testShortcuts = new Map<string, () => void>();
+  (globalThis as Record<string, unknown>).bowTestShortcuts = testShortcuts;
+  globalShortcut.register = (accelerator: string, callback: () => void): boolean => {
+    testShortcuts.set(accelerator, callback);
+    return true;
+  };
+  globalShortcut.unregister = (accelerator: string): void => {
+    testShortcuts.delete(accelerator);
+  };
+  globalShortcut.isRegistered = (accelerator: string): boolean => testShortcuts.has(accelerator);
+  globalShortcut.unregisterAll = (): void => testShortcuts.clear();
   app.on("browser-window-created", (_event, window) => {
     window.setOpacity(0);
     window.setIgnoreMouseEvents(true);

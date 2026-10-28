@@ -16,7 +16,7 @@
  *
  * Same rules as state.ts: never change what is passed in; `now` is a parameter.
  */
-import { ARCHIVE_LIMIT, BEFORE_RESTORE_SNAPSHOTS_KEPT, DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_LIMIT, READER_TEXT_SIZES, SNAPSHOTS_DAILY_KEPT, SNAPSHOTS_HOURLY_KEPT, SPLIT_PANES_LIMIT } from "../shared/settings";
+import { ARCHIVE_LIMIT, BEFORE_RESTORE_SNAPSHOTS_KEPT, DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_LIMIT, GLOBAL_SHORTCUT_CHOICES, READER_TEXT_SIZES, SNAPSHOTS_DAILY_KEPT, SNAPSHOTS_HOURLY_KEPT, SPLIT_PANES_LIMIT } from "../shared/settings";
 import { isSearchEngineId, SEARCH_ENGINE_IDS } from "../shared/searchEngines";
 import { isValidSearchKeyword } from "../shared/searchKeywords";
 import { createNoteUrl, getNoteId, isNoteId } from "../shared/notes";
@@ -543,6 +543,12 @@ function checkSettings(raw: unknown): BrowserSettings {
   const settings: BrowserSettings = { archiveAfterMs: archiveAfterMs, isSidebarVisible: source.isSidebarVisible !== false };
   if (source.isToolbarVisible === false) {
     settings.isToolbarVisible = false;
+  }
+  if (GLOBAL_SHORTCUT_CHOICES.some((choice) => choice.accelerator === source.globalShortcut)) {
+    settings.globalShortcut = source.globalShortcut as string;
+  }
+  if (source.globalShortcutOpens === "commandBar" || source.globalShortcutOpens === "littleWindow") {
+    settings.globalShortcutOpens = source.globalShortcutOpens;
   }
   if (READER_TEXT_SIZES.some((size) => size === source.readerTextSize)) {
     settings.readerTextSize = source.readerTextSize as number;
