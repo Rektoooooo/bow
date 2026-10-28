@@ -270,7 +270,8 @@ M about a day, L several days.
       sweep or Clear, places kept; "20m" on Today rows in their last hour; ⇧⌘T only reopens tabs you closed)
       Archive without surprises: Never Archive per tab and per Space, archive timing per Space, an Undo toast
       after the sweep or Clear, an "archives soon" hint, ⇧⌘T reopens only tabs you closed (M)
-- [ ] 4. Everyday basics: zoom remembered per site; downloads folder or ask where to save; ⌘, opens Settings;
+- [x] 4. (⌘, Settings; ⌘/ shortcuts sheet read from the menu; zoom per host; download folder / ask; search
+      keywords; Save Page As ⇧⌘S and Export as PDF) Everyday basics: zoom remembered per site; downloads folder or ask where to save; ⌘, opens Settings;
       custom search engines with keywords; Save Page As and Save as PDF; a Keyboard Shortcuts sheet (S each)
 - [ ] 5. Tab power tools: select several tabs (⇧/⌘-click) for close, move, pin, split; duplicate-tab detection
       ("already open, switch to it?"); tab search ⌘⇧A that shows each tab's Space and window (M)

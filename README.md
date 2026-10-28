@@ -243,6 +243,13 @@ Same keys as Arc. ⌘T new tab, ⌘N new window, ⇧⌘W close window, ⌘L edit
 (⌥⇧⌘C as Markdown), ⌘S sidebar, ⌘[ / ⌘] back/forward, ⌘R reload, ⌥⌘↑ / ⌥⌘↓ previous/next tab, ⌘1–⌘9 tab N,
 ⌃Tab / ⌃⇧Tab recent tabs, ⌃⌘N new note, ⌥⌘← / ⌥⌘→ previous/next Space, ⌃1–⌃9 Space N, ⇧⌘K clear Today, ⌃⇧= split view, ⌃⇧- close pane,
 ⌘O open Peek as tab, ⌥⌘N Little Window, ⌘F find, ⇧⌘L Library, ⌘+ / ⌘- / ⌘0 zoom, ⌥⌘I developer tools.
+Beyond Arc: ⌘, Settings, ⇧⌘S Save Page As, ⌘/ **Keyboard Shortcuts**, a sheet of every shortcut read from the menu
+itself, so it is always right.
+
+**Everyday basics.** Zoom is remembered per site (per host, like Chrome) and comes back the next time the page opens;
+private windows remember nothing. Library › Settings picks the folder downloads go to, or asks where to save each
+one. **Search keywords** you add there ("yt" → a search address with `%s`) let you type "yt cats" in the address
+field or the Command Bar to search that site directly. File › Export as PDF… saves the page as a PDF.
 
 ## How the code is organized
 
