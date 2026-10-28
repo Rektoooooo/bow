@@ -1028,7 +1028,8 @@ const readVideo = () =>
     const video = document.querySelector("video");
     const box = video.getBoundingClientRect();
     const isFixed = getComputedStyle(video).position === "fixed";
-    return { isFixed: isFixed, fills: box.width === innerWidth && box.height === innerHeight, isPaused: video.paused, header: getComputedStyle(document.querySelector("header")).visibility };
+    const isVisible = getComputedStyle(video).visibility === "visible";
+    return { isFixed: isFixed, isVisible: isVisible, fills: box.width === innerWidth && box.height === innerHeight, isPaused: video.paused, header: getComputedStyle(document.querySelector("header")).visibility };
   });
 state = await getState();
 const videoTabId = state.selectedTabIdBySpace[state.activeSpaceId];
@@ -1037,7 +1038,8 @@ let pipControls = await findPage("/pip/pip.html", 8000).catch(() => null);
 await sidebar.waitForTimeout(400);
 let pipFacts = await pictureInPictureFacts();
 let videoFacts = await readVideo();
-const isVideoAlone = videoFacts.isFixed && videoFacts.fills && videoFacts.header === "hidden" && !videoFacts.isPaused;
+// Visible too: the rule hiding the rest of the page must not hide the video (the test tone has no picture to see).
+const isVideoAlone = videoFacts.isFixed && videoFacts.isVisible && videoFacts.fills && videoFacts.header === "hidden" && !videoFacts.isPaused;
 check("leaving a tab whose video plays moves its page into our floating picture-in-picture window, the video alone filling it", pipControls !== null && pipFacts?.urls[0] === videoUrl && pipFacts.urls[1]?.endsWith("/pip/pip.html") === true && pipFacts.isOnTop && !pipFacts.isFocusable && isVideoAlone, JSON.stringify({ pipFacts, videoFacts }));
 await pipControls?.click(".pip-play").catch(() => undefined);
 await sidebar.waitForTimeout(400);
@@ -1075,12 +1077,12 @@ const readEmbed = () =>
     const inPage = await contents.executeJavaScript(`(() => {
       const element = document.querySelector("iframe");
       const box = element.getBoundingClientRect();
-      return { iframeFixed: getComputedStyle(element).position === "fixed", iframeFills: box.width === innerWidth && box.height === innerHeight };
+      return { iframeFixed: getComputedStyle(element).position === "fixed", iframeVisible: getComputedStyle(element).visibility === "visible", iframeFills: box.width === innerWidth && box.height === innerHeight };
     })()`);
     const inFrame = await frame.executeJavaScript(`(() => {
       const video = document.querySelector("video");
       const box = video.getBoundingClientRect();
-      return { videoFixed: getComputedStyle(video).position === "fixed", videoFills: box.width === innerWidth && box.height === innerHeight, isPaused: video.paused, time: video.currentTime };
+      return { videoFixed: getComputedStyle(video).position === "fixed", videoVisible: getComputedStyle(video).visibility === "visible", videoFills: box.width === innerWidth && box.height === innerHeight, isPaused: video.paused, time: video.currentTime };
     })()`);
     return { ...inPage, ...inFrame };
   });
@@ -1094,12 +1096,17 @@ while ((embedFacts === null || !(embedFacts.time > 0)) && Date.now() < embedDead
 }
 state = await getState();
 const embedTabId = state.selectedTabIdBySpace[state.activeSpaceId];
+// Embedded players are only asked while the tab really plays sound (Chromium marks it a moment after the start).
+const audibleDeadline = Date.now() + 10000;
+while (!(await sidebar.evaluate((tabId) => window.browserApi.getRuntimeState().then((runtime) => runtime.tabs[tabId]?.isAudible === true), embedTabId)) && Date.now() < audibleDeadline) {
+  await sidebar.waitForTimeout(250);
+}
 await dispatch({ type: "selectTab", tabId: tabBeforeVideo });
 pipControls = await findPage("/pip/pip.html", 8000).catch(() => null);
 await sidebar.waitForTimeout(600);
 pipFacts = await pictureInPictureFacts();
 embedFacts = await readEmbed();
-const isPlayerFilling = embedFacts?.iframeFixed && embedFacts.iframeFills && embedFacts.videoFixed && embedFacts.videoFills && !embedFacts.isPaused;
+const isPlayerFilling = embedFacts?.iframeFixed && embedFacts.iframeVisible && embedFacts.iframeFills && embedFacts.videoFixed && embedFacts.videoVisible && embedFacts.videoFills && !embedFacts.isPaused;
 check("an embedded player's video (an iframe from another site) goes into the window too, filling it", pipFacts?.urls[0] === embedUrl && isPlayerFilling === true, JSON.stringify({ pipFacts, embedFacts }));
 await pipControls?.click(".pip-play").catch(() => undefined);
 await sidebar.waitForTimeout(500);

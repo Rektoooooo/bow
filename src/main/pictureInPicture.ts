@@ -44,6 +44,10 @@ const SCREEN_MARGIN_PX = 16;
 /** The shape before the video knows its size (audio-only, still loading). */
 const FALLBACK_ASPECT_RATIO = 16 / 9;
 
+/** The narrowest and widest window shape, whatever a video (or a page faking one) reports. Our choice. */
+const MIN_ASPECT_RATIO = 1 / 3;
+const MAX_ASPECT_RATIO = 4;
+
 /** A video whose shape differs from the window's by less than this keeps the window as it is. Our choice. */
 const ASPECT_RATIO_TOLERANCE = 0.01;
 
@@ -147,7 +151,8 @@ function buildSeekScript(fraction: number): string {
  * video element (YouTube sets width and height inline). A fixed position only escapes its container when nothing
  * around it transforms, filters, clips or contains it, so those are switched off there. Hidden elements cannot hide
  * a child that is visible again, so the video alone becomes visible. Every rule needs the page's mark, so taking the
- * marks off turns the sheet off too. It is an author style sheet: Electron removes only those (removeInsertedCSS).
+ * marks off turns the sheet off too. The marked element's rule must be more specific than the one hiding everything
+ * (both are !important): with the same specificity only the order decided, and a looser selector lost to it. It is an author style sheet: Electron removes only those (removeInsertedCSS).
  */
 const FILL_WITH_VIDEO_CSS = `
 html[data-sidebar-browser-pip="page"] * { visibility: hidden !important; }
@@ -157,7 +162,7 @@ html[data-sidebar-browser-pip="page"], html[data-sidebar-browser-pip="page"] bod
   will-change: auto !important; contain: none !important; clip-path: none !important; mask: none !important;
   overflow: visible !important; opacity: 1 !important;
 }
-[data-sidebar-browser-pip="video"] {
+html[data-sidebar-browser-pip="page"] [data-sidebar-browser-pip="video"] {
   visibility: visible !important; position: fixed !important; inset: 0 !important;
   width: 100vw !important; height: 100vh !important; min-width: 0 !important; min-height: 0 !important;
   max-width: none !important; max-height: none !important; margin: 0 !important; padding: 0 !important;
@@ -176,11 +181,13 @@ const FRAME_MARK_SCRIPT = `(() => {
   if (video === null) {
     return null;
   }
-  const sheet = new CSSStyleSheet();
-  sheet.replaceSync(${JSON.stringify(FILL_WITH_VIDEO_CSS)});
-  document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
-  document.sidebarBrowserPipSheet = sheet;
-  return { width: video.videoWidth, height: video.videoHeight };
+  if (document.sidebarBrowserPipSheet === undefined) {
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(${JSON.stringify(FILL_WITH_VIDEO_CSS)});
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    document.sidebarBrowserPipSheet = sheet;
+  }
+  return { width: +video.videoWidth, height: +video.videoHeight };
 })()`;
 
 /** How long the page waits for its iframe's message (it comes at once; this only ends a wait that went wrong). */
@@ -267,7 +274,7 @@ interface VideoReading extends VideoSize {
  * app. Resolves to null when the frame is gone or the script failed.
  */
 async function runFrameScript(frame: WebFrameMain, script: string, isUserGesture: boolean = false): Promise<unknown> {
-  if (frame.detached) {
+  if (frame.isDestroyed() || frame.detached) {
     return null;
   }
   try {
@@ -282,7 +289,9 @@ async function runFrameScript(frame: WebFrameMain, script: string, isUserGesture
  */
 function runVideoScript(pip: OpenPictureInPicture, script: string, isUserGesture: boolean = false): Promise<unknown> {
   if (pip.videoFrame !== null) {
-    return runFrameScript(pip.videoFrame, script, isUserGesture);
+    // Never a gesture for another site's frame: it could use one to open windows or navigate the page. Electron plays
+    // without one anyway (autoplay needs no gesture).
+    return runFrameScript(pip.videoFrame, script, false);
   }
   return runScript(pip.pageView.webContents, script, isUserGesture);
 }
@@ -335,7 +344,10 @@ function isVideoSize(value: unknown): value is VideoSize {
     return false;
   }
   const size = value as Partial<VideoSize>;
-  return typeof size.width === "number" && typeof size.height === "number";
+  // A frame's own scripts can fake these values, so only real sizes count.
+  const isWidth = typeof size.width === "number" && Number.isFinite(size.width) && size.width >= 0;
+  const isHeight = typeof size.height === "number" && Number.isFinite(size.height) && size.height >= 0;
+  return isWidth && isHeight;
 }
 
 function isVideoReading(value: unknown): value is VideoReading {
@@ -343,7 +355,9 @@ function isVideoReading(value: unknown): value is VideoReading {
     return false;
   }
   const reading = value as Partial<VideoReading>;
-  return typeof reading.isPaused === "boolean" && typeof reading.currentTime === "number" && typeof reading.duration === "number";
+  const isCurrentTime = typeof reading.currentTime === "number" && Number.isFinite(reading.currentTime);
+  // A live stream's duration is Infinity; sendStatus shows no progress then.
+  return typeof reading.isPaused === "boolean" && isCurrentTime && typeof reading.duration === "number";
 }
 
 /**
@@ -353,7 +367,8 @@ function computeAspectRatio(size: VideoSize): number {
   if (size.width <= 0 || size.height <= 0) {
     return FALLBACK_ASPECT_RATIO;
   }
-  return size.width / size.height;
+  const aspectRatio = size.width / size.height;
+  return Math.min(MAX_ASPECT_RATIO, Math.max(MIN_ASPECT_RATIO, aspectRatio));
 }
 
 /**
@@ -405,6 +420,12 @@ function applyAspectRatio(pip: OpenPictureInPicture, aspectRatio: number): void 
  * Reads the video and tells the controls what to show.
  */
 async function sendStatus(pip: OpenPictureInPicture): Promise<void> {
+  // The embedded player was removed (or replaced by another document): nothing is left to show.
+  const frame = pip.videoFrame;
+  if (frame !== null && (frame.isDestroyed() || frame.detached)) {
+    closePictureInPicture(false);
+    return;
+  }
   const reading = await runVideoScript(pip, READ_SCRIPT);
   const tab = findTab(getState(), pip.tabId);
   if (current !== pip || tab === undefined || pip.controlsView.webContents.isDestroyed()) {
@@ -527,14 +548,35 @@ function closePictureInPicture(pausesVideo: boolean): void {
  * window (a window that is already open for another tab gives way, and its video pauses).
  */
 export async function enterPictureInPicture(tabId: ItemId): Promise<void> {
+  // Leaving, coming back and leaving again quickly must not start a second entry while the first asks the page.
+  if (enteringTabIds.has(tabId)) {
+    return;
+  }
+  enteringTabIds.add(tabId);
+  try {
+    await enterNow(tabId);
+  } finally {
+    enteringTabIds.delete(tabId);
+  }
+}
+
+/** Tabs whose page is being asked for a video right now (enterPictureInPicture). */
+const enteringTabIds = new Set<ItemId>();
+
+/**
+ * The entry itself: finds the video (in the page or an embedded player), marks it and opens the window.
+ */
+async function enterNow(tabId: ItemId): Promise<void> {
   const pageView = getTabViews().get(tabId);
   if (pageView === undefined || pageView.webContents.isDestroyed() || current?.tabId === tabId) {
     return;
   }
   const contents = pageView.webContents;
   const pageVideoSize = await runScript(contents, MARK_SCRIPT);
-  // No video in the page itself: maybe one plays in an embedded player.
-  const framedVideo = isVideoSize(pageVideoSize) ? null : await findVideoInFrames(contents);
+  // No video in the page itself: maybe one plays in an embedded player. Only asked while the tab really plays sound
+  // (the main process knows; a frame cannot fake it), so ad frames are not asked on every tab switch.
+  const asksFrames = !isVideoSize(pageVideoSize) && contents.isCurrentlyAudible();
+  const framedVideo = asksFrames ? await findVideoInFrames(contents) : null;
   const videoSize = framedVideo === null ? pageVideoSize : framedVideo.size;
   const videoFrame = framedVideo === null ? null : framedVideo.frame;
   if (!isVideoSize(videoSize)) {
@@ -567,6 +609,13 @@ export async function enterPictureInPicture(tabId: ItemId): Promise<void> {
       closePictureInPicture(false);
     }
   };
+  // The embedded player's frame loaded another document: its video and our marks are gone.
+  const endWithFrame = (_event: Electron.Event, _url: string, _code: number, _text: string, isMainFrame: boolean, frameProcessId: number, frameRoutingId: number): void => {
+    const isVideoFrame = videoFrame !== null && frameProcessId === videoFrame.processId && frameRoutingId === videoFrame.routingId;
+    if (!isMainFrame && isVideoFrame) {
+      endWithPage();
+    }
+  };
   const pip: OpenPictureInPicture = {
     tabId: tabId,
     window: window,
@@ -581,6 +630,7 @@ export async function enterPictureInPicture(tabId: ItemId): Promise<void> {
     stopWatchingPage: () => {
       contents.off("destroyed", endWithPage);
       contents.off("did-navigate", endWithPage);
+      contents.off("did-frame-navigate", endWithFrame);
     },
   };
   current = pip;
@@ -594,6 +644,7 @@ export async function enterPictureInPicture(tabId: ItemId): Promise<void> {
   });
   contents.on("destroyed", endWithPage);
   contents.on("did-navigate", endWithPage);
+  contents.on("did-frame-navigate", endWithFrame);
   controlsView.webContents.once("did-finish-load", () => sendStatus(pip));
   window.showInactive();
 }
