@@ -32,12 +32,12 @@ import {
   findRootLocation,
   findSpace,
   findSpaceIdOfItem,
-  findSplitOfTab,
   findTab,
   getActiveSpace,
   getIdsAt,
   insertIntoLocation,
   isSameOrDescendant,
+  listTabIdsShownWith,
   removeFromLocation,
   setIdsAt,
 } from "./tree";
@@ -647,6 +647,7 @@ export function closeTab(state: BrowserState, tabId: ItemId, now: number): Brows
  * but it keeps its place. The selection moves to the most recently used other tab.
  * A pane of a pinned split view: only that pane goes home, but the selection leaves every pane, because a split is
  * on screen whole while any of its panes is selected and would show the put-away page again.
+ * This is the focused window's part; windows.ts resetPinnedTabInEveryWindow adds the other windows'.
  * tabActions.ts also destroys the tab's web view.
  */
 export function resetPinnedTab(state: BrowserState, tabId: ItemId): BrowserState {
@@ -655,15 +656,14 @@ export function resetPinnedTab(state: BrowserState, tabId: ItemId): BrowserState
     return state;
   }
   const resetState = updateTab(state, tabId, { url: tab.homeUrl });
-  const splitId = findSplitOfTab(state, tabId);
-  const split = splitId === null ? undefined : state.items[splitId];
-  const hiddenTabIds = split !== undefined && split.kind === "split" ? split.childIds : [tabId];
+  const hiddenTabIds = listTabIdsShownWith(state, tabId);
   return repairSelections(resetState, new Set(hiddenTabIds));
 }
 
 /**
  * What the × on a pinned split view does: like resetPinnedTab for each of its tabs at once, so the selection leaves
  * them all together (one by one, it would move to the other pane, which shows the split, and its page, again).
+ * The focused window's part; windows.ts resetPinnedTabsInEveryWindow adds the other windows'.
  */
 export function resetPinnedTabs(state: BrowserState, tabIds: ItemId[]): BrowserState {
   let resetState = state;

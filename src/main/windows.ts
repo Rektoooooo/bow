@@ -14,11 +14,13 @@
  * Data flow:
  *   a main window gets the focus → focusWindow() → applyChange → each window's sidebar gets projectStateForWindow()
  *   every change → applyChange runs repairOtherWindows(), so parked choices never point at a gone tab, Space or folder
+ *   ⌘W on a pinned tab, a tab dragged in from another window → the parked windows that showed it let go (letGoOfTabs)
  *
  * Same rules as state.ts: never change the state passed in, return the same object when nothing changes.
  */
 import type { BrowserState, ItemId, ParkedWindow, SidebarItem, Space, SpaceId, WindowId, WindowSidebar } from "../shared/types";
-import { repairSelections, selectTab } from "./state";
+import { repairSelections, resetPinnedTab, resetPinnedTabs, selectTab } from "./state";
+import { findTab, listTabIdsShownWith } from "./tree";
 
 /**
  * The ids of the folders the focused window shows open.
@@ -261,6 +263,51 @@ function letGoOfTabs(state: BrowserState, parked: ParkedWindow, tabIds: Set<Item
 }
 
 /**
+ * Every parked window lets go of some tabs (letGoOfTabs). Same state when none of them showed any.
+ */
+function letOtherWindowsGoOfTabs(state: BrowserState, tabIds: Set<ItemId>): BrowserState {
+  let anyLetGo = false;
+  const otherWindows: ParkedWindow[] = [];
+  for (const parked of state.otherWindows) {
+    const repaired = letGoOfTabs(state, parked, tabIds);
+    otherWindows.push(repaired);
+    if (repaired !== parked) {
+      anyLetGo = true;
+    }
+  }
+  if (!anyLetGo) {
+    return state;
+  }
+  return { ...state, otherWindows: otherWindows };
+}
+
+/**
+ * ⌘W on a Pinned tab or Favorite (resetPinnedTab) in every window, not only the focused one: tabActions.ts destroys
+ * the page wherever it is on screen, so a parked window that selected the tab lets go too, or syncTabViews would load
+ * the page there again at its home URL. A split is on screen whole while any pane is selected, so the windows let go
+ * of every pane of the tab's split, like the focused window. Same state for a tab that is not pinned.
+ * Example: A and B both select pinned tab T; ⌘W in A → A and B each select their most recently used other tab
+ */
+export function resetPinnedTabInEveryWindow(state: BrowserState, tabId: ItemId): BrowserState {
+  const tab = findTab(state, tabId);
+  if (tab === undefined || tab.homeUrl === null) {
+    return state;
+  }
+  const resetState = resetPinnedTab(state, tabId);
+  const hiddenTabIds = listTabIdsShownWith(state, tabId);
+  return letOtherWindowsGoOfTabs(resetState, new Set(hiddenTabIds));
+}
+
+/**
+ * The × on a pinned split view (resetPinnedTabs) in every window: a parked window that selected any of its panes lets
+ * go too, for the same reason as resetPinnedTabInEveryWindow.
+ */
+export function resetPinnedTabsInEveryWindow(state: BrowserState, tabIds: ItemId[]): BrowserState {
+  const resetState = resetPinnedTabs(state, tabIds);
+  return letOtherWindowsGoOfTabs(resetState, new Set(tabIds));
+}
+
+/**
  * A tab or split view dragged from another window's sidebar and dropped into the focused window's comes along, like
  * a tab dragged to another browser window: the focused window selects it (a split shows all its panes), and the
  * windows that selected it let go, so its page moves over. A folder only moves (same state).
@@ -279,9 +326,8 @@ export function takeItemIntoFocusedWindow(state: BrowserState, itemId: ItemId, n
   if (firstTabId === undefined) {
     return state;
   }
-  const takenTabIds = new Set(tabIds);
-  const otherWindows = state.otherWindows.map((parked) => letGoOfTabs(state, parked, takenTabIds));
-  return selectTab({ ...state, otherWindows: otherWindows }, firstTabId, now);
+  const letGoState = letOtherWindowsGoOfTabs(state, new Set(tabIds));
+  return selectTab(letGoState, firstTabId, now);
 }
 
 /**

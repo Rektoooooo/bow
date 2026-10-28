@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { deleteSpace, switchSpace } from "../src/main/spaces";
-import { closeTab, createFolder, createInitialState, deleteItem, getSelectedTabId, selectTab, setPinnedSectionOpen, setSidebarVisible, setSidebarWidth, toggleFolder } from "../src/main/state";
+import { closeTab, createFolder, createInitialState, deleteItem, getSelectedTabId, selectTab, setPinnedSectionOpen, setSidebarVisible, setSidebarWidth, toggleFolder, updateTabPage } from "../src/main/state";
 import {
   closeWindow,
   collectSelectedTabIdsOfAllWindows,
@@ -14,13 +14,17 @@ import {
   openWindow,
   projectStateForWindow,
   repairOtherWindows,
+  resetPinnedTabInEveryWindow,
+  resetPinnedTabsInEveryWindow,
   takeItemIntoFocusedWindow,
 } from "../src/main/windows";
 import { splitTabs } from "../src/main/split";
 import { FIRST_WINDOW_ID, HOUR_MS } from "../src/shared/settings";
-import { ONE_PM, openTabs, PERSONAL_SPACE_ID, WORK_SPACE_ID } from "./builders";
+import { getTab, ONE_PM, openPinnedTabs, openTabs, PERSONAL_SPACE_ID, WORK_SPACE_ID } from "./builders";
 
 const TWO_PM = ONE_PM + 1 * HOUR_MS;
+const THREE_PM = ONE_PM + 2 * HOUR_MS;
+const FOUR_PM = ONE_PM + 3 * HOUR_MS;
 const SECOND_WINDOW_ID = "window-second";
 
 /**
@@ -259,5 +263,81 @@ describe("an item dragged from another window", () => {
     const folderId = Object.values(withFolder.items).find((item) => item.kind === "folder")?.id as string;
 
     expect(takeItemIntoFocusedWindow(withFolder, folderId, TWO_PM)).toBe(withFolder);
+  });
+});
+
+/**
+ * A pinned split view (mail | calendar), both panes navigated away from home, and a Today tab (news). The first
+ * window selected the calendar pane, then a second window opened and selected the mail pane; the second has the focus.
+ */
+function buildPinnedSplitInTwoWindows() {
+  const pinned = openPinnedTabs(["https://mail.example/inbox", "https://calendar.example/week"]);
+  const mailTabId = pinned.tabIds[0] as string;
+  const calendarTabId = pinned.tabIds[1] as string;
+  const withSplit = splitTabs(pinned.state, mailTabId, calendarTabId, ONE_PM);
+  const mailNavigated = updateTabPage(withSplit, mailTabId, "https://mail.example/message/42", "Message");
+  const bothNavigated = updateTabPage(mailNavigated, calendarTabId, "https://calendar.example/day", "Day");
+  const today = openTabs(["https://news.example"], bothNavigated);
+  const firstSelectsCalendar = selectTab(today.state, calendarTabId, TWO_PM);
+  const twoWindows = openWindow(firstSelectsCalendar, SECOND_WINDOW_ID);
+  const secondSelectsMail = selectTab(twoWindows, mailTabId, THREE_PM);
+  return { state: secondSelectsMail, mailTabId: mailTabId, calendarTabId: calendarTabId, newsTabId: today.tabIds[0] as string };
+}
+
+describe("⌘W on a pinned tab puts its page away in every window", () => {
+  it("moves every window that selected the tab to its most recently used other tab", () => {
+    const pinned = openPinnedTabs(["https://mail.example/inbox"]);
+    const mailTabId = pinned.tabIds[0] as string;
+    const navigated = updateTabPage(pinned.state, mailTabId, "https://mail.example/message/42", "Message");
+    const today = openTabs(["https://news.example"], navigated);
+    const firstSelectsMail = selectTab(today.state, mailTabId, TWO_PM);
+    // The second window selects the tab too; it showed "Open in another window" there.
+    const bothSelectMail = selectTab(openWindow(firstSelectsMail, SECOND_WINDOW_ID), mailTabId, THREE_PM);
+
+    const state = resetPinnedTabInEveryWindow(bothSelectMail, mailTabId);
+
+    expect(getTab(state, mailTabId).url).toBe("https://mail.example/inbox");
+    expect(getSelectedTabId(state)).toBe(today.tabIds[0]);
+    expect(state.otherWindows[0]?.selectedTabIdBySpace[PERSONAL_SPACE_ID]).toBe(today.tabIds[0]);
+  });
+
+  it("on a pane of a pinned split, moves a window that selected the other pane off the whole split", () => {
+    const { state: built, mailTabId, calendarTabId, newsTabId } = buildPinnedSplitInTwoWindows();
+
+    const state = resetPinnedTabInEveryWindow(built, mailTabId);
+
+    expect(getTab(state, mailTabId).url).toBe("https://mail.example/inbox");
+    expect(getTab(state, calendarTabId).url).toBe("https://calendar.example/day");
+    expect(getSelectedTabId(state)).toBe(newsTabId);
+    // The split is on screen whole while any pane is selected, so the first window would load the mail page again.
+    expect(state.otherWindows[0]?.selectedTabIdBySpace[PERSONAL_SPACE_ID]).toBe(newsTabId);
+  });
+
+  it("the × on a pinned split moves every window that selected a pane off it", () => {
+    const { state: built, mailTabId, calendarTabId, newsTabId } = buildPinnedSplitInTwoWindows();
+
+    const state = resetPinnedTabsInEveryWindow(built, [mailTabId, calendarTabId]);
+
+    expect(getTab(state, calendarTabId).url).toBe("https://calendar.example/week");
+    expect(getSelectedTabId(state)).toBe(newsTabId);
+    expect(state.otherWindows[0]?.selectedTabIdBySpace[PERSONAL_SPACE_ID]).toBe(newsTabId);
+  });
+
+  it("leaves a window that selected none of the panes, and changes nothing for a tab that is not pinned", () => {
+    const { state: built, mailTabId, newsTabId } = buildPinnedSplitInTwoWindows();
+    const firstOnNews = focusWindow(selectTab(focusWindow(built, FIRST_WINDOW_ID), newsTabId, FOUR_PM), SECOND_WINDOW_ID);
+
+    const state = resetPinnedTabInEveryWindow(firstOnNews, mailTabId);
+
+    expect(state.otherWindows[0]).toBe(firstOnNews.otherWindows[0]);
+    expect(resetPinnedTabInEveryWindow(firstOnNews, newsTabId)).toBe(firstOnNews);
+  });
+
+  it("returns the same state when the split's pages are home and no window selects a pane", () => {
+    const { state: built, mailTabId, calendarTabId, newsTabId } = buildPinnedSplitInTwoWindows();
+    const putAway = resetPinnedTabsInEveryWindow(built, [mailTabId, calendarTabId]);
+
+    expect(resetPinnedTabsInEveryWindow(putAway, [mailTabId, calendarTabId])).toBe(putAway);
+    expect(getSelectedTabId(putAway)).toBe(newsTabId);
   });
 });

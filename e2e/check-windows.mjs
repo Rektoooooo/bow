@@ -1,6 +1,7 @@
 // End-to-end check of several main windows (File › New Window, ⌘N, like Arc): a second window opens with its own
 // sidebar over the same Spaces and tabs; each window keeps its own Space and selection; a tab selected in both shows
-// "Open in another window" in the second one (and Move to This Window takes the page over); the Command Bar opens in
+// "Open in another window" in the second one (and Move to This Window takes the page over); ⌘W on a Pinned tab puts
+// its page away in every window that selected it; the Command Bar opens in
 // the focused window; menus act on the focused window; closing one window keeps the other; a restart opens both
 // again where they were; and the app quits with the last window, which the next start opens again.
 // usage: npm run build && node e2e/check-windows.mjs      (uses a throwaway --user-data-dir)
@@ -40,6 +41,10 @@ const folder = { kind: "folder", id: "folder-reading", title: "Reading", childId
 const splitPair = { kind: "split", id: "split-pair", childIds: ["tab-left", "tab-right"], orientation: "horizontal" };
 const spareTabNames = ["gamma", "delta", "epsilon", "zeta", "left", "right"];
 const spareTabs = Object.fromEntries(spareTabNames.map((name) => [`tab-${name}`, tab(`tab-${name}`, name)]));
+// A Pinned tab in Work, navigated away from its home page. Used an hour before the others, so it never becomes the
+// most recently used tab another check's selection falls back to.
+const HOUR_MS = 60 * 60 * 1000;
+const pinnedTab = { ...tab("tab-pinned", "pinned-away"), homeUrl: urlOf("pinned-home"), lastActiveAt: now - HOUR_MS };
 
 /** Same values as shared/settings.ts: where the page card starts with the sidebar shown, and with it hidden. */
 const SIDEBAR_WIDTH = 242;
@@ -49,11 +54,11 @@ fs.writeFileSync(
   path.join(userDataDir, "browser-state.json"),
   JSON.stringify({
     version: 3,
-    items: { "tab-alpha": tab("tab-alpha", "alpha"), "tab-beta": tab("tab-beta", "beta"), "tab-work": tab("tab-work", "work"), "folder-reading": folder, "split-pair": splitPair, ...spareTabs },
+    items: { "tab-alpha": tab("tab-alpha", "alpha"), "tab-beta": tab("tab-beta", "beta"), "tab-work": tab("tab-work", "work"), "folder-reading": folder, "split-pair": splitPair, "tab-pinned": pinnedTab, ...spareTabs },
     profiles: [{ id: "profile-default", name: "Default", favoriteIds: [] }],
     spaces: [
       space("space-main", "Main", ["tab-alpha", "tab-beta", "tab-gamma", "tab-delta", "tab-epsilon", "tab-zeta"], ["folder-reading"]),
-      space("space-work", "Work", ["tab-work", "split-pair"]),
+      space("space-work", "Work", ["tab-work", "split-pair"], ["tab-pinned"]),
     ],
     activeSpaceId: "space-main",
     selectedTabIdBySpace: { "space-main": "tab-alpha", "space-work": "tab-work" },
@@ -268,7 +273,7 @@ let firstState = await getState(firstSidebar);
 let secondState = await getState(secondSidebar);
 check(
   "both windows show the same Spaces and tabs",
-  JSON.stringify(firstState.spaces) === JSON.stringify(secondState.spaces) && Object.keys(secondState.items).length === 11,
+  JSON.stringify(firstState.spaces) === JSON.stringify(secondState.spaces) && Object.keys(secondState.items).length === 12,
 );
 check("the new window starts on the same Space with nothing selected", secondState.activeSpaceId === "space-main" && selectedTabId(secondState) === null && selectedTabId(firstState) === "tab-alpha");
 check("the new window has the focus", secondState.focusedWindowId !== "window-1" && firstState.otherWindows.length === 1);
@@ -319,6 +324,38 @@ check(
   findWindow(windows, "first").pageUrls.join() === urlOf("alpha") && findWindow(windows, "second").pageUrls.join() === urlOf("beta") && !(await showsElsewhereCard(firstSidebar)),
   JSON.stringify(windows.map((window) => window.pageUrls)),
 );
+
+// ⌘W on a Pinned tab selected in both windows puts its page away in both: the other window moves to another tab too,
+// or its page would load there again at the home URL. Closed once from the window that shows the page, and once from
+// the window that shows "Open in another window" (that destroys the page in the first one).
+const showsPinnedPage = (list) => list.some((window) => window.pageUrls.some((url) => url.includes("/pinned-")));
+for (const closer of ["first", "second"]) {
+  await dispatch(firstSidebar, { type: "switchSpace", spaceId: "space-work" });
+  await dispatch(firstSidebar, { type: "selectTab", tabId: "tab-pinned" });
+  await waitForWindows(app, (list) => findWindow(list, "first")?.pageUrls.some((url) => url.includes("/pinned-")));
+  await dispatch(secondSidebar, { type: "switchSpace", spaceId: "space-work" });
+  await dispatch(secondSidebar, { type: "selectTab", tabId: "tab-pinned" });
+  await secondSidebar.waitForTimeout(300);
+  const isSelectedInBoth = (await showsElsewhereCard(secondSidebar)) && showsPinnedPage(await describeWindows(app));
+  await dispatch(closer === "first" ? firstSidebar : secondSidebar, { type: "closeTab", tabId: "tab-pinned" });
+  // A page loaded again would take a moment to show its address.
+  await firstSidebar.waitForTimeout(800);
+  windows = await describeWindows(app);
+  firstState = await getState(firstSidebar);
+  secondState = await getState(secondSidebar);
+  const selections = [selectedTabId(firstState), selectedTabId(secondState)];
+  check(
+    `⌘W on a Pinned tab in the ${closer} window moves both windows off it, and its page does not come back`,
+    isSelectedInBoth && !selections.includes("tab-pinned") && !showsPinnedPage(windows) && firstState.items["tab-pinned"].url === urlOf("pinned-home"),
+    `selected ${selections.join(",")}, pages ${JSON.stringify(windows.map((window) => window.pageUrls))}`,
+  );
+}
+// Back to where the checks below expect the windows: both in Main, the first on alpha and the second on beta.
+await dispatch(firstSidebar, { type: "selectTab", tabId: "tab-work" });
+await dispatch(firstSidebar, { type: "switchSpace", spaceId: "space-main" });
+await dispatch(secondSidebar, { type: "selectTab", tabId: "tab-work" });
+await dispatch(secondSidebar, { type: "switchSpace", spaceId: "space-main" });
+await waitForWindows(app, (list) => findWindow(list, "first")?.pageUrls.includes(urlOf("alpha")) && findWindow(list, "second")?.pageUrls.includes(urlOf("beta")));
 
 // Notes and Easels follow the same rule as pages (Arc's notes are tabs too): one editor at a time writes the file.
 const editorCount = (sidebar, selector) => sidebar.evaluate((wanted) => document.querySelectorAll(wanted).length, selector);

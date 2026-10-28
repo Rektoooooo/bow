@@ -287,6 +287,16 @@ export function findSplitOfTab(state: BrowserState, tabId: ItemId): ItemId | nul
 }
 
 /**
+ * The tabs on screen while a tab is selected: every pane of its split view in pane order, or just the tab.
+ * Example: tab-1 in a split with tab-2 → ["tab-1", "tab-2"]; a tab on its own → ["tab-1"]
+ */
+export function listTabIdsShownWith(state: BrowserState, tabId: ItemId): ItemId[] {
+  const splitId = findSplitOfTab(state, tabId);
+  const split = splitId === null ? undefined : state.items[splitId];
+  return split !== undefined && split.kind === "split" ? split.childIds : [tabId];
+}
+
+/**
  * Deletes items from the items map. Ids that are missing are ignored.
  */
 export function deleteItems(state: BrowserState, itemIds: ItemId[]): BrowserState {

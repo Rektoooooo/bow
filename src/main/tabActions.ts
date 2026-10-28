@@ -14,11 +14,12 @@ import type { WebContents } from "electron";
 import type { NavigationCommand } from "../shared/actions";
 import type { ItemId } from "../shared/types";
 import { applyChange, getState, scheduleRuntimePush } from "./browserCore";
-import { closeTab, deleteItem, getSelectedTabId, openTab, resetPinnedTab, resetPinnedTabs, selectTab, setTabMuted, updateTab } from "./state";
+import { closeTab, deleteItem, getSelectedTabId, openTab, selectTab, setTabMuted, updateTab } from "./state";
 import type { OpenTabOptions } from "./state";
 import { destroyTabView, getFocusedContents, getTabContents } from "./tabViews";
 import type { OpenDisposition } from "./tabViews";
 import { findTab, isInToday } from "./tree";
+import { resetPinnedTabInEveryWindow, resetPinnedTabsInEveryWindow } from "./windows";
 
 /**
  * Opens a link in a new Today tab. Background links (⌘-click) do not take the selection.
@@ -38,9 +39,10 @@ export function closeTabByUser(tabId: ItemId): void {
     applyChange((state) => closeTab(state, tabId, Date.now()));
     return;
   }
-  // The page may be on screen in another window (this one showed "Open in another window"); it goes there too.
+  // The page may be on screen in another window (this one showed "Open in another window"); it goes there too, and
+  // every window that selected it moves on, so the page does not load again there.
   destroyTabView(tabId);
-  applyChange((state) => resetPinnedTab(state, tabId));
+  applyChange((state) => resetPinnedTabInEveryWindow(state, tabId));
   // The page is gone even when the state did not change, so the sidebar must hear about it.
   scheduleRuntimePush();
 }
@@ -59,11 +61,11 @@ export function closeSplitByUser(splitId: ItemId): void {
     applyChange((current) => deleteItem(current, splitId, Date.now()));
     return;
   }
-  // The pages may be on screen in another window too; they go there as well.
+  // The pages may be on screen in another window too; they go there as well, and every window moves on from them.
   for (const tabId of split.childIds) {
     destroyTabView(tabId);
   }
-  applyChange((current) => resetPinnedTabs(current, split.childIds));
+  applyChange((current) => resetPinnedTabsInEveryWindow(current, split.childIds));
   // The pages are gone even when the state did not change, so the sidebar must hear about it.
   scheduleRuntimePush();
 }
