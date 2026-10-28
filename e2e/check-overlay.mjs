@@ -526,16 +526,31 @@ await dispatch({ type: "setAdBlock", isOn: false });
 // The checks below expect the news page on screen, as before this block.
 await dispatch({ type: "selectTab", tabId: newsTabId });
 await sidebar.waitForTimeout(600);
-server.close();
 
-// Profiles: moving the Space to a new profile reloads its pages in that profile's own session.
+// Profiles: moving the Space to a new profile reloads its pages in that profile's own session. The new profile's
+// first page needs a new session and a new renderer, which can take seconds on a busy Mac (it once took longer than
+// a fixed 1.5 s wait), so wait until the page is there in that session. The local server stays up until then, so the
+// page really loads there.
 const contentsIdBefore = await app.evaluate(({ webContents }) => webContents.getAllWebContents().find((contents) => contents.getURL().includes("/news"))?.id);
 state = await getState();
 await dispatch({ type: "createProfileForSpace", spaceId: state.activeSpaceId });
-await sidebar.waitForTimeout(1500);
-state = await getState();
-const contentsIdAfter = await app.evaluate(({ webContents }) => webContents.getAllWebContents().find((contents) => contents.getURL().includes("/news"))?.id);
-check("a Space moved to a new profile uses it, and its page reloads in that profile", state.profiles.length === 2 && activeSpace(state).profileId === state.profiles[1].id && contentsIdAfter !== undefined && contentsIdAfter !== contentsIdBefore, `${contentsIdBefore} → ${contentsIdAfter}`);
+const profileMoveStart = Date.now();
+let contentsIdAfter;
+while (contentsIdAfter === undefined && Date.now() - profileMoveStart < 15000) {
+  state = await getState();
+  const target = { profileId: activeSpace(state).profileId, contentsIdBefore };
+  // The same session profiles.ts gives the profile's pages.
+  contentsIdAfter = await app.evaluate(({ webContents, session }, { profileId, contentsIdBefore }) => {
+    const profileSession = session.fromPartition(`persist:${profileId}`);
+    return webContents.getAllWebContents().find((contents) => contents.getURL().includes("/news") && contents.id !== contentsIdBefore && contents.session === profileSession)?.id;
+  }, target);
+  if (contentsIdAfter === undefined) {
+    await sidebar.waitForTimeout(200);
+  }
+}
+const profileMoveMs = Date.now() - profileMoveStart;
+check("a Space moved to a new profile uses it, and its page reloads in that profile", state.profiles.length === 2 && activeSpace(state).profileId === state.profiles[1].id && contentsIdAfter !== undefined, `${contentsIdBefore} → ${contentsIdAfter} in ${profileMoveMs} ms`);
+server.close();
 
 // Private window: says Private, has no Open in Space, and leaves nothing in the Archive.
 const archiveCountBefore = (await getState()).archive.length;
