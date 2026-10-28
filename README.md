@@ -342,7 +342,8 @@ Three ideas keep it simple:
 - Websites get nothing they were not allowed: camera, microphone, location, notifications and clipboard reading
   need the user's Allow (remembered per profile and site), screen sharing goes through macOS's sharing picker,
   everything else is refused, except full screen and clipboard writes. Our own pages are refused without asking. `e2e/permission-check.mjs` proves it.
-- Our pages cannot navigate away or open windows, and only load their own scripts.
+- Our pages cannot navigate away or open windows, and only load their own scripts. The only exception: each window's
+  sidebar opens the card's two corner pages the app asks it for, so they share its process.
 - Import from Arc only reads Arc's files (its history database through a temporary copy) and never changes them.
 
 ## Contributing
