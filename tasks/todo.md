@@ -282,7 +282,7 @@ M about a day, L several days.
 ### 4.2 Arc features, done better
 - [x] 6. Link menu: Open Link in Little Window, in Peek, in Split View (S)
 - [x] 7. Split view: drag the divider to resize, swap panes, 2×2 grid and keyboard layouts (M)
-- [ ] 8. Boosts: share and import as files; a clear badge while a JavaScript Boost runs (S)
+- [x] 8. Boosts: share and import as files; a clear badge while a JavaScript Boost runs (S)
 - [ ] 9. Live Folders: GitHub notifications and issues, Linear and Jira through the user's sign-in, ready-made feed
       presets (Hacker News, subreddits) (M)
 - [ ] 10. Command Bar: calculator and unit conversion, recently closed tabs and history by date, user-made action

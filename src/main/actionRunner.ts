@@ -35,6 +35,7 @@ import { deleteBoost, setBoostCss, setBoostEnabled, setBoostJavaScript, setBoost
 import { reapplyBoostsToAllPages } from "./boostPages";
 import { importFromArc } from "./arcImportController";
 import { exportBackup, restoreBackup, revealBackupsFolder } from "./backupController";
+import { exportBoostToFile, importBoostFromFile } from "./boostFilesController";
 import { chooseSyncFolder, revealSyncFolder, stopSyncing } from "./syncController";
 import { setFavoritesKeptAwake, setSiteKeptAwake } from "./tabSleep";
 import { canSleepNow, sleepOtherTabsNow, sleepTabNow } from "./tabSleepController";
@@ -311,6 +312,12 @@ export function runAction(action: BrowserAction): void {
       return closeSplitByUser(action.splitId);
     case "setSplitOrientation":
       return applyChange((state) => setSplitOrientation(state, action.splitId, action.orientation));
+    case "exportBoost":
+      exportBoostToFile(action.site).catch((error) => console.error("Exporting a Boost failed:", error));
+      return;
+    case "importBoost":
+      importBoostFromFile().catch((error) => console.error("Importing a Boost failed:", error));
+      return;
     case "resizeSplit":
       return resizeSplitPanes(action.splitId, action.sizes, action.isFinal);
     case "swapSplitPanes":

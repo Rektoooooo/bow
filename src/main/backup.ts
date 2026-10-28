@@ -219,7 +219,7 @@ export function createBackup(state: BrowserState, notes: Record<string, string>,
 // ---------- Checking a backup ----------
 
 /** Counts what the checks left out while they run. */
-interface CheckCounter {
+export interface CheckCounter {
   leftOut: number;
   scriptsTurnedOff: number;
 }
@@ -446,7 +446,7 @@ function checkArchive(raw: unknown, counter: CheckCounter): ArchivedTab[] {
 /**
  * The Boosts of a backup. JavaScript Boosts arrive switched off: code from a file runs only once the user says so.
  */
-function checkBoosts(raw: unknown, counter: CheckCounter): Boost[] {
+export function checkBoosts(raw: unknown, counter: CheckCounter): Boost[] {
   const boosts: Boost[] = [];
   for (const entry of Array.isArray(raw) ? raw : []) {
     const isWellFormed = isRecord(entry) && typeof entry.id === "string" && typeof entry.site === "string" && SITE_PATTERN.test(entry.site) && typeof entry.css === "string";

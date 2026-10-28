@@ -167,6 +167,19 @@ export function setBoostJavaScript(state: BrowserState, site: string, javascript
 }
 
 /**
+ * Puts a Boost from a shared file in place of the site's own (if it had one), under a new id. Its JavaScript, if
+ * any, arrives switched off (boostFiles.ts): the user turns it on once they trust it.
+ */
+export function importBoost(state: BrowserState, boost: Boost, now: number): BrowserState {
+  const others = (state.boosts ?? []).filter((existing) => existing.site !== boost.site);
+  const imported: Boost = { ...boost, id: createId("boost", now), isEnabled: true };
+  if (imported.javascript !== undefined) {
+    imported.isJavaScriptOn = false;
+  }
+  return { ...state, boosts: [...others, imported] };
+}
+
+/**
  * The JavaScript to run in a page of this Boost's site, or "" (Boost off, code switched off, or none).
  */
 export function getBoostJavaScript(boost: Boost): string {

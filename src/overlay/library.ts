@@ -520,8 +520,10 @@ function createBoostLine(boost: LibraryBoost): HTMLElement {
     dispatch({ type: "setBoostEnabled", site: boost.site, isEnabled: !boost.isEnabled }),
   );
   const editButton = createTextButton("Edit…", "library-chip", () => dispatch({ type: "openBoostEditor", site: boost.site }));
+  const exportButton = createTextButton("Export…", "library-chip boost-export", () => dispatch({ type: "exportBoost", site: boost.site }));
+  exportButton.title = "Save this Boost as a file to share";
   const deleteButton = createIconButton("trash", "Delete Boost", "library-line-icon-button", () => dispatch({ type: "deleteBoost", site: boost.site }));
-  line.append(text, switchButton, editButton, deleteButton);
+  line.append(text, switchButton, editButton, exportButton, deleteButton);
   return line;
 }
 
@@ -529,13 +531,21 @@ function createBoostLine(boost: LibraryBoost): HTMLElement {
  * Builds the Boosts section: every site you changed, like Arc's Library.
  */
 function renderBoostsSection(body: HTMLElement, data: LibraryData): void {
+  const section = createElement("div", "library-boosts");
+  const toolbar = createElement("div", "library-toolbar");
+  const importButton = createTextButton("Import Boost…", "library-chip boost-import", () => dispatch({ type: "importBoost" }));
+  importButton.title = "Add a Boost someone shared as a file (its JavaScript arrives switched off)";
+  toolbar.append(importButton);
+  section.append(toolbar);
   if (data.boosts.length === 0) {
-    body.replaceChildren(createEmptyState("boosts", "No Boosts yet", "Boosts change how a site looks. Open the Control Center on a site and choose Boost."));
+    section.append(createEmptyState("boosts", "No Boosts yet", "Boosts change how a site looks. Open the Control Center on a site and choose Boost, or import one."));
+    body.replaceChildren(section);
     return;
   }
   const list = createElement("div", "library-list");
   list.append(...data.boosts.map((boost) => createBoostLine(boost)));
-  body.replaceChildren(list);
+  section.append(list);
+  body.replaceChildren(section);
 }
 
 /** Where an extension came from, as its line says it. */

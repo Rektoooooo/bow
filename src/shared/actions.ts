@@ -71,6 +71,8 @@ export type BrowserAction =
   | { type: "setSplitOrientation"; splitId: ItemId; orientation: SplitOrientation }
   /** Dragging a split divider (shared/splitLayout.ts): shown live, saved when isFinal. */
   | { type: "resizeSplit"; splitId: ItemId; sizes: number[]; isFinal: boolean }
+  | { type: "exportBoost"; site: string }
+  | { type: "importBoost" }
   | { type: "swapSplitPanes"; splitId: ItemId }
   | { type: "equalizeSplit"; splitId: ItemId }
   | { type: "switchSpace"; spaceId: SpaceId }
@@ -203,6 +205,8 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "closeSplit",
   "setSplitOrientation",
   "resizeSplit",
+  "exportBoost",
+  "importBoost",
   "swapSplitPanes",
   "equalizeSplit",
   "switchSpace",

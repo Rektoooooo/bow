@@ -1749,6 +1749,19 @@ body.peek-open .main-column {
   white-space: nowrap;
 }
 
+/* A JavaScript Boost runs on this site (toolbar.ts): a small pill after the address. Our choice: Arc shows nothing. */
+.boost-script-badge {
+  flex: none;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: var(--row-selected);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 16px;
+}
+
 /* "Add Extension" on a Chrome Web Store extension page. */
 .toolbar-pill {
   display: flex;

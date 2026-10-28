@@ -16,6 +16,7 @@
  */
 import type { BrowserState, ItemId, RuntimeState, TabItem, TabRuntimeInfo } from "../shared/types";
 import { isDeveloperModeOn } from "../shared/developerMode.js";
+import { getSiteKey } from "../shared/siteKey.js";
 import { isNoteUrl } from "../shared/notes.js";
 import { isEaselUrl } from "../shared/easels.js";
 import { createActionButton, createElement, getDisplayHost } from "./dom.js";
@@ -47,7 +48,7 @@ function getDisplayAddress(url: string): string {
  * with "Show full URLs"). Clicking the icon copies the address (with the "Copied link" toast); clicking the rest
  * edits it. Clicks go to the innermost element with an action (sidebarEvents.ts), so the icon keeps its own.
  */
-function createAddressPill(url: string | null, showsFullUrl: boolean): HTMLElement {
+function createAddressPill(url: string | null, showsFullUrl: boolean, hasScriptBoost: boolean): HTMLElement {
   const pill = document.createElement("button");
   pill.type = "button";
   pill.className = "address-pill";
@@ -73,7 +74,31 @@ function createAddressPill(url: string | null, showsFullUrl: boolean): HTMLEleme
   const address = url !== null && showsFullUrl ? getFullAddress(url) : shortAddress;
   const label = address === "" ? url ?? "Search or enter address" : address;
   pill.append(createElement("span", "address-text", label));
+  // A Boost runs its own JavaScript on this site: said plainly, so it is never a surprise.
+  if (hasScriptBoost) {
+    pill.append(createScriptBoostBadge());
+  }
   return pill;
+}
+
+/**
+ * The "JS" badge after the address while a JavaScript Boost runs on the page (the address pill and Developer Mode's
+ * address both show it).
+ */
+function createScriptBoostBadge(): HTMLElement {
+  const badge = createElement("span", "boost-script-badge", "JS");
+  badge.title = "A JavaScript Boost runs on this site (Control Center › Boost to change it)";
+  return badge;
+}
+
+/**
+ * Whether a JavaScript Boost runs on a page: its site's Boost is on, has code, and the code is switched on.
+ */
+function hasScriptBoostFor(state: BrowserState, url: string | null): boolean {
+  const site = url === null ? null : getSiteKey(url);
+  const boost = site === null ? undefined : (state.boosts ?? []).find((candidate) => candidate.site === site);
+  const hasCode = (boost?.javascript ?? "").trim() !== "";
+  return boost !== undefined && boost.isEnabled && boost.isJavaScriptOn === true && hasCode;
 }
 
 /**
@@ -115,7 +140,7 @@ function getFullAddress(url: string): string {
  * Developer Mode's address: the lock (opens the Control Center, where Developer Mode is switched off) and the full
  * address in monospace (click to edit, like ⌘L).
  */
-function createDeveloperAddress(url: string): HTMLElement {
+function createDeveloperAddress(url: string, hasScriptBoost: boolean): HTMLElement {
   const address = createElement("div", "developer-address");
   address.dataset.key = "developer-address";
   const isSecure = url.startsWith("https://");
@@ -129,6 +154,9 @@ function createDeveloperAddress(url: string): HTMLElement {
   urlButton.setAttribute("aria-label", `Edit address ${url}`);
   urlButton.textContent = getFullAddress(url);
   address.append(lockButton, urlButton);
+  if (hasScriptBoost) {
+    address.append(createScriptBoostBadge());
+  }
   return address;
 }
 
@@ -216,7 +244,7 @@ export function renderToolbar(state: BrowserState, runtime: RuntimeState, select
     leftGroup.append(...createNavigationButtons(selectedTab, runtimeInfo, "toolbar-button", isDeveloper));
   }
   if (isDeveloper && selectedTab !== null) {
-    leftGroup.append(createDeveloperAddress(selectedTab.url));
+    leftGroup.append(createDeveloperAddress(selectedTab.url, hasScriptBoostFor(state, selectedTab.url)));
   }
 
   const centerGroup = createElement("div", "toolbar-group toolbar-center");
@@ -229,7 +257,8 @@ export function renderToolbar(state: BrowserState, runtime: RuntimeState, select
     pagePill.append(createIcon(isNote ? "note" : "easel", "icon address-icon"), createElement("span", "address-text", isNote ? "Note" : "Easel"));
     centerGroup.append(pagePill);
   } else if (!isDeveloper) {
-    centerGroup.append(createAddressPill(selectedTab === null ? null : selectedTab.url, state.settings.showsFullUrls === true));
+    const selectedUrl = selectedTab === null ? null : selectedTab.url;
+    centerGroup.append(createAddressPill(selectedUrl, state.settings.showsFullUrls === true, hasScriptBoostFor(state, selectedUrl)));
   }
 
   const rightGroup = createElement("div", "toolbar-group toolbar-right");

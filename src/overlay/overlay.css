@@ -751,7 +751,8 @@ body.dark .command-info-button {
 }
 
 .library-extensions,
-.library-tasks {
+.library-tasks,
+.library-boosts {
   padding: 12px 8px 12px 10px;
 }
 

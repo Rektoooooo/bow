@@ -1452,6 +1452,41 @@ await app.evaluate(({ BrowserWindow }) => {
     if (window.webContents.getURL().includes("/little/")) window.close();
   }
 });
+// Boosts as files, and the JavaScript badge: a JavaScript Boost on the page on screen shows "JS" in the toolbar;
+// Export… writes a file without the on switch; Import… puts it back with its JavaScript switched off, after asking.
+// The localhost page on screen (the split view above left its other pane selected).
+const localhostTab = Object.values((await getState()).items).find((item) => item.kind === "tab" && item.url === localhostUrl);
+await dispatch({ type: "selectTab", tabId: localhostTab?.id ?? "" });
+await sidebar.waitForTimeout(400);
+await dispatch({ type: "setBoostCss", site: "localhost", css: "body { outline: 1px solid teal }" });
+await dispatch({ type: "setBoostJavaScript", site: "localhost", javascript: "void 0", isOn: true });
+await sidebar.waitForTimeout(400);
+// localhost is in Developer Mode by itself, so its toolbar is the developer one: the badge shows there too.
+check("a JavaScript Boost on the page shows a JS badge in the toolbar", (await sidebar.locator("#toolbar .boost-script-badge").count()) === 1);
+const boostFilePath = path.join(basicsDir, "localhost.bowboost");
+await app.evaluate(({ dialog }, filePath) => {
+  globalThis.boostMessages = [];
+  dialog.showSaveDialog = async () => ({ canceled: false, filePath: filePath });
+  dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [filePath] });
+  dialog.showMessageBox = async (...parts) => {
+    globalThis.boostMessages.push(parts.at(-1).message + " | " + (parts.at(-1).detail ?? ""));
+    return { response: 0, checkboxChecked: false };
+  };
+}, boostFilePath);
+await dispatch({ type: "exportBoost", site: "localhost" });
+for (let attempt = 0; attempt < 25 && !fs.existsSync(boostFilePath); attempt += 1) {
+  await sidebar.waitForTimeout(200);
+}
+const exportedBoost = fs.existsSync(boostFilePath) ? JSON.parse(fs.readFileSync(boostFilePath, "utf8")) : null;
+check("Library › Boosts › Export… writes a Boost file without its on switch", exportedBoost?.format === "bow-boost" && exportedBoost.site === "localhost" && exportedBoost.javascript === "void 0" && !("isJavaScriptOn" in exportedBoost));
+fs.writeFileSync(boostFilePath, JSON.stringify({ ...exportedBoost, css: "body { outline: 2px solid tomato }" }));
+await dispatch({ type: "importBoost" });
+await sidebar.waitForTimeout(800);
+const importedBoost = ((await getState()).boosts ?? []).find((boost) => boost.site === "localhost");
+const boostMessages = await app.evaluate(() => globalThis.boostMessages);
+check("Import… asks before replacing the site's Boost, then puts the file's in place", importedBoost?.css === "body { outline: 2px solid tomato }" && boostMessages.some((message) => message.startsWith("Replace your Boost for localhost?")), boostMessages.join(" / "));
+check("and its JavaScript arrives switched off, which Bow says", importedBoost?.isJavaScriptOn === false && boostMessages.some((message) => message.includes("arrives switched off")) && (await sidebar.locator(".boost-script-badge").count()) === 0);
+await dispatch({ type: "deleteBoost", site: "localhost" });
 basicsServer.close();
 
 await app.close();

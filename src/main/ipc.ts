@@ -304,6 +304,8 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   closeSplit: { splitId: isText },
   setSplitOrientation: { splitId: isText, orientation: isOrientation },
   resizeSplit: { splitId: isText, sizes: isPaneSizes, isFinal: isBoolean },
+  exportBoost: { site: isSite },
+  importBoost: {},
   swapSplitPanes: { splitId: isText },
   equalizeSplit: { splitId: isText },
   switchSpace: { spaceId: isText },

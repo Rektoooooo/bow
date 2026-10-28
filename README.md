@@ -181,6 +181,8 @@ source never updates itself.
   sidebar. A Little Window left alone for 6 hours goes to the Archive.
 - **Boosts**: change a site's colors (shift them, or invert for a dark look) and font, Zap elements away, and add
   your own CSS and JavaScript (only once switched on). Turn a Boost off or reset it any time; Library › Boosts.
+  Share one as a `.bowboost` file (Export…, Import…; imported JavaScript arrives switched off), and a "JS" badge in
+  the toolbar says when a JavaScript Boost runs on the page.
 - **Developer Mode** per site (on by itself for localhost): a striped toolbar with the full address, Console,
   Network and Inspect buttons, a reload menu with Hard Reload, and the tab outlined in yellow.
 - **Show full URLs** (Library › Settings, View › Toggle Full URLs, or the Command Bar): the toolbar shows the whole

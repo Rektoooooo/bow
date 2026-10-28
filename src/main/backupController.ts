@@ -15,13 +15,13 @@
  *   Every SNAPSHOT_INTERVAL_MS with changes since the last copy → saveSnapshot("Snapshot") → old copies pruned
  *   (chooseSnapshotsToDelete in backup.ts)
  */
-import { app, dialog, shell } from "electron";
-import type { MessageBoxOptions, OpenDialogOptions, SaveDialogOptions } from "electron";
+import { app, shell } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { addSpacesFromBackup, chooseSnapshotsToDelete, collectNoteAndEaselIds, createBackup, parseBackup, replaceFromBackup } from "./backup";
 import type { BackupReport, BowBackup, CheckedBackup, SnapshotFile } from "./backup";
-import { applyChange, getState, getWindow, onStateChanged } from "./browserCore";
+import { applyChange, getState, onStateChanged } from "./browserCore";
+import { ask, askWhereToSave, askWhichFile } from "./dialogs";
 import { SNAPSHOT_INTERVAL_MS } from "../shared/settings";
 import { readEasel, writeEasel } from "./easelsStore";
 import { readNote, writeNote } from "./notesStore";
@@ -116,33 +116,6 @@ export function saveSnapshot(label: string, now: number): string | null {
     console.error("Could not keep a backup of the current setup:", error);
     return null;
   }
-}
-
-/**
- * Shows a save dialog over the focused window (or on its own without one).
- */
-async function askWhereToSave(options: SaveDialogOptions): Promise<string | null> {
-  const window = getWindow();
-  const result = window === null ? await dialog.showSaveDialog(options) : await dialog.showSaveDialog(window, options);
-  return result.canceled || result.filePath === undefined ? null : result.filePath;
-}
-
-/**
- * Shows an open dialog over the focused window (or on its own without one).
- */
-async function askWhichFile(options: OpenDialogOptions): Promise<string | null> {
-  const window = getWindow();
-  const result = window === null ? await dialog.showOpenDialog(options) : await dialog.showOpenDialog(window, options);
-  return result.canceled ? null : (result.filePaths[0] ?? null);
-}
-
-/**
- * Shows a message over the focused window and returns the button chosen.
- */
-async function ask(options: MessageBoxOptions): Promise<number> {
-  const window = getWindow();
-  const result = window === null ? await dialog.showMessageBox(options) : await dialog.showMessageBox(window, options);
-  return result.response;
 }
 
 /**
