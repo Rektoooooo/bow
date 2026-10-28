@@ -188,6 +188,10 @@ source never updates itself.
   `src/shared/siteSearch.ts`.
 
 **Pages**
+- **Reader view** (⌃⌘R, or the toolbar's page button on articles): the article without the site around it (menus,
+  ads, sidebars) in one calm column, with its site, author and reading time; A− / A+ size the text, Escape or Done
+  goes back to the page, which stayed loaded where it was. Bow's own extraction: the page's text comes in as plain
+  text, never as markup.
 - **Peek**: a link from a Pinned tab or Favorite to another site, or any Shift-clicked link, opens in a card that
   hangs from the window's top edge with its own back / forward / reload row, the page behind dimmed, like Arc's.
   ⌘O (or the round ↗ button) makes it a tab without reloading, Split puts it next to the page, Esc closes it.

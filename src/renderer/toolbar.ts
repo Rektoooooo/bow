@@ -273,6 +273,14 @@ export function renderToolbar(state: BrowserState, runtime: RuntimeState, select
   if (hasActiveExtensions(state)) {
     rightGroup.append(createActionButton("puzzle", "Extensions", "toolbar-button", "extensions-menu"));
   }
+  // Reader view's button: on pages that look like an article, and while Reader view shows.
+  const isReader = selectedTabId !== null && runtime.readerTabIds.includes(selectedTabId);
+  const isReadable = selectedTabId !== null && runtime.readerAvailableTabIds.includes(selectedTabId);
+  if (isReader || isReadable) {
+    const readerButton = createActionButton("reader", isReader ? "Leave Reader View (⌃⌘R)" : "Reader View (⌃⌘R)", "toolbar-button reader-toggle", "reader");
+    readerButton.classList.toggle("is-active", isReader);
+    rightGroup.append(readerButton);
+  }
   // In Developer Mode the lock opens the Control Center instead (Arc's shot 5 has no sliders button).
   if (!isDeveloper) {
     const siteButton = createActionButton("sliders", "Site controls", "toolbar-button", "site-controls");

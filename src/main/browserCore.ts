@@ -17,6 +17,7 @@
  *
  * Pattern: "single source of truth". Only applyChange() replaces the state.
  */
+import { listReaderAvailableTabIds, listReaderTabIds } from "./readerController";
 import type { BrowserWindow, WebContents } from "electron";
 import type { SidebarCommand } from "../shared/actions";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
@@ -658,6 +659,8 @@ export function collectRuntimeState(windowId: WindowId = currentState.focusedWin
     isSidebarPeeking: peekingWindowIds.has(windowId),
     isToolbarPeeking: toolbarPeekingWindowIds.has(windowId),
     isFocusMode: focusModeWindowIds.has(windowId),
+    readerTabIds: listReaderTabIds(),
+    readerAvailableTabIds: listReaderAvailableTabIds(),
     media: findMediaInfo(tabs, getShownTabIds()),
     // The Command Bar opens in the focused window, so only its "New Tab" row lights up.
     isNewTabPending: isNewTabPending && isFocused,

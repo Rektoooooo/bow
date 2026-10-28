@@ -71,6 +71,8 @@ export interface TabViewEvents {
   onContextMenu(tabId: ItemId, contents: WebContents, params: ContextMenuParams): void;
   /** The page's document is ready (Boost CSS goes in now). */
   onDomReady(tabId: ItemId, contents: WebContents): void;
+  /** The page finished loading (Reader view looks whether it is an article). */
+  onLoadFinished(tabId: ItemId, contents: WebContents): void;
   /** The pointer moved onto a link in a tab's page (its address) or off it (""). */
   onLinkHover(tabId: ItemId, url: string): void;
 }
@@ -409,6 +411,7 @@ function watchTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvent
     }
   });
   contents.on("dom-ready", () => events.onDomReady(tabId, contents));
+  contents.on("did-finish-load", () => events.onLoadFinished(tabId, contents));
   contents.on("did-start-loading", () => events.onRuntimeChanged());
   contents.on("did-stop-loading", () => {
     events.onRuntimeChanged();
@@ -535,6 +538,21 @@ function takeOutOfWindow(shown: ShownInWindow, tabId: ItemId): void {
   shown.tabIds = shown.tabIds.filter((shownId) => shownId !== tabId);
 }
 
+/** Tabs whose page stays loaded but hidden: Reader view draws the article in its place (readerController.ts). */
+const hiddenTabIds = new Set<ItemId>();
+
+/**
+ * Hides a tab's page (it stays loaded, scrolled where it was) or shows it again.
+ */
+export function setTabViewHidden(tabId: ItemId, isHidden: boolean): void {
+  if (isHidden) {
+    hiddenTabIds.add(tabId);
+  } else {
+    hiddenTabIds.delete(tabId);
+  }
+  tabViews.get(tabId)?.setVisible(!isHidden);
+}
+
 /**
  * Removes a tab's web view from the window that shows it and closes its page to free memory.
  */
@@ -551,6 +569,7 @@ export function destroyTabView(tabId: ItemId): void {
   }
   view.webContents.close();
   tabViews.delete(tabId);
+  hiddenTabIds.delete(tabId);
   sleepingHistories.delete(tabId);
   forgetSnapshot(tabId);
   viewProfileIds.delete(tabId);
@@ -727,6 +746,7 @@ function showTabsInWindow(target: WindowTarget, tabIds: ItemId[], events: TabVie
     const tab = findTab(target.state, tabId) as TabItem;
     const view = tabViews.get(tabId) ?? createTabView(target.state, tab, events);
     target.window.contentView.addChildView(view);
+    view.setVisible(!hiddenTabIds.has(tabId));
     // A page coming on screen may be on a site whose toolbar color is not known yet.
     if (getToolbarColor(view.webContents.getURL()) === null) {
       sampleToolbarColorSoon(view.webContents);

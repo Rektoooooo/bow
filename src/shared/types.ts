@@ -196,6 +196,25 @@ export interface SpaceTemplate {
   archiveAfterMs?: number | null;
 }
 
+/** One block of an article in Reader view (main/readerView.ts), in reading order. Plain text only. */
+export type ReaderBlock =
+  | { kind: "heading"; level: number; text: string }
+  | { kind: "paragraph" | "listItem" | "quote" | "code" | "caption"; text: string }
+  | { kind: "image"; src: string; alt: string };
+
+/** An article as Reader view shows it. */
+export interface ReaderArticle {
+  title: string;
+  /** The author line, or "". */
+  byline: string;
+  /** The site's name ("The Example Times"), or its host. */
+  siteName: string;
+  url: string;
+  blocks: ReaderBlock[];
+  /** Minutes to read, at least 1. */
+  minutesToRead: number;
+}
+
 /** One step of a command chain: a Command Bar action (by its id), or a web page to open in a new tab. */
 export type CommandChainStep = { kind: "action"; actionId: string } | { kind: "open"; url: string };
 
@@ -241,6 +260,8 @@ export interface BrowserSettings {
    * missing means SIDEBAR_WIDTH_PX.
    */
   sidebarWidth?: number;
+  /** Reader view's text size in pixels (READER_TEXT_SIZES). Optional: missing means READER_DEFAULT_TEXT_SIZE. */
+  readerTextSize?: number;
   /** The engine that searches typed words (shared/searchEngines.ts). Optional: missing means DuckDuckGo. */
   searchEngine?: SearchEngineId;
   /** Blocks ads and trackers (main/adBlock.ts). Optional: missing means off until the user turns it on. */
@@ -454,6 +475,9 @@ export interface RuntimeState {
   isToolbarPeeking: boolean;
   /** Focus Mode (⇧⌘F): only the page, filling the window. */
   isFocusMode: boolean;
+  /** Tabs in Reader view (their article drawn in the card), and tabs whose page looks like an article. */
+  readerTabIds: ItemId[];
+  readerAvailableTabIds: ItemId[];
   /** A tab playing (or paused) media in the background, shown as a small player above the bottom bar. */
   media: MediaInfo | null;
   /** True while the Command Bar is open to make a new tab: "New Tab" is highlighted instead of the tab, like Arc. */
@@ -547,6 +571,8 @@ export interface BrowserApi {
   saveNote(noteId: string, html: string, title: string): Promise<void>;
   /** An easel's board (JSON) and saving it (shared/easels.ts). */
   readEasel(easelId: string): Promise<string>;
+  /** The article a tab shows in Reader view (main/readerController.ts), or null. */
+  readReaderArticle(tabId: ItemId): Promise<ReaderArticle | null>;
   saveEasel(easelId: string, json: string): Promise<void>;
   /**
    * The Library's captures, for putting one on an easel (with where each came from, for a live capture), and one

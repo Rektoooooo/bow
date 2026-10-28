@@ -61,6 +61,7 @@ import { addVisit, loadHistory, saveHistoryNow, setVisitTitle } from "./historyS
 import { registerIpcHandlers } from "./ipc";
 import { archiveIdleLittleWindows, handleExternalUrl, registerLittleWindowIpc } from "./littleWindow";
 import { readFrontApp } from "./linkSourceApps";
+import { getReaderArticle, noticeReaderPageChanged, probeReaderPage } from "./readerController";
 import type { LinkSourceApp } from "../shared/routingRules";
 import { showPageContextMenu } from "./menus";
 import { applyBoostToPage, runBoostJavaScript } from "./boostPages";
@@ -112,6 +113,7 @@ let pendingExternalUrls: { url: string; sourceApp: LinkSourceApp | null }[] | nu
 /** What tabViews.ts calls when a page does something. */
 const tabViewEvents: TabViewEvents = {
   onPageChanged: (tabId, url, title) => {
+    noticeReaderPageChanged(tabId, url);
     const isOnScreen = getShownTabIds().includes(tabId);
     applyChange((state) => updateTabPage(state, tabId, url, title, isOnScreen));
     setVisitTitle(url, title);
@@ -138,6 +140,7 @@ const tabViewEvents: TabViewEvents = {
     return true;
   },
   onContextMenu: (tabId, contents, params) => showPageContextMenu(menuHost, contents, params, getExtensionMenuItems(contents, params), tabId),
+  onLoadFinished: (tabId, contents) => probeReaderPage(tabId, contents),
   onDomReady: (_tabId, contents) => {
     applySiteZoom(contents);
     applyBoostToPage(contents, getState()).catch(() => undefined);
@@ -357,6 +360,7 @@ async function handleAppReady(): Promise<void> {
       }
     },
     readEasel: (easelId) => readEasel(easelId),
+    readReaderArticle: (tabId) => getReaderArticle(tabId),
     saveEasel: (easelId, json) => {
       markSnapshotNeeded();
       markSyncedFileSaved();

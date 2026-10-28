@@ -141,6 +141,7 @@ export const appMenuCommands: AppMenuCommands = {
   toggleToolbar: () => menuHost.runAction({ type: "toggleToolbar" }),
   toggleCompactMode: () => menuHost.runAction({ type: "toggleCompactMode" }),
   toggleFocusMode: () => menuHost.runAction({ type: "toggleFocusMode" }),
+  toggleReaderView: () => menuHost.runAction({ type: "toggleReaderView" }),
   toggleFullUrls: () => applyChange((state) => setShowFullUrls(state, state.settings.showsFullUrls !== true)),
   // With a Peek open, ⌘[ / ⌘] / ⌘R and zoom act on the Peek's page (the page behind it is dimmed), like Arc.
   navigate: (command) => {

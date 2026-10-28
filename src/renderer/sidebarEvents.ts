@@ -86,6 +86,8 @@ function runButtonAction(button: HTMLElement): void {
       return dispatch({ type: "openCommandBar", mode: data.mode === "editUrl" ? "editUrl" : "newTab" });
     case "site-controls":
       return dispatch({ type: "openSiteControls" });
+    case "reader":
+      return dispatch({ type: "toggleReaderView" });
     case "split-menu":
       return dispatch({ type: "showMenu", request: { menu: "split" } });
     case "reload-menu":

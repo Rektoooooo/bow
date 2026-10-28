@@ -1905,6 +1905,109 @@ body.peek-open .main-column {
   }
 }
 
+/* ---------- Reader view (readerView.ts): the article over the hidden page, one calm column ---------- */
+
+.reader-view {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow-y: auto;
+  background: var(--note-paper);
+  color: var(--note-ink);
+  outline: none;
+}
+
+.reader-bar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  background: var(--note-paper);
+  border-bottom: 1px solid var(--note-line);
+}
+
+.reader-facts {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--note-muted);
+  font-size: 12px;
+}
+
+.reader-button {
+  border: 0;
+  border-radius: 6px;
+  padding: 3px 8px;
+  background: transparent;
+  color: var(--note-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.reader-button:hover {
+  background: var(--note-button-hover);
+}
+
+.reader-column {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 36px 28px 96px;
+  font-family: ui-serif, "New York", Georgia, serif;
+  font-size: var(--reader-text-size, 19px);
+  line-height: 1.6;
+}
+
+.reader-title {
+  margin: 0 0 8px;
+  font-size: 1.7em;
+  line-height: 1.2;
+}
+
+.reader-byline,
+.reader-caption {
+  color: var(--note-muted);
+  font-size: 0.8em;
+}
+
+.reader-heading {
+  margin: 1.4em 0 0.4em;
+  line-height: 1.3;
+}
+
+.reader-quote {
+  margin: 1em 0;
+  padding-left: 1em;
+  border-left: 3px solid var(--note-line);
+  font-style: italic;
+}
+
+.reader-code {
+  overflow-x: auto;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--note-button-hover);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75em;
+  white-space: pre;
+}
+
+.reader-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.2em auto;
+  border-radius: 6px;
+}
+
+.toolbar-button.reader-toggle.is-active {
+  background: var(--toolbar-button-active, rgba(127, 127, 127, 0.22));
+}
+
 /* ---------- Notes (noteEditor.ts): the editor fills the page card where a web page would be ---------- */
 
 .card-slot {

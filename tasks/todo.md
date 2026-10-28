@@ -308,7 +308,10 @@ M about a day, L several days.
       slides in from the top edge like the sidebar from the left, the page moving without resizing; the toolbar's
       setting is per window like the sidebar's; Focus Mode is per window and not saved)
       Compact mode (sidebar and toolbar hidden, both slide in from the edge) and Focus mode (page only) (M)
-- [ ] 14. Reader view (M)
+- [x] 14. (⌃⌘R / View / Command Bar / a toolbar button on pages that look like articles; our own extraction in an
+      isolated world (the block with the most paragraph text), checked as plain text and web images; drawn in the card
+      over the hidden page; A− / A+ text size remembered; navigating away leaves it)
+      Reader view (M)
 - [ ] 15. System-wide shortcut: Command Bar or a Little Window from any app (S)
 - [ ] 16. `bow://` URL scheme and a Raycast extension (search tabs, open in a Space, switch Spaces) (M)
 - [ ] 17. Privacy report (trackers blocked per site and week), HTTPS-only mode, per-Space "forget cookies on quit" (M)

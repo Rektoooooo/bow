@@ -24,6 +24,12 @@ export const CHAIN_STEPS_LIMIT = 20;
 /** Most command chains kept. Our choice. */
 export const CHAINS_LIMIT = 50;
 
+/** Reader view's text sizes (A− / A+ step through them), in pixels. Our choice: comfortable reading sizes. */
+export const READER_TEXT_SIZES = [15, 17, 19, 21, 24] as const;
+
+/** Reader view's text size until the user changes it. Our choice. */
+export const READER_DEFAULT_TEXT_SIZE = 19;
+
 /** Most Space templates kept. Our choice. */
 export const SPACE_TEMPLATES_LIMIT = 30;
 

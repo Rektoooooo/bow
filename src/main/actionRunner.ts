@@ -33,6 +33,7 @@ import {
 } from "./browserCore";
 import { focusMainWindow } from "./mainWindows";
 import { showToast } from "./statusBubble";
+import { toggleReaderView } from "./readerController";
 import { dismissMedia, toggleMediaPlayback } from "./media";
 import { addRoutingRule, removeRoutingRule } from "./routing";
 import { deleteBoost, setBoostCss, setBoostEnabled, setBoostJavaScript, setBoostStyle } from "./boosts";
@@ -115,6 +116,7 @@ import {
   setPinnedSectionOpen,
   setSidebarVisible,
   setToolbarVisible,
+  setReaderTextSize,
   setCompactMode,
   isCompactMode,
   setSidebarWidth,
@@ -389,6 +391,11 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => setCompactMode(state, !isCompactMode(state)));
     case "toggleFocusMode":
       return toggleFocusMode();
+    case "toggleReaderView":
+      toggleReaderView().catch((error) => console.error("Reader view failed:", error));
+      return;
+    case "setReaderTextSize":
+      return applyChange((state) => setReaderTextSize(state, action.size));
     case "setSidebarWidth":
       return resizeSidebar(action.width, action.isFinal);
     case "setSpaceProfile":

@@ -56,6 +56,7 @@ function buildFixedActions(host: CommandActionHost): FixedAction[] {
     { entry: { id: "toggle-sidebar", title: "Toggle Sidebar", keywords: ["hide sidebar", "show sidebar"] }, run: () => commands.toggleSidebar() },
     { entry: { id: "toggle-toolbar", title: "Toggle Toolbar", keywords: ["hide toolbar", "show toolbar", "address bar"] }, run: () => commands.toggleToolbar() },
     { entry: { id: "compact-mode", title: "Compact Mode", keywords: ["hide sidebar and toolbar", "minimal", "more room"] }, run: () => commands.toggleCompactMode() },
+    { entry: { id: "reader-view", title: "Reader View", keywords: ["reader", "reading", "article", "clean page"] }, run: () => commands.toggleReaderView() },
     { entry: { id: "focus-mode", title: "Focus Mode", keywords: ["page only", "distraction free", "zen", "reading"] }, run: () => commands.toggleFocusMode() },
     { entry: { id: "toggle-full-urls", title: "Toggle Full URLs", keywords: ["show full url", "full address", "hide full url"] }, run: () => commands.toggleFullUrls() },
     { entry: { id: "copy-url", title: "Copy URL", keywords: ["copy link", "copy address"] }, run: () => commands.copySelectedUrl("plain") },

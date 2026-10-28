@@ -95,6 +95,9 @@ export type BrowserAction =
   | { type: "toggleToolbar" }
   | { type: "toggleCompactMode" }
   | { type: "toggleFocusMode" }
+  /** Reader view for the selected tab (main/readerController.ts), and its text size (READER_TEXT_SIZES). */
+  | { type: "toggleReaderView" }
+  | { type: "setReaderTextSize"; size: number }
   | { type: "setSidebarWidth"; width: number; isFinal: boolean }
   | { type: "setSpaceProfile"; spaceId: SpaceId; profileId: string }
   | { type: "createProfileForSpace"; spaceId: SpaceId }
@@ -252,6 +255,8 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "toggleToolbar",
   "toggleCompactMode",
   "toggleFocusMode",
+  "toggleReaderView",
+  "setReaderTextSize",
   "setSidebarWidth",
   "setSpaceProfile",
   "createProfileForSpace",

@@ -23,6 +23,7 @@ export const IPC_CHANNELS = {
   readNote: "browser:read-note",
   saveNote: "browser:save-note",
   readEasel: "browser:read-easel",
+  readReaderArticle: "browser:read-reader-article",
   saveEasel: "browser:save-easel",
   listCaptures: "browser:list-captures",
   readCapture: "browser:read-capture",

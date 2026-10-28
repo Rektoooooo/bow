@@ -44,6 +44,7 @@ export const SYMBOL_NAMES = {
   download: "arrow.down.circle",
   camera: "camera",
   copy: "doc.on.doc",
+  reader: "doc.plaintext",
   calculator: "plus.forwardslash.minus",
   chains: "bolt.horizontal",
   code: "chevron.left.forwardslash.chevron.right",

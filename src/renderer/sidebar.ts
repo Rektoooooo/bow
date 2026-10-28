@@ -38,6 +38,7 @@ import { installTabTooltipHover } from "./tabTooltipHover.js";
 import { reloadNoteIfShown, showNoteEditor } from "./noteEditor.js";
 import { createSpaceIcon } from "./spaceIcon.js";
 import { reloadEaselIfShown, showEaselEditor } from "./easelEditor.js";
+import { renderReaderView } from "./readerView.js";
 import { getEaselId } from "../shared/easels.js";
 import { getNoteId } from "../shared/notes.js";
 import { isDeveloperModeOn } from "../shared/developerMode.js";
@@ -56,6 +57,8 @@ let currentRuntime: RuntimeState = {
   isSidebarPeeking: false,
   isToolbarPeeking: false,
   isFocusMode: false,
+  readerTabIds: [],
+  readerAvailableTabIds: [],
   media: null,
   isNewTabPending: false,
   liveFolders: {},
@@ -606,6 +609,7 @@ function renderAll(): void {
   const cardSlot = document.getElementById("card-slot");
   if (cardSlot !== null) {
     showEditors(cardSlot, selectedTabId, noteId, easelId);
+    renderReaderView(cardSlot, state, currentRuntime, selectedTabId);
   }
   updateDocumentTitle(state, selectedTabId);
 }

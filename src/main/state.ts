@@ -1049,6 +1049,16 @@ export function setSidebarVisible(state: BrowserState, isVisible: boolean): Brow
 }
 
 /**
+ * Reader view's text size (one of READER_TEXT_SIZES; ipc.ts checks).
+ */
+export function setReaderTextSize(state: BrowserState, size: number): BrowserState {
+  if (state.settings.readerTextSize === size) {
+    return state;
+  }
+  return { ...state, settings: { ...state.settings, readerTextSize: size } };
+}
+
+/**
  * Shows or hides the focused window's toolbar (Toggle Toolbar).
  */
 export function setToolbarVisible(state: BrowserState, isVisible: boolean): BrowserState {

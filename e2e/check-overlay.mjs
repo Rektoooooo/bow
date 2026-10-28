@@ -50,6 +50,7 @@ await sidebar.emulateMedia({ reducedMotion: "reduce" });
 await sidebar.waitForSelector(".space-title");
 const overlay = await findPage("/overlay/overlay.html");
 const getState = () => sidebar.evaluate(() => window.browserApi.getState());
+const getRuntime = () => sidebar.evaluate(() => window.browserApi.getRuntimeState());
 const dispatch = (action) => sidebar.evaluate((value) => window.browserApi.dispatch(value), action);
 const activeSpace = (state) => state.spaces.find((space) => space.id === state.activeSpaceId);
 const selectedTab = (state) => state.items[state.selectedTabIdBySpace[state.activeSpaceId]];
@@ -1395,7 +1396,21 @@ videoServer.close();
 const basicsDir = path.join(outDir, "overlay-basics");
 fs.rmSync(basicsDir, { recursive: true, force: true });
 fs.mkdirSync(path.join(basicsDir, "downloads"), { recursive: true });
+/** A made-up article with a site around it (menu, ads) that Reader view leaves out. */
+const ARTICLE_PARAGRAPH = "This paragraph is long enough to count as the article's own text, the way a real story reads on a page. ";
+const ARTICLE_HTML = `<!doctype html><title>A test article - Basics</title>
+  <nav><a href="/">Home menu</a> <p>${ARTICLE_PARAGRAPH.repeat(2)} Menu text</p></nav>
+  <aside><p>Buy now and save. ${ARTICLE_PARAGRAPH}</p></aside>
+  <article><h1>A test article</h1>
+    <p>${ARTICLE_PARAGRAPH.repeat(4)}</p><p>${ARTICLE_PARAGRAPH.repeat(4)}</p><h2>A part</h2><p>${ARTICLE_PARAGRAPH.repeat(4)}</p>
+    <ul><li>First point</li><li>Second point</li></ul><blockquote><p>A quoted line.</p></blockquote>
+  </article>`;
 const basicsServer = http.createServer((request, response) => {
+  if (request.url === "/article") {
+    response.writeHead(200, { "Content-Type": "text/html" });
+    response.end(ARTICLE_HTML);
+    return;
+  }
   if (request.url === "/notes.txt") {
     response.writeHead(200, { "Content-Type": "application/octet-stream", "Content-Disposition": 'attachment; filename="notes.txt"' });
     response.end("made-up notes");
@@ -1647,6 +1662,40 @@ await overlay.click(".chain-delete");
 await sidebar.waitForTimeout(400);
 check("and its trash button deletes it", ((await getState()).commandChains ?? []).length === 0 && (await getState()).settings.isSidebarVisible === true);
 await overlay.press("body", "Escape");
+
+// Reader view: an article page offers it in the toolbar; it draws the article (not the menu or the ads) over the
+// hidden page; A+ makes the text larger; Escape goes back to the page.
+await dispatch({ type: "openTab", typedText: `${basicsOrigin}/article` });
+await waitForSelectedUrl("/article");
+await sidebar.waitForSelector(".reader-toggle", { timeout: 10000 }).catch(() => undefined);
+const offersReader = (await sidebar.$(".reader-toggle")) !== null;
+await sidebar.click(".reader-toggle").catch(() => undefined);
+await sidebar.waitForSelector(".reader-view", { timeout: 5000 }).catch(() => undefined);
+const readerText = await sidebar.evaluate(() => {
+  const view = document.querySelector(".reader-view");
+  return view === null ? null : { title: view.querySelector(".reader-title")?.textContent, paragraphs: view.querySelectorAll(".reader-paragraph").length, items: view.querySelectorAll(".reader-list li").length, text: view.textContent };
+});
+const articleTabId = selectedTab(await getState()).id;
+const pageHidden = await app.evaluate(({ BrowserWindow }, origin) => {
+  const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  const view = win.contentView.children.find((child) => child.webContents?.getURL() === `${origin}/article`);
+  return view === undefined ? null : !view.getVisible();
+}, basicsOrigin);
+check(
+  "an article page offers Reader view, which draws the article over the page without the menu or the ads",
+  offersReader && readerText?.title === "A test article" && readerText.paragraphs === 3 && readerText.items === 2 && !readerText.text.includes("Buy now") && !readerText.text.includes("Menu text") && (await getRuntime()).readerTabIds.includes(articleTabId) && pageHidden === true,
+  JSON.stringify({ offersReader, title: readerText?.title, paragraphs: readerText?.paragraphs, items: readerText?.items, pageHidden }),
+);
+await sidebar.click(".reader-larger", { timeout: 5000 }).catch(() => undefined);
+await sidebar.waitForTimeout(300);
+check("A+ makes the text larger, and remembers it", (await getState()).settings.readerTextSize === 21 && (await sidebar.evaluate(() => getComputedStyle(document.querySelector(".reader-column")).fontSize)) === "21px");
+await sidebar.press(".reader-view", "Escape", { timeout: 5000 }).catch(() => undefined);
+await sidebar.waitForTimeout(400);
+check("Escape goes back to the page", (await sidebar.$(".reader-view")) === null && !(await getRuntime()).readerTabIds.includes(articleTabId));
+await dispatch({ type: "openTab", typedText: `${basicsOrigin}/not-an-article` });
+await waitForSelectedUrl("/not-an-article");
+await sidebar.waitForTimeout(1200);
+check("a page that is no article offers no Reader view", (await sidebar.$(".reader-toggle")) === null);
 
 // Space templates: save the Space as one (Space menu › Save as Template), make a new Space from it in
 // Library › Spaces, then delete the template there.

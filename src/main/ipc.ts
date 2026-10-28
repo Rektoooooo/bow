@@ -27,10 +27,10 @@ import type { WebContents } from "electron";
 import type { BrowserAction } from "../shared/actions";
 import { BROWSER_ACTION_TYPES } from "../shared/actions";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
-import { ARCHIVE_THRESHOLD_OPTIONS, SPLIT_PANES_LIMIT, TAB_SLEEP_OPTIONS } from "../shared/settings";
+import { ARCHIVE_THRESHOLD_OPTIONS, READER_TEXT_SIZES, SPLIT_PANES_LIMIT, TAB_SLEEP_OPTIONS } from "../shared/settings";
 import { isValidKeywordUrl, MAX_KEYWORD_NAME_LENGTH, SEARCH_KEYWORD_PATTERN } from "../shared/searchKeywords";
 import { isSearchEngineId } from "../shared/searchEngines";
-import type { BrowserState, GitHubLiveList, RuntimeState } from "../shared/types";
+import type { BrowserState, GitHubLiveList, ReaderArticle, RuntimeState } from "../shared/types";
 
 /** What main.ts must provide so the handlers have something to call. */
 export interface IpcHandlers {
@@ -44,6 +44,7 @@ export interface IpcHandlers {
   readNote(noteId: string): string;
   saveNote(noteId: string, html: string, title: string): void;
   readEasel(easelId: string): string;
+  readReaderArticle(tabId: string): ReaderArticle | null;
   saveEasel(easelId: string, json: string): void;
   listCaptures(): { id: string; title: string; url: string; thumbnailUrl: string | null; source: CaptureSource | null }[];
   readCapture(captureId: string): string | null;
@@ -170,6 +171,11 @@ function isGitHubLiveList(value: unknown): boolean {
 /** A whole command chain as the Library sends it: only what commandChains.ts would keep. */
 function isCommandChain(value: unknown): boolean {
   return checkCommandChain(value) !== null;
+}
+
+/** One of Reader view's text sizes. */
+function isReaderTextSize(value: unknown): boolean {
+  return READER_TEXT_SIZES.some((size) => size === value);
 }
 
 /** A ready-made feed folder's id (feedPresets.ts). */
@@ -363,6 +369,8 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   toggleToolbar: {},
   toggleCompactMode: {},
   toggleFocusMode: {},
+  toggleReaderView: {},
+  setReaderTextSize: { size: isReaderTextSize },
   setSidebarWidth: { width: isWholeNumber, isFinal: isBoolean },
   setSpaceProfile: { spaceId: isText, profileId: isText },
   createProfileForSpace: { spaceId: isText },
@@ -505,6 +513,12 @@ export function registerIpcHandlers(handlers: IpcHandlers): void {
       return;
     }
     handlers.saveNote(noteId, html, title as string);
+  });
+  ipcMain.handle(IPC_CHANNELS.readReaderArticle, (event, tabId: unknown) => {
+    if (!handlers.isTrustedSender(event.sender) || typeof tabId !== "string" || !isText(tabId)) {
+      return null;
+    }
+    return handlers.readReaderArticle(tabId);
   });
   ipcMain.handle(IPC_CHANNELS.readEasel, (event, easelId: unknown) => {
     if (!handlers.isTrustedSender(event.sender) || !isEaselId(easelId)) {
