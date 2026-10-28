@@ -5,26 +5,41 @@
  *   or be dismissed (Escape, ⌘W, a click outside). It is not saved: like Arc's, a Peek is transient.
  *
  * Data source:
- *   Link events from tabViews.ts (through main.ts), the selected tab, and the card's position.
+ *   Link events from tabViews.ts (through main.ts), the selected tab, the card's position, and where the clicked link
+ *   is in its page (asked of that page when the Peek opens).
  *
  * Data flow:
- *   link in a Pinned tab → main.ts onWillNavigate → openPeek(url, sourceTabId) → page view on top of the overlay
+ *   link in a Pinned tab → main.ts onWillNavigate → openPeek(url, sourceTabId) → the overlay grows an empty card out
+ *   of the link → "grown" → the page view goes on top of it
+ *   close → a picture of the page → the overlay shows it in the card → "closeReady" → the page view goes while the
+ *   card shrinks back into the link
  *   "Open as Tab" → adoptTabView() + openTab({ id }) → the same page becomes a Today tab, nothing reloads
  */
-import { nativeTheme, WebContentsView } from "electron";
+import { nativeTheme, screen, WebContentsView } from "electron";
 import type { BrowserWindow, WebContents } from "electron";
-import { CARD_INSET_PX, DEFAULT_PROFILE_ID, PEEK_BOTTOM_SPACE_PX, PEEK_TOOLBAR_HEIGHT_PX, PEEK_TOP_SPACE_PX } from "../shared/settings";
+import {
+  CARD_INSET_PX,
+  DEFAULT_PROFILE_ID,
+  PEEK_BOTTOM_SPACE_PX,
+  PEEK_GROW_DELAY_MS,
+  PEEK_GROW_MS,
+  PEEK_LINK_LOOKUP_MS,
+  PEEK_PICTURE_WAIT_MS,
+  PEEK_SHRINK_FADE_MS,
+  PEEK_SHRINK_MS,
+  PEEK_TOOLBAR_HEIGHT_PX,
+  PEEK_TOP_SPACE_PX,
+} from "../shared/settings";
 import { computeFramePalette } from "../shared/themePalette";
 import type { ItemId } from "../shared/types";
 import { addAfterSyncHook, applyChange, getLayoutOptions, getState, getWindow, setPeekWindow } from "./browserCore";
 import { computeCardBounds } from "./layout";
 import type { Bounds } from "./layout";
-import { hideOverlay, raiseOverlayIfShown, showOverlay } from "./overlay";
+import { getOverlayShowCount, hideOverlay, raiseOverlayIfShown, sendPeekClosing, showOverlay } from "./overlay";
 import { getProfileSession } from "./profiles";
 import { splitTabs } from "./split";
 import { getSelectedTabId, openTab, updateTabPage } from "./state";
-import { adoptTabView, glideView } from "./tabViews";
-import { LAYOUT_MOTION_MS } from "../shared/settings";
+import { adoptTabView, getTabViews } from "./tabViews";
 import type { TabViewEvents } from "./tabViews";
 import { createId, findProfileIdOfItem, getActiveSpace } from "./tree";
 
@@ -39,14 +54,33 @@ const PEEK_SIDE_MARGIN_RATIO = 0.1;
 /** Corner radius of the Peek's page (its bottom corners show; the top ones sit under the toolbar row). */
 const PEEK_RADIUS_PX = 10;
 
-/** A Peek grows from this share of its size when it opens and shrinks back to it when it closes. Our choice. */
+/**
+ * Without a link to grow from (the pointer was outside the window), the card grows from this share of its size,
+ * about its middle. Our choice.
+ */
 const PEEK_START_SCALE = 0.94;
 
-/** A closing Peek's page goes once its shrink has finished: the glide's length plus one step's margin. */
-const PEEK_CLOSE_MS = LAYOUT_MOTION_MS + 40;
+/** Without the link's own box, the card grows from a square this big around the pointer. Our choice. */
+const PEEK_POINTER_ORIGIN_PX = 16;
 
 /**
- * The Peek's bounds scaled about their middle (the size it grows from and shrinks to).
+ * The page's color before it paints, also the empty card that grows in: black in dark mode, like Arc's in the user's
+ * recording; white in light mode (no light capture exists; it is what a page without a background shows).
+ */
+const PEEK_PAGE_COLOR_DARK = "#000000";
+const PEEK_PAGE_COLOR_LIGHT = "#ffffff";
+
+/** The page's picture for the closing card: JPEG at this quality, at 1× (it shows for about 120 ms). Our choice. */
+const PEEK_PICTURE_JPEG_QUALITY = 80;
+
+/** The link lookup runs in its own JavaScript world, so the page's scripts never see it. Any id above 0 works. */
+const LINK_LOOKUP_WORLD_ID = 1007;
+
+/** If the overlay never says the card has grown (or the picture is in place), the page shows (or goes) after this. */
+const PEEK_STEP_FALLBACK_MS = 600;
+
+/**
+ * The Peek's bounds scaled about their middle (where the card grows from when there is no link).
  */
 function scaleAboutCenter(bounds: Bounds, scale: number): Bounds {
   const width = Math.round(bounds.width * scale);
@@ -62,6 +96,18 @@ let peekWindow: BrowserWindow | null = null;
 
 /** The tab the Peek was opened from; "Split" puts the Peek next to it. */
 let peekSourceTabId: ItemId | null = null;
+
+/**
+ * Where the open Peek grew from (the clicked link, window coordinates); it shrinks back there. Null until the frame's
+ * first draw, which waits for it.
+ */
+let peekOrigin: Bounds | null = null;
+
+/** True once the open Peek's card has grown and its page is on screen. */
+let isPeekPageShown = false;
+
+/** A closed Peek's page, on screen until the overlay shows its picture in the shrinking card. */
+let closingPeek: { view: WebContentsView; window: BrowserWindow; showCount: number; fallbackTimer: NodeJS.Timeout | null } | null = null;
 
 /** Page events for a Peek that becomes a tab. Set once by main.ts. */
 let tabViewEvents: TabViewEvents | null = null;
@@ -126,13 +172,95 @@ function computeDimmedCard(window: BrowserWindow): Bounds {
 }
 
 /**
- * Draws the overlay part of the Peek (its toolbar row, the dimmed page card, the buttons) under the Peek's page view,
- * and gives the page the keyboard unless the Peek is only being redrawn.
+ * The page's color before it paints (and the growing card's): it follows the system's appearance, as pages do.
  */
-function showPeekFrame(contents: WebContents, takesKeyboard: boolean = true): void {
+function getPeekPageColor(): string {
+  return nativeTheme.shouldUseDarkColors ? PEEK_PAGE_COLOR_DARK : PEEK_PAGE_COLOR_LIGHT;
+}
+
+/**
+ * Where the pointer is in a window's content (the link just clicked), or null when it is outside the window.
+ */
+function findPointerInWindow(window: BrowserWindow): { x: number; y: number } | null {
+  const pointer = screen.getCursorScreenPoint();
+  const content = window.getContentBounds();
+  const x = pointer.x - content.x;
+  const y = pointer.y - content.y;
+  const isInside = x >= 0 && y >= 0 && x < content.width && y < content.height;
+  return isInside ? { x: x, y: y } : null;
+}
+
+/**
+ * True for a box as the link lookup returns it (it comes from a web page, so it is checked).
+ */
+function isBox(value: unknown): value is Bounds {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const box = value as Record<string, unknown>;
+  const numbers = [box.x, box.y, box.width, box.height];
+  return numbers.every((number) => typeof number === "number" && Number.isFinite(number));
+}
+
+/**
+ * The box of the link under the pointer in the tab the Peek came from, in window coordinates, or null (no such tab
+ * on screen, no link there, the page did not answer within PEEK_LINK_LOOKUP_MS).
+ */
+async function findClickedLink(sourceTabId: ItemId | null, pointer: { x: number; y: number } | null): Promise<Bounds | null> {
+  const sourceView = sourceTabId === null ? undefined : getTabViews().get(sourceTabId);
+  if (sourceView === undefined || pointer === null || sourceView.webContents.isDestroyed()) {
+    return null;
+  }
+  const viewBounds = sourceView.getBounds();
+  const zoomFactor = sourceView.webContents.getZoomFactor();
+  // Page coordinates are CSS pixels; the view's zoom scales them.
+  const pageX = Math.round((pointer.x - viewBounds.x) / zoomFactor);
+  const pageY = Math.round((pointer.y - viewBounds.y) / zoomFactor);
+  const code = `(() => {
+    const link = document.elementFromPoint(${pageX}, ${pageY})?.closest("a");
+    if (!link) return null;
+    const box = link.getBoundingClientRect();
+    return { x: box.x, y: box.y, width: box.width, height: box.height };
+  })()`;
+  const lookup = sourceView.webContents.executeJavaScriptInIsolatedWorld(LINK_LOOKUP_WORLD_ID, [{ code: code }]).catch(() => null);
+  const deadline = new Promise<null>((resolve) => setTimeout(() => resolve(null), PEEK_LINK_LOOKUP_MS));
+  const found: unknown = await Promise.race([lookup, deadline]);
+  if (!isBox(found) || found.width <= 0 || found.height <= 0) {
+    return null;
+  }
+  return {
+    x: Math.round(viewBounds.x + found.x * zoomFactor),
+    y: Math.round(viewBounds.y + found.y * zoomFactor),
+    width: Math.round(found.width * zoomFactor),
+    height: Math.round(found.height * zoomFactor),
+  };
+}
+
+/**
+ * Where the card grows from: the clicked link, else a small square at the pointer, else the card itself a little
+ * smaller.
+ */
+function chooseGrowOrigin(linkBox: Bounds | null, pointer: { x: number; y: number } | null, bounds: Bounds): Bounds {
+  if (linkBox !== null) {
+    return linkBox;
+  }
+  if (pointer !== null) {
+    const half = PEEK_POINTER_ORIGIN_PX / 2;
+    return { x: Math.round(pointer.x - half), y: Math.round(pointer.y - half), width: PEEK_POINTER_ORIGIN_PX, height: PEEK_POINTER_ORIGIN_PX };
+  }
+  return scaleAboutCenter(bounds, PEEK_START_SCALE);
+}
+
+/**
+ * Draws the overlay part of the Peek (its toolbar row, the dimmed page card, the buttons) under the Peek's page view,
+ * and gives the page the keyboard unless the Peek is only being redrawn. The first draw (`isFirstDraw`) makes the
+ * card grow out of the link; until it has, the page stays off screen.
+ */
+function showPeekFrame(contents: WebContents, takesKeyboard: boolean = true, isFirstDraw: boolean = false): void {
   const window = peekWindow;
   const frame = computePeekBounds(window);
-  if (window === null || frame === null || peekView === null) {
+  // Page events before the first draw wait for it (it reads the address and history when it happens).
+  if (window === null || frame === null || peekView === null || peekOrigin === null) {
     return;
   }
   const contentSize = window.getContentSize();
@@ -146,13 +274,15 @@ function showPeekFrame(contents: WebContents, takesKeyboard: boolean = true): vo
     card: computeDimmedCard(window),
     url: contents.getURL(),
     chromeColor: palette.colors[0],
+    pageColor: getPeekPageColor(),
     canGoBack: history.canGoBack(),
     canGoForward: history.canGoForward(),
+    growFrom: isFirstDraw ? peekOrigin : null,
   };
   const view = peekView;
   showOverlay(window, fullWindow, { panel: panel, isDark: palette.isDark, library: null, site: null }, takesKeyboard).then(() => {
-    // The overlay was just put on top; the page view must sit above it.
-    if (peekView !== view) {
+    // The overlay was just put on top; the page view must sit above it (once the card has grown).
+    if (peekView !== view || !isPeekPageShown) {
       return;
     }
     window.contentView.addChildView(view);
@@ -160,6 +290,28 @@ function showPeekFrame(contents: WebContents, takesKeyboard: boolean = true): vo
       view.webContents.focus();
     }
   });
+}
+
+/**
+ * The card has grown (the overlay says so, or the fallback timer): the page goes on top of it and takes the keyboard.
+ */
+function showPeekPage(view: WebContentsView): void {
+  const window = peekWindow;
+  if (peekView !== view || isPeekPageShown || window === null || window.isDestroyed()) {
+    return;
+  }
+  isPeekPageShown = true;
+  window.contentView.addChildView(view);
+  view.webContents.focus();
+}
+
+/**
+ * The overlay's card has grown: the open Peek's page shows.
+ */
+export function finishPeekGrow(): void {
+  if (peekView !== null) {
+    showPeekPage(peekView);
+  }
 }
 
 /**
@@ -171,7 +323,9 @@ function raisePeek(): void {
     return;
   }
   raiseOverlayIfShown(window);
-  window.contentView.addChildView(peekView);
+  if (isPeekPageShown) {
+    window.contentView.addChildView(peekView);
+  }
 }
 
 /**
@@ -206,6 +360,8 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
   if (window === null || bounds === null) {
     return;
   }
+  // Read at once: the pointer is still on the link that was clicked.
+  const pointer = findPointerInWindow(window);
   closePeek();
   peekWindow = window;
   setPeekWindow(window);
@@ -216,10 +372,12 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
     webPreferences: { session: getProfileSession(profileId), sandbox: true, contextIsolation: true, nodeIntegration: false },
   });
   view.setBorderRadius(PEEK_RADIUS_PX);
-  // It grows into place, like Arc's Peek.
-  view.setBounds(scaleAboutCenter(bounds, PEEK_START_SCALE));
-  glideView(view, bounds);
+  // The same color as the empty card that grows in, so the page taking its place does not flash.
+  view.setBackgroundColor(getPeekPageColor());
+  view.setBounds(bounds);
   peekView = view;
+  peekOrigin = null;
+  isPeekPageShown = false;
   peekSourceTabId = sourceTabId ?? getSelectedTabId(state);
 
   const contents = view.webContents;
@@ -242,7 +400,83 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
   });
 
   contents.loadURL(url).catch(() => undefined);
-  showPeekFrame(contents);
+  // The card grows out of the clicked link, like Arc's; its page loads meanwhile and shows once it has grown.
+  findClickedLink(sourceTabId, pointer).then((linkBox) => {
+    if (peekView !== view) {
+      return;
+    }
+    peekOrigin = chooseGrowOrigin(linkBox, pointer, bounds);
+    showPeekFrame(contents, true, true);
+    setTimeout(() => showPeekPage(view), PEEK_GROW_DELAY_MS + PEEK_GROW_MS + PEEK_STEP_FALLBACK_MS);
+  });
+}
+
+/**
+ * A picture of a Peek's page as a 1× JPEG data: URL, or null when it fails.
+ */
+async function encodePeekPicture(view: WebContentsView): Promise<string | null> {
+  try {
+    const image = await view.webContents.capturePage();
+    const picture = image.resize({ width: view.getBounds().width, quality: "good" });
+    const jpegBytes = picture.toJPEG(PEEK_PICTURE_JPEG_QUALITY);
+    return `data:image/jpeg;base64,${jpegBytes.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A picture of a Peek's page for its closing card, or null when it takes longer than PEEK_PICTURE_WAIT_MS or fails.
+ */
+async function capturePeekPicture(view: WebContentsView): Promise<string | null> {
+  const deadline = new Promise<null>((resolve) => setTimeout(() => resolve(null), PEEK_PICTURE_WAIT_MS));
+  return Promise.race([encodePeekPicture(view), deadline]);
+}
+
+/**
+ * Closes a Peek the way Arc does: a picture of its page takes the page's place in the card, which shrinks back into
+ * the link it came from while the dim fades. The page view goes once the overlay shows the picture (finishPeekClose).
+ */
+async function playPeekClose(window: BrowserWindow, view: WebContentsView, origin: Bounds | null): Promise<void> {
+  // A Peek still closing goes at once.
+  finishPeekClose();
+  const showCount = getOverlayShowCount();
+  closingPeek = { view: view, window: window, showCount: showCount, fallbackTimer: null };
+  const pictureUrl = await capturePeekPicture(view);
+  if (closingPeek?.view !== view) {
+    return;
+  }
+  // Another panel (or a new Peek) took the overlay meanwhile: the old page just goes.
+  if (getOverlayShowCount() !== showCount || window.isDestroyed()) {
+    finishPeekClose();
+    return;
+  }
+  sendPeekClosing({ target: origin, pictureUrl: pictureUrl });
+  closingPeek.fallbackTimer = setTimeout(() => finishPeekClose(), PEEK_STEP_FALLBACK_MS);
+}
+
+/**
+ * The closing card shows the page's picture (the overlay says so, or the fallback timer): the page view goes, and
+ * the overlay once the card has shrunk, unless a new panel took it meanwhile.
+ */
+export function finishPeekClose(): void {
+  const closing = closingPeek;
+  if (closing === null) {
+    return;
+  }
+  closingPeek = null;
+  if (closing.fallbackTimer !== null) {
+    clearTimeout(closing.fallbackTimer);
+  }
+  if (!closing.window.isDestroyed()) {
+    closing.window.contentView.removeChildView(closing.view);
+  }
+  closing.view.webContents.close();
+  setTimeout(() => {
+    if (getOverlayShowCount() === closing.showCount) {
+      hideOverlay(true);
+    }
+  }, PEEK_SHRINK_MS + PEEK_SHRINK_FADE_MS);
 }
 
 /**
@@ -251,37 +485,49 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
 function removePeek(keepPage: boolean): WebContentsView | null {
   const window = peekWindow;
   const view = peekView;
+  const origin = peekOrigin;
+  const wasPageShown = isPeekPageShown;
   peekView = null;
   peekWindow = null;
+  peekOrigin = null;
+  isPeekPageShown = false;
   setPeekWindow(null);
-  hideOverlay();
   if (view === null) {
+    hideOverlay();
     return null;
   }
-  if (!keepPage) {
-    // It shrinks away while its frame fades, then the page goes.
-    glideView(view, scaleAboutCenter(view.getBounds(), PEEK_START_SCALE));
-    setTimeout(() => {
-      if (window !== null && !window.isDestroyed()) {
-        window.contentView.removeChildView(view);
-      }
-      view.webContents.close();
-    }, PEEK_CLOSE_MS);
+  if (keepPage) {
+    hideOverlay();
+    return view;
+  }
+  if (window !== null && !window.isDestroyed() && wasPageShown) {
+    playPeekClose(window, view, origin).catch(() => finishPeekClose());
     return null;
   }
-  return view;
+  // Closed before its page showed (Escape while the card grows): the frame fades, the page never appeared.
+  hideOverlay();
+  if (window !== null && !window.isDestroyed()) {
+    window.contentView.removeChildView(view);
+  }
+  view.webContents.close();
+  return null;
 }
 
 /**
  * A main window is closing: its Peek goes at once, without the shrink.
  */
 export function closePeekIn(window: BrowserWindow): void {
+  if (closingPeek?.window === window) {
+    finishPeekClose();
+  }
   if (peekView === null || peekWindow !== window) {
     return;
   }
   const view = peekView;
   peekView = null;
   peekWindow = null;
+  peekOrigin = null;
+  isPeekPageShown = false;
   peekSourceTabId = null;
   setPeekWindow(null);
   if (!window.isDestroyed()) {

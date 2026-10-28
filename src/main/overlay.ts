@@ -17,7 +17,7 @@ import { WebContentsView } from "electron";
 import type { BrowserWindow, WebContents } from "electron";
 import * as path from "node:path";
 import { OVERLAY_CHANNELS } from "../shared/overlay";
-import type { OverlayShowMessage } from "../shared/overlay";
+import type { OverlayShowMessage, PeekClosingMessage } from "../shared/overlay";
 import type { Bounds } from "./layout";
 
 /** Fully transparent, so only the panel itself is drawn over the page. */
@@ -31,6 +31,9 @@ let removalTimer: NodeJS.Timeout | null = null;
 
 let overlayView: WebContentsView | null = null;
 let isShown = false;
+
+/** How many panels were shown so far: a Peek that takes a moment to close checks that no new panel took the overlay. */
+let showCount = 0;
 
 /** The main window the overlay sits in: it moves to the focused window when a panel opens there. */
 let overlayWindow: BrowserWindow | null = null;
@@ -79,10 +82,28 @@ export async function showOverlay(window: BrowserWindow, bounds: Bounds, message
   window.contentView.addChildView(overlayView);
   overlayWindow = window;
   isShown = true;
+  showCount += 1;
   overlayView.webContents.send(OVERLAY_CHANNELS.show, message);
   if (takesKeyboard) {
     overlayView.webContents.focus();
   }
+}
+
+/**
+ * How many panels were shown so far (see showCount).
+ */
+export function getOverlayShowCount(): number {
+  return showCount;
+}
+
+/**
+ * Tells the Peek's frame to shrink back into its link (peek.ts, while the overlay still shows the Peek).
+ */
+export function sendPeekClosing(message: PeekClosingMessage): void {
+  if (overlayView === null || !isShown) {
+    return;
+  }
+  overlayView.webContents.send(OVERLAY_CHANNELS.peekClosing, message);
 }
 
 /**

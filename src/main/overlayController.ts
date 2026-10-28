@@ -59,7 +59,7 @@ import {
 import { buildFolderList } from "./folderList";
 import type { Bounds } from "./layout";
 import { getOverlayContents, hideOverlay, sendToOverlay, setOverlayBounds, showOverlay } from "./overlay";
-import { closePeek, isPeekOpen, navigatePeek, openPeekAsTab, openPeekInSplit } from "./peek";
+import { closePeek, finishPeekClose, finishPeekGrow, isPeekOpen, navigatePeek, openPeekAsTab, openPeekInSplit } from "./peek";
 import { toggleDevTools, translatePage, zoomPage } from "./pageCommands";
 import { splitTabs } from "./split";
 import { getSelectedTabId, openTab, selectTab } from "./state";
@@ -1211,6 +1211,12 @@ export function registerOverlayIpc(): void {
     }
     if (command === "back" || command === "forward" || command === "reload") {
       navigatePeek(command);
+    }
+    if (command === "grown") {
+      finishPeekGrow();
+    }
+    if (command === "closeReady") {
+      finishPeekClose();
     }
   });
   ipcMain.handle(OVERLAY_CHANNELS.openUrl, (event, url: unknown) => {

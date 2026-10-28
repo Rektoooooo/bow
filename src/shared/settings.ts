@@ -110,6 +110,28 @@ export const PEEK_TOP_SPACE_PX = 10;
 export const PEEK_TOOLBAR_HEIGHT_PX = 33;
 export const PEEK_BOTTOM_SPACE_PX = 11;
 
+/**
+ * Arc's Peek motion, measured frame by frame in the user's recording (2026-10-28, 60 fps). Opening: the dim fades in
+ * over about 90 ms while an empty card (its toolbar row over a blank page) grows out of the clicked link from about
+ * 80 ms on, for about 190 ms on an ease-out curve (width progress fits a cubic ease-out); the page shows once it has
+ * grown. Closing: a picture of the page shrinks back into the link in about 88 ms, close to linearly, then fades in
+ * about 35 ms, while the dim is gone after about 60 ms.
+ */
+export const PEEK_DIM_IN_MS = 90;
+export const PEEK_GROW_DELAY_MS = 80;
+export const PEEK_GROW_MS = 190;
+export const PEEK_GROW_EASING = "cubic-bezier(0.33, 1, 0.68, 1)";
+export const PEEK_SHRINK_MS = 88;
+export const PEEK_SHRINK_FADE_MS = 35;
+export const PEEK_DIM_OUT_MS = 60;
+
+/**
+ * How long opening waits to learn where the clicked link is in its page, and closing for a picture of the page,
+ * before they animate without (from the pointer, or a plain card). Our choice: short enough not to be felt.
+ */
+export const PEEK_LINK_LOOKUP_MS = 50;
+export const PEEK_PICTURE_WAIT_MS = 100;
+
 /** Gap between the sidebar's content and the page card. Measured on the user's Arc: 7 pt. Must match --card-gap. */
 export const CARD_GAP_PX = 7;
 

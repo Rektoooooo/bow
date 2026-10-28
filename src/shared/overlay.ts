@@ -49,11 +49,12 @@ export type OverlayPanel =
   /** Arc's icon picker for a Space, pointing at the Space's button (anchor, in window coordinates). */
   | { kind: "spaceIcon"; spaceId: string; icon: string; anchor: OverlayRect }
   /**
-   * Arc's Peek: `frame` is where the page view sits; the overlay draws the card's toolbar row above it (from the
-   * window's top edge, in `chromeColor`, the window frame's color), dims the page card (`card`) behind it and stacks
-   * the buttons right of it.
+   * Arc's Peek: `frame` is where the page view sits; the overlay draws the card's toolbar row above it (in
+   * `chromeColor`, the window frame's color), dims the page card (`card`) behind it and stacks the buttons right of
+   * it. The first draw of a Peek carries `growFrom`, the clicked link's place: the card grows out of it, empty (in
+   * `pageColor`, the page view's color before it paints), and the page shows once it has grown.
    */
-  | { kind: "peek"; frame: OverlayRect; card: OverlayRect; url: string; chromeColor: string; canGoBack: boolean; canGoForward: boolean }
+  | { kind: "peek"; frame: OverlayRect; card: OverlayRect; url: string; chromeColor: string; pageColor: string; canGoBack: boolean; canGoForward: boolean; growFrom: OverlayRect | null }
   | { kind: "permission"; requestId: string; host: string; kinds: SitePermissionKind[]; appName: string | null }
   | { kind: "capture"; frame: { x: number; y: number; width: number; height: number } }
   | { kind: "switcher"; tabs: SwitcherTab[]; index: number }
@@ -90,8 +91,17 @@ export interface OverlayRect {
   height: number;
 }
 
-/** The Peek header's buttons. */
-export type PeekCommand = "openAsTab" | "split" | "close" | "back" | "forward" | "reload";
+/**
+ * The Peek frame's buttons, and two steps of its animations: "grown" (the card has grown, the page may show) and
+ * "closeReady" (the closing card shows the page's picture, the page view may go).
+ */
+export type PeekCommand = "openAsTab" | "split" | "close" | "back" | "forward" | "reload" | "grown" | "closeReady";
+
+/** A Peek is closing: the card shrinks into `target` (the link it grew from), showing `pictureUrl` (null: none). */
+export interface PeekClosingMessage {
+  target: OverlayRect | null;
+  pictureUrl: string | null;
+}
 
 /** One line in the Command Bar, as the overlay draws it. */
 export interface CommandBarLine {
@@ -256,6 +266,8 @@ export interface OverlayApi {
   onFindProgress(listener: (progress: FindProgress) => void): void;
   /** The panel is closing: play the closing animation and clear the page (the view goes away right after). */
   onClosing(listener: () => void): void;
+  /** The Peek is closing: its card shrinks back into the link (peekFrame.ts playPeekClose). */
+  onPeekClosing(listener: (message: PeekClosingMessage) => void): void;
   /** The switcher: ⌃Tab pressed again (+1) or ⌃⇧Tab (−1), and ⌃ let go while the page still had the keyboard. */
   onSwitcherStep(listener: (step: number) => void): void;
   onSwitcherCommit(listener: () => void): void;
@@ -308,6 +320,7 @@ export const OVERLAY_CHANNELS = {
   activateExtension: "overlay:activate-extension",
   showSiteMenu: "overlay:show-site-menu",
   closing: "overlay:closing",
+  peekClosing: "overlay:peek-closing",
   switcherStep: "overlay:switcher-step",
   switcherCommit: "overlay:switcher-commit",
   chooseTab: "overlay:choose-tab",

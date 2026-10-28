@@ -15,7 +15,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { IpcRendererEvent } from "electron";
 import type { BrowserAction } from "../shared/actions";
 import type { IPC_CHANNELS } from "../shared/ipcChannels";
-import type { CommandBarLine, FindProgress, LibraryData, OVERLAY_CHANNELS, OverlayApi, OverlayShowMessage } from "../shared/overlay";
+import type { CommandBarLine, FindProgress, LibraryData, OVERLAY_CHANNELS, OverlayApi, OverlayShowMessage, PeekClosingMessage } from "../shared/overlay";
 
 /**
  * Sandboxed preload scripts may load only Electron's own modules, so the channel names are repeated here, typed
@@ -40,6 +40,7 @@ const CHANNELS: typeof OVERLAY_CHANNELS = {
   activateExtension: "overlay:activate-extension",
   showSiteMenu: "overlay:show-site-menu",
   closing: "overlay:closing",
+  peekClosing: "overlay:peek-closing",
   switcherStep: "overlay:switcher-step",
   switcherCommit: "overlay:switcher-commit",
   chooseTab: "overlay:choose-tab",
@@ -69,6 +70,9 @@ function createOverlayApi(): OverlayApi {
     },
     onClosing: (listener) => {
       ipcRenderer.on(CHANNELS.closing, () => listener());
+    },
+    onPeekClosing: (listener) => {
+      ipcRenderer.on(CHANNELS.peekClosing, (_event: IpcRendererEvent, message: PeekClosingMessage) => listener(message));
     },
     onSwitcherStep: (listener) => {
       ipcRenderer.on(CHANNELS.switcherStep, (_event: IpcRendererEvent, step: number) => listener(step));

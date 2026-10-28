@@ -220,7 +220,39 @@ async function clickLinkInPage(urlPart) {
   });
   await page.mouse.click(point.x, point.y);
 }
+// Where the clicked link is in the window: its box in the page plus the page view's place.
+const sourceLinkBox = await (async () => {
+  const sourcePage = await findPage("example.com/peek-source");
+  const linkInPage = await sourcePage.evaluate(() => document.querySelector("a").getBoundingClientRect().toJSON());
+  const sourceViewBounds = await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+    return win.contentView.children.find((child) => child.webContents?.getURL().includes("example.com/peek-source"))?.getBounds() ?? null;
+  });
+  return sourceViewBounds === null ? null : { x: sourceViewBounds.x + linkInPage.x, y: sourceViewBounds.y + linkInPage.y, width: linkInPage.width, height: linkInPage.height };
+})();
 await clickLinkInPage("example.com/peek-source");
+// Like Arc's, the Peek opens as an empty card growing out of the clicked link; its page goes on top once it has grown.
+const growTransform = await overlay
+  .waitForFunction(
+    () => {
+      const grow = document.querySelector(".peek-card")?.getAnimations().find((animation) => animation.effect.getKeyframes().length === 2);
+      return grow?.effect.getKeyframes()[0].transform ?? null;
+    },
+    null,
+    { timeout: 5000, polling: "raf" },
+  )
+  .then((handle) => handle.jsonValue())
+  .catch(() => null);
+const viewsWhileGrowing = await peekViews();
+const isStillGrowing = await overlay.evaluate(() => document.querySelector(".peek-card")?.getAnimations().some((animation) => animation.playState === "running") ?? false);
+const growCardBox = await overlay.$eval(".peek-card", (element) => ({ x: parseFloat(element.style.left), y: parseFloat(element.style.top), width: parseFloat(element.style.width), height: parseFloat(element.style.height) })).catch(() => null);
+const growNumbers = (growTransform ?? "").match(/-?[\d.]+/g)?.map(Number) ?? [];
+const growStart = growCardBox === null || growNumbers.length !== 4 ? null : { x: growCardBox.x + growNumbers[0], y: growCardBox.y + growNumbers[1], width: growCardBox.width * growNumbers[2], height: growCardBox.height * growNumbers[3] };
+const isFromLink = growStart !== null && sourceLinkBox !== null && ["x", "y", "width", "height"].every((key) => Math.abs(growStart[key] - sourceLinkBox[key]) <= 2);
+check("the Peek's card grows out of the clicked link", isFromLink, `from ${JSON.stringify(growStart)} link ${JSON.stringify(sourceLinkBox)} (${growTransform})`);
+// The page view may only be on screen once the card has grown (checked while the grow is still running).
+const isPageEarly = isStillGrowing && viewsWhileGrowing.some((view) => view.url.includes("iana.org"));
+check("…empty, its page shows once it has grown", !isPageEarly, `still growing ${isStillGrowing}, views ${viewsWhileGrowing.map((view) => view.url).join(",")}`);
 await sidebar.waitForTimeout(2500);
 let views = await peekViews();
 const peekEntry = views.find((view) => view.url.includes("iana.org"));
@@ -285,15 +317,37 @@ const peekUrlAfterBack = await newestPeekUrl();
 state = await getState();
 const isPeekBack = secondPeekUrl.includes("/about") && peekUrlAfterBack === firstPeekUrl;
 check("the menu's Back goes back in the Peek, not in the tab behind it", isPeekBack && state.items[pinnedSourceId]?.url.startsWith("https://example.com/peek-source"), `${firstPeekUrl} → ${secondPeekUrl} → ${peekUrlAfterBack}`);
+// Closing, like Arc's: a picture of the page takes its place in the card, which shrinks back into the link.
+await overlay.evaluate(() => {
+  window.peekCloseSeen = { picture: false, shrinkTo: null };
+  const watch = () => {
+    const picture = document.querySelector(".peek-picture");
+    if (picture?.src.startsWith("data:image/jpeg")) {
+      window.peekCloseSeen.picture = true;
+    }
+    const shrink = document.querySelector(".peek-card")?.getAnimations().find((animation) => animation.effect.getKeyframes().length === 3);
+    if (shrink !== undefined) {
+      window.peekCloseSeen.shrinkTo = shrink.effect.getKeyframes()[1].transform;
+    }
+    if (window.peekCloseSeen.shrinkTo === null) {
+      requestAnimationFrame(watch);
+    }
+  };
+  requestAnimationFrame(watch);
+});
 // Press Escape in the Peek's page: the newest iana.org page (the adopted tab is an older one).
 await app.evaluate(({ webContents }) => {
   const ianaPages = webContents.getAllWebContents().filter((contents) => contents.getURL().includes("iana.org"));
   const peekContents = ianaPages.sort((first, second) => second.id - first.id)[0];
   peekContents.sendInputEvent({ type: "keyDown", keyCode: "Escape" });
 });
-await sidebar.waitForTimeout(600);
+await sidebar.waitForTimeout(1000);
 views = await peekViews();
 check("Escape dismisses the Peek", !views.some((view) => view.url.includes("iana.org")) && !(await overlayIsShown()), JSON.stringify(views.map((view) => view.url)));
+const closeSeen = await overlay.evaluate(() => window.peekCloseSeen);
+const shrinkScales = (closeSeen.shrinkTo ?? "").match(/scale\(([\d.]+), ([\d.]+)\)/);
+const isIntoLink = shrinkScales !== null && Number(shrinkScales[1]) < 0.5 && Number(shrinkScales[2]) < 0.5;
+check("…its card shrinks back into the link, showing a picture of the page", closeSeen.picture && isIntoLink, JSON.stringify(closeSeen));
 const dragAfterPeek = await dragRegions();
 check("…and the toolbar drags the window again", dragAfterPeek.toolbar === "drag", JSON.stringify(dragAfterPeek));
 

@@ -2301,10 +2301,15 @@ body[data-panel="peek"] .backdrop {
   pointer-events: none;
 }
 
+/* Transformed about its top left: peekFrame.ts grows it out of the clicked link and shrinks it back. */
 .peek-card {
   position: fixed;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border-radius: 10px;
   background: var(--peek-chrome);
+  transform-origin: 0 0;
   box-shadow:
     0 0 0 0.5px rgba(0, 0, 0, 0.12),
     0 16px 50px rgba(0, 0, 0, 0.35);
@@ -2316,7 +2321,25 @@ body.dark .peek-card {
     0 16px 50px rgba(0, 0, 0, 0.35);
 }
 
+/* The page's place: empty (the page's color before it paints) while the card grows, under the page view after. */
+.peek-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: var(--peek-page);
+}
+
+/* The page's picture, in the page's place while the card shrinks away. */
+.peek-picture {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .peek-toolbar {
+  flex: none;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
@@ -2418,30 +2441,8 @@ body.dark .peek-address {
   height: 14px;
 }
 
-/* The Peek's frame grows in with its page (peek.ts glides the page from 94 %) and fades out with it. */
-.peek-dim,
-.peek-card,
-.peek-buttons {
-  animation: peek-in var(--motion-layout, 260ms) var(--motion-ease);
-}
-
-.peek-dim {
-  animation-name: fade-in;
-}
-
-@keyframes peek-in {
-  from {
-    opacity: 0;
-    transform: scale(0.97);
-  }
-}
-
-.is-peek-redraw .peek-dim,
-.is-peek-redraw .peek-card,
-.is-peek-redraw .peek-buttons {
-  animation: none;
-}
-
+/* Opening and closing grow and shrink the card in peekFrame.ts (Arc's motion, settings.ts PEEK_*). A Peek that
+   becomes a tab or a split view, or closes before its page showed, just fades. */
 body.is-closing .peek-dim,
 body.is-closing .peek-card,
 body.is-closing .peek-buttons {

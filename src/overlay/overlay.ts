@@ -18,7 +18,7 @@ import type { IconName } from "../renderer/icons.js";
 import { renderFindBar } from "./findBar.js";
 import { renderLibrary } from "./library.js";
 import { renderBoostEditor } from "./boostEditor.js";
-import { renderPeekFrame } from "./peekFrame.js";
+import { playPeekClose, renderPeekFrame } from "./peekFrame.js";
 import { renderPermissionPrompt } from "./permissionPrompt.js";
 import { renderThemeEditor } from "./themeEditor.js";
 import { renderSpaceIconPicker } from "./spaceIconPicker.js";
@@ -535,6 +535,12 @@ function startOverlay(): void {
   window.overlayApi.getSymbols().then(installSymbols).catch(() => undefined);
   window.overlayApi.onShow(showPanel);
   window.overlayApi.onClosing(playClosing);
+  window.overlayApi.onPeekClosing((message) => {
+    const host = document.getElementById("panel");
+    if (host !== null) {
+      playPeekClose(host, message).catch(() => undefined);
+    }
+  });
   installSwitcherMessages();
   window.overlayApi.onResults((query, lines) => {
     if (commandInput === null || typedText !== query || siteSearch !== null) {
