@@ -20,6 +20,7 @@ import {
   getWindow,
   moveShownElsewhereTabsHere,
   previewSidebarWidthWhileDragging,
+  previewSplitSizesWhileDragging,
   reportOpenEditor,
   setItemDrag,
   handOverDrop,
@@ -72,10 +73,11 @@ import { setTabSleepAfter } from "./tabSleep";
 import { restartToUpdate } from "./appUpdates";
 import { createFeedLiveFolderFromPage, createGitHubLiveFolder, openLiveFolderSource, refreshLiveFolder } from "./liveFolderRefresher";
 import { showHiddenLiveFolderItems } from "./liveFolders";
-import { setSplitOrientation, separateTabFromSplit, splitTabs, unsplit } from "./split";
+import { equalizeSplit, setSplitOrientation, setSplitSizes, separateTabFromSplit, splitTabs, swapSplitPanes, unsplit } from "./split";
 import {
   addToFavorites,
   addSearchKeyword,
+  getSelectedTabId,
   removeSearchKeyword,
   setAskWhereToSave,
   setDownloadFolder,
@@ -153,6 +155,19 @@ function openLinkElsewhere(url: string, place: LinkPlace, sourceTabId: ItemId): 
     return;
   }
   openLittleWindow(url);
+}
+
+/**
+ * Dragging a split divider: the panes follow live, and the sizes are saved when the drag ends (then the preview
+ * goes, after the saved sizes are in place, so nothing jumps).
+ */
+function resizeSplitPanes(splitId: ItemId, sizes: number[], isFinal: boolean): void {
+  if (!isFinal) {
+    previewSplitSizesWhileDragging({ splitId: splitId, sizes: sizes });
+    return;
+  }
+  applyChange((state) => setSplitSizes(state, splitId, sizes));
+  previewSplitSizesWhileDragging(null);
 }
 
 /**
@@ -296,6 +311,12 @@ export function runAction(action: BrowserAction): void {
       return closeSplitByUser(action.splitId);
     case "setSplitOrientation":
       return applyChange((state) => setSplitOrientation(state, action.splitId, action.orientation));
+    case "resizeSplit":
+      return resizeSplitPanes(action.splitId, action.sizes, action.isFinal);
+    case "swapSplitPanes":
+      return applyChange((state) => swapSplitPanes(state, action.splitId, getSelectedTabId(state)));
+    case "equalizeSplit":
+      return applyChange((state) => equalizeSplit(state, action.splitId));
     case "switchSpace":
       return applyChange((state) => switchSpace(state, action.spaceId, now));
     case "switchSpaceByOffset":

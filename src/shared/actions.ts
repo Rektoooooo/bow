@@ -69,6 +69,10 @@ export type BrowserAction =
   | { type: "unsplit"; splitId: ItemId }
   | { type: "closeSplit"; splitId: ItemId }
   | { type: "setSplitOrientation"; splitId: ItemId; orientation: SplitOrientation }
+  /** Dragging a split divider (shared/splitLayout.ts): shown live, saved when isFinal. */
+  | { type: "resizeSplit"; splitId: ItemId; sizes: number[]; isFinal: boolean }
+  | { type: "swapSplitPanes"; splitId: ItemId }
+  | { type: "equalizeSplit"; splitId: ItemId }
   | { type: "switchSpace"; spaceId: SpaceId }
   | { type: "switchSpaceByOffset"; offset: number }
   | { type: "createSpace"; name: string; icon: string; theme: SpaceTheme }
@@ -198,6 +202,9 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "unsplit",
   "closeSplit",
   "setSplitOrientation",
+  "resizeSplit",
+  "swapSplitPanes",
+  "equalizeSplit",
   "switchSpace",
   "switchSpaceByOffset",
   "createSpace",

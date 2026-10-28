@@ -210,6 +210,39 @@ const splitBounds = await tabViewBounds(app);
 check("a split view shows two pages side by side", splitBounds.length === 2 && splitBounds[0].x < splitBounds[1].x && splitBounds[0].y === splitBounds[1].y, JSON.stringify(splitBounds));
 check("the split shows as one row with two panes", (await page.locator(".split-row .split-pane").count()) === 2);
 await windowShot(app, "03-split-view");
+
+// The divider between the panes: the sidebar page draws its handle in the gap main left between the pages
+// (shared/splitLayout.ts on both sides); dragging resizes the pages and saves, a double-click makes them equal.
+const panesByX = async () => (await tabViewBounds(app)).sort((first, second) => first.x - second.x);
+const handleBox = await page.locator("#split-dividers .split-divider").first().boundingBox().catch(() => null);
+const panesBefore = await panesByX();
+const gapLeft = (panesBefore[0]?.x ?? 0) + (panesBefore[0]?.width ?? 0);
+const gapRight = panesBefore[1]?.x ?? 0;
+const handleCenterX = handleBox === null ? -1 : handleBox.x + handleBox.width / 2;
+check("the split divider's handle sits in the gap between the two pages", handleCenterX > gapLeft && handleCenterX < gapRight, `${handleCenterX} in ${gapLeft}–${gapRight}`);
+const handleCenterY = handleBox === null ? 0 : handleBox.y + handleBox.height / 2;
+await page.mouse.move(handleCenterX, handleCenterY);
+await page.mouse.down();
+await page.mouse.move(handleCenterX - 150, handleCenterY, { steps: 6 });
+await page.mouse.up();
+await page.waitForTimeout(600);
+state = await getState(page);
+const resizedSplit = Object.values(state.items).find((item) => item.kind === "split");
+const panesAfterDrag = await panesByX();
+check("dragging the divider resizes the panes, and the sizes are saved", (resizedSplit?.sizes?.[0] ?? 1) < 0.45 && panesAfterDrag[0].width < panesBefore[0].width - 100, `${JSON.stringify(resizedSplit?.sizes)} ${panesBefore[0]?.width} → ${panesAfterDrag[0]?.width}`);
+const movedHandle = await page.locator("#split-dividers .split-divider").first().boundingBox().catch(() => null);
+const movedGap = (panesAfterDrag[0]?.x ?? 0) + (panesAfterDrag[0]?.width ?? 0);
+check("and the handle follows into the new gap", movedHandle !== null && Math.abs(movedHandle.x - movedGap) <= 1, `${movedHandle?.x} vs ${movedGap}`);
+await page.locator("#split-dividers .split-divider").first().dblclick();
+await page.waitForTimeout(600);
+state = await getState(page);
+const panesEqual = await panesByX();
+check("double-clicking the divider makes the panes equal again", Object.values(state.items).find((item) => item.kind === "split")?.sizes === undefined && Math.abs(panesEqual[0].width - panesEqual[1].width) <= 1, `${panesEqual[0]?.width} / ${panesEqual[1]?.width}`);
+const orderBeforeSwap = Object.values(state.items).find((item) => item.kind === "split").childIds;
+await dispatch(page, { type: "swapSplitPanes", splitId: Object.values(state.items).find((item) => item.kind === "split").id });
+await page.waitForTimeout(400);
+state = await getState(page);
+check("Swap Panes trades the two pages' places", JSON.stringify(Object.values(state.items).find((item) => item.kind === "split").childIds) === JSON.stringify([...orderBeforeSwap].reverse()));
 state = await getState(page);
 // Like a Today tab's row, the split's row shows × on hover: it closes the split view, its tabs go to the Archive.
 const splitItem = Object.values(state.items).find((item) => item.kind === "split");

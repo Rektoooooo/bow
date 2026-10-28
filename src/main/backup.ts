@@ -49,6 +49,7 @@ import type {
   SpaceId,
   SpaceTheme,
   SplitItem,
+  SplitOrientation,
   TabItem,
 } from "../shared/types";
 import { upgradeToCurrentVersion } from "./migrate";
@@ -301,8 +302,14 @@ function checkItem(key: string, raw: unknown): SidebarItem | null {
     return folder;
   }
   if (raw.kind === "split") {
-    const orientation = raw.orientation === "vertical" ? "vertical" : "horizontal";
+    const isKnownLayout = raw.orientation === "vertical" || raw.orientation === "grid";
+    const orientation: SplitOrientation = isKnownLayout ? (raw.orientation as SplitOrientation) : "horizontal";
     const split: SplitItem = { kind: "split", id: key, childIds: readIdList(raw.childIds), orientation: orientation };
+    // Pane sizes: a few numbers; whether they fit is decided where they are used (shared/splitLayout.ts).
+    const isSizeList = Array.isArray(raw.sizes) && raw.sizes.length <= SPLIT_PANES_LIMIT && raw.sizes.every((size) => isFiniteNumber(size));
+    if (isSizeList) {
+      split.sizes = raw.sizes as number[];
+    }
     return split;
   }
   return null;

@@ -3,7 +3,7 @@
  *   Split views rearrange the sidebar; these tests make sure no tab is lost or duplicated while splitting and unsplitting.
  */
 import { describe, expect, it } from "vitest";
-import { addTabToSplit, separateTabFromSplit, splitTabs, unsplit } from "../src/main/split";
+import { addTabToSplit, equalizeSplit, findAdjacentPaneTabId, separateTabFromSplit, setSplitOrientation, setSplitSizes, splitTabs, swapSplitPanes, unsplit } from "../src/main/split";
 import { closeTab, getSelectedTabId } from "../src/main/state";
 import { findSplitOfTab } from "../src/main/tree";
 import { HOUR_MS, SPLIT_PANES_LIMIT } from "../src/shared/settings";
@@ -85,5 +85,64 @@ describe("leaving a split", () => {
     const state = unsplit(threePanes, findSplitOfTab(threePanes, tabC) as ItemId);
 
     expect(getTodayIds(state)).toEqual([tabC, tabIds[0], tabIds[1]]);
+  });
+});
+
+describe("split view layouts", () => {
+  /** A split view of the given tabs (in pane order) and its id. */
+  function buildSplit(urls: string[]) {
+    const { state: built, tabIds } = openTabs(urls);
+    let state = splitTabs(built, tabIds[0] as ItemId, tabIds[1] as ItemId, ONE_PM);
+    const splitId = findSplitOfTab(state, tabIds[0] as ItemId) as ItemId;
+    for (const tabId of tabIds.slice(2)) {
+      state = addTabToSplit(state, splitId, tabId, ONE_PM);
+    }
+    return { state, splitId, tabIds };
+  }
+  const splitOf = (state: ReturnType<typeof buildSplit>["state"], splitId: ItemId) => {
+    const item = state.items[splitId];
+    if (item === undefined || item.kind !== "split") {
+      throw new Error("Test setup problem: no split view");
+    }
+    return item;
+  };
+
+  it("keeps dragged sizes that fit, and refuses ones that do not", () => {
+    const { state, splitId } = buildSplit(["https://a.example/", "https://b.example/"]);
+    const sized = setSplitSizes(state, splitId, [0.3, 0.7]);
+    expect(splitOf(sized, splitId).sizes).toEqual([0.3, 0.7]);
+    expect(setSplitSizes(state, splitId, [0.3, 0.3, 0.4])).toBe(state);
+    expect(setSplitSizes(state, splitId, [0.5, 0.9])).toBe(state);
+    expect(splitOf(equalizeSplit(sized, splitId), splitId).sizes).toBeUndefined();
+  });
+
+  it("a grid needs three panes, and a new layout starts with equal panes", () => {
+    const two = buildSplit(["https://a.example/", "https://b.example/"]);
+    expect(setSplitOrientation(two.state, two.splitId, "grid")).toBe(two.state);
+    const three = buildSplit(["https://a.example/", "https://b.example/", "https://c.example/"]);
+    const sized = setSplitSizes(three.state, three.splitId, [0.2, 0.3, 0.5]);
+    const grid = setSplitOrientation(sized, three.splitId, "grid");
+    expect(splitOf(grid, three.splitId).orientation).toBe("grid");
+    expect(splitOf(grid, three.splitId).sizes).toBeUndefined();
+  });
+
+  it("Swap Panes trades the focused pane with the next, its size with it", () => {
+    const { state, splitId } = buildSplit(["https://a.example/", "https://b.example/", "https://c.example/"]);
+    const before = splitOf(state, splitId).childIds;
+    const sized = setSplitSizes(state, splitId, [0.2, 0.3, 0.5]);
+    const swapped = swapSplitPanes(sized, splitId, before[1] as ItemId);
+    expect(splitOf(swapped, splitId).childIds).toEqual([before[0], before[2], before[1]]);
+    expect(splitOf(swapped, splitId).sizes).toEqual([0.2, 0.5, 0.3]);
+    const lastSwapped = swapSplitPanes(state, splitId, before[2] as ItemId);
+    expect(splitOf(lastSwapped, splitId).childIds).toEqual([before[0], before[2], before[1]]);
+  });
+
+  it("Next Pane and Previous Pane go round the split view's panes", () => {
+    const { state, splitId } = buildSplit(["https://a.example/", "https://b.example/", "https://c.example/"]);
+    const panes = splitOf(state, splitId).childIds;
+    const selected = getSelectedTabId(state) as ItemId;
+    const index = panes.indexOf(selected);
+    expect(findAdjacentPaneTabId(state, 1)).toBe(panes[(index + 1) % panes.length]);
+    expect(findAdjacentPaneTabId(state, -1)).toBe(panes[(index - 1 + panes.length) % panes.length]);
   });
 });

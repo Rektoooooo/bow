@@ -2237,3 +2237,36 @@ body.peek-open .main-column {
   margin: 4px;
   color: var(--note-muted);
 }
+
+/* The handles between split panes (splitDividers.ts): placed in window coordinates over the gaps the page views
+   leave; a thin line shows on hover and while dragging. */
+.split-dividers {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.split-divider {
+  position: absolute;
+  pointer-events: auto;
+  cursor: col-resize;
+}
+
+.split-divider.is-row-line {
+  cursor: row-resize;
+}
+
+.split-divider::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background-color var(--motion-fast) linear;
+}
+
+.split-divider:hover::after,
+.is-resizing-split .split-divider::after {
+  background: var(--row-selected);
+}

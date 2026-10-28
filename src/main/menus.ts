@@ -26,6 +26,7 @@ import { getSiteKey } from "../shared/siteKey";
 import { ARCHIVE_THRESHOLD_OPTIONS } from "../shared/settings";
 import { isKeptAwake } from "./tabSleep";
 import { canJoinSplit } from "./split";
+import { GRID_MIN_PANES } from "../shared/splitLayout";
 
 /** What the menus need from main.ts. */
 export interface MenuHost {
@@ -112,7 +113,10 @@ function buildSplitItems(host: MenuHost, tabId: ItemId): MenuItemConstructorOpti
     return [buildSplitWithMenu(host, tabId)];
   }
   const split = state.items[splitId];
-  const orientation = split !== undefined && split.kind === "split" ? split.orientation : "horizontal";
+  const isSplit = split !== undefined && split.kind === "split";
+  const orientation = isSplit ? split.orientation : "horizontal";
+  const paneCount = isSplit ? split.childIds.length : 0;
+  const hasSizes = isSplit && split.sizes !== undefined;
   return [
     buildSplitWithMenu(host, tabId),
     { label: "Separate from Split View", click: () => host.runAction({ type: "separateTabFromSplit", tabId: tabId }) },
@@ -129,6 +133,17 @@ function buildSplitItems(host: MenuHost, tabId: ItemId): MenuItemConstructorOpti
       checked: orientation === "vertical",
       click: () => host.runAction({ type: "setSplitOrientation", splitId: splitId, orientation: "vertical" }),
     },
+    {
+      label: "Grid",
+      type: "radio",
+      checked: orientation === "grid",
+      // A grid needs 3 or 4 panes (shared/splitLayout.ts).
+      enabled: paneCount >= GRID_MIN_PANES,
+      click: () => host.runAction({ type: "setSplitOrientation", splitId: splitId, orientation: "grid" }),
+    },
+    { type: "separator" },
+    { label: "Swap Panes", click: () => host.runAction({ type: "swapSplitPanes", splitId: splitId }) },
+    { label: "Equal Pane Sizes", enabled: hasSizes, click: () => host.runAction({ type: "equalizeSplit", splitId: splitId }) },
   ];
 }
 

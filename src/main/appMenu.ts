@@ -15,6 +15,7 @@
 import { Menu } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
 import type { NavigationCommand } from "../shared/actions";
+import type { SplitOrientation } from "../shared/types";
 
 /** What the menu items do. main.ts implements each one. */
 export interface AppMenuCommands {
@@ -33,6 +34,11 @@ export interface AppMenuCommands {
   closeDuplicateTabs(): void;
   addSplitPane(): void;
   closeSplitPane(): void;
+  /** Tabs › Split View: the selected split view's layout, Swap Panes, Equal Pane Sizes, and moving between panes. */
+  setSplitLayout(orientation: SplitOrientation): void;
+  swapSplitPanes(): void;
+  equalizeSplitPanes(): void;
+  focusAdjacentPane(offset: number): void;
   switchSpaceByOffset(offset: number): void;
   switchSpaceByNumber(spaceNumber: number): void;
   newSpace(): void;
@@ -229,6 +235,20 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
         { type: "separator" },
         { label: "Add Split View", accelerator: "Control+Shift+=", click: () => commands.addSplitPane() },
         { label: "Close Split Pane", accelerator: "Control+Shift+-", click: () => commands.closeSplitPane() },
+        {
+          label: "Split View",
+          submenu: [
+            { label: "Side by Side", accelerator: "Control+Alt+CommandOrControl+1", click: () => commands.setSplitLayout("horizontal") },
+            { label: "Stacked", accelerator: "Control+Alt+CommandOrControl+2", click: () => commands.setSplitLayout("vertical") },
+            { label: "Grid", accelerator: "Control+Alt+CommandOrControl+3", click: () => commands.setSplitLayout("grid") },
+            { type: "separator" },
+            { label: "Swap Panes", accelerator: "Control+Alt+CommandOrControl+S", click: () => commands.swapSplitPanes() },
+            { label: "Equal Pane Sizes", accelerator: "Control+Alt+CommandOrControl+0", click: () => commands.equalizeSplitPanes() },
+            { type: "separator" },
+            { label: "Next Pane", accelerator: "Control+Alt+CommandOrControl+Right", click: () => commands.focusAdjacentPane(1) },
+            { label: "Previous Pane", accelerator: "Control+Alt+CommandOrControl+Left", click: () => commands.focusAdjacentPane(-1) },
+          ],
+        },
         { type: "separator" },
         { label: "New Folder", click: () => commands.newFolder() },
         { type: "separator" },

@@ -31,6 +31,7 @@ import {
   getSelectedTabId,
   pinTab,
   restoreLastArchivedTab,
+  selectTab,
   setSidebarVisible,
   setShowFullUrls,
   unpinTab,
@@ -39,12 +40,21 @@ import { switchSpaceByNumber, switchSpaceByOffset } from "./spaces";
 import { closeSelectedTab, closeTabByUser, navigateFocusedPage, navigatePage, openLinkInNewTab, selectTabIfAny } from "./tabActions";
 import { getFocusedContents } from "./tabViews";
 import { findSplitOfTab, findTab, isInToday } from "./tree";
+import { findAdjacentPaneTabId } from "./split";
 
 /**
  * Returns the selected tab id of the active Space, or null.
  */
 function getSelectedId(): string | null {
   return getSelectedTabId(getState());
+}
+
+/**
+ * The split view the selected tab is in, or null.
+ */
+function findSelectedSplitId(): string | null {
+  const selectedTabId = getSelectedId();
+  return selectedTabId === null ? null : findSplitOfTab(getState(), selectedTabId);
 }
 
 export const appMenuCommands: AppMenuCommands = {
@@ -97,6 +107,30 @@ export const appMenuCommands: AppMenuCommands = {
     const selectedTabId = getSelectedId();
     if (selectedTabId !== null && findSplitOfTab(getState(), selectedTabId) !== null) {
       closeTabByUser(selectedTabId);
+    }
+  },
+  setSplitLayout: (orientation) => {
+    const splitId = findSelectedSplitId();
+    if (splitId !== null) {
+      menuHost.runAction({ type: "setSplitOrientation", splitId: splitId, orientation: orientation });
+    }
+  },
+  swapSplitPanes: () => {
+    const splitId = findSelectedSplitId();
+    if (splitId !== null) {
+      menuHost.runAction({ type: "swapSplitPanes", splitId: splitId });
+    }
+  },
+  equalizeSplitPanes: () => {
+    const splitId = findSelectedSplitId();
+    if (splitId !== null) {
+      menuHost.runAction({ type: "equalizeSplit", splitId: splitId });
+    }
+  },
+  focusAdjacentPane: (offset) => {
+    const tabId = findAdjacentPaneTabId(getState(), offset);
+    if (tabId !== null) {
+      applyChange((state) => selectTab(state, tabId, Date.now()));
     }
   },
   switchSpaceByOffset: (offset) => applyChange((state) => switchSpaceByOffset(state, offset, Date.now())),

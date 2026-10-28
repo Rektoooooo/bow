@@ -5,7 +5,8 @@
  */
 import { describe, expect, it } from "vitest";
 import { parseAction } from "../src/main/ipc";
-import { computeCardBounds, computeLibraryWidth, computePaneBounds } from "../src/main/layout";
+import { computeCardBounds, computeLibraryWidth } from "../src/main/layout";
+import { computePaneBounds } from "../src/shared/splitLayout";
 import { CARD_GAP_PX, CARD_INSET_PX, DEVELOPER_TOOLBAR_HEIGHT_PX, SIDEBAR_WIDTH_PX, SPLIT_GAP_PX, TOOLBAR_HEIGHT_PX } from "../src/shared/settings";
 
 describe("computeCardBounds", () => {

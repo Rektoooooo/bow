@@ -168,8 +168,10 @@ source never updates itself.
 - **Peek**: a link from a Pinned tab or Favorite to another site, or any Shift-clicked link, opens in a card that
   hangs from the window's top edge with its own back / forward / reload row, the page behind dimmed, like Arc's.
   ⌘O (or the round ↗ button) makes it a tab without reloading, Split puts it next to the page, Esc closes it.
-- **Split View**: two to four tabs side by side or stacked, one row in the sidebar. Drop a tab on the middle of
-  another tab (or ⌃⇧=) to make one.
+- **Split View**: two to four tabs side by side, stacked, or in a 2×2 grid, one row in the sidebar. Drop a tab on the
+  middle of another tab (or ⌃⇧=) to make one. Drag the line between panes to resize them (double-click it to make
+  them equal again); Tabs › Split View has the layouts (⌃⌥⌘1 / 2 / 3), Swap Panes (⌃⌥⌘S) and Next / Previous Pane
+  (⌃⌥⌘→ / ←).
 - **Sleeping tabs**: a page you have not used for 30 minutes (Library › Settings: 15 minutes to 2 hours, or never)
   closes to free its memory, about 80 MB each, and wakes where you left it, scroll position, form values and Back
   included, when you go back; its tab fades meanwhile. Pages on screen, playing sound, in a call or sharing the screen

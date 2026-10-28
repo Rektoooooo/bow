@@ -152,6 +152,9 @@ function toSyncedItem(item: SidebarItem): unknown {
     return toSyncedFolder(item);
   }
   const split: SplitItem = { kind: "split", id: item.id, childIds: item.childIds, orientation: item.orientation };
+  if (item.sizes !== undefined) {
+    split.sizes = item.sizes;
+  }
   return split;
 }
 
@@ -489,7 +492,11 @@ function landItem(remote: SidebarItem, local: SidebarItem | undefined, now: numb
     }
     return folder;
   }
-  return { kind: "split", id: remote.id, childIds: remote.childIds, orientation: remote.orientation };
+  const split: SplitItem = { kind: "split", id: remote.id, childIds: remote.childIds, orientation: remote.orientation };
+  if (remote.sizes !== undefined) {
+    split.sizes = remote.sizes;
+  }
+  return split;
 }
 
 /**

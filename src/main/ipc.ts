@@ -23,7 +23,7 @@ import type { WebContents } from "electron";
 import type { BrowserAction } from "../shared/actions";
 import { BROWSER_ACTION_TYPES } from "../shared/actions";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
-import { ARCHIVE_THRESHOLD_OPTIONS, TAB_SLEEP_OPTIONS } from "../shared/settings";
+import { ARCHIVE_THRESHOLD_OPTIONS, SPLIT_PANES_LIMIT, TAB_SLEEP_OPTIONS } from "../shared/settings";
 import { isValidKeywordUrl, MAX_KEYWORD_NAME_LENGTH, SEARCH_KEYWORD_PATTERN } from "../shared/searchKeywords";
 import { isSearchEngineId } from "../shared/searchEngines";
 import type { BrowserState, RuntimeState } from "../shared/types";
@@ -102,7 +102,15 @@ function isAllowedTabSleepAfter(value: unknown): boolean {
 }
 
 function isOrientation(value: unknown): boolean {
-  return value === "horizontal" || value === "vertical";
+  return value === "horizontal" || value === "vertical" || value === "grid";
+}
+
+/**
+ * A split view's pane sizes: a few fractions (shared/splitLayout.ts; split.ts checks they fit the split view).
+ */
+function isPaneSizes(value: unknown): boolean {
+  const isFraction = (size: unknown): boolean => typeof size === "number" && Number.isFinite(size) && size > 0 && size < 1;
+  return Array.isArray(value) && value.length >= 2 && value.length <= SPLIT_PANES_LIMIT && value.every(isFraction);
 }
 
 function isNavigationCommand(value: unknown): boolean {
@@ -295,6 +303,9 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   unsplit: { splitId: isText },
   closeSplit: { splitId: isText },
   setSplitOrientation: { splitId: isText, orientation: isOrientation },
+  resizeSplit: { splitId: isText, sizes: isPaneSizes, isFinal: isBoolean },
+  swapSplitPanes: { splitId: isText },
+  equalizeSplit: { splitId: isText },
   switchSpace: { spaceId: isText },
   switchSpaceByOffset: { offset: isWholeNumber },
   createSpace: { name: isText, icon: isText, theme: isTheme },

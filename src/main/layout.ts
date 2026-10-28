@@ -1,14 +1,15 @@
 /**
  * WHY this file exists:
  *   The page card sits right of the sidebar, inset from the window edges, like Arc's: the toolbar at its top (drawn
- *   by the sidebar page), the web page below it. computeCardBounds() returns where the web page goes. A split view
- *   divides that area into panes. The arithmetic lives here, without Electron, so it can be tested.
+ *   by the sidebar page), the web page below it. computeCardBounds() returns where the web page goes; a split view
+ *   divides that area into panes (shared/splitLayout.ts, which the sidebar page uses too). The arithmetic lives here,
+ *   without Electron, so it can be tested.
  *
  * Data source:
  *   The window's content size and the layout constants in shared/settings.ts.
  *
  * Data flow:
- *   tabViews.ts → computeCardBounds() → computePaneBounds() → WebContentsView.setBounds()
+ *   tabViews.ts → computeCardBounds() → shared/splitLayout.ts computePaneBounds() → WebContentsView.setBounds()
  */
 import {
   CARD_GAP_PX,
@@ -21,11 +22,9 @@ import {
   LIBRARY_SPACE_COLUMN_GAP_PX,
   LIBRARY_SPACE_COLUMN_WIDTH_PX,
   SIDEBAR_WIDTH_PX,
-  SPLIT_GAP_PX,
   TOOLBAR_HEIGHT_PX,
 } from "../shared/settings";
 import type { LibrarySection } from "../shared/overlay";
-import type { SplitOrientation } from "../shared/types";
 
 /** A rectangle in window content coordinates, in pixels. */
 export interface Bounds {
@@ -49,6 +48,8 @@ export interface CardLayoutOptions {
   isLibraryOpen?: boolean;
   /** How wide the Library's column is while open (computeLibraryWidth); LIBRARY_COLUMN_WIDTH_PX when not given. */
   libraryWidth?: number;
+  /** A split divider being dragged: its sizes, shown before they are saved (shared/splitLayout.ts). */
+  paneSizesPreview?: { splitId: string; sizes: number[] };
 }
 
 /**
@@ -85,32 +86,4 @@ export function computeLibraryWidth(section: LibrarySection, spaceCount: number,
   const wantedWidth = LIBRARY_RAIL_WIDTH_PX + columnsWidth + LIBRARY_ADD_SPACE_ROOM_PX;
   const widestWidth = contentWidth - CARD_GAP_PX - CARD_INSET_PX - LIBRARY_MIN_PAGE_WIDTH_PX;
   return Math.max(LIBRARY_COLUMN_WIDTH_PX, Math.min(wantedWidth, widestWidth));
-}
-
-/**
- * Divides the card into equal panes with a gap between them: side by side for "horizontal", stacked for "vertical".
- * The last pane takes the rounding leftovers so the panes fill the card exactly.
- * Example: card width 1000, 2 panes, gap 6 → widths 497 and 497
- */
-export function computePaneBounds(card: Bounds, paneCount: number, orientation: SplitOrientation): Bounds[] {
-  if (paneCount <= 1) {
-    return [card];
-  }
-
-  const totalGap = SPLIT_GAP_PX * (paneCount - 1);
-  const availableLength = orientation === "horizontal" ? card.width - totalGap : card.height - totalGap;
-  const paneLength = Math.floor(Math.max(availableLength, 0) / paneCount);
-
-  const panes: Bounds[] = [];
-  for (let index = 0; index < paneCount; index++) {
-    const offset = index * (paneLength + SPLIT_GAP_PX);
-    const isLastPane = index === paneCount - 1;
-    const length = isLastPane ? Math.max(availableLength - paneLength * (paneCount - 1), 0) : paneLength;
-    if (orientation === "horizontal") {
-      panes.push({ x: card.x + offset, y: card.y, width: length, height: card.height });
-    } else {
-      panes.push({ x: card.x, y: card.y + offset, width: card.width, height: length });
-    }
-  }
-  return panes;
 }

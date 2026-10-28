@@ -28,6 +28,7 @@ import { renderFavoriteTile, renderItemRows, startRowRedraw } from "./rows.js";
 import type { RowContext } from "./rows.js";
 import { installSidebarEvents } from "./sidebarEvents.js";
 import { clearMultiSelection, extendTo, keepOnly, toggleTab } from "./multiSelect.js";
+import { installSplitDividers, renderSplitDividers } from "./splitDividers.js";
 import { createIcon, installSymbols } from "./icons.js";
 import { installOverlayScrollbar } from "./overlayScrollbar.js";
 import { applySpaceTheme, onSystemAppearanceChange } from "./theme.js";
@@ -593,6 +594,7 @@ function renderAll(): void {
   renderToolbar(state, currentRuntime, selectedTabId);
   applyToolbarTint(selectedTabId);
   updateEmptyCard(selectedTabId);
+  renderSplitDividers(state, selectedTabId);
   const cardSlot = document.getElementById("card-slot");
   if (cardSlot !== null) {
     showEditors(cardSlot, selectedTabId, noteId, easelId);
@@ -855,6 +857,7 @@ async function startSidebar(): Promise<void> {
   }
   setUpSidebarPeek();
   setUpSidebarResizer();
+  installSplitDividers();
   document.getElementById("move-here-button")?.addEventListener("click", () => dispatch({ type: "moveTabToThisWindow" }));
 
   window.browserApi.getSymbols().then(installSymbols).catch(() => undefined);

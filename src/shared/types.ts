@@ -98,7 +98,8 @@ export interface LiveFolderStatus {
 }
 
 /** Side-by-side or stacked panes. */
-export type SplitOrientation = "horizontal" | "vertical";
+/** Side by side, stacked, or a 2×2 grid (3 or 4 panes; shared/splitLayout.ts). */
+export type SplitOrientation = "horizontal" | "vertical" | "grid";
 
 /** Two to four tabs shown together in the page card. Shown as one row in the sidebar. */
 export interface SplitItem {
@@ -107,6 +108,11 @@ export interface SplitItem {
   /** The tabs in pane order. Only tab ids. */
   childIds: ItemId[];
   orientation: SplitOrientation;
+  /**
+   * How big each pane was dragged, as fractions (shared/splitLayout.ts readPaneSizes: [column, row] in a grid).
+   * Optional: missing means equal panes.
+   */
+  sizes?: number[];
 }
 
 export type SidebarItem = TabItem | FolderItem | SplitItem;

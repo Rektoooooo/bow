@@ -31,7 +31,8 @@ import * as path from "node:path";
 import type { BrowserWindow, ContextMenuParams, HandlerDetails, NavigationEntry, Rectangle, WebContents } from "electron";
 import { LAYOUT_MOTION_MS } from "../shared/settings";
 import type { BrowserState, ItemId, TabItem, TabRuntimeInfo, WindowId } from "../shared/types";
-import { computeCardBounds, computePaneBounds } from "./layout";
+import { computeCardBounds } from "./layout";
+import { computePaneBounds } from "../shared/splitLayout";
 import type { CardLayoutOptions } from "./layout";
 import { getProfileSession } from "./profiles";
 import { getToolbarColor, sampleToolbarColorSoon } from "./toolbarTint";
@@ -615,8 +616,14 @@ export function layoutShownTabViews(target: WindowTarget, isAnimated: boolean = 
   const selectedTabId = getSelectedTabId(state);
   const splitId = selectedTabId === null ? null : findSplitOfTab(state, selectedTabId);
   const split = splitId === null ? undefined : state.items[splitId];
-  const orientation = split !== undefined && split.kind === "split" ? split.orientation : "horizontal";
-  const paneBounds = computePaneBounds(card, shownTabIds.length, orientation);
+  const isSplit = split !== undefined && split.kind === "split";
+  const orientation = isSplit ? split.orientation : "horizontal";
+  // While a divider is dragged, its sizes are shown before they are saved (layout options, like the sidebar width).
+  const preview = target.layoutOptions.paneSizesPreview;
+  const isPreviewed = isSplit && preview !== undefined && preview.splitId === split.id;
+  const savedSizes = isSplit ? split.sizes : undefined;
+  const sizes = isPreviewed ? preview.sizes : savedSizes;
+  const paneBounds = computePaneBounds(card, shownTabIds.length, orientation, sizes);
 
   for (let index = 0; index < shownTabIds.length; index++) {
     const view = tabViews.get(shownTabIds[index] as ItemId);

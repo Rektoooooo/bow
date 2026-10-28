@@ -170,6 +170,9 @@ export const DEVELOPER_TOOLBAR_HEIGHT_PX = 38;
 /** Gap between the panes of a split view, in pixels. Our choice; Arc's panes sit a few pixels apart. */
 export const SPLIT_GAP_PX = 6;
 
+/** Smallest a split pane can be dragged, in pixels. Our choice: a page still reads at this width. */
+export const SPLIT_MIN_PANE_PX = 160;
+
 /**
  * Corner radius of the web page card, in pixels (= sidebar.css --card-radius). The page view itself is square; the
  * corner masks (cornerMasks.ts) are this big.

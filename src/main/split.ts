@@ -13,8 +13,9 @@
  * Rules: never change the state that was passed in; return a changed copy, or the same object when nothing changed.
  */
 import { SPLIT_PANES_LIMIT } from "../shared/settings";
+import { GRID_MIN_PANES, readPaneSizes } from "../shared/splitLayout";
 import type { BrowserState, ItemId, SplitItem, SplitOrientation } from "../shared/types";
-import { applyHomeUrlRule, dissolveSmallSplits, replaceSplitWithChildren, selectTab } from "./state";
+import { applyHomeUrlRule, dissolveSmallSplits, getSelectedTabId, replaceSplitWithChildren, selectTab } from "./state";
 import { createId, findLocation, findSplitOfTab, findTab, getIdsAt, insertIntoLocation, removeFromLocation, setIdsAt } from "./tree";
 
 /**
@@ -124,13 +125,105 @@ export function unsplit(state: BrowserState, splitId: ItemId): BrowserState {
 }
 
 /**
- * Sets a split view's orientation: "horizontal" puts panes side by side, "vertical" stacks them.
+ * Finds a split view by id, or undefined.
+ */
+function findSplit(state: BrowserState, splitId: ItemId): SplitItem | undefined {
+  const item = state.items[splitId];
+  return item !== undefined && item.kind === "split" ? item : undefined;
+}
+
+/**
+ * Puts a changed split view in the state.
+ */
+function replaceSplit(state: BrowserState, split: SplitItem): BrowserState {
+  return { ...state, items: { ...state.items, [split.id]: split } };
+}
+
+/**
+ * Sets a split view's layout: "horizontal" puts panes side by side, "vertical" stacks them, "grid" makes a 2×2 grid
+ * (3 or 4 panes only). The dragged sizes start over: each layout means something else by them.
  */
 export function setSplitOrientation(state: BrowserState, splitId: ItemId, orientation: SplitOrientation): BrowserState {
-  const split = state.items[splitId];
-  if (split === undefined || split.kind !== "split" || split.orientation === orientation) {
+  const split = findSplit(state, splitId);
+  const isGridTooSmall = orientation === "grid" && split !== undefined && split.childIds.length < GRID_MIN_PANES;
+  if (split === undefined || split.orientation === orientation || isGridTooSmall) {
     return state;
   }
   const updatedSplit: SplitItem = { ...split, orientation: orientation };
-  return { ...state, items: { ...state.items, [splitId]: updatedSplit } };
+  delete updatedSplit.sizes;
+  return replaceSplit(state, updatedSplit);
+}
+
+/**
+ * Keeps the sizes a divider was dragged to. Sizes that do not fit the split view (shared/splitLayout.ts
+ * readPaneSizes would not use them) change nothing.
+ */
+export function setSplitSizes(state: BrowserState, splitId: ItemId, sizes: number[]): BrowserState {
+  const split = findSplit(state, splitId);
+  if (split === undefined) {
+    return state;
+  }
+  const usable = readPaneSizes(split.orientation, sizes, split.childIds.length);
+  const fits = usable.length === sizes.length && usable.every((size, index) => size === sizes[index]);
+  if (!fits) {
+    return state;
+  }
+  return replaceSplit(state, { ...split, sizes: sizes });
+}
+
+/**
+ * Equal panes again (double-click a divider, "Equal Pane Sizes").
+ */
+export function equalizeSplit(state: BrowserState, splitId: ItemId): BrowserState {
+  const split = findSplit(state, splitId);
+  if (split === undefined || split.sizes === undefined) {
+    return state;
+  }
+  const updatedSplit: SplitItem = { ...split };
+  delete updatedSplit.sizes;
+  return replaceSplit(state, updatedSplit);
+}
+
+/**
+ * Swap Panes: the focused pane trades places with the next one (the last with the one before), its size with it.
+ * With two panes that is a plain swap.
+ */
+export function swapSplitPanes(state: BrowserState, splitId: ItemId, focusedTabId: ItemId | null): BrowserState {
+  const split = findSplit(state, splitId);
+  if (split === undefined || split.childIds.length < 2) {
+    return state;
+  }
+  const foundIndex = focusedTabId === null ? -1 : split.childIds.indexOf(focusedTabId);
+  const focusedIndex = Math.max(foundIndex, 0);
+  const isLast = focusedIndex === split.childIds.length - 1;
+  const otherIndex = isLast ? focusedIndex - 1 : focusedIndex + 1;
+  const childIds = [...split.childIds];
+  childIds[focusedIndex] = split.childIds[otherIndex] as ItemId;
+  childIds[otherIndex] = split.childIds[focusedIndex] as ItemId;
+  const updatedSplit: SplitItem = { ...split, childIds: childIds };
+  // Side by side or stacked, each pane keeps its size; a grid's lines stay where they are.
+  const hasPaneSizes = split.sizes !== undefined && split.orientation !== "grid" && split.sizes.length === split.childIds.length;
+  if (hasPaneSizes) {
+    const sizes = [...(split.sizes as number[])];
+    sizes[focusedIndex] = split.sizes?.[otherIndex] as number;
+    sizes[otherIndex] = split.sizes?.[focusedIndex] as number;
+    updatedSplit.sizes = sizes;
+  }
+  return replaceSplit(state, updatedSplit);
+}
+
+/**
+ * The pane beside the selected one in its split view (Next Pane / Previous Pane), wrapping around; null outside a
+ * split view.
+ */
+export function findAdjacentPaneTabId(state: BrowserState, offset: number): ItemId | null {
+  const selectedTabId = getSelectedTabId(state);
+  const splitId = selectedTabId === null ? null : findSplitOfTab(state, selectedTabId);
+  const split = splitId === null ? undefined : findSplit(state, splitId);
+  if (split === undefined || selectedTabId === null) {
+    return null;
+  }
+  const count = split.childIds.length;
+  const index = split.childIds.indexOf(selectedTabId);
+  return split.childIds[(index + offset + count) % count] ?? null;
 }

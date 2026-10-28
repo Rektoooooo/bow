@@ -103,6 +103,9 @@ let updateReadyVersion: string | null = null;
 /** The sidebar width while its edge is being dragged in the focused window; null otherwise (the saved width applies). */
 let previewSidebarWidth: number | null = null;
 
+/** A split divider being dragged in the focused window: its sizes, shown before they are saved. */
+let previewPaneSizes: { splitId: ItemId; sizes: number[] } | null = null;
+
 /** Functions to run after new page views were added (they land on top): floating layers raise themselves again. */
 const afterSyncHooks: (() => void)[] = [];
 
@@ -230,6 +233,7 @@ export function getLayoutOptions(windowId: WindowId = currentState.focusedWindow
   const windowState = getStateForWindow(windowId);
   const isFocused = windowId === currentState.focusedWindowId;
   const draggedWidth = isFocused ? previewSidebarWidth : null;
+  const paneSizesPreview = isFocused && previewPaneSizes !== null ? previewPaneSizes : undefined;
   const sidebarWidth = draggedWidth ?? windowState.settings.sidebarWidth ?? SIDEBAR_WIDTH_PX;
   const selectedTabId = getSelectedTabId(windowState);
   const selectedTab = selectedTabId === null ? undefined : findTab(windowState, selectedTabId);
@@ -242,6 +246,7 @@ export function getLayoutOptions(windowId: WindowId = currentState.focusedWindow
     isDeveloperToolbar: isDeveloperToolbar,
     isLibraryOpen: libraryWindowId === windowId,
     libraryWidth: getLibraryWidth(windowId),
+    paneSizesPreview: paneSizesPreview,
   };
 }
 
@@ -330,6 +335,14 @@ export function relayoutWindow(windowId: WindowId, isAnimated: boolean = false):
 /**
  * Moves the focused window's page card while the sidebar's edge is dragged, without saving (null ends the preview).
  */
+/**
+ * Shows a split divider's drag in the focused window before it is saved (null: the drag ended).
+ */
+export function previewSplitSizesWhileDragging(preview: { splitId: ItemId; sizes: number[] } | null): void {
+  previewPaneSizes = preview;
+  relayoutWindow(currentState.focusedWindowId);
+}
+
 export function previewSidebarWidthWhileDragging(width: number | null): void {
   previewSidebarWidth = width === null ? null : Math.max(SIDEBAR_MIN_WIDTH_PX, Math.min(width, SIDEBAR_MAX_WIDTH_PX));
   relayoutWindow(currentState.focusedWindowId);

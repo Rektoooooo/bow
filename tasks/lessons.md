@@ -143,6 +143,10 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   background (`backgroundTesting.ts`); a new check imports `./background.mjs` first. A check that needs real OS
   focus or real mouse events cannot work there: drive the page through Playwright (CDP) instead.
 
+- A runtime import in `src/shared/` must end in `.js` (`from "./settings.js"`): the pages load shared files as ES
+  modules in the browser, which cannot resolve a bare `./settings`, and the whole sidebar script fails (an empty
+  window; check-app times out on `.space-title`). Main's CommonJS build accepts both, so the main typecheck passes.
+
 ## Dependencies
 - Check a package's license **per version** and diff a just-published release against the previous one before
   adding it (electron-chrome-extensions 4.9 was GPL with a runtime license check; 4.10, one day old, is MIT and only
