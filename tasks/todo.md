@@ -250,6 +250,51 @@ repo: the user stores them in their own keychain); Arc Max and sync/sharing stay
       measure when the order changed, the toolbar tint restyles the card alone → about 8 ms per redraw
 - [ ] Hands-on runs of the packaged app; all suites green; docs + teardown page current
 
+## Milestone 4 — "Arc but better" (user-approved 2026-10-28: "everything you mentioned I love, do them all 1 by 1")
+From a discovery pass over v0.1.0, Arc users' complaints (HN, reviews, migration write-ups) and rivals (Zen, Dia,
+Vivaldi, Edge, Orion). Done one at a time: build, unit + e2e tests, full suite green, commit, push. Sizes: S hours,
+M about a day, L several days.
+
+### 4.1 Top five
+- [ ] 1. Backup and export of everything (Spaces, pins, folders, Live Folders, Boosts, rules, settings, Notes,
+      Easels) to an open, documented file; restore with a preview (merge or replace); rolling automatic snapshots;
+      account-free sync through a folder such as iCloud Drive (L)
+- [ ] 2. Smarter tab sleeping: per-site Keep Awake list (Settings, Control Center, tab menu), a decision for
+      pinned tabs and Favorites, sleeping tabs dimmed in the sidebar, Sleep Tab Now / Sleep Other Tabs, a Task
+      Manager with memory and CPU per tab (M)
+- [ ] 3. Archive without surprises: Never Archive per tab and per Space, archive timing per Space, an Undo toast
+      after the sweep or Clear, an "archives soon" hint, ⇧⌘T reopens only tabs you closed (M)
+- [ ] 4. Everyday basics: zoom remembered per site; downloads folder or ask where to save; ⌘, opens Settings;
+      custom search engines with keywords; Save Page As and Save as PDF; a Keyboard Shortcuts sheet (S each)
+- [ ] 5. Tab power tools: select several tabs (⇧/⌘-click) for close, move, pin, split; duplicate-tab detection
+      ("already open, switch to it?"); tab search ⌘⇧A that shows each tab's Space and window (M)
+
+### 4.2 Arc features, done better
+- [ ] 6. Link menu: Open Link in Little Window, in Peek, in Split View (S)
+- [ ] 7. Split view: drag the divider to resize, swap panes, 2×2 grid and keyboard layouts (M)
+- [ ] 8. Boosts: share and import as files; a clear badge while a JavaScript Boost runs (S)
+- [ ] 9. Live Folders: GitHub notifications and issues, Linear and Jira through the user's sign-in, ready-made feed
+      presets (Hacker News, subreddits) (M)
+- [ ] 10. Command Bar: calculator and unit conversion, recently closed tabs and history by date, user-made action
+      chains (M)
+- [ ] 11. Per-Space defaults (search engine, new-tab behaviour) and Space templates (M)
+- [ ] 12. Air Traffic Control by source app (links from Slack go to Work) and a "test this link" box (S)
+
+### 4.3 Beyond Arc
+- [ ] 13. Compact mode (sidebar and toolbar hidden, both slide in from the edge) and Focus mode (page only) (M)
+- [ ] 14. Reader view (M)
+- [ ] 15. System-wide shortcut: Command Bar or a Little Window from any app (S)
+- [ ] 16. `bow://` URL scheme and a Raycast extension (search tabs, open in a Space, switch Spaces) (M)
+- [ ] 17. Privacy report (trackers blocked per site and week), HTTPS-only mode, per-Space "forget cookies on quit" (M)
+- [ ] 18. Tab notes: attach a Note to a tab or folder (S)
+- [ ] 19. Shortcut editor (M)
+
+### 4.4 Trust and polish
+- [ ] 20. Crash-proof restore: scroll positions come back; snapshots from item 1 cover the sidebar (S)
+- [ ] 21. Less memory for Bow's own helper views (70–90 MB each per window) (M)
+- [x] 22. The Control Center no longer rebuilds when nothing changed (an unclickable panel under bursts of
+      refreshes, found 2026-10-27; the fix is uncommitted in the main checkout's src/overlay/siteControls.ts) (S)
+
 ## Review (2026-10-28, an unattended night: open source, releases, auto-update, speed, polish)
 - **Works and verified:** open-source setup and repo rename; `npm run release` up to Apple's notarization (signing,
   hardened runtime, DMG checked by hand; notarization waits for the user's credentials); auto-update (a real signed

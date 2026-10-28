@@ -764,6 +764,17 @@ await dispatch({ type: "openSiteControls" });
 await overlay.waitForSelector(".control-center", { timeout: 5000 });
 const actionLabels = await overlay.$$eval(".control-action", (buttons) => buttons.map((button) => button.getAttribute("aria-label")));
 check("the Control Center shows Share, Boost, Screenshot and Capture", actionLabels.join("|") === "Share|Boost this site|Take Screenshot|Capture Part of the Page", actionLabels.join("|"));
+// Every action refreshes the open panel; one that changes nothing it shows must leave its elements alone (a rebuild
+// drops the hover and any click landing at that moment).
+await overlay.evaluate(() => {
+  window.markedControlAction = document.querySelector(".control-action");
+});
+for (let refresh = 0; refresh < 3; refresh++) {
+  await dispatch({ type: "setSidebarPeek", isPeeking: false });
+}
+await overlay.waitForTimeout(300);
+const keptElements = await overlay.evaluate(() => document.querySelector(".control-action") === window.markedControlAction);
+check("refreshes that change nothing leave the Control Center's elements in place", keptElements);
 const soundSetting = '.control-setting:has(.control-setting-title:text-is("Sound"))';
 const soundBefore = await overlay.textContent(`${soundSetting} .control-setting-state`);
 await overlay.click(soundSetting);

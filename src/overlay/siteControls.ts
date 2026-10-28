@@ -240,7 +240,14 @@ function createFooter(site: SiteInfo): HTMLElement {
  */
 export function renderSiteControls(host: HTMLElement, site: SiteInfo): void {
   const openPanel = host.querySelector<HTMLElement>(".control-center");
+  // Main refreshes the open panel after every action, download step or window focus change. When what it shows is
+  // the same, nothing is rebuilt: a rebuild would drop the hover and a click landing at that moment.
+  const siteKey = JSON.stringify(site);
+  if (openPanel !== null && openPanel.dataset.siteKey === siteKey) {
+    return;
+  }
   const panel = openPanel ?? createElement("div", "panel site-controls control-center");
+  panel.dataset.siteKey = siteKey;
   panel.setAttribute("role", "dialog");
   panel.setAttribute("aria-label", `Controls for ${site.host}`);
   panel.replaceChildren(
