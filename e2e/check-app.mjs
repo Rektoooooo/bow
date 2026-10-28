@@ -222,6 +222,62 @@ state = await getState(page);
 const archivedIds = state.archive.slice(0, 2).map((entry) => entry.tab.id);
 const isSplitClosed = state.items[splitItem.id] === undefined && todayTabs(state).length === 0 && splitItem.childIds.every((tabId) => archivedIds.includes(tabId));
 check("hovering a split view's row shows × and it closes the split view into the Archive", splitCloseOpacity === "1" && isSplitClosed, `opacity ${splitCloseOpacity}, today ${todayTabs(state).length}, archived ${archivedIds.join(",")}`);
+
+// ⌘W (or Close Split Pane) on one pane of a pinned split puts only that pane's page away, and the selection leaves
+// the whole split: the split shows whole while any pane is selected, so it would load the closed page again.
+const clickMenuItem = (label) => app.evaluate(({ Menu }, itemLabel) => {
+  const menuItems = Menu.getApplicationMenu().items.flatMap((menu) => menu.submenu?.items ?? []);
+  menuItems.find((item) => item.label === itemLabel).click();
+}, label);
+const shownPageUrls = () => app.evaluate(({ BrowserWindow }) => {
+  const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  return win.contentView.children
+    .filter((child) => child.webContents && child.webContents !== win.webContents && !child.webContents.getURL().startsWith("file:"))
+    .map((child) => child.webContents.getURL());
+});
+const loadedPageUrls = () => app.evaluate(({ webContents }) => webContents.getAllWebContents().map((contents) => contents.getURL()));
+await dispatch(page, { type: "openTab", typedText: "example.net" });
+await dispatch(page, { type: "openTab", typedText: "example.org" });
+await page.waitForFunction(() => document.querySelectorAll(".today-list .tab-row").length === 2, null, { timeout: 10000 });
+state = await getState(page);
+const pinnedPaneIds = todayTabs(state).map((tab) => tab.id);
+for (const tabId of pinnedPaneIds) {
+  await dispatch(page, { type: "pinTab", tabId: tabId });
+}
+await dispatch(page, { type: "splitTabs", firstTabId: pinnedPaneIds[0], secondTabId: pinnedPaneIds[1] });
+await page.waitForSelector(".pinned-list .split-row", { timeout: 5000 });
+await page.waitForTimeout(500);
+state = await getState(page);
+const pinnedSplit = pinnedItems(state).find((item) => item?.kind === "split");
+const paneHosts = pinnedPaneIds.map((tabId) => new URL(state.items[tabId].homeUrl).host);
+const showsPane = (urls) => urls.some((url) => paneHosts.some((host) => url.includes(host)));
+const isPinnedSplitShown = pinnedSplit !== undefined && (await shownPageUrls()).length === 2;
+await clickMenuItem("Close Tab");
+await page.waitForTimeout(500);
+state = await getState(page);
+const closedPane = state.items[pinnedPaneIds[0]];
+const selectedAfterClose = state.selectedTabIdBySpace[state.activeSpaceId];
+const urlsAfterClose = await shownPageUrls();
+const loadedAfterClose = await loadedPageUrls();
+const isClosedPageGone = !loadedAfterClose.some((url) => url.includes(paneHosts[0]));
+const isOtherPageKept = loadedAfterClose.some((url) => url.includes(paneHosts[1]));
+const isSplitLeft = !pinnedPaneIds.includes(selectedAfterClose) && !showsPane(urlsAfterClose);
+const isSplitKept = JSON.stringify(state.items[pinnedSplit?.id]?.childIds) === JSON.stringify(pinnedPaneIds);
+const isPaneClosed = closedPane?.url === closedPane?.homeUrl && isClosedPageGone && isOtherPageKept && isSplitLeft && isSplitKept;
+check("⌘W on a pinned split's pane puts only its page away and leaves the split", isPinnedSplitShown && isPaneClosed, `selected ${selectedAfterClose}, shown ${urlsAfterClose.join(",")}, loaded ${loadedAfterClose.join(",")}`);
+await dispatch(page, { type: "selectTab", tabId: pinnedPaneIds[1] });
+await page.waitForTimeout(800);
+const isSplitShownAgain = (await shownPageUrls()).length === 2;
+await clickMenuItem("Close Split Pane");
+await page.waitForTimeout(500);
+state = await getState(page);
+const selectedAfterPaneClose = state.selectedTabIdBySpace[state.activeSpaceId];
+const urlsAfterPaneClose = await shownPageUrls();
+const isOtherPaneClosed = !pinnedPaneIds.includes(selectedAfterPaneClose) && !showsPane(urlsAfterPaneClose);
+check("Close Split Pane on a pinned split's other pane leaves the split too", isSplitShownAgain && isOtherPaneClosed, `selected ${selectedAfterPaneClose}, shown ${urlsAfterPaneClose.join(",")}`);
+// The checks below expect Pinned to hold only the folder.
+await dispatch(page, { type: "deleteItem", itemId: pinnedSplit.id });
+await page.waitForFunction(() => document.querySelectorAll(".pinned-list .split-row").length === 0, null, { timeout: 5000 });
 // Clear (below) needs a Today tab again.
 await dispatch(page, { type: "openTab", typedText: "example.net" });
 await page.waitForFunction(() => document.querySelectorAll(".today-list .tab-row").length === 1, null, { timeout: 10000 });

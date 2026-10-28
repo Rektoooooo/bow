@@ -32,6 +32,7 @@ import {
   findRootLocation,
   findSpace,
   findSpaceIdOfItem,
+  findSplitOfTab,
   findTab,
   getActiveSpace,
   getIdsAt,
@@ -644,7 +645,9 @@ export function closeTab(state: BrowserState, tabId: ItemId, now: number): Brows
 /**
  * What ⌘W does to a Pinned tab or Favorite in Arc: the page is put away and the tab goes back to its home URL,
  * but it keeps its place. The selection moves to the most recently used other tab.
- * main.ts also destroys the tab's web view.
+ * A pane of a pinned split view: only that pane goes home, but the selection leaves every pane, because a split is
+ * on screen whole while any of its panes is selected and would show the put-away page again.
+ * tabActions.ts also destroys the tab's web view.
  */
 export function resetPinnedTab(state: BrowserState, tabId: ItemId): BrowserState {
   const tab = findTab(state, tabId);
@@ -652,7 +655,10 @@ export function resetPinnedTab(state: BrowserState, tabId: ItemId): BrowserState
     return state;
   }
   const resetState = updateTab(state, tabId, { url: tab.homeUrl });
-  return repairSelections(resetState, new Set([tabId]));
+  const splitId = findSplitOfTab(state, tabId);
+  const split = splitId === null ? undefined : state.items[splitId];
+  const hiddenTabIds = split !== undefined && split.kind === "split" ? split.childIds : [tabId];
+  return repairSelections(resetState, new Set(hiddenTabIds));
 }
 
 /**

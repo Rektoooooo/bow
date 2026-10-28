@@ -30,7 +30,8 @@ export function openLinkInNewTab(url: string, disposition: OpenDisposition): voi
 
 /**
  * ⌘W and the close button. A Today tab goes to the archive. A Pinned tab or Favorite keeps its place: its page is
- * put away and it goes back to its home URL, like Arc.
+ * put away and it goes back to its home URL, like Arc. A pane of a pinned split puts only its own page away, and the
+ * selection leaves the whole split (see resetPinnedTab).
  */
 export function closeTabByUser(tabId: ItemId): void {
   if (isInToday(getState(), tabId)) {

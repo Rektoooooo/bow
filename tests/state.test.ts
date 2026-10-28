@@ -38,7 +38,8 @@ import {
   setAdBlockForSite,
   setAppIcon,
 } from "../src/main/state";
-import { findLocation, findTab } from "../src/main/tree";
+import { splitTabs } from "../src/main/split";
+import { findLocation, findSplitOfTab, findTab } from "../src/main/tree";
 import { getSiteKey, isSameSite, normalizeTypedInput } from "../src/main/urls";
 import { findSearchEngine } from "../src/shared/searchEngines";
 import { DEFAULT_PROFILE_ID, FAVORITES_LIMIT, HOUR_MS, SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX } from "../src/shared/settings";
@@ -270,6 +271,28 @@ describe("moveTabsToArchive / closeTab", () => {
     expect(getTab(state, calendarTabId).url).toBe("https://calendar.example/week");
     expect(getSelectedTabId(state)).toBe(todayIds[0]);
     expect(resetPinnedTabs(state, [mailTabId, calendarTabId])).toBe(state);
+  });
+
+  it("resetPinnedTab on a pane of a pinned split sends only that pane home and moves the selection off the split", () => {
+    const { state: withPinned, tabIds } = openPinnedTabs(["https://mail.example/inbox", "https://calendar.example/week"]);
+    const mailTabId = tabIds[0] as ItemId;
+    const calendarTabId = tabIds[1] as ItemId;
+    const withSplit = splitTabs(withPinned, mailTabId, calendarTabId, THREE_PM);
+    const splitId = findSplitOfTab(withSplit, mailTabId) as ItemId;
+    const mailNavigated = updateTabPage(withSplit, mailTabId, "https://mail.example/message/42", "Message");
+    const bothNavigated = updateTabPage(mailNavigated, calendarTabId, "https://calendar.example/day", "Day");
+    const { state: withToday, tabIds: todayIds } = openTabs(["https://news.example"], bothNavigated);
+    // The calendar pane was used last, so excluding only the mail pane would select it and show the split again.
+    const usedBoth = selectTab(selectTab(withToday, mailTabId, THREE_PM), calendarTabId, FOUR_PM);
+    const selectedMail = selectTab(usedBoth, mailTabId, FOUR_PM + 1);
+
+    const state = resetPinnedTab(selectedMail, mailTabId);
+
+    expect(getTab(state, mailTabId).url).toBe("https://mail.example/inbox");
+    expect(getTab(state, calendarTabId).url).toBe("https://calendar.example/day");
+    expect(getPinnedIds(state)).toEqual([splitId]);
+    expect(state.items[splitId]).toEqual(selectedMail.items[splitId]);
+    expect(getSelectedTabId(state)).toBe(todayIds[0]);
   });
 
   it("deleting a folder archives every tab inside it", () => {
