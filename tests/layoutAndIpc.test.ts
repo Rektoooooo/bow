@@ -93,6 +93,13 @@ describe("parseAction", () => {
     expect(parseAction("selectTab")).toBeNull();
   });
 
+  it("takes an app rule only with a bundle id and a name", () => {
+    expect(parseAction({ type: "addAppRoutingRule", bundleId: "com.example.chat", appName: "Example Chat", spaceId: "space-work" })).not.toBeNull();
+    expect(parseAction({ type: "addAppRoutingRule", bundleId: "com.example.chat; rm -rf /", appName: "Example Chat", spaceId: "space-work" })).toBeNull();
+    expect(parseAction({ type: "addAppRoutingRule", bundleId: "com.example.chat", appName: "", spaceId: "space-work" })).toBeNull();
+    expect(parseAction({ type: "addRoutingRule", matchType: "app", value: "com.example.chat", spaceId: "space-work" })).toBeNull();
+  });
+
   it("takes a Space's search engine and new-tab page only when they are known and a web page", () => {
     expect(parseAction({ type: "setSpaceSearchEngine", spaceId: "space-work", engineId: "kagi" })).not.toBeNull();
     expect(parseAction({ type: "setSpaceSearchEngine", spaceId: "space-work", engineId: "default" })).not.toBeNull();

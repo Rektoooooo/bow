@@ -212,8 +212,10 @@ source never updates itself.
   from its page (same size, scroll and region) when the easel opens, or when you click its **Live** badge.
 - **Ad and tracker blocking** with EasyList and EasyPrivacy (off until you turn it on in Library › Settings), allowed
   per site in the Control Center.
-- **Air Traffic Control**: rules such as "address contains github.com → Work" send links from other apps to a Space
-  (Library › Settings).
+- **Air Traffic Control**: rules such as "address contains github.com → Work" or "link comes from Slack → Work" send
+  links from other apps to a Space (Library › Settings, which lists your running apps). The sender is the app in front
+  when the link arrives, read with macOS's own `lsappinfo` (no permission needed). **Test a link** there shows where
+  a pasted link would open, from any app or a chosen one.
 - **Permission prompts**: a site that wants your camera, microphone, location, notifications or clipboard asks
   first ("meet.google.com wants to use your camera and microphone", Block / Allow). The answer is remembered per
   profile and site; the site controls list it with a Reset. Private windows ask every time and remember nothing.

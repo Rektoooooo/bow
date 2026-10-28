@@ -18,13 +18,14 @@ import { ARCHIVE_THRESHOLD_OPTIONS, DAY_MS, HOUR_MS, MINUTE_MS, TAB_SLEEP_OPTION
 import { APP_ICON_VARIANTS, buildAppIconSvg } from "../shared/appIconDrawing.js";
 import { isSearchEngineId, SEARCH_ENGINE_IDS, SEARCH_ENGINES } from "../shared/searchEngines.js";
 import { isValidSearchKeyword } from "../shared/searchKeywords.js";
-import type { ArchiveReason, ArchivedTab } from "../shared/types";
+import type { ArchiveReason, ArchivedTab, RoutingRule } from "../shared/types";
 import { createElement, createFavicon, createIconButton, createTextButton, dispatch, getDisplayHost } from "../renderer/dom.js";
 import { createIcon } from "../renderer/icons.js";
 import type { IconName } from "../renderer/icons";
 import { createSpaceIcon } from "../renderer/spaceIcon.js";
 import { describeSpaceIconAsText } from "../shared/spaceIcons.js";
 import { describeDay } from "../shared/timeAgo.js";
+import { findMatchingRule } from "../shared/routingRules.js";
 import { haveChainsChanged, renderChainsSection } from "./chainEditor.js";
 
 /** How long a Media tile says what its button did: as long as Copy URL's toast (statusBubble.ts TOAST_SHOWN_MS). */
@@ -1029,8 +1030,11 @@ function renderSearchKeywordSettings(data: LibraryData): HTMLElement {
   form.className = "routing-form keyword-form";
   const keywordInput = createFormInput("yt", "Keyword");
   keywordInput.classList.add("keyword-input");
+  keywordInput.dataset.keep = "keyword";
   const nameInput = createFormInput("YouTube", "Name");
+  nameInput.dataset.keep = "keyword-name";
   const urlInput = createFormInput("https://www.youtube.com/results?search_query=%s", "Search address, with %s for the words");
+  urlInput.dataset.keep = "keyword-url";
   urlInput.classList.add("keyword-url-input");
   const addButton = document.createElement("button");
   addButton.type = "submit";
@@ -1045,6 +1049,10 @@ function renderSearchKeywordSettings(data: LibraryData): HTMLElement {
       problem.textContent = "Use one short word as the keyword, a name, and a web address with %s where the words go.";
       return;
     }
+    // Cleared first: the redraw that shows the new keyword keeps what the fields hold.
+    keywordInput.value = "";
+    nameInput.value = "";
+    urlInput.value = "";
     dispatch({ type: "addSearchKeyword", keyword: entry.keyword, name: entry.name, url: entry.url });
   });
   section.append(form, problem);
@@ -1063,34 +1071,78 @@ function createFormInput(example: string, label: string): HTMLInputElement {
 }
 
 /**
- * Builds the Air Traffic Control settings: the rules that send links from other apps to a Space, and a form to add one.
+ * A rule in words: "If the address contains “github.com”", "If the link comes from “Slack”".
+ */
+function describeRule(rule: RoutingRule): string {
+  if (rule.matchType === "app") {
+    return `If the link comes from “${rule.appName ?? rule.value}”`;
+  }
+  const verb = rule.matchType === "contains" ? "contains" : "is";
+  return `If the address ${verb} “${rule.value}”`;
+}
+
+/**
+ * A Space as the routing settings name it: "✦ Work", or "a deleted Space".
+ */
+function describeRuleSpace(data: LibraryData, spaceId: string): string {
+  const space = data.spaces.find((candidate) => candidate.id === spaceId);
+  return space === undefined ? "a deleted Space" : `${describeSpaceIconAsText(space.icon)} ${space.name}`;
+}
+
+/**
+ * A select of the apps an app rule can name; with `anyLabel`, a first choice for "any app" (value "").
+ */
+function createAppSelect(data: LibraryData, keepKey: string, anyLabel: string | null): HTMLSelectElement {
+  const select = document.createElement("select");
+  select.className = "library-select";
+  select.dataset.keep = keepKey;
+  select.setAttribute("aria-label", "App");
+  if (anyLabel !== null) {
+    select.append(new Option(anyLabel, ""));
+  }
+  for (const app of data.linkSourceApps) {
+    select.append(new Option(app.name, app.bundleId));
+  }
+  if (anyLabel === null && data.linkSourceApps.length === 0) {
+    const none = new Option("No apps found", "");
+    none.disabled = true;
+    select.append(none);
+  }
+  return select;
+}
+
+/**
+ * Builds the Air Traffic Control settings: the rules that send links from other apps to a Space, a form to add one
+ * (by address or by the app the link comes from), and a field that tests where a link would open.
  */
 function renderRoutingSettings(data: LibraryData): HTMLElement {
   const section = createElement("div", "library-routing");
   section.append(createElement("h2", "library-setting-heading", "Links from other apps"));
-  section.append(createElement("p", "library-setting-note", "Links you open in other apps open in a Little Window, unless a rule below sends them to a Space."));
+  section.append(createElement("p", "library-setting-note", "Links you open in other apps open in a Little Window, unless a rule below sends them to a Space. The first rule that matches wins."));
 
   for (const rule of data.routingRules) {
-    const space = data.spaces.find((candidate) => candidate.id === rule.spaceId);
-    const spaceLabel = space === undefined ? "a deleted Space" : `${describeSpaceIconAsText(space.icon)} ${space.name}`;
     const line = createElement("div", "library-line routing-rule");
-    const verb = rule.matchType === "contains" ? "contains" : "is";
-    line.append(createElement("span", "library-line-title", `If the address ${verb} “${rule.value}” → ${spaceLabel}`));
+    line.append(createElement("span", "library-line-title", `${describeRule(rule)} → ${describeRuleSpace(data, rule.spaceId)}`));
     line.append(createIconButton("trash", "Remove rule", "library-line-icon-button", () => dispatch({ type: "removeRoutingRule", ruleId: rule.id })));
     section.append(line);
   }
 
   const form = document.createElement("form");
-  form.className = "routing-form";
+  form.className = "routing-form routing-rule-form";
   const matchSelect = document.createElement("select");
-  matchSelect.className = "library-select";
-  matchSelect.append(new Option("Address contains", "contains"), new Option("Address is", "is"));
+  matchSelect.className = "library-select routing-match";
+  matchSelect.dataset.keep = "route-match";
+  matchSelect.append(new Option("Address contains", "contains"), new Option("Address is", "is"), new Option("Link comes from", "app"));
   const valueInput = document.createElement("input");
   valueInput.className = "library-search";
+  valueInput.dataset.keep = "route-value";
   valueInput.placeholder = "github.com";
   valueInput.setAttribute("aria-label", "Address part");
+  const appSelect = createAppSelect(data, "route-app", null);
+  appSelect.classList.add("routing-app");
   const spaceSelect = document.createElement("select");
   spaceSelect.className = "library-select";
+  spaceSelect.dataset.keep = "route-space";
   for (const space of data.spaces) {
     spaceSelect.append(new Option(`${describeSpaceIconAsText(space.icon)} ${space.name}`, space.id));
   }
@@ -1098,14 +1150,62 @@ function renderRoutingSettings(data: LibraryData): HTMLElement {
   addButton.type = "submit";
   addButton.className = "library-chip is-active";
   addButton.textContent = "Add Rule";
-  form.append(matchSelect, valueInput, spaceSelect, addButton);
+  // An app rule picks an app instead of typing part of an address.
+  const showMatchFields = (): void => {
+    const isAppRule = matchSelect.value === "app";
+    valueInput.hidden = isAppRule;
+    appSelect.hidden = !isAppRule;
+  };
+  matchSelect.addEventListener("change", showMatchFields);
+  showMatchFields();
+  form.append(matchSelect, valueInput, appSelect, spaceSelect, addButton);
   form.addEventListener("submit", (event) => {
     event.preventDefault();
+    if (matchSelect.value === "app") {
+      const app = data.linkSourceApps.find((candidate) => candidate.bundleId === appSelect.value);
+      if (app !== undefined) {
+        dispatch({ type: "addAppRoutingRule", bundleId: app.bundleId, appName: app.name, spaceId: spaceSelect.value });
+      }
+      return;
+    }
     const matchType = matchSelect.value === "is" ? "is" : "contains";
-    dispatch({ type: "addRoutingRule", matchType: matchType, value: valueInput.value, spaceId: spaceSelect.value });
+    const value = valueInput.value;
+    // Cleared first: the redraw that shows the new rule keeps what the field holds.
+    valueInput.value = "";
+    dispatch({ type: "addRoutingRule", matchType: matchType, value: value, spaceId: spaceSelect.value });
   });
-  section.append(form);
+  section.append(form, renderLinkTest(data));
   return section;
+}
+
+/**
+ * "Test a link": paste a link (and pick the app it would come from) to see where it would open, by the same rules.
+ */
+function renderLinkTest(data: LibraryData): HTMLElement {
+  const box = createElement("div", "routing-form route-test");
+  const urlInput = document.createElement("input");
+  urlInput.className = "library-search route-test-url";
+  urlInput.dataset.keep = "route-test-url";
+  urlInput.placeholder = "Test a link: paste one to see where it opens";
+  urlInput.setAttribute("aria-label", "Link to test");
+  const appSelect = createAppSelect(data, "route-test-app", "From any app");
+  appSelect.classList.add("route-test-app");
+  const result = createElement("p", "library-setting-note route-test-result");
+  const showResult = (): void => {
+    const url = urlInput.value.trim();
+    if (url === "") {
+      result.textContent = "";
+      return;
+    }
+    const app = data.linkSourceApps.find((candidate) => candidate.bundleId === appSelect.value) ?? null;
+    const spaceIds = data.spaces.map((space) => space.id);
+    const rule = findMatchingRule(data.routingRules, spaceIds, url, app);
+    result.textContent = rule === null ? "Opens in a Little Window: no rule matches." : `Opens in ${describeRuleSpace(data, rule.spaceId)}: ${describeRule(rule)}.`;
+  };
+  urlInput.addEventListener("input", showResult);
+  appSelect.addEventListener("change", showResult);
+  box.append(urlInput, appSelect, result);
+  return box;
 }
 
 /** The parts of a Library section that scroll (overlay.css overflow-y: auto). */
@@ -1132,6 +1232,47 @@ function restoreScrollPositions(body: HTMLElement, positions: number[]): void {
   });
 }
 
+/** What was typed or chosen in a section's fields (by data-keep), and which one had the focus and where. */
+interface KeptFields {
+  values: Map<string, string>;
+  focusedKey: string | null;
+  selection: { start: number | null; end: number | null };
+}
+
+/**
+ * Reads the section's kept fields before a redraw: a Library update must not wipe what the user is typing.
+ */
+function readKeptFields(body: HTMLElement): KeptFields {
+  const values = new Map<string, string>();
+  for (const field of body.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-keep]")) {
+    values.set(field.dataset.keep as string, field.value);
+  }
+  const focused = document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLSelectElement ? document.activeElement : null;
+  const focusedKey = focused !== null && body.contains(focused) ? (focused.dataset.keep ?? null) : null;
+  const selection = focused instanceof HTMLInputElement ? { start: focused.selectionStart, end: focused.selectionEnd } : { start: null, end: null };
+  return { values: values, focusedKey: focusedKey, selection: selection };
+}
+
+/**
+ * Puts kept values back after a redraw (each field's own handlers run, as if the user had typed or chosen it again)
+ * and gives the focus back to the field that had it.
+ */
+function restoreKeptFields(body: HTMLElement, kept: KeptFields): void {
+  for (const field of body.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-keep]")) {
+    const value = kept.values.get(field.dataset.keep as string);
+    if (value === undefined || value === field.value) {
+      continue;
+    }
+    field.value = value;
+    field.dispatchEvent(new Event(field instanceof HTMLSelectElement ? "change" : "input"));
+  }
+  const focusedField = kept.focusedKey === null ? null : body.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-keep="${kept.focusedKey}"]`);
+  focusedField?.focus();
+  if (focusedField instanceof HTMLInputElement && kept.selection.start !== null) {
+    focusedField.setSelectionRange(kept.selection.start, kept.selection.end);
+  }
+}
+
 /**
  * Draws the selected section into the panel body.
  */
@@ -1145,6 +1286,7 @@ function renderBody(data: LibraryData): void {
   // without this, every change in Settings jumped back to the top (the user, 2026-10-27).
   const isRedraw = body.dataset.section === section;
   const scrollPositions = isRedraw ? readScrollPositions(body) : [];
+  const keptFields = isRedraw ? readKeptFields(body) : null;
   for (const button of tabs.querySelectorAll<HTMLButtonElement>("button")) {
     button.classList.toggle("is-active", button.dataset.section === section);
   }
@@ -1181,6 +1323,9 @@ function renderBody(data: LibraryData): void {
   }
   body.dataset.section = section;
   restoreScrollPositions(body, scrollPositions);
+  if (keptFields !== null) {
+    restoreKeptFields(body, keptFields);
+  }
 }
 
 /**

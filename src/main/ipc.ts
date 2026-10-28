@@ -13,6 +13,7 @@
 import { GITHUB_LIVE_LISTS } from "./gitHubLists";
 import { FEED_PRESETS } from "./feedPresets";
 import { checkCommandChain } from "./commandChains";
+import { BUNDLE_ID_PATTERN } from "./linkSourceApps";
 import { APP_ICON_VARIANTS } from "../shared/appIconDrawing";
 import { BOOST_FONTS } from "../shared/boostFonts";
 import { isNoteId } from "../shared/notes";
@@ -51,6 +52,9 @@ export interface IpcHandlers {
 
 /** Longest text we accept from the sidebar (typed addresses, names). Longer input is refused. */
 const MAX_TEXT_LENGTH = 8192;
+
+/** Longest app name an app rule keeps. Our choice: app names are a few words. */
+const MAX_APP_NAME_LENGTH = 200;
 
 /** A field check: true when the field has the expected shape. */
 type FieldCheck = (value: unknown) => boolean;
@@ -197,6 +201,16 @@ function isBoostCss(value: unknown): boolean {
 
 function isRoutingMatchType(value: unknown): boolean {
   return value === "contains" || value === "is";
+}
+
+/** An app's bundle id, as an app rule keeps it. */
+function isBundleId(value: unknown): boolean {
+  return typeof value === "string" && BUNDLE_ID_PATTERN.test(value);
+}
+
+/** An app's name for the Library: short text. */
+function isAppName(value: unknown): boolean {
+  return typeof value === "string" && value.trim() !== "" && value.length <= MAX_APP_NAME_LENGTH;
 }
 
 function isCommandBarMode(value: unknown): boolean {
@@ -349,6 +363,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   setSpaceProfile: { spaceId: isText, profileId: isText },
   createProfileForSpace: { spaceId: isText },
   addRoutingRule: { matchType: isRoutingMatchType, value: isText, spaceId: isText },
+  addAppRoutingRule: { bundleId: isBundleId, appName: isAppName, spaceId: isText },
   removeRoutingRule: { ruleId: isText },
   setBoostCss: { site: isSite, css: isBoostCss },
   setBoostStyle: { site: isSite, hueShift: isHueShift, isInverted: isBoolean, fontId: isBoostFontId },

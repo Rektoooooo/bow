@@ -364,6 +364,8 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => setSpaceProfile(state, action.spaceId, action.profileId));
     case "addRoutingRule":
       return applyChange((state) => addRoutingRule(state, action.matchType, action.value, action.spaceId, now));
+    case "addAppRoutingRule":
+      return applyChange((state) => addRoutingRule(state, "app", action.bundleId, action.spaceId, now, action.appName));
     case "removeRoutingRule":
       return applyChange((state) => removeRoutingRule(state, action.ruleId));
     case "setBoostCss":

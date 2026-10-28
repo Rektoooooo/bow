@@ -14,6 +14,7 @@
 import type { SearchEngineId } from "./searchEngines";
 import type { ShortcutGroup } from "./shortcuts";
 import type { SymbolImage } from "./symbols";
+import type { LinkSourceApp } from "./routingRules";
 import type { ArchivedTab, CommandChain, ItemId, RoutingRule, SearchKeyword, SitePermissionKind, SpaceTheme, ThemeAppearance } from "./types";
 
 /** What a Command Bar line does when chosen. */
@@ -251,6 +252,8 @@ export interface LibraryData {
   /** Library › Chains: the chains, and the Command Bar actions a step may run (main/commandChains.ts). */
   commandChains: CommandChain[];
   chainActions: { id: string; title: string }[];
+  /** The apps an app rule can name: those that sent links and those running (main/linkSourceApps.ts). */
+  linkSourceApps: LinkSourceApp[];
   /** Library › Spaces: the Space templates (main/spaceTemplates.ts), with how many Pinned items each makes. */
   spaceTemplates: { id: string; name: string; icon: string; itemCount: number }[];
   /** Where downloads go ("~/Downloads"), and whether each one asks (main/downloads.ts). */

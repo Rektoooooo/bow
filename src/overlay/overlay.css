@@ -807,6 +807,21 @@ body.dark .command-info-button {
   margin-top: 10px;
 }
 
+/* "Test a link": the link and the app it would come from, then where it opens on the line below. */
+.route-test .route-test-url {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.route-test-result {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+}
+
+.route-test-result:empty {
+  display: none;
+}
+
 /* Search keywords: a short keyword, a name, then the search address on its own line. */
 .keyword-form .library-search {
   flex: 1 1 120px;

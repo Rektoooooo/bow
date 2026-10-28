@@ -93,6 +93,8 @@ export type BrowserAction =
   | { type: "setSpaceProfile"; spaceId: SpaceId; profileId: string }
   | { type: "createProfileForSpace"; spaceId: SpaceId }
   | { type: "addRoutingRule"; matchType: RoutingMatchType; value: string; spaceId: SpaceId }
+  /** A rule for every link that comes from an app (by bundle id; its name for the Library). */
+  | { type: "addAppRoutingRule"; bundleId: string; appName: string; spaceId: SpaceId }
   | { type: "removeRoutingRule"; ruleId: string }
   | { type: "setBoostCss"; site: string; css: string }
   | { type: "setBoostEnabled"; site: string; isEnabled: boolean }
@@ -244,6 +246,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setSpaceProfile",
   "createProfileForSpace",
   "addRoutingRule",
+  "addAppRoutingRule",
   "removeRoutingRule",
   "setBoostCss",
   "setBoostEnabled",

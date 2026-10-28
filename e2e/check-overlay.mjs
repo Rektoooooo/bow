@@ -28,6 +28,9 @@ function check(name, ok, detail = "") {
 const app = await _electron.launch({
   executablePath: createRequire(import.meta.url)("electron"),
   args: [`--user-data-dir=${userDataDir}`, "--skip-welcome", appDir],
+  // Links "from another app" come from this made-up app: a test cannot choose which app is in front on a Mac
+  // someone is using (main/linkSourceApps.ts).
+  env: { ...process.env, BOW_E2E_LINK_SOURCE_APP: "com.example.chat|Example Chat" },
   timeout: 30000,
 });
 
@@ -734,6 +737,37 @@ check("a link from another app that matches a rule opens in that rule's Space", 
 await openFromAnotherApp("https://example.com/not-routed");
 const routedLittle = await findPage("/little/little.html").catch(() => null);
 check("a link that matches no rule opens in a Little Window", routedLittle !== null);
+
+// A rule by the app a link comes from (Library › Settings › Link comes from), and Test a link, which shows where a
+// link would open by the same rules.
+await dispatch({ type: "openLibrary" });
+await overlay.waitForSelector(".library-tab[data-section='settings']", { timeout: 5000 });
+await overlay.click(".library-tab[data-section='settings']");
+await overlay.waitForSelector(".routing-match", { timeout: 5000 });
+await overlay.selectOption(".routing-match", "app");
+const offeredApps = await overlay.$$eval(".routing-app option", (options) => options.map((option) => option.textContent));
+await overlay.selectOption(".routing-app", "com.example.chat");
+await overlay.selectOption(".routing-rule-form select[data-keep='route-space']", workSpace.id);
+await overlay.click(".routing-rule-form button[type='submit']");
+await sidebar.waitForTimeout(400);
+const appRule = ((await getState()).routingRules ?? []).find((rule) => rule.matchType === "app");
+check("Link comes from lists the apps and adds a rule for the one chosen", offeredApps.includes("Example Chat") && appRule?.value === "com.example.chat" && appRule.appName === "Example Chat" && appRule.spaceId === workSpace.id, `${offeredApps.join(", ")} / ${JSON.stringify(appRule)}`);
+await overlay.fill(".route-test-url", "https://example.org/from-chat");
+const testFromAnyApp = await overlay.textContent(".route-test-result");
+await overlay.selectOption(".route-test-app", "com.example.chat");
+const testFromChat = await overlay.textContent(".route-test-result");
+check(
+  "Test a link says where a link would open, by its address and by the app it comes from",
+  testFromAnyApp === "Opens in a Little Window: no rule matches." && testFromChat?.startsWith("Opens in ") && testFromChat.includes(workSpace.name) && testFromChat.includes("comes from “Example Chat”"),
+  `${testFromAnyApp} / ${testFromChat}`,
+);
+await overlay.press("body", "Escape");
+await dispatch({ type: "switchSpace", spaceId: state.spaces[0].id });
+await openFromAnotherApp("https://example.org/from-chat");
+await sidebar.waitForTimeout(1500);
+state = await getState();
+check("a link from that app opens in the rule's Space", state.activeSpaceId === workSpace.id && selectedTab(state)?.url.startsWith("https://example.org/from-chat"), `${state.activeSpaceId} ${selectedTab(state)?.url}`);
+await dispatch({ type: "removeRoutingRule", ruleId: appRule?.id ?? "" });
 
 // Tab to search a site, like Arc: "youtu" offers it, Tab turns the input into a YouTube search, Backspace on the
 // empty input leaves it, Enter opens the site's results in a new tab.

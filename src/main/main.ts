@@ -60,6 +60,8 @@ import { isRecordableUrl } from "./history";
 import { addVisit, loadHistory, saveHistoryNow, setVisitTitle } from "./historyStore";
 import { registerIpcHandlers } from "./ipc";
 import { archiveIdleLittleWindows, handleExternalUrl, registerLittleWindowIpc } from "./littleWindow";
+import { readFrontApp } from "./linkSourceApps";
+import type { LinkSourceApp } from "../shared/routingRules";
 import { showPageContextMenu } from "./menus";
 import { applyBoostToPage, runBoostJavaScript } from "./boostPages";
 import { createStatusBubble, showLinkStatus } from "./statusBubble";
@@ -105,7 +107,7 @@ const launchedAt = Date.now();
 const TOOLBAR_COLORS_FILE_NAME = "toolbar-colors.json";
 
 /** Links from other apps that arrived before the app was ready; null once they have been opened. */
-let pendingExternalUrls: string[] | null = [];
+let pendingExternalUrls: { url: string; sourceApp: LinkSourceApp | null }[] | null = [];
 
 /** What tabViews.ts calls when a page does something. */
 const tabViewEvents: TabViewEvents = {
@@ -393,10 +395,10 @@ async function handleAppReady(): Promise<void> {
     openLinkInNewTab(startupUrl, "foreground");
   }
 
-  const waitingUrls = pendingExternalUrls ?? [];
+  const waitingLinks = pendingExternalUrls ?? [];
   pendingExternalUrls = null;
-  for (const url of waitingUrls) {
-    handleExternalUrl(url);
+  for (const link of waitingLinks) {
+    handleExternalUrl(link.url, link.sourceApp);
   }
 
   pruneOldArchiveEntries();
@@ -419,6 +421,17 @@ async function handleAppReady(): Promise<void> {
       openWelcome();
     }
   }
+}
+
+/**
+ * A link from another app, once its sender is known: opened now, or kept until the app is ready.
+ */
+function receiveExternalUrl(url: string, sourceApp: LinkSourceApp | null): void {
+  if (pendingExternalUrls === null) {
+    handleExternalUrl(url, sourceApp);
+    return;
+  }
+  pendingExternalUrls.push({ url: url, sourceApp: sourceApp });
 }
 
 /**
@@ -451,7 +464,7 @@ function startApp(): void {
   app.on("second-instance", (_event, argumentList) => {
     const url = findUrlArgument(argumentList);
     if (url !== null) {
-      handleExternalUrl(url);
+      readFrontApp().then((sourceApp) => handleExternalUrl(url, sourceApp));
       return;
     }
     const lastFocusedWindow = getWindow();
@@ -465,11 +478,8 @@ function startApp(): void {
     if (!isRecordableUrl(url)) {
       return;
     }
-    if (pendingExternalUrls === null) {
-      handleExternalUrl(url);
-      return;
-    }
-    pendingExternalUrls.push(url);
+    // The app in front sent the link: read it before Bow comes forward, so Air Traffic Control can route by app.
+    readFrontApp().then((sourceApp) => receiveExternalUrl(url, sourceApp));
   });
   app.whenReady().then(handleAppReady);
   app.on("before-quit", () => saveHistoryNow());

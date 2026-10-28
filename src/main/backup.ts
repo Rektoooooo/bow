@@ -58,6 +58,7 @@ import { upgradeToCurrentVersion } from "./migrate";
 import { GITHUB_LIVE_LISTS } from "./gitHubLists";
 import { checkCommandChains } from "./commandChains";
 import { checkSpaceTemplates } from "./spaceTemplates";
+import { BUNDLE_ID_PATTERN } from "./linkSourceApps";
 import { MAX_NOTE_LENGTH } from "./notesStore";
 import { MAX_EASEL_LENGTH } from "./easelsStore";
 import { repairSelections } from "./state";
@@ -504,13 +505,19 @@ export function checkBoosts(raw: unknown, counter: CheckCounter): Boost[] {
 function checkRoutingRules(raw: unknown, spaceIds: Set<SpaceId>, counter: CheckCounter): RoutingRule[] {
   const rules: RoutingRule[] = [];
   for (const entry of Array.isArray(raw) ? raw : []) {
-    const isMatchType = isRecord(entry) && (entry.matchType === "contains" || entry.matchType === "is");
-    const isWellFormed = isRecord(entry) && isMatchType && typeof entry.id === "string" && typeof entry.value === "string" && typeof entry.spaceId === "string";
+    const isAddressRule = isRecord(entry) && (entry.matchType === "contains" || entry.matchType === "is");
+    // An app rule keeps a bundle id, and the app's name for the Library.
+    const isAppRule = isRecord(entry) && entry.matchType === "app" && typeof entry.value === "string" && BUNDLE_ID_PATTERN.test(entry.value);
+    const isWellFormed = isRecord(entry) && (isAddressRule || isAppRule) && typeof entry.id === "string" && typeof entry.value === "string" && typeof entry.spaceId === "string";
     if (!isWellFormed || !spaceIds.has(entry.spaceId as string)) {
       counter.leftOut += 1;
       continue;
     }
-    rules.push({ id: (entry.id as string).slice(0, MAX_TEXT_LENGTH), matchType: entry.matchType as RoutingRule["matchType"], value: (entry.value as string).slice(0, MAX_TEXT_LENGTH), spaceId: entry.spaceId as string });
+    const rule: RoutingRule = { id: (entry.id as string).slice(0, MAX_TEXT_LENGTH), matchType: entry.matchType as RoutingRule["matchType"], value: (entry.value as string).slice(0, MAX_TEXT_LENGTH), spaceId: entry.spaceId as string };
+    if (isAppRule && typeof entry.appName === "string") {
+      rule.appName = entry.appName.slice(0, MAX_TEXT_LENGTH);
+    }
+    rules.push(rule);
   }
   return rules;
 }

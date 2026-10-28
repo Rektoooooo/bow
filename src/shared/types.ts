@@ -273,7 +273,8 @@ export interface BrowserSettings {
 }
 
 /** How a link-routing rule compares an address. */
-export type RoutingMatchType = "contains" | "is";
+/** "contains" / "is": the link's address; "app": the app the link came from, by bundle id (shared/routingRules.ts). */
+export type RoutingMatchType = "contains" | "is" | "app";
 
 /**
  * Arc's Air Traffic Control: a link from another app whose address matches goes straight to a Space instead of a
@@ -282,8 +283,11 @@ export type RoutingMatchType = "contains" | "is";
 export interface RoutingRule {
   id: string;
   matchType: RoutingMatchType;
+  /** The address part, or for "app" the bundle id ("com.tinyspeck.slackmacgap"). */
   value: string;
   spaceId: SpaceId;
+  /** For "app": the app's name as the Library shows it ("Slack"). */
+  appName?: string;
 }
 
 /**

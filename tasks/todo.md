@@ -298,7 +298,10 @@ M about a day, L several days.
       per Mac; Save as Template / New Space from Template (+ menu, Command Bar, Library › Spaces) with the Pinned
       tree, live folder sources and the defaults; templates in backups and sync)
       Per-Space defaults (search engine, new-tab behaviour) and Space templates (M)
-- [ ] 12. Air Traffic Control by source app (links from Slack go to Work) and a "test this link" box (S)
+- [x] 12. (Rules "Link comes from <app>" by bundle id, the sender read as the front app with /usr/bin/lsappinfo
+      when the link arrives; the form lists running apps and recent senders; Test a link shows the Space or Little
+      Window by the same shared matching; Library › Settings keeps typed text and focus through redraws)
+      Air Traffic Control by source app (links from Slack go to Work) and a "test this link" box (S)
 
 ### 4.3 Beyond Arc
 - [ ] 13. Compact mode (sidebar and toolbar hidden, both slide in from the edge) and Focus mode (page only) (M)

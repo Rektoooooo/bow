@@ -37,6 +37,7 @@ import {
 } from "./browserCore";
 import { rankCommandBarResults, rankTabSearchResults } from "./commandBar";
 import { isChainableActionId } from "./commandChains";
+import { listKnownSourceApps, refreshRunningApps } from "./linkSourceApps";
 import { RESTART_TO_UPDATE_ID } from "./commandBarActions";
 import { focusMainWindow } from "./mainWindows";
 import type { CommandBarResult } from "./commandBar";
@@ -328,6 +329,7 @@ function buildLibraryData(state: BrowserState): LibraryData {
     sync: getSyncStatus(),
     searchKeywords: state.searchKeywords ?? [],
     commandChains: state.commandChains ?? [],
+    linkSourceApps: listKnownSourceApps(),
     spaceTemplates: (state.spaceTemplates ?? []).map((template) => ({ id: template.id, name: template.name, icon: template.icon, itemCount: countTemplateItems(template.pinned) })),
     chainActions: listChainableActions(),
     downloadFolder: shortenHomePath(getDownloadFolder()),
@@ -521,6 +523,8 @@ export function openShortcutSheet(): void {
 
 export function openLibrary(section: LibrarySection = "archive"): void {
   openPanel({ kind: "library", section: section });
+  // The rule form's app list: read in the background, then the Library draws again with it.
+  refreshRunningApps(() => refreshOpenPanel());
 }
 
 /**

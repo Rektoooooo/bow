@@ -208,6 +208,18 @@ describe("backups", () => {
     expect(restored.state.spaces[1]?.newTabUrl).toBeUndefined();
   });
 
+  it("keep app rules with a bundle id, and drop one without", () => {
+    const text = craftedBackupText((backup) => {
+      const spaceId = backup.state.spaces[0]?.id as string;
+      backup.state.routingRules = [
+        { id: "route-1", matchType: "app", value: "com.example.chat", spaceId: spaceId, appName: "Example Chat" },
+        { id: "route-2", matchType: "app", value: "not a bundle id!", spaceId: spaceId },
+      ];
+    });
+    const restored = parseOrFail(text);
+    expect(restored.state.routingRules).toEqual([{ id: "route-1", matchType: "app", value: "com.example.chat", spaceId: restored.state.spaces[0]?.id, appName: "Example Chat" }]);
+  });
+
   it("keep Space templates through a backup", () => {
     const template = { id: "template-1-1", name: "Client", icon: "💼", theme: { colors: ["#000000"], appearance: "dark" as const, grain: 0 }, pinned: [{ kind: "tab" as const, url: "https://docs.example/", title: "Docs" }], searchEngine: "google" as const };
     const restored = parseOrFail(backupText({ ...buildSetup().state, spaceTemplates: [template] }));

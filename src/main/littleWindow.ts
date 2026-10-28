@@ -22,6 +22,8 @@ import { applyChange, getState, getWindow } from "./browserCore";
 import { showPageContextMenu } from "./menus";
 import { createPrivateSession, getProfileSession } from "./profiles";
 import { findRoutedSpaceId } from "./routing";
+import { rememberSourceApp } from "./linkSourceApps";
+import type { LinkSourceApp } from "../shared/routingRules";
 import { switchSpace } from "./spaces";
 import { addPageToArchive, openTab } from "./state";
 import { openLinkInNewTab, openOrSwitchToTab } from "./tabActions";
@@ -197,8 +199,9 @@ export function openLittleWindow(url: string | null, options: LittleWindowOption
  * Opens a link that came from another app. A matching Air Traffic Control rule sends it to its Space as a Today tab
  * (and brings the main window forward); otherwise it opens in a Little Window, like Arc.
  */
-export function handleExternalUrl(url: string): void {
-  const routedSpaceId = findRoutedSpaceId(getState(), url);
+export function handleExternalUrl(url: string, sourceApp: LinkSourceApp | null): void {
+  rememberSourceApp(sourceApp);
+  const routedSpaceId = findRoutedSpaceId(getState(), url, sourceApp);
   if (routedSpaceId === null) {
     openLittleWindow(url);
     return;
