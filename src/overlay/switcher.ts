@@ -25,6 +25,12 @@ let isChosen = false;
 let showTimer: number | null = null;
 
 /**
+ * True once the pointer really moved over the switcher. Like macOS's ⌘Tab, a pointer that only rests where the cards
+ * appear picks nothing: Chromium sends hover events when cards appear under a still pointer, with no movement.
+ */
+let hasPointerMoved = false;
+
+/**
  * Moves the highlight by a step, wrapping around.
  */
 function stepHighlight(step: number): void {
@@ -75,12 +81,31 @@ function createCard(tab: SwitcherTab, index: number): HTMLElement {
   const caption = createElement("span", "switcher-caption");
   caption.append(createFavicon(tab.faviconUrl, tab.url), createElement("span", "switcher-title", tab.title));
   card.append(picture, caption);
-  card.addEventListener("mouseenter", () => stepHighlight(index - highlightedIndex));
+  card.addEventListener("mouseenter", () => {
+    if (hasPointerMoved) {
+      stepHighlight(index - highlightedIndex);
+    }
+  });
   card.addEventListener("click", () => {
     highlightedIndex = index;
     chooseHighlighted();
   });
   return card;
+}
+
+/**
+ * The first real movement over the switcher lets hover pick cards, starting with the card under the pointer.
+ */
+function followMovingPointer(event: MouseEvent): void {
+  const isStill = event.movementX === 0 && event.movementY === 0;
+  if (hasPointerMoved || isStill) {
+    return;
+  }
+  hasPointerMoved = true;
+  const card = event.target instanceof Element ? event.target.closest<HTMLElement>(".switcher-card") : null;
+  if (card !== null) {
+    stepHighlight(Number(card.dataset.index) - highlightedIndex);
+  }
 }
 
 /**
@@ -90,7 +115,9 @@ export function renderSwitcher(host: HTMLElement, panel: SwitcherPanel): void {
   switcherTabs = panel.tabs;
   highlightedIndex = panel.index;
   isChosen = false;
+  hasPointerMoved = false;
   const container = createElement("div", "panel switcher");
+  container.addEventListener("mousemove", (event) => followMovingPointer(event));
   container.setAttribute("role", "listbox");
   container.setAttribute("aria-label", "Recent tabs");
   container.hidden = true;

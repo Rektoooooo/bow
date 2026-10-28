@@ -1029,8 +1029,11 @@ await sidebar.waitForTimeout(1500);
 await overlay.mouse.move(1, 1);
 await findMenuItemByLabel("Recent Tab");
 await overlay.waitForSelector(".switcher:not([hidden]) .switcher-card", { timeout: 5000 }).catch(() => undefined);
+// A pointer resting where the cards appear gets a hover event without moving (as the real one may): it picks nothing.
+await overlay.$eval(".switcher-card:last-child", (card) => card.dispatchEvent(new MouseEvent("mouseenter")));
 const switcherCards = await overlay.$$eval(".switcher-card", (cards) => cards.map((card) => ({ highlighted: card.classList.contains("is-highlighted"), picture: card.querySelector("img") !== null })));
 check("⌃Tab shows the recent tabs, starting on the previous one, with pictures", switcherCards.length >= 2 && switcherCards[1]?.highlighted === true && switcherCards[0]?.picture === true, JSON.stringify(switcherCards.slice(0, 3)));
+check("a pointer resting where the cards appear doesn't move the highlight", switcherCards.filter((card) => card.highlighted).length === 1 && switcherCards[1]?.highlighted === true);
 await overlay.keyboard.down("Control");
 await overlay.keyboard.up("Control");
 await sidebar.waitForTimeout(600);
