@@ -23,7 +23,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License"></a>
 </p>
 
-![Bow in a dark Space: Favorites as tiles, a pinned folder, Today tabs and a Wikipedia page in the inset card](docs/screenshot-dark.png)
+![Bow in a dark Space: Favorites as tiles, a pinned Reading folder, Today tabs and apple.com in the inset card](docs/screenshot-dark.png)
 
 ## Why Bow
 
@@ -38,12 +38,12 @@ word for an arc.)
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshot-command-bar.png" alt="The Command Bar: typing &quot;wiki&quot; offers the open Wikipedia Favorite first, and Tab to search Wikipedia"><br><sub><b>Command Bar</b> (⌘T): open tabs, history, search and browser actions in one list.</sub></td>
+    <td width="50%"><img src="docs/screenshot-command-bar.png" alt="The Command Bar over a light Space, offering the open tabs to switch to"><br><sub><b>Command Bar</b> (⌘T): open tabs, history, search and browser actions in one list.</sub></td>
     <td width="50%"><img src="docs/screenshot-split.png" alt="Split View: MDN and the Electron docs side by side, one row in the sidebar"><br><sub><b>Split View</b>: drop a tab on another tab to put them side by side.</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshot-spaces.png" alt="Library › Spaces: a column for each Space with what it has pinned"><br><sub><b>Spaces</b>: each with its own theme, pinned tabs and profile.</sub></td>
-    <td width="50%"><img src="docs/screenshot-light.png" alt="A light Space with pinned developer sites and a Wikipedia article"><br><sub><b>Light and dark</b>: a Space's theme colours the whole window.</sub></td>
+    <td width="50%"><img src="docs/screenshot-spaces.png" alt="Library › Spaces: a column for each Space with what it has pinned, beside Bow's GitHub page"><br><sub><b>Spaces</b>: each with its own theme, pinned tabs and profile.</sub></td>
+    <td width="50%"><img src="docs/screenshot-light.png" alt="A light Space with pinned developer sites and a Wikipedia article on typography"><br><sub><b>Light and dark</b>: a Space's theme colours the whole window.</sub></td>
   </tr>
 </table>
 

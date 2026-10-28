@@ -1,13 +1,13 @@
-// Takes the README screenshots from a made-up sample sidebar (public sites only, never the user's data), at 2x so
-// they stay sharp on Retina screens:
-//   docs/screenshot-dark.png         the window in a dark Space
-//   docs/screenshot-command-bar.png  the same window with the Command Bar open
-//   docs/screenshot-split.png        two tabs side by side in a split view
-//   docs/screenshot-spaces.png       Library › Spaces: every Space as a column
-//   docs/screenshot-light.png        a light Space
-// Window and page views are composited at their real bounds (screen recording permission is not needed).
+// The README's pictures (docs/screenshot-*.png) are taken by hand, in Bow opened on a made-up sample sidebar (public
+// sites only, never the user's data):
+//   node e2e/window-shot.mjs --open   (after npm run package) writes the sample profile to
+//   e2e/output/screenshot-profile and opens the packaged Bow on it, 1440 × 900, for macOS's own window screenshots.
+// Without --open it takes the same views by itself, at 2x, into e2e/output/readme-shots/ (dark Space, Command Bar,
+// split view, Library › Spaces, light Space): compositing the window and page views at their real bounds, so screen
+// recording permission is not needed. It never writes into docs/.
 // usage: npm run build && node e2e/window-shot.mjs
 import { _electron } from "playwright-core";
+import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -15,7 +15,8 @@ import { captureWindow } from "./composite.mjs";
 
 const appDir = path.resolve(import.meta.dirname, "..");
 const outDir = process.env.E2E_OUTPUT_DIR || path.join(appDir, "e2e", "output");
-const userDataDir = path.join(outDir, "user-data-shot");
+const isOpenOnly = process.argv.includes("--open");
+const userDataDir = path.join(outDir, isOpenOnly ? "screenshot-profile" : "user-data-shot");
 fs.rmSync(userDataDir, { recursive: true, force: true });
 fs.mkdirSync(userDataDir, { recursive: true });
 
@@ -61,6 +62,16 @@ const sampleState = {
 };
 fs.writeFileSync(path.join(userDataDir, "browser-state.json"), JSON.stringify(sampleState));
 
+if (isOpenOnly) {
+  // The window opens at the screenshots' size (window-state.json, windowState.ts), near the screen's top left.
+  fs.writeFileSync(path.join(userDataDir, "window-state.json"), JSON.stringify({ "window-1": { x: 80, y: 40, width: 1440, height: 900 } }));
+  const bundlePath = path.join(appDir, "release", `Bow-darwin-${process.arch}`, "Bow.app");
+  // -n: a second Bow next to the one in use; its own data folder keeps them apart.
+  execFileSync("open", ["-n", "-a", bundlePath, "--args", `--user-data-dir=${userDataDir}`, "--skip-welcome"]);
+  console.log(`Opened ${bundlePath} on the sample profile in ${userDataDir}`);
+  process.exit(0);
+}
+
 const app = await _electron.launch({
   executablePath: createRequire(import.meta.url)("electron"),
   // 2x: README images stay sharp on Retina screens whatever this Mac's display is.
@@ -79,8 +90,10 @@ await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((ca
 await sidebar.waitForTimeout(6000);
 const dispatch = (action) => sidebar.evaluate((value) => window.browserApi.dispatch(value), action);
 
+const shotsDir = path.join(outDir, "readme-shots");
+fs.mkdirSync(shotsDir, { recursive: true });
 async function compositeShot(fileName) {
-  const filePath = path.join(appDir, "docs", fileName);
+  const filePath = path.join(shotsDir, fileName);
   fs.writeFileSync(filePath, await captureWindow(app));
   console.log("saved", filePath);
 }
