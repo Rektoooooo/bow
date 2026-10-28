@@ -32,7 +32,11 @@ if [[ -n "$BOW_SIGN_IDENTITY" ]]; then
   cp build/extend-info.plist "$extend_info"
   plutil -insert BowUpdatesFromGitHub -bool YES "$extend_info"
 fi
+# A temporary folder of its own: two packaging runs at once shared the packager's default one, and one cleaned it up
+# while the other was signing (2026-10-28, a release build failed with "No such file or directory").
+packager_tmpdir="$(mktemp -d)"
 npx electron-packager . "Bow" "${zip_options[@]}" "${sign_options[@]}" \
+  --tmpdir="$packager_tmpdir" \
   --platform=darwin \
   --arch="$architecture" \
   --out=release \
@@ -43,6 +47,7 @@ npx electron-packager . "Bow" "${zip_options[@]}" "${sign_options[@]}" \
   --ignore='^/(src|tests|e2e|docs|reference|tools|tasks|build|release|\.handoffs|\.claude|\.github)(/|$)' \
   --ignore='^/node_modules/(?!(electron-chrome-extensions|debug|ms)(/|$))' \
   --ignore='^/(tsconfig[^/]*\.json|vitest\.config\.ts|README\.md|CLAUDE\.md|\.nvmrc|\.gitignore)$'
+rm -rf "$packager_tmpdir"
 app_path="release/Bow-darwin-$architecture/Bow.app"
 [[ -z "$BOW_SIGN_IDENTITY" ]] && codesign --force --deep --sign - "$app_path"
 echo "Built $app_path"
