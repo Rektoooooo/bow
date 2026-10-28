@@ -185,7 +185,8 @@ source never updates itself.
   tools). Find in page,
   downloads, Print (⌘P), spelling suggestions, a right-click menu in pages, and automatic picture-in-picture when
   you leave a tab playing a video: the tab's own page floats in a small window of ours, the video filling it, with
-  its title, Back to Tab, close, play / pause, mute and the progress showing while the pointer is over it.
+  its title, Back to Tab, close, play / pause, mute and the progress showing while the pointer is over it. A video in
+  an embedded player (a YouTube or Vimeo player inside an article) floats the same way.
 
 **Extensions**
 - Chrome extensions per profile, like Arc: imported from Arc, added from the Chrome Web Store (open an extension's
