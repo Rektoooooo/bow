@@ -37,6 +37,7 @@ import { exportBackup, restoreBackup, revealBackupsFolder } from "./backupContro
 import { chooseSyncFolder, revealSyncFolder, stopSyncing } from "./syncController";
 import { setFavoritesKeptAwake, setSiteKeptAwake } from "./tabSleep";
 import { canSleepNow, sleepOtherTabsNow, sleepTabNow } from "./tabSleepController";
+import { clearTodayTabsWithUndo, dismissArchiveUndo, undoLastArchive } from "./archiveUndoController";
 import { importFromBrowser } from "./browserImportController";
 import { applyCosmeticFilters, ensureFilterLists } from "./adBlock";
 import { applyAppIcon } from "./appIcon";
@@ -72,7 +73,8 @@ import { showHiddenLiveFolderItems } from "./liveFolders";
 import { setSplitOrientation, separateTabFromSplit, splitTabs, unsplit } from "./split";
 import {
   addToFavorites,
-  clearTodayTabs,
+  setSpaceArchiveAfter,
+  setTabNeverArchived,
   createFolder,
   deleteItem,
   duplicateTab,
@@ -251,7 +253,7 @@ export function runAction(action: BrowserAction): void {
     case "setPinnedSectionOpen":
       return applyChange((state) => setPinnedSectionOpen(state, action.spaceId, action.isOpen));
     case "clearTodayTabs":
-      return applyChange((state) => clearTodayTabs(state, now));
+      return clearTodayTabsWithUndo();
     case "restoreArchivedTab":
       return applyChange((state) => restoreArchivedTab(state, action.tabId, now));
     case "duplicateTab":
@@ -430,6 +432,14 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => setSnapshots(state, action.isOn));
     case "revealBackups":
       return revealBackupsFolder();
+    case "setTabNeverArchived":
+      return applyChange((state) => setTabNeverArchived(state, action.tabId, action.isNeverArchived));
+    case "setSpaceArchiveAfter":
+      return applyChange((state) => setSpaceArchiveAfter(state, action.spaceId, action.archiveAfterMs));
+    case "undoArchive":
+      return undoLastArchive();
+    case "dismissArchiveUndo":
+      return dismissArchiveUndo();
     case "sleepTab":
       sleepTabNow(action.tabId);
       return;

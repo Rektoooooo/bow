@@ -53,6 +53,11 @@ export interface TabItem {
    * `isUnread`. Cleared when you open the tab. Optional, so files saved before it existed still load.
    */
   isUnread?: boolean;
+  /**
+   * A Today tab the user marked Never Archive: neither the sweep nor Clear takes it (main/autoArchive.ts). Closing or
+   * deleting it still does. Optional: missing means it archives like the others.
+   */
+  isNeverArchived?: boolean;
 }
 
 /** A folder in the Pinned section. Folders can hold tabs, split views and other folders. */
@@ -135,6 +140,11 @@ export interface Space {
   todayIds: ItemId[];
   /** True when the Pinned section is expanded in the focused window (others: ParkedWindow.collapsedPinnedSpaceIds). */
   isPinnedOpen: boolean;
+  /**
+   * How long this Space's Today tabs may go unused before they are archived, or null for never. Optional: missing
+   * means the setting in Library › Settings (main/autoArchive.ts). Stays on each Mac (sync.ts leaves it out).
+   */
+  archiveAfterMs?: number | null;
 }
 
 /** A browsing identity: its own cookies and logins, and its own Favorites shared by every Space that uses it. */
@@ -405,6 +415,10 @@ export interface RuntimeState {
   updateReadyVersion: string | null;
   /** Tabs whose page went to sleep (tabSleep.ts): the sidebar dims them until they wake. */
   sleepingTabIds: ItemId[];
+  /** Today tabs that archive soon, with the minutes left (autoArchive.ts findTabsArchivingSoon): their rows say so. */
+  archivingSoon: Record<ItemId, number>;
+  /** What the last sweep or Clear archived, while it can still be undone (archiveUndoController.ts), or null. */
+  archiveUndo: { message: string } | null;
 }
 
 /** A profile waiting for a Web Store extension's download (RuntimeState.extensionsBeingAdded). */

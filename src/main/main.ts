@@ -27,7 +27,8 @@ import { findTabsInUse, markTabsActive } from "./activity";
 import { installAppMenu } from "./appMenu";
 import { offerMoveToApplications, startAppUpdates } from "./appUpdates";
 import { appMenuCommands } from "./appMenuCommands";
-import { findTabsToArchive, pruneArchive } from "./autoArchive";
+import { findTabsArchivingSoon, findTabsToArchive, pruneArchive } from "./autoArchive";
+import { archiveUnusedTabsWithUndo } from "./archiveUndoController";
 import {
   applyChange,
   collectRuntimeState,
@@ -39,6 +40,7 @@ import {
   onStateChanged,
   saveStateNow,
   scheduleRuntimePush,
+  setArchivingSoon,
   setTabViewEvents,
   syncViews,
 } from "./browserCore";
@@ -69,7 +71,7 @@ import { flushSyncNow, markSyncedFileSaved, startSync } from "./syncController";
 import { getProfileSession, onProfileSessionCreated, restrictWebPermissions, useChromeUserAgent } from "./profiles";
 import { retakeCapture } from "./liveCaptures";
 import { linkNativeMessagingHosts, listOtherBrowserHostFolders } from "./nativeMessagingHosts";
-import { moveTabsToArchive, setNoteTitle, updateTabFavicon, updateTabPage } from "./state";
+import { setNoteTitle, updateTabFavicon, updateTabPage } from "./state";
 import { getStateFilePath } from "./store";
 import { openLinkInNewTab } from "./tabActions";
 import { getShownTabIds, getTabViews, refreshShownSnapshots, sleepTabView } from "./tabViews";
@@ -181,7 +183,14 @@ async function runArchiveSweep(): Promise<void> {
   }
 
   console.log(`Auto-archived ${tabIdsToArchive.length} tab(s).`);
-  applyChange((state) => moveTabsToArchive(state, tabIdsToArchive, now, "auto"));
+  archiveUnusedTabsWithUndo(tabIdsToArchive);
+}
+
+/**
+ * Tells the sidebar which Today tabs archive soon (autoArchive.ts), so their rows can say so.
+ */
+function updateArchivingSoon(inUseTabIds: ItemId[], now: number): void {
+  setArchivingSoon(findTabsArchivingSoon(getState(), now, launchedAt, inUseTabIds));
 }
 
 /**
@@ -225,7 +234,11 @@ function logTimerError(error: unknown): void {
 function startAutoArchiveTimers(): void {
   setInterval(() => {
     refreshTabsInUse()
-      .then((inUseTabIds) => sleepIdleTabs(inUseTabIds, Date.now()))
+      .then((inUseTabIds) => {
+        const now = Date.now();
+        sleepIdleTabs(inUseTabIds, now);
+        updateArchivingSoon(inUseTabIds, now);
+      })
       .catch(logTimerError);
   }, IN_USE_REFRESH_INTERVAL_MS);
 

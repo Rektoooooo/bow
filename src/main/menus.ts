@@ -23,6 +23,7 @@ import { listImportSources } from "./browserImportController";
 import { addMenuIcons } from "./menuIcons";
 import { describeSpaceIconAsText } from "../shared/spaceIcons";
 import { getSiteKey } from "../shared/siteKey";
+import { ARCHIVE_THRESHOLD_OPTIONS } from "../shared/settings";
 import { isKeptAwake } from "./tabSleep";
 
 /** What the menus need from main.ts. */
@@ -175,6 +176,51 @@ function buildCloseItems(host: MenuHost, tab: TabItem): MenuItemConstructorOptio
 }
 
 /**
+ * A Space's own archive timing: the setting ("Default (12 hours)"), one of its choices, or Never (autoArchive.ts).
+ */
+function buildSpaceArchiveMenu(host: MenuHost, space: Space): MenuItemConstructorOptions[] {
+  const settingMs = host.getState().settings.archiveAfterMs;
+  const settingLabel = ARCHIVE_THRESHOLD_OPTIONS.find((option) => option.valueMs === settingMs)?.label ?? "Never";
+  const items: MenuItemConstructorOptions[] = [
+    {
+      label: `Default (${settingLabel})`,
+      type: "radio",
+      checked: space.archiveAfterMs === undefined,
+      click: () => host.runAction({ type: "setSpaceArchiveAfter", spaceId: space.id, archiveAfterMs: "default" }),
+    },
+    { type: "separator" },
+  ];
+  for (const option of ARCHIVE_THRESHOLD_OPTIONS) {
+    items.push({
+      label: option.label,
+      type: "radio",
+      checked: space.archiveAfterMs === option.valueMs,
+      click: () => host.runAction({ type: "setSpaceArchiveAfter", spaceId: space.id, archiveAfterMs: option.valueMs }),
+    });
+  }
+  return items;
+}
+
+/**
+ * "Never Archive" for a Today tab: neither the sweep nor Clear takes it (autoArchive.ts). Nothing for other tabs.
+ */
+function buildNeverArchiveItems(host: MenuHost, tab: TabItem): MenuItemConstructorOptions[] {
+  const isToday = findRootLocation(host.getState(), tab.id)?.kind === "today";
+  if (!isToday) {
+    return [];
+  }
+  const isNeverArchived = tab.isNeverArchived === true;
+  return [
+    {
+      label: "Never Archive",
+      type: "checkbox",
+      checked: isNeverArchived,
+      click: () => host.runAction({ type: "setTabNeverArchived", tabId: tab.id, isNeverArchived: !isNeverArchived }),
+    },
+  ];
+}
+
+/**
  * Sleep Tab, Sleep Other Tabs, and keeping the tab's site awake (tabSleep.ts).
  */
 function buildSleepItems(host: MenuHost, tab: TabItem): MenuItemConstructorOptions[] {
@@ -215,6 +261,7 @@ function buildTabMenu(host: MenuHost, tab: TabItem): MenuItemConstructorOptions[
   }
   template.push({ label: muteLabel, click: () => host.runAction({ type: "setTabMuted", tabId: tab.id, isMuted: !tab.isMuted }) });
   template.push(...buildSleepItems(host, tab));
+  template.push(...buildNeverArchiveItems(host, tab));
   template.push({ type: "separator" });
   template.push(...buildCloseItems(host, tab));
   return template;
@@ -329,6 +376,7 @@ function buildSpaceMenu(host: MenuHost, space: Space): MenuItemConstructorOption
     { label: "Appearance", submenu: appearanceMenu },
     { label: "Grain", submenu: grainMenu },
     { label: "Profile (cookies, logins, Favorites)", submenu: profileMenu },
+    { label: "Archive Today Tabs After", submenu: buildSpaceArchiveMenu(host, space) },
     { type: "separator" },
     { label: "Move Left", enabled: spaceIndex > 0, click: () => host.runAction({ type: "moveSpace", spaceId: space.id, index: spaceIndex - 1 }) },
     {

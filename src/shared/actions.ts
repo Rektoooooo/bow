@@ -130,6 +130,10 @@ export type BrowserAction =
   | { type: "setShowFullUrls"; isOn: boolean }
   | { type: "setSnapshots"; isOn: boolean }
   | { type: "revealBackups" }
+  | { type: "setTabNeverArchived"; tabId: ItemId; isNeverArchived: boolean }
+  | { type: "setSpaceArchiveAfter"; spaceId: SpaceId; archiveAfterMs: number | null | "default" }
+  | { type: "undoArchive" }
+  | { type: "dismissArchiveUndo" }
   | { type: "sleepTab"; tabId: ItemId }
   | { type: "sleepOtherTabs" }
   | { type: "setSiteKeptAwake"; site: string; isKeptAwake: boolean }
@@ -248,6 +252,10 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setShowFullUrls",
   "setSnapshots",
   "revealBackups",
+  "setTabNeverArchived",
+  "setSpaceArchiveAfter",
+  "undoArchive",
+  "dismissArchiveUndo",
   "sleepTab",
   "sleepOtherTabs",
   "setSiteKeptAwake",

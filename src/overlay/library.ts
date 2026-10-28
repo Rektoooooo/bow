@@ -829,7 +829,7 @@ function renderSettingsSection(body: HTMLElement, data: LibraryData): void {
   const tabs = createSettingGroup("Tabs", [
     createSettingRow(
       "Archive Today tabs after",
-      "Unused Today tabs move to the Archive (default 12 hours). Pinned tabs and Favorites never do; time with the browser closed does not count. The Archive keeps your newest 250 tabs.",
+      "Unused Today tabs move to the Archive (default 12 hours). Pinned tabs and Favorites never do; time with the browser closed does not count. A Space can have its own timing (right-click it), and a tab marked Never Archive in its menu stays, even through Clear. The Archive keeps your newest 250 tabs.",
       createArchiveSelect(data),
     ),
     createSettingRow(

@@ -71,6 +71,10 @@ function runButtonAction(button: HTMLElement): void {
       return dispatch({ type: "dismissMedia" });
     case "restart-to-update":
       return dispatch({ type: "restartToUpdate" });
+    case "archive-undo":
+      return dispatch({ type: "undoArchive" });
+    case "archive-undo-dismiss":
+      return dispatch({ type: "dismissArchiveUndo" });
     case "navigate":
       return dispatch({ type: "navigate", command: (data.command ?? "reload") as NavigationCommand });
     case "open-command-bar":

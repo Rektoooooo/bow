@@ -230,10 +230,32 @@ await page.waitForTimeout(200);
 state = await getState(page);
 check("'Archive tabs after' setting saves 1 hour", state.settings.archiveAfterMs === 3600000, String(state.settings.archiveAfterMs));
 
+// A Today tab about to be archived shows the minutes left (main.ts measures every minute; set here directly through
+// the app's own browserCore module, the instance the app uses).
+const browserCorePath = path.join(appDir, "dist", "node", "main", "browserCore.js");
+const soonTabId = todayTabs(state)[0]?.id;
+await app.evaluate((_electron, { modulePath, tabId }) => process.mainModule.require(modulePath).setArchivingSoon({ [tabId]: 7 }), { modulePath: browserCorePath, tabId: soonTabId });
+const soonText = await page.textContent(".today-list .tab-row .archive-soon", { timeout: 3000 }).catch(() => null);
+check("a Today tab about to be archived shows the minutes left", soonText === "7m", String(soonText));
+await app.evaluate((_electron, modulePath) => process.mainModule.require(modulePath).setArchivingSoon({}), browserCorePath);
+
 await dispatch(page, { type: "clearTodayTabs" });
 await page.waitForTimeout(300);
 state = await getState(page);
 check("Clear archives Today tabs and keeps Pinned ones", todayTabs(state).length === 0 && state.archive[0]?.reason === "clear-button" && pinnedItems(state).length === 1);
+// The sidebar offers Undo for a few seconds (archiveUndoController.ts); it puts the tab back where it was.
+const clearedTabId = state.archive[0]?.tab.id;
+const undoText = await page.textContent("#archive-undo:not([hidden]) .archive-undo-text", { timeout: 3000 }).catch(() => null);
+check("after Clear the sidebar offers Undo", undoText === "Cleared 1 tab", String(undoText));
+await page.click("#archive-undo .archive-undo-button");
+await page.waitForFunction(() => document.querySelectorAll(".today-list .tab-row").length === 1, null, { timeout: 5000 }).catch(() => undefined);
+state = await getState(page);
+const isOfferGone = await page.waitForSelector("#archive-undo[hidden]", { state: "attached", timeout: 3000 }).then(() => true, () => false);
+check("Undo brings the cleared tab back, out of the Archive, and the offer goes", todayTabs(state)[0]?.id === clearedTabId && state.archive[0]?.tab.id !== clearedTabId && isOfferGone, `${todayTabs(state).map((tab) => tab?.id).join(",")} offer gone ${isOfferGone}`);
+// Back to the state the checks below expect: Today cleared, no offer on screen.
+await dispatch(page, { type: "clearTodayTabs" });
+await dispatch(page, { type: "dismissArchiveUndo" });
+await page.waitForTimeout(300);
 
 await dispatch(page, { type: "setSidebarVisible", isVisible: false });
 await page.waitForTimeout(400);

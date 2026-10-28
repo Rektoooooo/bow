@@ -66,6 +66,8 @@ let currentRuntime: RuntimeState = {
   isPeekOpen: false,
   faviconAccents: {},
   sleepingTabIds: [],
+  archivingSoon: {},
+  archiveUndo: null,
 };
 
 /** The Note or Easel tab whose editor this page last told main it has open, or null. */
@@ -410,6 +412,32 @@ function renderMediaPlayer(state: BrowserState): void {
 }
 
 /**
+ * Draws the Undo offer after the sweep or Clear archived tabs ("Cleared 4 tabs · Undo"), for as long as main offers it
+ * (archiveUndoController.ts). It sits where the tabs left, at the bottom of the sidebar.
+ */
+function renderArchiveUndo(): void {
+  const bar = document.getElementById("archive-undo");
+  if (bar === null) {
+    return;
+  }
+  const offer = currentRuntime.archiveUndo;
+  if (offer === null) {
+    bar.hidden = true;
+    morphChildren(bar, [], { animate: false });
+    return;
+  }
+  const message = createElement("span", "archive-undo-text", offer.message);
+  const undoButton = document.createElement("button");
+  undoButton.type = "button";
+  undoButton.className = "archive-undo-button";
+  undoButton.dataset.action = "archive-undo";
+  undoButton.textContent = "Undo";
+  const closeButton = createActionButton("close", "Dismiss", "media-button", "archive-undo-dismiss");
+  morphChildren(bar, [message, undoButton, closeButton], { animate: false });
+  bar.hidden = false;
+}
+
+/**
  * Draws the notice for a new version of Bow that has downloaded: one button that restarts into it. It stays until
  * the restart; quitting Bow installs the update too.
  */
@@ -540,6 +568,7 @@ function renderAll(): void {
   hasRenderedOnce = true;
   renderMediaPlayer(state);
   renderUpdateNotice();
+  renderArchiveUndo();
   renderBottomBar(state);
   // The page area follows the real selection even while "New Tab" carries the highlight (Arc's shot 3).
   const selectedTabId = getSelectedTabId(state);

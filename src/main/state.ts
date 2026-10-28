@@ -731,12 +731,58 @@ function collectContainerIds(state: BrowserState, itemId: ItemId): ItemId[] {
 }
 
 /**
- * Archives every Today tab in the active Space with reason "clear-button" (Arc's "Clear", ⇧⌘K).
+ * The Today tabs Clear takes from the active Space: all of them except those marked Never Archive.
  */
-export function clearTodayTabs(state: BrowserState, now: number): BrowserState {
+export function listClearableTodayTabIds(state: BrowserState): ItemId[] {
   const activeSpace = getActiveSpace(state);
   const todayTabIds = collectTabIdsInList(state, activeSpace.todayIds);
-  return moveTabsToArchive(state, todayTabIds, now, "clear-button");
+  return todayTabIds.filter((tabId) => findTab(state, tabId)?.isNeverArchived !== true);
+}
+
+/**
+ * Archives the active Space's Today tabs with reason "clear-button" (Arc's "Clear", ⇧⌘K), except those marked
+ * Never Archive.
+ */
+export function clearTodayTabs(state: BrowserState, now: number): BrowserState {
+  return moveTabsToArchive(state, listClearableTodayTabIds(state), now, "clear-button");
+}
+
+/**
+ * Marks a tab Never Archive (or not): neither the sweep nor Clear takes it; closing or deleting it still does.
+ */
+export function setTabNeverArchived(state: BrowserState, tabId: ItemId, isNeverArchived: boolean): BrowserState {
+  const tab = findTab(state, tabId);
+  if (tab === undefined || (tab.isNeverArchived === true) === isNeverArchived) {
+    return state;
+  }
+  const changedTab: TabItem = { ...tab };
+  if (isNeverArchived) {
+    changedTab.isNeverArchived = true;
+  } else {
+    delete changedTab.isNeverArchived;
+  }
+  return { ...state, items: { ...state.items, [tabId]: changedTab } };
+}
+
+/**
+ * Gives a Space its own archive timing, Never (null), or back to the setting ("default").
+ */
+export function setSpaceArchiveAfter(state: BrowserState, spaceId: SpaceId, archiveAfterMs: number | null | "default"): BrowserState {
+  const space = findSpace(state, spaceId);
+  if (space === undefined) {
+    return state;
+  }
+  const current = space.archiveAfterMs === undefined ? "default" : space.archiveAfterMs;
+  if (current === archiveAfterMs) {
+    return state;
+  }
+  const changedSpace: Space = { ...space };
+  if (archiveAfterMs === "default") {
+    delete changedSpace.archiveAfterMs;
+  } else {
+    changedSpace.archiveAfterMs = archiveAfterMs;
+  }
+  return { ...state, spaces: state.spaces.map((candidate) => (candidate.id === spaceId ? changedSpace : candidate)) };
 }
 
 /**
@@ -764,14 +810,15 @@ export function restoreArchivedTab(state: BrowserState, tabId: ItemId, now: numb
 }
 
 /**
- * Restores the most recently archived tab (⇧⌘T, "Restore Last Closed Tab"). Returns the same state when the archive is empty.
+ * Reopens the tab you closed last (⇧⌘T, "Reopen Closed Tab"): only tabs closed by you, never ones the sweep or Clear
+ * archived (Undo brings those back). Returns the same state when you closed none.
  */
 export function restoreLastArchivedTab(state: BrowserState, now: number): BrowserState {
-  const newestEntry = state.archive[0];
-  if (newestEntry === undefined) {
+  const newestClosed = state.archive.find((entry) => entry.reason === "manual");
+  if (newestClosed === undefined) {
     return state;
   }
-  return restoreArchivedTab(state, newestEntry.tab.id, now);
+  return restoreArchivedTab(state, newestClosed.tab.id, now);
 }
 
 /**

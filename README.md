@@ -233,6 +233,10 @@ These timings match what we measured on a real Arc install. The sweep runs every
 refreshed every minute, time while the app is closed does not count, and the Archive keeps the newest 250 tabs.
 The evidence is in [docs/research/arc-findings.md](docs/research/arc-findings.md#2-auto-archive).
 
+Better than Arc, without surprises: a Today tab shows the minutes left in its last hour, a tab marked **Never
+Archive** (its menu) stays even through Clear, each Space can have its own timing (right-click the Space), the
+sidebar offers **Undo** for a few seconds after the sweep or Clear, and ⇧⌘T reopens only tabs you closed yourself.
+
 ## Keyboard shortcuts
 
 Same keys as Arc. ⌘T new tab, ⌘N new window, ⇧⌘W close window, ⌘L edit address, ⌘W close, ⇧⌘T reopen, ⌘D pin/unpin, ⇧⌘C copy URL

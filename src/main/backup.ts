@@ -247,6 +247,9 @@ function checkTab(raw: unknown, expectedId: string | null): TabItem | null {
   if (typeof raw.isUnread === "boolean") {
     tab.isUnread = raw.isUnread;
   }
+  if (raw.isNeverArchived === true) {
+    tab.isNeverArchived = true;
+  }
   return tab;
 }
 
@@ -393,7 +396,7 @@ function checkSpaces(raw: unknown, profileIds: Set<ProfileId>, fallbackProfileId
     }
     seenIds.add(entry.id);
     const profileId = typeof entry.profileId === "string" && profileIds.has(entry.profileId) ? entry.profileId : fallbackProfileId;
-    spaces.push({
+    const space: Space = {
       id: entry.id.slice(0, MAX_TEXT_LENGTH),
       name: readText(entry.name, "Space"),
       icon: readText(entry.icon, "✦").slice(0, 64),
@@ -402,7 +405,13 @@ function checkSpaces(raw: unknown, profileIds: Set<ProfileId>, fallbackProfileId
       pinnedIds: readIdList(entry.pinnedIds),
       todayIds: readIdList(entry.todayIds),
       isPinnedOpen: entry.isPinnedOpen !== false,
-    });
+    };
+    // Its own archive timing: Never, or a positive time (anything else means the setting).
+    const isTiming = isFiniteNumber(entry.archiveAfterMs) && entry.archiveAfterMs > 0;
+    if (entry.archiveAfterMs === null || isTiming) {
+      space.archiveAfterMs = entry.archiveAfterMs as number | null;
+    }
+    spaces.push(space);
   }
   return spaces;
 }

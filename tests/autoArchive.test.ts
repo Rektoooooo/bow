@@ -4,10 +4,10 @@
  *   Each test below is one rule from autoArchive.ts.
  */
 import { describe, expect, it } from "vitest";
-import { findTabsToArchive, getInactiveDurationMs, pruneArchive } from "../src/main/autoArchive";
-import { addToFavorites, createInitialState, pinTab } from "../src/main/state";
+import { findTabsArchivingSoon, findTabsToArchive, getInactiveDurationMs, pruneArchive } from "../src/main/autoArchive";
+import { addToFavorites, createInitialState, pinTab, setSpaceArchiveAfter, setTabNeverArchived } from "../src/main/state";
 import { splitTabs } from "../src/main/split";
-import { ARCHIVE_LIMIT, DAY_MS, HOUR_MS } from "../src/shared/settings";
+import { ARCHIVE_LIMIT, DAY_MS, HOUR_MS, MINUTE_MS } from "../src/shared/settings";
 import type { ArchivedTab, BrowserState, ItemId, TabItem } from "../src/shared/types";
 
 const NINE_AM = Date.UTC(2026, 9, 26, 9, 0, 0);
@@ -130,6 +130,50 @@ describe("findTabsToArchive", () => {
     const tabIds = findTabsToArchive(state, oneHourAfterLaunch, launchedAt, []);
 
     expect(tabIds).toEqual([]);
+  });
+});
+
+describe("archiving without surprises", () => {
+  it("a tab marked Never Archive stays, however old", () => {
+    const state = setTabNeverArchived(makeStateWithTabs([makeTab(NINE_AM)]), "tab-1", true);
+    expect(findTabsToArchive(state, NINE_AM + 30 * DAY_MS, LAUNCHED_LONG_AGO, [])).toEqual([]);
+  });
+
+  it("a Space's own timing wins over the setting, both shorter and Never", () => {
+    const state = makeStateWithTabs([makeTab(NINE_AM)]);
+    const spaceId = state.spaces[0]?.id as string;
+    const now = NINE_AM + 2 * HOUR_MS;
+    expect(findTabsToArchive(state, now, LAUNCHED_LONG_AGO, [])).toEqual([]);
+    const sooner = setSpaceArchiveAfter(state, spaceId, 1 * HOUR_MS);
+    expect(findTabsToArchive(sooner, now, LAUNCHED_LONG_AGO, [])).toEqual(["tab-1"]);
+    const never = setSpaceArchiveAfter(state, spaceId, null);
+    expect(findTabsToArchive(never, NINE_AM + 30 * DAY_MS, LAUNCHED_LONG_AGO, [])).toEqual([]);
+    expect(setSpaceArchiveAfter(setSpaceArchiveAfter(state, spaceId, null), spaceId, "default").spaces[0]).toEqual(state.spaces[0]);
+  });
+
+  it("a Space with its own timing archives even when the setting is Never", () => {
+    const state = makeStateWithTabs([makeTab(NINE_AM)], null);
+    const timed = setSpaceArchiveAfter(state, state.spaces[0]?.id as string, 6 * HOUR_MS);
+    expect(findTabsToArchive(timed, NINE_AM + 7 * HOUR_MS, LAUNCHED_LONG_AGO, [])).toEqual(["tab-1"]);
+  });
+
+  it("says which tabs archive within the last hour, with the minutes left", () => {
+    const state = makeStateWithTabs([makeTab(NINE_AM), makeTab(NINE_AM + 3 * HOUR_MS, { id: "tab-2" })]);
+    const now = NINE_AM + TWELVE_HOURS_MS - 20 * MINUTE_MS;
+    expect(findTabsArchivingSoon(state, now, LAUNCHED_LONG_AGO, [])).toEqual({ "tab-1": 20 });
+  });
+
+  it("uses the last quarter of a short timing, and shows at least a minute for a tab past its time", () => {
+    const state = makeStateWithTabs([makeTab(NINE_AM)], 1 * HOUR_MS);
+    expect(findTabsArchivingSoon(state, NINE_AM + 30 * MINUTE_MS, LAUNCHED_LONG_AGO, [])).toEqual({});
+    expect(findTabsArchivingSoon(state, NINE_AM + 50 * MINUTE_MS, LAUNCHED_LONG_AGO, [])).toEqual({ "tab-1": 10 });
+    expect(findTabsArchivingSoon(state, NINE_AM + 2 * HOUR_MS, LAUNCHED_LONG_AGO, [])).toEqual({ "tab-1": 1 });
+  });
+
+  it("never warns about tabs in use or marked Never Archive", () => {
+    const state = makeStateWithTabs([makeTab(NINE_AM), makeTab(NINE_AM, { id: "tab-2" })]);
+    const marked = setTabNeverArchived(state, "tab-2", true);
+    expect(findTabsArchivingSoon(marked, NINE_AM + 11.5 * HOUR_MS, LAUNCHED_LONG_AGO, ["tab-1"])).toEqual({});
   });
 });
 

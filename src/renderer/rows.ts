@@ -187,7 +187,7 @@ function isLiveFolderList(location: ItemLocation, state: BrowserState): boolean 
 
 /**
  * Everything a tab row shows depends on, as one text: the tab, where it sits, its runtime facts, whether it is
- * selected or in Developer Mode, and the tidy-titles setting.
+ * selected, in Developer Mode, asleep or archiving soon, and the tidy-titles setting.
  */
 function describeTabRowInputs(tab: TabItem, location: ItemLocation, index: number, depth: number, context: RowContext): TabRowInputs {
   const encodedLocation = encodeLocation(location);
@@ -201,6 +201,8 @@ function describeTabRowInputs(tab: TabItem, location: ItemLocation, index: numbe
     isDeveloperModeOn(context.state, tab.url),
     context.state.settings.areTitlesTidy !== false,
     isLiveFolderList(location, context.state),
+    context.runtime.sleepingTabIds.includes(tab.id),
+    context.runtime.archivingSoon[tab.id] ?? null,
   ];
   return { key: `tab:${encodedLocation}:${tab.id}`, text: JSON.stringify(facts) };
 }
@@ -265,6 +267,14 @@ function buildTabRow(tab: TabItem, location: ItemLocation, index: number, depth:
     const unreadDot = createElement("span", "unread-dot");
     unreadDot.title = "Changed since you last looked";
     row.append(unreadDot);
+  }
+
+  // A Today tab about to be archived says so, so it never vanishes by surprise (autoArchive.ts).
+  const minutesLeft = isToday ? context.runtime.archivingSoon[tab.id] : undefined;
+  if (minutesLeft !== undefined) {
+    const soon = createElement("span", "archive-soon", `${minutesLeft}m`);
+    soon.title = `Archives in about ${minutesLeft} minute${minutesLeft === 1 ? "" : "s"}. "Never Archive" in its menu keeps it.`;
+    row.append(soon);
   }
 
   const isAudible = runtimeInfo?.isAudible === true;

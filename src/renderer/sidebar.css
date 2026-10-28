@@ -1264,6 +1264,57 @@ button:disabled {
 
 /* ---------- Update notice (a new version of Bow has downloaded) ---------- */
 
+/* A Today tab that archives soon shows the minutes left; the row's × takes its place on hover. Our choice. */
+.archive-soon {
+  flex: none;
+  color: var(--ink);
+  opacity: 0.55;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.row:hover .archive-soon {
+  display: none;
+}
+
+/* "Cleared 4 tabs · Undo" after the sweep or Clear (archiveUndoController.ts): a tile like the media player's. */
+.archive-undo {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 2px;
+  padding: 4px 4px 4px 10px;
+  border-radius: 10px;
+  background: var(--tile);
+}
+
+.archive-undo[hidden] {
+  display: none;
+}
+
+.archive-undo-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archive-undo-button {
+  flex: none;
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--row-selected);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.archive-undo-button:hover {
+  opacity: 0.85;
+}
+
 .update-notice {
   flex: none;
   margin: 4px 0 2px;

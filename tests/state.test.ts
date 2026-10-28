@@ -25,6 +25,7 @@ import {
   resetPinnedTabs,
   restoreArchivedTab,
   restoreLastArchivedTab,
+  setTabNeverArchived,
   selectTab,
   setSidebarWidth,
   toggleFolder,
@@ -343,6 +344,27 @@ describe("restoreArchivedTab", () => {
     const state = restoreLastArchivedTab(closedBoth, FIVE_PM);
 
     expect(getTodayIds(state)).toEqual([tabIds[1]]);
+  });
+
+  it("⇧⌘T reopens only tabs you closed, not ones Clear or the sweep took", () => {
+    const { state: withTabs, tabIds } = openTabs(["https://a.example", "https://b.example"]);
+    const closedFirst = closeTab(withTabs, tabIds[0] as ItemId, THREE_PM);
+    const cleared = clearTodayTabs(closedFirst, FOUR_PM);
+
+    const state = restoreLastArchivedTab(cleared, FIVE_PM);
+
+    expect(getTodayIds(state)).toEqual([tabIds[0]]);
+    expect(restoreLastArchivedTab(clearTodayTabs(withTabs, FOUR_PM), FIVE_PM).archive).toHaveLength(2);
+  });
+
+  it("Clear leaves the tabs marked Never Archive", () => {
+    const { state: withTabs, tabIds } = openTabs(["https://a.example", "https://b.example"]);
+    const marked = setTabNeverArchived(withTabs, tabIds[1] as ItemId, true);
+
+    const state = clearTodayTabs(marked, FOUR_PM);
+
+    expect(getTodayIds(state)).toEqual([tabIds[1]]);
+    expect(setTabNeverArchived(marked, tabIds[1] as ItemId, true)).toBe(marked);
   });
 });
 

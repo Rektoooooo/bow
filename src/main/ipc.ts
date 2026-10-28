@@ -76,6 +76,13 @@ function isAllowedArchiveAfter(value: unknown): boolean {
   return ARCHIVE_THRESHOLD_OPTIONS.some((option) => option.valueMs === value);
 }
 
+/**
+ * A Space's archive timing: "default" (the setting), null (never) or one of the setting's choices.
+ */
+function isSpaceArchiveAfter(value: unknown): boolean {
+  return value === "default" || isAllowedArchiveAfter(value);
+}
+
 function isAllowedTabSleepAfter(value: unknown): boolean {
   return TAB_SLEEP_OPTIONS.some((option) => option.valueMs === value);
 }
@@ -323,6 +330,10 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   setShowFullUrls: { isOn: isBoolean },
   setSnapshots: { isOn: isBoolean },
   revealBackups: {},
+  setTabNeverArchived: { tabId: isText, isNeverArchived: isBoolean },
+  setSpaceArchiveAfter: { spaceId: isText, archiveAfterMs: isSpaceArchiveAfter },
+  undoArchive: {},
+  dismissArchiveUndo: {},
   sleepTab: { tabId: isText },
   sleepOtherTabs: {},
   setSiteKeptAwake: { site: isSite, isKeptAwake: isBoolean },

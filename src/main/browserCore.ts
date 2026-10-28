@@ -253,6 +253,31 @@ export function getLibraryWidth(windowId: WindowId = currentState.focusedWindowI
   return computeLibraryWidth(librarySection, currentState.spaces.length, contentWidth);
 }
 
+/** Today tabs that archive soon, with the minutes left (main.ts measures every minute). */
+let archivingSoon: Record<ItemId, number> = {};
+
+/** The Undo offer after a sweep or Clear (archiveUndoController.ts), or null. */
+let archiveUndo: { message: string } | null = null;
+
+/**
+ * Sets which Today tabs archive soon; the sidebar hears about a change with the next runtime push.
+ */
+export function setArchivingSoon(minutesLeftByTab: Record<ItemId, number>): void {
+  if (JSON.stringify(minutesLeftByTab) === JSON.stringify(archivingSoon)) {
+    return;
+  }
+  archivingSoon = minutesLeftByTab;
+  scheduleRuntimePush();
+}
+
+/**
+ * Shows or takes away the sidebar's Undo offer.
+ */
+export function setArchiveUndo(offer: { message: string } | null): void {
+  archiveUndo = offer;
+  scheduleRuntimePush();
+}
+
 /**
  * The section the Library shows (or showed last).
  */
@@ -572,6 +597,8 @@ export function collectRuntimeState(windowId: WindowId = currentState.focusedWin
     faviconAccents: getFaviconAccents(),
     updateReadyVersion: updateReadyVersion,
     sleepingTabIds: getSleepingTabIds(),
+    archivingSoon: archivingSoon,
+    archiveUndo: archiveUndo,
   };
 }
 

@@ -266,7 +266,9 @@ M about a day, L several days.
       check-overlay) Smarter tab sleeping: per-site Keep Awake list (Settings, Control Center, tab menu), a decision for
       pinned tabs and Favorites, sleeping tabs dimmed in the sidebar, Sleep Tab Now / Sleep Other Tabs, a Task
       Manager with memory and CPU per tab (M)
-- [ ] 3. Archive without surprises: Never Archive per tab and per Space, archive timing per Space, an Undo toast
+- [x] 3. (Never Archive per tab, also through Clear; a Space's own timing incl. Never; Undo in the sidebar after the
+      sweep or Clear, places kept; "20m" on Today rows in their last hour; ⇧⌘T only reopens tabs you closed)
+      Archive without surprises: Never Archive per tab and per Space, archive timing per Space, an Undo toast
       after the sweep or Clear, an "archives soon" hint, ⇧⌘T reopens only tabs you closed (M)
 - [ ] 4. Everyday basics: zoom remembered per site; downloads folder or ask where to save; ⌘, opens Settings;
       custom search engines with keywords; Save Page As and Save as PDF; a Keyboard Shortcuts sheet (S each)
