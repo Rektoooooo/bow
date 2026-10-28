@@ -101,6 +101,15 @@ export const SIDEBAR_COLLAPSE_WIDTH_PX = 130;
  */
 export const CARD_INSET_PX = 10;
 
+/**
+ * Arc's Peek, measured in the user's screenshot and recording (2026-10-28, 1 px per pt): the card starts 10 pt below
+ * the window's top (rounded corners, a faint rim), its toolbar row is 33 pt tall, so the page starts 43 pt down;
+ * the page ends 11 pt above the window's bottom. main/peek.ts places the page, overlay/peekFrame.ts draws the card.
+ */
+export const PEEK_TOP_SPACE_PX = 10;
+export const PEEK_TOOLBAR_HEIGHT_PX = 33;
+export const PEEK_BOTTOM_SPACE_PX = 11;
+
 /** Gap between the sidebar's content and the page card. Measured on the user's Arc: 7 pt. Must match --card-gap. */
 export const CARD_GAP_PX = 7;
 

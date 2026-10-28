@@ -2230,10 +2230,11 @@ body[data-panel="spaceIcon"] .backdrop {
 }
 
 /* ---------- Peek (the page itself is a separate view below .peek-card's toolbar row) ----------
-   Arc's, measured in the user's recording (2026-10-27): only the page card dims (its toolbar 56 → 25, so black at
-   55 %; the sidebar stays as it is); the card hangs from the window's top edge in the frame's color with a 44 pt
-   toolbar row (peek.ts PEEK_TOOLBAR_HEIGHT_PX); the round buttons are black, 34 pt, 42 pt apart. The backdrop stays,
-   see-through, to catch a click outside. */
+   Arc's, measured in the user's screenshot and recording (2026-10-28): the page card dims, its toolbar included (the
+   sidebar stays as it is), under a dark grey veil: black 2.4 → 9.8 and the toolbar 56 → 25 fit rgba(13, 13, 13, 0.72);
+   the card starts 10 pt below the window's top, rounded, with a faint rim, in the frame's color, with a 33 pt toolbar
+   row (settings.ts PEEK_*); the round buttons are 34 pt, 42 pt apart. The backdrop stays, see-through, to catch a
+   click outside. Light Spaces use the same veil (no light Arc capture exists to measure). */
 
 body[data-panel="peek"] .backdrop {
   background: transparent;
@@ -2242,22 +2243,30 @@ body[data-panel="peek"] .backdrop {
 .peek-dim {
   position: fixed;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(13, 13, 13, 0.72);
   pointer-events: none;
 }
 
 .peek-card {
   position: fixed;
-  border-radius: 0 0 10px 10px;
+  border-radius: 10px;
   background: var(--peek-chrome);
-  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.12),
+    0 16px 50px rgba(0, 0, 0, 0.35);
+}
+
+body.dark .peek-card {
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.14),
+    0 16px 50px rgba(0, 0, 0, 0.35);
 }
 
 .peek-toolbar {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  height: 44px;
+  height: 33px;
   padding: 0 8px;
 }
 

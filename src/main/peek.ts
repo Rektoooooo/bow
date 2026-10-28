@@ -13,10 +13,10 @@
  */
 import { nativeTheme, WebContentsView } from "electron";
 import type { BrowserWindow, WebContents } from "electron";
-import { DEFAULT_PROFILE_ID } from "../shared/settings";
+import { CARD_INSET_PX, DEFAULT_PROFILE_ID, PEEK_BOTTOM_SPACE_PX, PEEK_TOOLBAR_HEIGHT_PX, PEEK_TOP_SPACE_PX } from "../shared/settings";
 import { computeFramePalette } from "../shared/themePalette";
 import type { ItemId } from "../shared/types";
-import { addAfterSyncHook, applyChange, getLayoutOptions, getState, getWindow } from "./browserCore";
+import { addAfterSyncHook, applyChange, getLayoutOptions, getState, getWindow, setPeekWindow } from "./browserCore";
 import { computeCardBounds } from "./layout";
 import type { Bounds } from "./layout";
 import { hideOverlay, raiseOverlayIfShown, showOverlay } from "./overlay";
@@ -29,13 +29,11 @@ import type { TabViewEvents } from "./tabViews";
 import { createId, findProfileIdOfItem, getActiveSpace } from "./tree";
 
 /*
- * Arc's Peek, measured in the user's recording (2026-10-27): the card hangs from the window's top edge, its own
- * toolbar row (back, forward, reload, address) 44 pt tall in the window frame's color, the page below it ending 12 pt
+ * Arc's Peek (settings.ts PEEK_*: measured 2026-10-28): the card starts 10 pt below the window's top with its own
+ * toolbar row (back, forward, reload, address) 33 pt tall in the window frame's color, the page below it ending 11 pt
  * above the window's bottom; it is 80 % as wide as the page card (10 % free on each side), centered on it. The
- * overlay draws the toolbar row and must use the same height (overlay.css --peek-toolbar-height).
+ * overlay draws the card and its toolbar row with the same numbers.
  */
-const PEEK_TOOLBAR_HEIGHT_PX = 44;
-const PEEK_BOTTOM_SPACE_PX = 12;
 const PEEK_SIDE_MARGIN_RATIO = 0.1;
 
 /** Corner radius of the Peek's page (its bottom corners show; the top ones sit under the toolbar row). */
@@ -109,12 +107,22 @@ function computePeekBounds(window: BrowserWindow | null): Bounds | null {
   const contentHeight = window.getContentSize()[1] ?? 0;
   const card = computeWindowCard(window);
   const sideMargin = Math.round(card.width * PEEK_SIDE_MARGIN_RATIO);
+  const pageTop = PEEK_TOP_SPACE_PX + PEEK_TOOLBAR_HEIGHT_PX;
   return {
     x: card.x + sideMargin,
-    y: PEEK_TOOLBAR_HEIGHT_PX,
+    y: pageTop,
     width: Math.max(card.width - 2 * sideMargin, 0),
-    height: Math.max(contentHeight - PEEK_TOOLBAR_HEIGHT_PX - PEEK_BOTTOM_SPACE_PX, 0),
+    height: Math.max(contentHeight - pageTop - PEEK_BOTTOM_SPACE_PX, 0),
   };
+}
+
+/**
+ * What dims behind the Peek: the whole page card, its toolbar included, like Arc's (its toolbar's buttons do not show
+ * through).
+ */
+function computeDimmedCard(window: BrowserWindow): Bounds {
+  const card = computeWindowCard(window);
+  return { x: card.x, y: CARD_INSET_PX, width: card.width, height: card.y + card.height - CARD_INSET_PX };
 }
 
 /**
@@ -135,7 +143,7 @@ function showPeekFrame(contents: WebContents, takesKeyboard: boolean = true): vo
   const panel = {
     kind: "peek" as const,
     frame: frame,
-    card: computeWindowCard(window),
+    card: computeDimmedCard(window),
     url: contents.getURL(),
     chromeColor: palette.colors[0],
     canGoBack: history.canGoBack(),
@@ -200,6 +208,7 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
   }
   closePeek();
   peekWindow = window;
+  setPeekWindow(window);
 
   const state = getState();
   const profileId = sourceTabId === null ? DEFAULT_PROFILE_ID : findProfileIdOfItem(state, sourceTabId) ?? DEFAULT_PROFILE_ID;
@@ -244,6 +253,7 @@ function removePeek(keepPage: boolean): WebContentsView | null {
   const view = peekView;
   peekView = null;
   peekWindow = null;
+  setPeekWindow(null);
   hideOverlay();
   if (view === null) {
     return null;
@@ -273,6 +283,7 @@ export function closePeekIn(window: BrowserWindow): void {
   peekView = null;
   peekWindow = null;
   peekSourceTabId = null;
+  setPeekWindow(null);
   if (!window.isDestroyed()) {
     window.contentView.removeChildView(view);
   }

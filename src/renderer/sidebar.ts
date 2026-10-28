@@ -63,6 +63,7 @@ let currentRuntime: RuntimeState = {
   isWindowActive: true,
   isLibraryOpen: false,
   libraryWidth: LIBRARY_COLUMN_WIDTH_PX,
+  isPeekOpen: false,
   faviconAccents: {},
 };
 
@@ -518,6 +519,7 @@ function renderAll(): void {
   document.body.classList.toggle("sidebar-hidden", !state.settings.isSidebarVisible);
   document.body.classList.toggle("sidebar-peeking", currentRuntime.isSidebarPeeking);
   document.body.classList.toggle("library-open", currentRuntime.isLibraryOpen);
+  document.body.classList.toggle("peek-open", currentRuntime.isPeekOpen);
   // Library › Spaces widens the column (main: computeLibraryWidth); sidebar.css glides it there.
   document.body.style.setProperty("--library-width", `${currentRuntime.libraryWidth}px`);
   // An item dragged in another window shows this sidebar's drop places too (the Favorites end zone).

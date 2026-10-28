@@ -1480,6 +1480,14 @@ body.sidebar-hidden.library-open .main-column {
   transition: padding var(--motion-layout) var(--motion-layout-ease);
 }
 
+/*
+  Electron hit-tests every view's drag region, not only the top one's: the toolbar under an open Peek's toolbar row and
+  Close button would turn their clicks into window drags. The sidebar's top strip and the window's edge still drag.
+*/
+body.peek-open .toolbar {
+  -webkit-app-region: no-drag;
+}
+
 /* Loading glow: a soft line moving along the toolbar's bottom edge while the page loads. */
 .toolbar.is-loading::after {
   content: "";

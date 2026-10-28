@@ -375,6 +375,11 @@ export interface RuntimeState {
   isLibraryOpen: boolean;
   /** The Library's column width in this window (layout.ts computeLibraryWidth: Spaces is wider). */
   libraryWidth: number;
+  /**
+   * True while a Peek is open over this window. Electron gives a click to any view's drag region under it, even one
+   * below the overlay, so the sidebar's toolbar stops moving the window then (the Peek's buttons sit over it).
+   */
+  isPeekOpen: boolean;
   /** The colour of each Favorite's icon, by icon address (shared/faviconColor.ts): the selected tile's border. */
   faviconAccents: Record<string, string>;
   /**

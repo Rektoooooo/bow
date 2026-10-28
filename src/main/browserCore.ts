@@ -78,6 +78,9 @@ const peekingWindowIds = new Set<WindowId>();
 /** The window whose sidebar column shows the Library (the overlay is in one window at a time), or null. */
 let libraryWindowId: WindowId | null = null;
 
+/** The window a Peek is open over (RuntimeState.isPeekOpen), or null. */
+let peekWindowId: WindowId | null = null;
+
 /** The section the Library shows (its width depends on it). */
 let librarySection: LibrarySection = "archive";
 
@@ -557,6 +560,7 @@ export function collectRuntimeState(windowId: WindowId = currentState.focusedWin
     isWindowActive: getMainWindow(windowId)?.isFocused() ?? false,
     isLibraryOpen: libraryWindowId === windowId,
     libraryWidth: getLibraryWidth(windowId),
+    isPeekOpen: peekWindowId === windowId,
     faviconAccents: getFaviconAccents(),
     updateReadyVersion: updateReadyVersion,
   };
@@ -594,6 +598,19 @@ export function getExtensionsBeingAdded(): ExtensionBeingAdded[] {
  */
 export function setExtensionsBeingAdded(entries: ExtensionBeingAdded[]): void {
   extensionsBeingAdded = entries;
+  scheduleRuntimePush();
+}
+
+/**
+ * A Peek opened over a window or closed (null): that window's sidebar stops or starts dragging the window by its
+ * toolbar (RuntimeState.isPeekOpen).
+ */
+export function setPeekWindow(window: BrowserWindow | null): void {
+  const windowId = window === null ? null : findMainWindowIdOf(window.webContents);
+  if (windowId === peekWindowId) {
+    return;
+  }
+  peekWindowId = windowId;
   scheduleRuntimePush();
 }
 

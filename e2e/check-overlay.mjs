@@ -227,8 +227,8 @@ const peekEntry = views.find((view) => view.url.includes("iana.org"));
 state = await getState();
 check("a link from a pinned tab to another site opens in a Peek", peekEntry !== undefined, JSON.stringify(views.map((view) => view.url)));
 check("…and the pinned tab stays on its page", state.items[pinnedSourceId]?.url.startsWith("https://example.com/peek-source"), state.items[pinnedSourceId]?.url);
-// Arc's layout: the page sits under the Peek's own 44 pt toolbar row (which hangs from the window's top edge and
-// shows the address), 80 % as wide as the page card; the round buttons are stacked right of it.
+// Arc's layout: the page sits under the Peek's own toolbar row (which shows the address), 80 % as wide as the page
+// card; the round buttons are stacked right of it.
 const peekLayout = await app.evaluate(({ BrowserWindow }) => {
   const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
   const peekView = win.contentView.children.find((child) => child.webContents?.getURL().includes("iana.org"));
@@ -237,8 +237,19 @@ const peekLayout = await app.evaluate(({ BrowserWindow }) => {
 const peekHost = await overlay.$eval(".peek-toolbar .peek-host", (element) => element.textContent).catch(() => "");
 const buttonsBox = await overlay.$eval(".peek-buttons", (element) => element.getBoundingClientRect().toJSON()).catch(() => null);
 const peekBox = peekLayout.peek;
-const isArcLayout = peekBox !== null && peekBox.y === 44 && peekHost.includes("iana.org") && buttonsBox !== null && buttonsBox.x > peekBox.x + peekBox.width && buttonsBox.height > buttonsBox.width;
-check("the Peek has Arc's layout: its own toolbar row with the address on top, buttons stacked at its right", isArcLayout, `${JSON.stringify(peekBox)} host=${peekHost} buttons=${JSON.stringify(buttonsBox)}`);
+const peekCardBox = await overlay.$eval(".peek-card", (element) => element.getBoundingClientRect().toJSON()).catch(() => null);
+// Arc's (measured 2026-10-28): the card 10 pt below the window's top, a 33 pt toolbar row, the page from 43 pt.
+const isArcLayout = peekBox !== null && peekBox.y === 43 && peekCardBox?.y === 10 && peekHost.includes("iana.org") && buttonsBox !== null && buttonsBox.x > peekBox.x + peekBox.width && buttonsBox.height > buttonsBox.width;
+check("the Peek has Arc's layout: its own toolbar row with the address on top, buttons stacked at its right", isArcLayout, `${JSON.stringify(peekBox)} card top=${peekCardBox?.y} host=${peekHost} buttons=${JSON.stringify(buttonsBox)}`);
+// Electron turns a click over any view's drag region into a window drag, even under the overlay: the sidebar's
+// toolbar under the Peek's toolbar row and Close button must not drag while the Peek is open.
+const dragRegions = () =>
+  sidebar.evaluate(() => ({
+    toolbar: getComputedStyle(document.querySelector(".toolbar")).getPropertyValue("-webkit-app-region"),
+    header: getComputedStyle(document.querySelector(".sidebar-header")).getPropertyValue("-webkit-app-region"),
+  }));
+const dragWhilePeek = await dragRegions();
+check("while a Peek is open the toolbar under it does not drag the window (the sidebar's top strip still does)", dragWhilePeek.toolbar === "no-drag" && dragWhilePeek.header === "drag", JSON.stringify(dragWhilePeek));
 await overlay.click(".peek-button[aria-label^='Open as Tab']");
 await sidebar.waitForTimeout(800);
 state = await getState();
@@ -283,6 +294,8 @@ await app.evaluate(({ webContents }) => {
 await sidebar.waitForTimeout(600);
 views = await peekViews();
 check("Escape dismisses the Peek", !views.some((view) => view.url.includes("iana.org")) && !(await overlayIsShown()), JSON.stringify(views.map((view) => view.url)));
+const dragAfterPeek = await dragRegions();
+check("…and the toolbar drags the window again", dragAfterPeek.toolbar === "drag", JSON.stringify(dragAfterPeek));
 
 // Media: a page plays a tone in a looping <audio>; in the background, the sidebar shows a player that can pause it.
 function createToneWav() {

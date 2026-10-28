@@ -1,7 +1,7 @@
 /**
  * WHY this file exists:
  *   The parts of Arc's Peek that are not the page itself: the page card dimmed behind it, the card's own toolbar row
- *   (back, forward, reload and the address) hanging from the window's top edge in the frame's color, and Arc's round
+ *   (back, forward, reload and the address) in the frame's color, 10 pt below the window's top, and Arc's round
  *   buttons stacked right of the card (Close, Open as Tab ⌘O, Split View). The page is a separate view that peek.ts
  *   places exactly inside `frame`.
  *
@@ -13,6 +13,7 @@
  *   peek.ts showPeekFrame() → "overlay:show" (peek) → renderPeekFrame() → button → overlayApi.peekCommand()
  */
 import type { OverlayPanel, PeekCommand } from "../shared/overlay";
+import { PEEK_TOOLBAR_HEIGHT_PX } from "../shared/settings.js";
 import type { IconName } from "../renderer/icons";
 import { createElement, createIconButton, getDisplayHost } from "../renderer/dom.js";
 import { createIcon } from "../renderer/icons.js";
@@ -72,8 +73,9 @@ export function renderPeekFrame(host: HTMLElement, panel: PeekPanel): void {
   const dim = createElement("div", "peek-dim");
   placeAt(dim, panel.card.x, panel.card.y, panel.card.width, panel.card.height);
 
+  // The card holds the toolbar row and frames the page view main placed in `frame` below it.
   const card = createElement("div", "peek-card");
-  placeAt(card, frame.x, 0, frame.width, frame.y + frame.height);
+  placeAt(card, frame.x, frame.y - PEEK_TOOLBAR_HEIGHT_PX, frame.width, PEEK_TOOLBAR_HEIGHT_PX + frame.height);
   card.style.setProperty("--peek-chrome", panel.chromeColor);
   card.append(createToolbarRow(panel));
 
