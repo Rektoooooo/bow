@@ -161,6 +161,10 @@ source never updates itself.
 - Open tabs ("Switch to Tab"), history, what you typed, search suggestions and about 40 browser actions
   ("New Space", "Toggle Sidebar", "Copy URL", "Theme: Mint", …), ranked by how well title and address match plus
   boosts for open tabs, Favorites and recent use, the way Arc ranks.
+- **Answers**: a sum ("12*7", "(3+4)^2", "sqrt(2)", "15%") or a unit conversion ("5 km in mi", "350 f to c",
+  "2 cups in ml", "1 GiB in MB", "100 km/h to mph") is worked out on top as you type; Return copies the answer.
+  Worked out on your Mac, so the text is not sent to the search engine (no currencies: their rates would need a
+  server).
 
 - **Tab to search a site**: type "youtube" (or "wiki", "gh", "maps", "claude", …), press Tab, type your search, Enter.
   Backspace in the empty field goes back. The sites and their search addresses are listed in

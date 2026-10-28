@@ -780,7 +780,8 @@ function toLines(results: CommandBarResult[]): CommandBarLine[] {
 }
 
 /**
- * Ranks the Command Bar results for a query. A split-view pane can only hold a page, so actions are left out there.
+ * Ranks the Command Bar results for a query. A split-view pane can only hold a page, so actions and answers are left
+ * out there.
  */
 function rankForQuery(query: string, mode: CommandBarMode, suggestions: string[]): CommandBarResult[] {
   const state = getState();
@@ -805,7 +806,7 @@ function rankForQuery(query: string, mode: CommandBarMode, suggestions: string[]
   if (mode !== "splitWith") {
     return results;
   }
-  return results.filter((result) => result.tabId !== selectedTabId);
+  return results.filter((result) => result.tabId !== selectedTabId && result.kind !== "answer");
 }
 
 /**
@@ -855,7 +856,9 @@ function handleQuery(query: string, mode: CommandBarMode): CommandBarLine[] {
   const lines = toLines(rankForQuery(query, mode, []));
   // A keyword search ("yt cats") goes to its own page: the default engine's suggestions would not fit it.
   const isKeywordSearch = matchSearchKeyword(query, getState().searchKeywords ?? []) !== null;
-  const wantsSuggestions = mode !== "tabs" && query.trim() !== "" && !looksLikeWebAddress(query.trim()) && !isKeywordSearch;
+  // A sum or a conversion is answered here: its text need not go to the search engine.
+  const hasAnswer = lines.some((line) => line.kind === "answer");
+  const wantsSuggestions = mode !== "tabs" && query.trim() !== "" && !looksLikeWebAddress(query.trim()) && !isKeywordSearch && !hasAnswer;
   if (wantsSuggestions) {
     fetchSuggestions(query.trim()).then((suggestions) => {
       if (suggestions.length === 0 || latestQuery !== query || shownPanel?.kind !== "commandBar") {
@@ -923,6 +926,11 @@ function handleChoose(resultId: string | null, typedText: string, mode: CommandB
   }
   if (result.kind === "action" && result.actionId !== null && actionRegistry !== null) {
     actionRegistry.run(result.actionId);
+    return;
+  }
+  if (result.kind === "answer" && result.copyText !== undefined) {
+    clipboard.writeText(result.copyText);
+    showToast(`Copied ${result.copyText}`).catch(() => undefined);
     return;
   }
   if (result.url !== null) {

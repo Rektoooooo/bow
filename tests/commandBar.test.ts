@@ -117,3 +117,24 @@ describe("history", () => {
     expect(updateHistoryTitle(retitled, "https://site4000.example/", "Weather in Prague")).toBe(retitled);
   });
 });
+
+describe("answers", () => {
+  it("put a sum's answer on top, with the search for the same text still listed", () => {
+    const state = createInitialState(ONE_PM);
+    const results = rankCommandBarResults(makeInput("12*7", state), ONE_PM);
+    expect(results[0]).toMatchObject({ kind: "answer", title: "= 84", subtitle: "Calculator", copyText: "84" });
+    expect(results.some((result) => result.kind === "search" && result.title === "12*7")).toBe(true);
+  });
+
+  it("put a conversion's answer on top, with its unit", () => {
+    const state = createInitialState(ONE_PM);
+    const results = rankCommandBarResults(makeInput("5 km in mi", state), ONE_PM);
+    expect(results[0]).toMatchObject({ kind: "answer", title: "= 3.10686 mi", subtitle: "5 km in mi", copyText: "3.10686" });
+  });
+
+  it("give no answer to a plain search", () => {
+    const state = createInitialState(ONE_PM);
+    const results = rankCommandBarResults(makeInput("weather tomorrow", state), ONE_PM);
+    expect(results.some((result) => result.kind === "answer")).toBe(false);
+  });
+});

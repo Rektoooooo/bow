@@ -17,7 +17,8 @@ import type { SymbolImage } from "./symbols";
 import type { ArchivedTab, ItemId, RoutingRule, SearchKeyword, SitePermissionKind, SpaceTheme, ThemeAppearance } from "./types";
 
 /** What a Command Bar line does when chosen. */
-export type CommandBarResultKind = "navigate" | "search" | "tab" | "history" | "action";
+/** "answer": a worked-out sum or unit conversion; Return copies it. */
+export type CommandBarResultKind = "navigate" | "search" | "tab" | "history" | "action" | "answer";
 
 /** "tabs" is tab search (⇧⌘A): only tabs, every Space. */
 export type CommandBarMode = "newTab" | "editUrl" | "splitWith" | "tabs";

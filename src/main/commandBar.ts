@@ -17,6 +17,7 @@
  *   boosts: open tab +15, Favorite +10, recently used tab up to +10, history visits up to +10, recent visit up to +10
  *   penalty: the page you are on −50 (Arc also ranks the current page down)
  *   what you typed: an address scores 75, a search 70, so only strong matches (prefix or better) beat it
+ *   an answer (a sum or a unit conversion) 150: above everything, the search for the same text stays below it
  */
 import type { CommandBarResultKind } from "../shared/overlay";
 import { DAY_MS } from "../shared/settings";
@@ -27,6 +28,8 @@ import { buildSearchUrl, findSearchEngine } from "../shared/searchEngines";
 import { matchSearchKeyword } from "../shared/searchKeywords";
 import { describeSpaceIconAsText } from "../shared/spaceIcons";
 import { findSpaceIdOfItem } from "./tree";
+import { calculate } from "./calculator";
+import { convertUnits } from "./unitConversion";
 
 /** One line in the Command Bar. */
 export interface CommandBarResult {
@@ -42,6 +45,8 @@ export interface CommandBarResult {
   /** The action an "action" result runs. */
   actionId: string | null;
   faviconUrl: string | null;
+  /** What Return copies for an "answer" result. */
+  copyText?: string;
 }
 
 /** A browser action the Command Bar can run, such as "New Space". */
@@ -83,6 +88,7 @@ const TYPED_ADDRESS_SCORE = 75;
 const TYPED_SEARCH_SCORE = 70;
 const SUGGESTION_BASE_SCORE = 25;
 const ACTION_BOOST = 5;
+const ANSWER_SCORE = 150;
 const WEEK_MS = 7 * DAY_MS;
 
 /** A result with its score, before sorting. */
@@ -312,6 +318,22 @@ function scoreActions(input: CommandBarInput): ScoredResult[] {
 }
 
 /**
+ * The answer to a typed sum or unit conversion ("12*7", "5 km in mi"), when the query is one.
+ */
+function scoreAnswer(input: CommandBarInput): ScoredResult[] {
+  const conversion = convertUnits(input.query);
+  const sum = conversion === null ? calculate(input.query) : null;
+  if (conversion === null && sum === null) {
+    return [];
+  }
+  const copyText = conversion?.text ?? sum?.text ?? "";
+  const title = conversion === null ? `= ${copyText}` : `= ${conversion.title}`;
+  const subtitle = conversion === null ? "Calculator" : conversion.description;
+  const result: CommandBarResult = { id: `answer:${copyText}`, kind: "answer", title: title, subtitle: subtitle, url: null, tabId: null, actionId: null, faviconUrl: null, copyText: copyText };
+  return [{ result: result, score: ANSWER_SCORE, dedupeKey: "answer" }];
+}
+
+/**
  * Builds the "what you typed" result (open the address, or search for the words) and the search suggestions.
  */
 function scoreTypedAndSuggestions(input: CommandBarInput): ScoredResult[] {
@@ -384,7 +406,7 @@ export function rankCommandBarResults(input: CommandBarInput, now: number): Comm
   if (input.query.trim() === "") {
     return listRecentTabs(input);
   }
-  const allScored = [...scoreTypedAndSuggestions(input), ...scoreTabs(input), ...scoreHistory(input, now), ...scoreActions(input)];
+  const allScored = [...scoreAnswer(input), ...scoreTypedAndSuggestions(input), ...scoreTabs(input), ...scoreHistory(input, now), ...scoreActions(input)];
   const uniqueScored = removeDuplicates(allScored);
   // A stable sort keeps the order above (typed first) between equal scores.
   uniqueScored.sort((first, second) => second.score - first.score);

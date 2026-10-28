@@ -48,6 +48,7 @@ const LINE_HINTS: Record<CommandBarLine["kind"], string> = {
   navigate: "Open",
   search: "Search",
   action: "Run",
+  answer: "Copy",
 };
 
 /** Icon for lines that have no favicon, by kind. */
@@ -57,6 +58,7 @@ const LINE_ICONS: Record<CommandBarLine["kind"], IconName> = {
   navigate: "globe",
   search: "search",
   action: "sliders",
+  answer: "calculator",
 };
 
 /** What the info button lists: things the Command Bar does that a first look does not show. Our own wording. */

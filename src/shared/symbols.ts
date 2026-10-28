@@ -43,6 +43,7 @@ export const SYMBOL_NAMES = {
   download: "arrow.down.circle",
   camera: "camera",
   copy: "doc.on.doc",
+  calculator: "plus.forwardslash.minus",
   code: "chevron.left.forwardslash.chevron.right",
   zoomIn: "plus.magnifyingglass",
   zoomOut: "minus.magnifyingglass",

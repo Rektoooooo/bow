@@ -927,6 +927,30 @@ const toastAfterIcon = (await toastPage?.textContent("#status").catch(() => ""))
 const commandBarOpened = await overlay.isVisible(".command-input").catch(() => false);
 check("clicking the address's link icon copies the address, with the toast, without opening the Command Bar", copiedByIcon === copiedTabUrl && toastAfterIcon.includes("Copied link") && !commandBarOpened, `${copiedByIcon} / ${toastAfterIcon} / command bar ${commandBarOpened}`);
 await sidebar.waitForTimeout(2200);
+
+// The Command Bar works out sums and unit conversions; Return copies the answer and opens nothing.
+const tabCountBeforeAnswer = activeSpace(await getState()).todayIds.length;
+await dispatch({ type: "openCommandBar", mode: "newTab" });
+await overlay.waitForSelector(".command-input", { timeout: 5000 });
+await overlay.fill(".command-input", "5 km in mi");
+await overlay.waitForFunction(() => document.querySelector(".command-line.is-highlighted .command-line-title")?.textContent?.startsWith("="), null, { timeout: 5000 }).catch(() => undefined);
+const conversionLine = await overlay.textContent(".command-line.is-highlighted .command-line-title").catch(() => null);
+await overlay.waitForTimeout(1200);
+const conversionLineCount = await overlay.$$eval(".command-line", (lines) => lines.length);
+check("typing a unit conversion shows the answer first, and asks the search engine for no suggestions", conversionLine === "= 3.10686 mi" && conversionLineCount === 2, `${conversionLine} / ${conversionLineCount} lines`);
+await overlay.fill(".command-input", "12 * 7");
+await overlay.waitForFunction(() => document.querySelector(".command-line.is-highlighted .command-line-title")?.textContent === "= 84", null, { timeout: 5000 }).catch(() => undefined);
+const answerHint = await overlay.textContent(".command-line.is-highlighted .command-line-hint").catch(() => null);
+await overlay.press(".command-input", "Enter");
+await sidebar.waitForTimeout(500);
+const copiedAnswer = await app.evaluate(async ({ clipboard }) => await clipboard.readText());
+const answerToast = (await toastPage?.textContent("#status").catch(() => "")) ?? "";
+check(
+  "a sum's answer is on top, and Return copies it without opening a tab",
+  answerHint?.includes("Copy") && copiedAnswer === "84" && answerToast.includes("Copied 84") && activeSpace(await getState()).todayIds.length === tabCountBeforeAnswer,
+  `${answerHint} / ${copiedAnswer} / ${answerToast}`,
+);
+await sidebar.waitForTimeout(2200);
 await app.evaluate(({ clipboard }, text) => clipboard.writeText(text), clipboardTextBefore);
 
 // Live captures, like Arc's Easels: the capture remembers where it came from; put on an easel it is live, and its
