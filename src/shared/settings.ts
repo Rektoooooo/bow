@@ -43,6 +43,33 @@ export const READER_TEXT_SIZES = [15, 17, 19, 21, 24] as const;
 /** Reader view's text size until the user changes it. Our choice. */
 export const READER_DEFAULT_TEXT_SIZE = 19;
 
+/**
+ * A page offers Reader view with at least this many paragraphs of at least this many characters, holding at least
+ * this much text in all. Our choice: a story or an encyclopedia article passes, a home page or a search page does not.
+ */
+export const READER_ARTICLE_MIN_PARAGRAPHS = 3;
+export const READER_ARTICLE_PARAGRAPH_LENGTH = 80;
+export const READER_ARTICLE_MIN_TEXT = 1000;
+
+/** Shortest paragraph that counts when Reader view looks for the part of the page holding the article. Our choice. */
+export const READER_COUNTED_PARAGRAPH_LENGTH = 40;
+
+/**
+ * Least paragraph text in a page's article or main element for Reader view to take it; with less, the element whose
+ * own paragraphs hold the most text wins instead. Our choice.
+ */
+export const READER_LANDMARK_MIN_TEXT = 500;
+
+/** Narrowest image Reader view keeps, in pixels. Our choice: icons and buttons are narrower. */
+export const READER_IMAGE_MIN_WIDTH = 120;
+
+/**
+ * Share of a list's text (spaces not counted) in links from which Reader view takes the list for a menu and leaves it
+ * out. Measured on en.wikipedia.org/wiki/Web_browser (2026-10-28): the language list and "See also" are all links
+ * (1.0), the references about 0.4 and a list in the article's text about 0.1. Our choice between them.
+ */
+export const READER_LINK_LIST_SHARE = 0.7;
+
 /** How long the "no secure version · Open with HTTP" offer stays. Our choice: time to read and decide. */
 export const HTTPS_FALLBACK_NOTICE_MS = 30 * 1000;
 

@@ -1433,10 +1433,55 @@ const ARTICLE_HTML = `<!doctype html><title>A test article - Basics</title>
     <p>${ARTICLE_PARAGRAPH.repeat(4)}</p><p>${ARTICLE_PARAGRAPH.repeat(4)}</p><h2>A part</h2><p>${ARTICLE_PARAGRAPH.repeat(4)}</p>
     <ul><li>First point</li><li>Second point</li></ul><blockquote><p>A quoted line.</p></blockquote>
   </article>`;
+/**
+ * A made-up encyclopedia article shaped like a Wikipedia page (en.wikipedia.org, 2026-10-28), where Reader view once
+ * showed the language list as the article and the title twice: the title "… - Wikipedia" over a heading without it,
+ * the language list in a hidden dropdown next to the heading, an infobox before the first paragraph, a table of
+ * contents and a navigation box, link lists ("See also", categories), and a style sheet inside a reference.
+ */
+const WIKI_LANGUAGES = ["Afrikaans", "Alemannisch", "Asturianu", "Català", "Čeština", "Dansk", "Deutsch", "Eesti", "Español", "Esperanto", "Euskara", "Français", "Galego", "Italiano", "Magyar", "Nederlands", "Polski", "Português", "Suomi", "Svenska", "Türkçe"];
+const WIKI_PARAGRAPH = "A paper boat is folded from one sheet, and this sentence stands in for the text of a real encyclopedia article. ";
+const WIKI_HTML = `<!doctype html><html><head><title>Paper boat - Wikipedia</title>
+  <meta property="og:title" content="Paper boat - Wikipedia">
+  <style>.dropdown-content { display: none; } .dropdown-checkbox:checked ~ .dropdown-content { display: block; }</style></head><body>
+  <div class="site-header"><a href="/">Main page</a> <a href="/random">Random article</a></div>
+  <nav aria-label="Contents" class="column-start"><ul><li><a href="#top">(Top)</a></li><li><a href="#History">History</a></li><li><a href="#Folding">Folding</a></li></ul></nav>
+  <main id="content">
+    <header class="titlebar"><h1 id="firstHeading">Paper boat</h1>
+      <div class="dropdown"><input type="checkbox" class="dropdown-checkbox" aria-label="${WIKI_LANGUAGES.length} languages"><label>${WIKI_LANGUAGES.length} languages</label>
+        <div class="dropdown-content"><ul>${WIKI_LANGUAGES.map((name) => `<li><a href="/other-language">${name}</a></li>`).join("")}</ul></div></div>
+    </header>
+    <div id="bodyContent"><div id="siteSub">From the made-up encyclopedia</div>
+      <table class="infobox"><caption>Paper boat</caption><tr><th>Material</th><td><ul><li>Infobox paper</li><li>Infobox card</li></ul></td></tr></table>
+      <p>A <b>paper boat</b> floats for a while. ${WIKI_PARAGRAPH.repeat(3)}</p>
+      <p>${WIKI_PARAGRAPH.repeat(3)}</p>
+      <div id="toc" class="toc" role="navigation"><div class="toctitle"><h2>Contents</h2></div>
+        <ul><li><a href="#History"><span>1</span> <span>History</span></a></li><li><a href="#Folding"><span>2</span> <span>Folding</span></a></li><li><a href="#See_also"><span>3</span> <span>See also</span></a></li></ul></div>
+      <div class="mw-heading"><h2 id="History">History</h2></div>
+      <p>${WIKI_PARAGRAPH.repeat(3)}</p>
+      <div class="mw-heading"><h2 id="Folding">Folding</h2></div>
+      <p>${WIKI_PARAGRAPH.repeat(2)}</p>
+      <ul><li>Fold the sheet in half.</li><li>Fold the corners down to make a hat.</li><li>Open the hat <a href="/hat">into a boat</a>.</li></ul>
+      <div class="mw-heading"><h2 id="See_also">See also</h2></div>
+      <ul><li><a href="/origami">Origami</a></li><li><a href="/paper-plane">Paper plane</a></li></ul>
+      <div class="mw-heading"><h2 id="References">References</h2></div>
+      <ol class="references"><li><a href="#cite-1">↑</a> <span class="reference-text"><style>.citation { font-style: inherit; }</style>Example, Ann (2001). <a href="/folding">"Folding boats"</a>. Example Press. Retrieved 2 May 2002.</span></li></ol>
+      <div role="navigation" class="navbox"><table><tr><th><ul><li><a href="/v">v</a></li><li><a href="/t">t</a></li><li><a href="/e">e</a></li></ul>Paper crafts</th></tr><tr><td><ul><li><a href="/origami">Origami</a></li><li><a href="/kirigami">Kirigami</a></li></ul></td></tr></table></div>
+      <div id="catlinks"><a href="/categories">Categories</a>: <ul><li><a href="/toys">Paper toys</a></li><li><a href="/boats">Boats</a></li></ul>
+        <div style="display: none">Hidden categories: <ul><li><a href="/hidden">Articles with short description</a></li></ul></div></div>
+    </div>
+  </main>
+  <footer><p>This footer stands in for the page's license text and links, which Reader view leaves out of the article.</p></footer>
+</body></html>`;
 const basicsServer = http.createServer((request, response) => {
   if (request.url === "/article") {
     response.writeHead(200, { "Content-Type": "text/html" });
     response.end(ARTICLE_HTML);
+    return;
+  }
+  if (request.url === "/wiki/Paper_boat") {
+    response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    response.end(WIKI_HTML);
     return;
   }
   if (request.url === "/notes.txt") {
@@ -1724,6 +1769,46 @@ await dispatch({ type: "openTab", typedText: `${basicsOrigin}/not-an-article` })
 await waitForSelectedUrl("/not-an-article");
 await sidebar.waitForTimeout(1200);
 check("a page that is no article offers no Reader view", (await sidebar.$(".reader-toggle")) === null);
+
+// Reader view on a page shaped like Wikipedia's: the article's paragraphs come first, under its title shown once
+// ("Paper boat", without " - Wikipedia", the site its host names); the languages, contents, infobox, navigation box,
+// link lists, hidden categories and style sheet text are left out, and so is "See also", whose list was all links.
+// The host is a .localhost name, which Chromium sends to this machine.
+const wikiUrl = `http://wikipedia.localhost:${basicsServer.address().port}/wiki/Paper_boat`;
+await dispatch({ type: "openTab", typedText: wikiUrl });
+await waitForSelectedUrl("/wiki/Paper_boat");
+await sidebar.waitForSelector(".reader-toggle", { timeout: 10000 }).catch(() => undefined);
+await sidebar.click(".reader-toggle").catch(() => undefined);
+await sidebar.waitForSelector(".reader-view", { timeout: 5000 }).catch(() => undefined);
+const wikiReader = await sidebar.evaluate(() => {
+  const column = document.querySelector(".reader-view .reader-column");
+  if (column === null) {
+    return null;
+  }
+  const elements = Array.from(column.children);
+  return {
+    title: column.querySelector(".reader-title")?.textContent,
+    titleCount: elements.filter((element) => element.textContent.trim() === "Paper boat").length,
+    firstBlock: `${elements[1]?.className}: ${elements[1]?.textContent.slice(0, 30)}`,
+    headings: Array.from(column.querySelectorAll(".reader-heading"), (heading) => heading.textContent),
+    items: Array.from(column.querySelectorAll(".reader-list li"), (item) => item.textContent.slice(0, 20)),
+    text: column.textContent,
+  };
+});
+const wikiLeftOut = ["Afrikaans", "Deutsch", "Türkçe", "languages", "Infobox", "Contents", "Origami", "Paper crafts", "Kirigami", "Paper toys", "Articles with short description", "font-style", "footer"];
+const wikiLeaks = wikiLeftOut.filter((text) => wikiReader?.text.includes(text));
+check(
+  "on a page shaped like Wikipedia's, Reader view starts with the article's paragraphs under its title, shown once",
+  wikiReader?.title === "Paper boat" && wikiReader.titleCount === 1 && wikiReader.firstBlock.startsWith("reader-paragraph: A paper boat floats"),
+  JSON.stringify({ title: wikiReader?.title, titleCount: wikiReader?.titleCount, firstBlock: wikiReader?.firstBlock }),
+);
+check(
+  "and leaves out the languages, contents, infobox, navigation box, link lists, hidden parts and style sheet text",
+  wikiReader !== null && wikiLeaks.length === 0 && JSON.stringify(wikiReader.headings) === JSON.stringify(["History", "Folding", "References"]) && wikiReader.items.length === 4,
+  JSON.stringify({ leaks: wikiLeaks, headings: wikiReader?.headings, items: wikiReader?.items }),
+);
+await sidebar.press(".reader-view", "Escape", { timeout: 5000 }).catch(() => undefined);
+await sidebar.waitForTimeout(400);
 
 // The shortcut from any app (Library › Settings): choosing keys registers them (in test runs a list stands in for the
 // system's, so a check never takes the keys of whoever uses the Mac); pressing them opens the Command Bar, or a
