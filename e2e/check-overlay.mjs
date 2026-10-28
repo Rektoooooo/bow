@@ -68,12 +68,16 @@ async function waitForSelectedUrl(text) {
 }
 
 // Type into the Command Bar and press Enter, like a user.
-async function commandBar(mode, text) {
+async function commandBar(mode, text, expectedTitle = null) {
   await dispatch({ type: "openCommandBar", mode });
   await overlay.waitForSelector(".command-input", { timeout: 5000 });
   await overlay.fill(".command-input", text);
-  // Let the ranked results arrive before choosing.
+  // Let the ranked results arrive before choosing; when the line to choose is known, wait for it (a busy Mac can be
+  // slower than any fixed wait).
   await overlay.waitForTimeout(400);
+  if (expectedTitle !== null) {
+    await overlay.waitForFunction((title) => document.querySelector(".command-line.is-highlighted .command-line-title")?.textContent === title, expectedTitle, { timeout: 5000 }).catch(() => undefined);
+  }
   await overlay.press(".command-input", "Enter");
   await sidebar.waitForTimeout(600);
 }
@@ -101,7 +105,7 @@ await sidebar.waitForTimeout(500);
 state = await getState();
 check("choosing it switches to that tab without opening another", activeSpace(state).todayIds.length === 2 && selectedTab(state)?.url.startsWith("https://example.org"));
 
-await commandBar("newTab", "toggle sidebar");
+await commandBar("newTab", "toggle sidebar", "Toggle Sidebar");
 state = await getState();
 check("actions run from the Command Bar (Toggle Sidebar)", state.settings.isSidebarVisible === false);
 await dispatch({ type: "setSidebarVisible", isVisible: true });
@@ -149,7 +153,7 @@ await overlay.press("body", "Escape");
 await sidebar.waitForTimeout(300);
 
 // Find in page through the Command Bar's "Find in Page" action.
-await commandBar("newTab", "find in page");
+await commandBar("newTab", "find in page", "Find in Page");
 await overlay.waitForSelector(".find-input", { timeout: 5000 });
 await overlay.fill(".find-input", "domain");
 await overlay.waitForFunction(() => /\d+ of [1-9]/.test(document.querySelector(".find-counter")?.textContent ?? ""), null, { timeout: 5000 }).catch(() => undefined);
@@ -171,7 +175,7 @@ await overlay.press(".find-input", "Escape");
 await sidebar.waitForTimeout(300);
 
 // Little Window: open one from the Command Bar, load a page, then move it into the Space.
-await commandBar("newTab", "new little window");
+await commandBar("newTab", "new little window", "New Little Window");
 const little = await findPage("/little/little.html");
 await little.waitForSelector(".little-address");
 await little.fill(".little-address", "example.net");
@@ -186,7 +190,7 @@ const windowCount = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getA
 check("Open in Space moves the Little Window's page into Today", activeSpace(state).todayIds.length === tabsBefore + 1 && selectedTab(state)?.url.startsWith("https://example.net"), selectedTab(state)?.url);
 check("…and closes the Little Window", windowCount === 1, String(windowCount));
 
-await commandBar("newTab", "new little window");
+await commandBar("newTab", "new little window", "New Little Window");
 const secondLittle = await findPage("/little/little.html");
 await secondLittle.fill(".little-address", "example.com/little");
 await secondLittle.press(".little-address", "Enter");
@@ -520,7 +524,7 @@ check("a Space moved to a new profile uses it, and its page reloads in that prof
 
 // Private window: says Private, has no Open in Space, and leaves nothing in the Archive.
 const archiveCountBefore = (await getState()).archive.length;
-await commandBar("newTab", "new private window");
+await commandBar("newTab", "new private window", "New Private Window");
 const privateBar = await findPage("private=1");
 await privateBar.waitForSelector(".little-private", { timeout: 5000 });
 check("a private window shows its badge and cannot move pages into a Space", (await privateBar.locator(".little-move").count()) === 0);

@@ -38,6 +38,9 @@ function placeOver(element: HTMLElement, rect: OverlayRect): void {
 /**
  * Draws the capture layer over the page and follows the drag.
  */
+/** MouseEvent.buttons' bit for the primary (left) button. */
+const PRIMARY_BUTTON_MASK = 1;
+
 export function renderCapture(host: HTMLElement, panel: CapturePanel): void {
   const layer = createElement("div", "capture-layer");
   layer.setAttribute("role", "dialog");
@@ -63,16 +66,21 @@ export function renderCapture(host: HTMLElement, panel: CapturePanel): void {
     layer.classList.add("is-selecting");
   });
   layer.addEventListener("mousemove", (event) => {
-    if (start === null) {
+    // Chromium also sends "mousemove" events of its own (when the layer's look changes) at a pointer place it
+    // remembers; only moves with the button held draw the selection, and the release point ends it (below).
+    const isDragging = (event.buttons & PRIMARY_BUTTON_MASK) !== 0;
+    if (start === null || !isDragging) {
       return;
     }
     region = rectBetween(start.x, start.y, event.clientX, event.clientY, panel.frame);
     placeOver(selection, region);
   });
-  layer.addEventListener("mouseup", () => {
+  layer.addEventListener("mouseup", (event) => {
     if (start === null) {
       return;
     }
+    // Where the button was let go ends the selection, whatever the last move said.
+    region = rectBetween(start.x, start.y, event.clientX, event.clientY, panel.frame);
     start = null;
     window.overlayApi.captureRegion(region);
   });
