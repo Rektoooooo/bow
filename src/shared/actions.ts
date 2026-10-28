@@ -141,7 +141,8 @@ export type BrowserAction =
   | { type: "setExtensionEnabled"; profileId: string; extensionId: string; isEnabled: boolean }
   | { type: "removeExtension"; profileId: string; extensionId: string }
   | { type: "loadUnpackedExtension" }
-  | { type: "importFromArc" }
+  /** fromWelcome: started from the onboarding, which shows the import's progress and summary on its card. */
+  | { type: "importFromArc"; fromWelcome?: boolean }
   | { type: "exportBackup" }
   | { type: "restoreBackup" }
   | { type: "showExtensionsMenu"; anchor: { x: number; y: number; width: number; height: number } }
@@ -152,7 +153,7 @@ export type BrowserAction =
   | { type: "setDeveloperMode"; site: string; isOn: boolean }
   | { type: "openDeveloperTool"; tool: DeveloperTool }
   | { type: "runSiteCommand"; command: ToolbarSiteCommand }
-  | { type: "importFromBrowser"; sourceId: string }
+  | { type: "importFromBrowser"; sourceId: string; fromWelcome?: boolean }
   | { type: "setAdBlock"; isOn: boolean }
   | { type: "setAdBlockForSite"; site: string; isOn: boolean }
   | { type: "setAppIcon"; variantId: string }

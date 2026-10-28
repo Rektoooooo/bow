@@ -11,7 +11,8 @@
  *
  * Data flow:
  *   menu → importFromArc() → importArcSidebar() → importArcArchive() → attachArcFavicons() → applyChange()
- *   → readArcHistory() → importHistoryEntries() → importArcExtensions() → summary dialog
+ *   → readArcHistory() → importHistoryEntries() → importArcExtensions() → summary dialog (or, from the onboarding,
+ *   the summary returned to its card)
  */
 import { app, dialog } from "electron";
 import * as fs from "node:fs";
@@ -25,6 +26,7 @@ import type { ArcImportReport } from "./arcImport";
 import { applyChange, getState, getWindow } from "./browserCore";
 import { importArcExtensions } from "./extensionsController";
 import type { ArcExtensionsImportReport } from "./extensionsController";
+import type { ImportSummary } from "../shared/onboarding";
 import { importHistoryEntries } from "./historyStore";
 import { removeEmptySpaces, switchSpace } from "./spaces";
 import { setSidebarWidth } from "./state";
@@ -118,13 +120,22 @@ function readFileNextToSidebar(sidebarFilePath: string, fileName: string): unkno
 }
 
 /**
- * Imports the user's Arc sidebar. Safe to run twice: Spaces imported before are skipped.
+ * True when Arc's sidebar is on this Mac (the onboarding offers Arc only then; the menu can also pick a backup).
  */
-export async function importFromArc(): Promise<void> {
+export function isArcSidebarPresent(): boolean {
+  return fs.existsSync(ARC_SIDEBAR_FILE);
+}
+
+/**
+ * Imports the user's Arc sidebar. Safe to run twice: Spaces imported before are skipped. Returns what arrived, or
+ * null when nothing was imported (cancelled, or an error the user was shown). `showsSummary`: the dialog at the end
+ * (the onboarding shows the summary on its card instead).
+ */
+export async function importFromArc(showsSummary: boolean = true): Promise<ImportSummary | null> {
   const window = getWindow();
   const filePath = await chooseSidebarFile();
   if (window === null || filePath === null) {
-    return;
+    return null;
   }
 
   let parsedFile: unknown = null;
@@ -132,14 +143,14 @@ export async function importFromArc(): Promise<void> {
     parsedFile = JSON.parse(fs.readFileSync(filePath, "utf8"));
   } catch (error) {
     dialog.showErrorBox("Import from Arc", `The file could not be read: ${String(error)}`);
-    return;
+    return null;
   }
 
   const stateBefore = getState();
   const result = importArcSidebar(parsedFile, stateBefore, Date.now());
   if (result.report.error !== null) {
     dialog.showErrorBox("Import from Arc", result.report.error);
-    return;
+    return null;
   }
 
   const existingSpaceIds = new Set(stateBefore.spaces.map((space) => space.id));
@@ -175,9 +186,18 @@ export async function importFromArc(): Promise<void> {
   // After the sidebar, which creates the profiles the extensions belong to.
   const extensionsReport = importArcExtensions(arcFolder);
 
-  await dialog.showMessageBox(window, {
-    type: "info",
-    message: result.report.spacesImported > 0 ? "Imported your Arc sidebar" : "Nothing new to import",
-    detail: describeReport(result.report, archiveReports[0], historyPagesImported, extensionsReport),
-  });
+  const summary: ImportSummary = {
+    spaces: result.report.spacesImported,
+    tabs: result.report.tabsImported,
+    bookmarks: 0,
+    historyPages: historyPagesImported,
+  };
+  if (showsSummary) {
+    await dialog.showMessageBox(window, {
+      type: "info",
+      message: result.report.spacesImported > 0 ? "Imported your Arc sidebar" : "Nothing new to import",
+      detail: describeReport(result.report, archiveReports[0], historyPagesImported, extensionsReport),
+    });
+  }
+  return summary;
 }

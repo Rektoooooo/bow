@@ -1,0 +1,1604 @@
+/*
+  WHY this file exists:
+    The onboarding's look (overlay/onboarding.ts): a full-window scene in light or dark, a slow wash of three colored
+    lights with film grain behind it, New York (macOS's own serif) for the headlines and SF for the rest, glass
+    surfaces, and the small Bow window the scenes and the tour's demos are drawn with. Its own file, because it is a
+    world of its own next to the overlay's panels (overlay.css).
+
+  Data source:
+    body.dark (the Space's look, or the system's), --wash-1…3 on .onboarding and --mini-1…3 on each small window
+    (onboarding.ts / onboardingScenes.ts set them).
+*/
+
+/* Registered, so light and dark, the wash and the small windows cross-fade instead of jumping. */
+@property --onb-base {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f5f4f8;
+}
+
+@property --onb-ink {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #16151b;
+}
+
+@property --onb-surface {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(255, 255, 255, 0.62);
+}
+
+@property --wash-1 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ff8a7a;
+}
+
+@property --wash-2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b56cff;
+}
+
+@property --wash-3 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #4f7cff;
+}
+
+@property --mini-1 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e9d8d4;
+}
+
+@property --mini-2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e9d8d4;
+}
+
+@property --mini-3 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e9d8d4;
+}
+
+.onboarding {
+  --onb-base: #f5f4f8;
+  --onb-ink: #16151b;
+  --onb-ink-soft: color-mix(in srgb, var(--onb-ink) 68%, transparent);
+  --onb-muted: color-mix(in srgb, var(--onb-ink) 46%, transparent);
+  --onb-faint: color-mix(in srgb, var(--onb-ink) 16%, transparent);
+  --onb-surface: rgba(255, 255, 255, 0.62);
+  --onb-surface-strong: rgba(255, 255, 255, 0.9);
+  --onb-border: color-mix(in srgb, var(--onb-ink) 8%, transparent);
+  --onb-shadow: 0 1px 2px rgba(20, 18, 30, 0.05), 0 14px 34px -16px rgba(20, 18, 30, 0.22);
+  --onb-accent: #16151b;
+  --onb-accent-ink: #ffffff;
+  --onb-positive: #23a35f;
+  --onb-warning: #c8621f;
+  --onb-wash-opacity: 0.55;
+  --onb-grain-opacity: 0.22;
+  /* The onboarding's motion (onboarding.ts uses the same curves). */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
+  --font-display: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
+  --font-text: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  color: var(--onb-ink);
+  font: 14px/1.5 var(--font-text);
+  -webkit-font-smoothing: antialiased;
+  transition:
+    --onb-base 700ms var(--ease-out),
+    --onb-ink 700ms var(--ease-out),
+    --onb-surface 700ms var(--ease-out),
+    --wash-1 1200ms var(--ease-out),
+    --wash-2 1200ms var(--ease-out),
+    --wash-3 1200ms var(--ease-out);
+}
+
+body.dark .onboarding {
+  --onb-base: #0c0c11;
+  --onb-ink: #f3f2f7;
+  --onb-surface: rgba(255, 255, 255, 0.06);
+  --onb-surface-strong: rgba(255, 255, 255, 0.11);
+  --onb-border: color-mix(in srgb, var(--onb-ink) 10%, transparent);
+  --onb-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 18px 40px -18px rgba(0, 0, 0, 0.7);
+  --onb-accent: #f3f2f7;
+  --onb-accent-ink: #111114;
+  --onb-positive: #42c97f;
+  --onb-warning: #f0955a;
+  --onb-wash-opacity: 0.5;
+  --onb-grain-opacity: 0.3;
+}
+
+body[data-panel="welcome"] {
+  background: transparent;
+}
+
+/* ---------- The wash: three soft lights drifting, and grain ---------- */
+
+.onboarding-base {
+  position: absolute;
+  inset: 0;
+  background: var(--onb-base);
+}
+
+.onboarding-wash {
+  position: absolute;
+  inset: -12%;
+  opacity: var(--onb-wash-opacity);
+  pointer-events: none;
+}
+
+.wash-light {
+  position: absolute;
+  width: 78vmax;
+  height: 78vmax;
+  border-radius: 50%;
+  animation: wash-drift-1 27s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.wash-light-1 {
+  left: -18vmax;
+  top: -34vmax;
+  background: radial-gradient(circle at center, var(--wash-1) 0%, transparent 62%);
+}
+
+.wash-light-2 {
+  right: -26vmax;
+  top: -4vmax;
+  background: radial-gradient(circle at center, var(--wash-2) 0%, transparent 60%);
+  animation-name: wash-drift-2;
+  animation-duration: 33s;
+}
+
+.wash-light-3 {
+  left: 4vmax;
+  bottom: -46vmax;
+  background: radial-gradient(circle at center, var(--wash-3) 0%, transparent 60%);
+  animation-name: wash-drift-3;
+  animation-duration: 39s;
+}
+
+@keyframes wash-drift-1 {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(9vmax, 7vmax) scale(1.16);
+  }
+}
+
+@keyframes wash-drift-2 {
+  from {
+    transform: translate(0, 0) scale(1.08);
+  }
+  to {
+    transform: translate(-11vmax, 6vmax) scale(0.94);
+  }
+}
+
+@keyframes wash-drift-3 {
+  from {
+    transform: translate(0, 0) scale(0.96);
+  }
+  to {
+    transform: translate(8vmax, -9vmax) scale(1.12);
+  }
+}
+
+/* Our own noise, drawn by an SVG filter (the same as the sidebar's frame, sidebar.css). */
+.wash-grain,
+.mini-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  opacity: var(--onb-grain-opacity);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='grain'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23grain)'/></svg>");
+}
+
+/* ---------- Frame: progress and Skip on top, the scene, Back and Continue below ---------- */
+
+.onboarding-content {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.onboarding-top {
+  position: relative;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* The window moves by its top edge, as everywhere in Bow; the traffic lights sit at its left. */
+  -webkit-app-region: drag;
+}
+
+.onboarding-progress {
+  display: flex;
+  gap: 6px;
+}
+
+.onboarding-mark {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--onb-faint);
+  transition:
+    width 520ms var(--ease-emphasized),
+    background-color 300ms linear;
+}
+
+.onboarding-mark.is-done {
+  background: var(--onb-muted);
+}
+
+.onboarding-mark.is-active {
+  width: 24px;
+  background: var(--onb-ink);
+}
+
+.onboarding-skip {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  translate: 0 -50%;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--onb-muted);
+  font: 500 13px/1 var(--font-text);
+  -webkit-app-region: no-drag;
+  transition:
+    color 200ms linear,
+    background-color 200ms linear;
+}
+
+.onboarding-skip:hover {
+  color: var(--onb-ink);
+  background: var(--onb-surface);
+}
+
+.onboarding-stage {
+  position: relative;
+  min-height: 0;
+}
+
+.onboarding-scene {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 clamp(20px, 6vw, 80px);
+  text-align: center;
+}
+
+.onboarding-scene[hidden] {
+  display: none;
+}
+
+.onboarding-bottom {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 clamp(18px, 4.5vh, 40px);
+}
+
+.onboarding-next {
+  width: 184px;
+  height: 46px;
+  border: 0;
+  border-radius: 23px;
+  background: var(--onb-accent);
+  color: var(--onb-accent-ink);
+  font: 600 15px/1 var(--font-text);
+  letter-spacing: -0.01em;
+  box-shadow: 0 8px 22px -10px rgba(0, 0, 0, 0.45);
+  transition:
+    transform 220ms var(--ease-out),
+    box-shadow 220ms var(--ease-out),
+    background-color 500ms var(--ease-out),
+    color 500ms var(--ease-out);
+}
+
+.onboarding-next:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px -12px rgba(0, 0, 0, 0.5);
+}
+
+.onboarding-next:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Back sits left of Continue, so Continue stays in the middle whether Back shows or not. */
+.onboarding-back {
+  position: absolute;
+  right: calc(50% + 92px + 10px);
+  height: 46px;
+  padding: 0 20px;
+  border: 1px solid var(--onb-border);
+  border-radius: 23px;
+  background: var(--onb-surface);
+  color: var(--onb-ink);
+  font: 500 15px/1 var(--font-text);
+  backdrop-filter: blur(20px) saturate(1.3);
+  transition:
+    opacity 300ms var(--ease-out),
+    background-color 200ms linear;
+}
+
+.onboarding-back:hover {
+  background: var(--onb-surface-strong);
+}
+
+.onboarding-back.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.onboarding:focus {
+  outline: none;
+}
+
+.onboarding-announcer {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.onboarding :focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--wash-3) 70%, var(--onb-ink));
+  outline-offset: 3px;
+}
+
+/* ---------- Type ---------- */
+
+.onboarding-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(28px, min(4.6vw, 7.4vh), 54px);
+  line-height: 1.08;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+}
+
+.onboarding-title-hero {
+  font-size: clamp(34px, min(6.6vw, 10.5vh), 80px);
+  letter-spacing: -0.03em;
+}
+
+.onboarding-word {
+  display: inline-block;
+}
+
+.onboarding-lede {
+  max-width: 34em;
+  margin: clamp(10px, 2.2vh, 18px) auto 0;
+  color: var(--onb-ink-soft);
+  font-size: clamp(14px, min(1.5vw, 2.5vh), 17.5px);
+  line-height: 1.55;
+  text-wrap: balance;
+}
+
+.onboarding-header {
+  max-width: 640px;
+}
+
+.onboarding-key {
+  display: inline-block;
+  padding: 2px 7px;
+  border: 1px solid var(--onb-border);
+  border-radius: 7px;
+  background: var(--onb-surface-strong);
+  color: var(--onb-ink);
+  font: 600 0.9em/1.2 var(--font-text);
+}
+
+/* ---------- Scene 1: hello ---------- */
+
+.hello-icon-holder {
+  position: relative;
+  width: clamp(88px, min(14vw, 23vh), 156px);
+  aspect-ratio: 1;
+  margin-bottom: clamp(14px, 4vh, 34px);
+}
+
+.hello-icon,
+.ready-icon {
+  position: absolute;
+  inset: -11%;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 18px 30px rgba(40, 20, 80, 0.28));
+}
+
+.hello-glow {
+  position: absolute;
+  inset: -55%;
+  border-radius: 50%;
+  background: radial-gradient(circle at center, color-mix(in srgb, var(--wash-2) 55%, transparent) 0%, transparent 62%);
+  animation: hello-breathe 6s ease-in-out infinite alternate;
+}
+
+@keyframes hello-breathe {
+  from {
+    transform: scale(0.94);
+    opacity: 0.75;
+  }
+  to {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
+/* ---------- Scene 2: bring your things ---------- */
+
+.import-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+  width: min(760px, 100%);
+  margin-top: clamp(16px, 4.5vh, 40px);
+}
+
+.import-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--onb-border);
+  border-radius: 16px;
+  background: var(--onb-surface);
+  color: var(--onb-ink);
+  text-align: left;
+  box-shadow: var(--onb-shadow);
+  backdrop-filter: blur(24px) saturate(1.3);
+  transition:
+    transform 260ms var(--ease-out),
+    background-color 260ms linear,
+    border-color 260ms linear;
+}
+
+.import-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background: var(--onb-surface-strong);
+}
+
+.import-card:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
+}
+
+.import-card[data-phase="done"] {
+  border-color: color-mix(in srgb, var(--onb-positive) 45%, transparent);
+}
+
+.import-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(140deg, var(--mark-a), var(--mark-b));
+  color: #ffffff;
+  font: 650 14px/1 var(--font-text);
+  letter-spacing: 0.01em;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+/* Six of our own color pairs, picked by the browser's name (onboarding.ts). */
+.import-mark[data-hue="0"] {
+  --mark-a: #ff8a7a;
+  --mark-b: #d9568f;
+}
+
+.import-mark[data-hue="1"] {
+  --mark-a: #6d8dff;
+  --mark-b: #4b56d8;
+}
+
+.import-mark[data-hue="2"] {
+  --mark-a: #4fc3a1;
+  --mark-b: #2b8f8c;
+}
+
+.import-mark[data-hue="3"] {
+  --mark-a: #f5b45c;
+  --mark-b: #e07b39;
+}
+
+.import-mark[data-hue="4"] {
+  --mark-a: #b98bff;
+  --mark-b: #7a4fd6;
+}
+
+.import-mark[data-hue="5"] {
+  --mark-a: #8a96a8;
+  --mark-b: #5a6474;
+}
+
+.import-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.import-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.import-status {
+  overflow: hidden;
+  color: var(--onb-muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.import-card[data-phase="done"] .import-status {
+  color: var(--onb-ink-soft);
+}
+
+.import-state {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+}
+
+.import-spinner,
+.import-check {
+  display: none;
+  grid-area: 1 / 1;
+}
+
+.import-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--onb-faint);
+  border-top-color: var(--onb-ink);
+  border-radius: 50%;
+  animation: import-spin 800ms linear infinite;
+}
+
+.import-card[data-phase="running"] .import-spinner {
+  display: block;
+}
+
+.import-check {
+  color: var(--onb-positive);
+  --symbol-scale: 1.1;
+}
+
+.import-card[data-phase="done"] .import-check {
+  display: inline-flex;
+  animation: import-check-in 520ms var(--ease-emphasized);
+}
+
+@keyframes import-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes import-check-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4) rotate(-20deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+.import-tag {
+  position: absolute;
+  top: -9px;
+  right: 14px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--onb-accent);
+  color: var(--onb-accent-ink);
+  font: 600 10.5px/1.2 var(--font-text);
+  letter-spacing: 0.02em;
+}
+
+.import-none {
+  margin: clamp(16px, 4vh, 32px) 0 0;
+  color: var(--onb-muted);
+}
+
+/* ---------- Scene 3: make it yours ---------- */
+
+.scene-look {
+  flex-direction: row;
+  gap: clamp(28px, 6vw, 88px);
+  text-align: left;
+}
+
+.look-controls {
+  flex: 0 1 400px;
+  min-width: 0;
+}
+
+.scene-look .onboarding-lede {
+  margin-left: 0;
+}
+
+.look-swatches {
+  display: grid;
+  grid-template-columns: repeat(5, 34px);
+  gap: 14px;
+  margin-top: clamp(18px, 4vh, 30px);
+}
+
+.look-swatch {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.1),
+    0 4px 10px -4px rgba(0, 0, 0, 0.3);
+  transition: transform 260ms var(--ease-out);
+}
+
+.look-swatch::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 2px solid var(--onb-ink);
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(0.8);
+  transition:
+    opacity 220ms linear,
+    transform 360ms var(--ease-emphasized);
+}
+
+.look-swatch:hover {
+  transform: scale(1.08);
+}
+
+/* Dark swatches would vanish on the dark scene: a light edge keeps their shape. */
+body.dark .look-swatch {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+    0 4px 10px -4px rgba(0, 0, 0, 0.5);
+}
+
+.look-swatch[aria-checked="true"]::after {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.look-appearance {
+  display: inline-flex;
+  gap: 2px;
+  margin-top: clamp(16px, 3.5vh, 26px);
+  padding: 3px;
+  border: 1px solid var(--onb-border);
+  border-radius: 12px;
+  background: var(--onb-surface);
+  backdrop-filter: blur(20px) saturate(1.3);
+}
+
+.look-appearance-choice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--onb-ink-soft);
+  font: 500 13px/1 var(--font-text);
+  transition:
+    background-color 220ms linear,
+    color 220ms linear;
+}
+
+.look-appearance-choice[aria-checked="true"] {
+  background: var(--onb-surface-strong);
+  color: var(--onb-ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+}
+
+.look-preview {
+  flex: 0 1 520px;
+  min-width: 0;
+  width: clamp(260px, 40vw, 520px);
+}
+
+/* ---------- The small Bow window (scene 3 and the tour) ---------- */
+
+.mini-window {
+  --mini-tile: rgba(255, 255, 255, 0.45);
+  --mini-tile-strong: rgba(255, 255, 255, 0.72);
+  --mini-faint: rgba(0, 0, 0, 0.14);
+  --mini-icon-alpha: 0.85;
+  --mini-card-bg: #ffffff;
+  --mini-page-line: rgba(0, 0, 0, 0.08);
+  --mini-panel: rgba(255, 255, 255, 0.96);
+  --onb-grain-opacity: 0.2;
+  position: relative;
+  display: grid;
+  grid-template-columns: 27% minmax(0, 1fr);
+  gap: 2.2%;
+  width: 100%;
+  aspect-ratio: 16 / 10.4;
+  padding: 2.2%;
+  overflow: hidden;
+  border-radius: 12px;
+  background: linear-gradient(165deg, var(--mini-1), var(--mini-2) 55%, var(--mini-3));
+  box-shadow:
+    0 34px 70px -30px rgba(10, 8, 30, 0.45),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
+  container-type: inline-size;
+  transition:
+    --mini-1 800ms var(--ease-out),
+    --mini-2 800ms var(--ease-out),
+    --mini-3 800ms var(--ease-out);
+}
+
+.mini-window.is-dark {
+  box-shadow:
+    0 34px 70px -30px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+  --mini-tile: rgba(255, 255, 255, 0.1);
+  --mini-tile-strong: rgba(255, 255, 255, 0.2);
+  --mini-faint: rgba(255, 255, 255, 0.24);
+  --mini-card-bg: #1c1c20;
+  --mini-page-line: rgba(255, 255, 255, 0.1);
+  --mini-panel: rgba(36, 36, 42, 0.97);
+}
+
+.mini-sidebar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mini-lights {
+  display: flex;
+  gap: 1.1cqw;
+  padding: 0.6cqw 0 2.4cqw 0.8cqw;
+}
+
+.mini-light {
+  width: 1.5cqw;
+  height: 1.5cqw;
+  border-radius: 50%;
+  background: #ff5f57;
+}
+
+.mini-light:nth-child(2) {
+  background: #febc2e;
+}
+
+.mini-light:nth-child(3) {
+  background: #28c840;
+}
+
+.mini-favorites {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1cqw;
+}
+
+.mini-favorite {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1.15;
+  border-radius: 1.3cqw;
+  background: var(--mini-tile);
+}
+
+.mini-favorite::after {
+  content: "";
+  width: 1.8cqw;
+  height: 1.8cqw;
+  border-radius: 0.5cqw;
+  background: #ff8a7a;
+}
+
+.mini-favorite-2::after {
+  background: #4f7cff;
+}
+
+.mini-favorite-3::after {
+  background: #4fc3a1;
+}
+
+.mini-favorite-4::after {
+  background: #f5b45c;
+}
+
+.mini-space-title {
+  width: 42%;
+  height: 1.2cqw;
+  margin: 2.6cqw 0 1.4cqw 1cqw;
+  border-radius: 1cqw;
+  background: var(--mini-faint);
+}
+
+.mini-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7cqw;
+}
+
+.mini-row {
+  display: flex;
+  align-items: center;
+  gap: 1.1cqw;
+  height: 4.1cqw;
+  padding: 0 1.1cqw;
+  border-radius: 1.3cqw;
+}
+
+.mini-row.is-selected {
+  background: var(--mini-tile-strong);
+}
+
+.mini-row-icon {
+  flex: none;
+  width: 1.9cqw;
+  height: 1.9cqw;
+  border-radius: 0.6cqw;
+  background: #b56cff;
+  opacity: var(--mini-icon-alpha);
+}
+
+.mini-row:nth-child(2) .mini-row-icon {
+  background: #4f7cff;
+}
+
+.mini-row:nth-child(3) .mini-row-icon {
+  background: #ff8a7a;
+}
+
+.mini-row:nth-child(4) .mini-row-icon {
+  background: #4fc3a1;
+}
+
+.mini-row:nth-child(5) .mini-row-icon {
+  background: #f5b45c;
+}
+
+.mini-row-text {
+  height: 1.1cqw;
+  border-radius: 1cqw;
+  background: var(--mini-faint);
+}
+
+.mini-row-text-1 {
+  width: 70%;
+}
+
+.mini-row-text-2 {
+  width: 52%;
+}
+
+.mini-row-text-3 {
+  width: 64%;
+}
+
+.mini-row-text-4 {
+  width: 44%;
+}
+
+.mini-row-text-5 {
+  width: 58%;
+}
+
+.mini-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--mini-card-bg);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
+}
+
+.mini-toolbar {
+  flex: none;
+  height: 4.4cqw;
+  border-bottom: 1px solid var(--mini-page-line);
+}
+
+.mini-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5cqw;
+  padding: 3cqw 3.6cqw;
+}
+
+.mini-page-hero {
+  height: 15cqw;
+  border-radius: 1.4cqw;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--mini-2) 75%, #8f8fff), color-mix(in srgb, var(--mini-3) 70%, #ff9f8f));
+  opacity: 0.85;
+}
+
+.mini-page-line {
+  height: 1.3cqw;
+  border-radius: 1cqw;
+  background: var(--mini-page-line);
+}
+
+.mini-page-line-1 {
+  width: 82%;
+}
+
+.mini-page-line-2 {
+  width: 94%;
+}
+
+.mini-page-line-3 {
+  width: 76%;
+}
+
+.mini-page-line-4 {
+  width: 58%;
+}
+
+.mini-page-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.6cqw;
+  margin-top: 1.2cqw;
+}
+
+.mini-page-tile {
+  aspect-ratio: 1.4;
+  border-radius: 1.2cqw;
+  background: var(--mini-page-line);
+}
+
+/* ---------- Scene 4: the essentials ---------- */
+
+.tour {
+  display: grid;
+  grid-template-columns: minmax(240px, 340px) minmax(280px, 540px);
+  align-items: center;
+  gap: clamp(20px, 4.5vw, 64px);
+  width: min(940px, 100%);
+  margin-top: clamp(14px, 3.5vh, 34px);
+  text-align: left;
+}
+
+.tour-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tour-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 14px 12px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: none;
+  color: var(--onb-ink);
+  text-align: left;
+  transition:
+    background-color 260ms linear,
+    border-color 260ms linear;
+}
+
+.tour-item:hover {
+  background: var(--onb-surface);
+}
+
+.tour-item.is-active {
+  border-color: var(--onb-border);
+  background: var(--onb-surface-strong);
+  box-shadow: var(--onb-shadow);
+}
+
+.tour-item-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 600;
+  font-size: 14.5px;
+}
+
+.tour-item-icon {
+  color: var(--onb-ink-soft);
+}
+
+.tour-item-keys {
+  margin-left: auto;
+  padding: 3px 6px;
+  border: 1px solid var(--onb-border);
+  border-radius: 6px;
+  background: var(--onb-surface);
+  color: var(--onb-muted);
+  font: 500 11.5px/1 var(--font-text);
+}
+
+.tour-item-text {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  color: var(--onb-ink-soft);
+  font-size: 13px;
+  line-height: 1.45;
+  transition:
+    max-height 440ms var(--ease-emphasized),
+    opacity 300ms linear;
+}
+
+.tour-item.is-active .tour-item-text {
+  max-height: 3.2em;
+  opacity: 1;
+}
+
+/* A thin line fills while the tour waits to move on by itself (its length is the demo's loop, onboarding.ts). */
+.tour-item-progress {
+  position: absolute;
+  right: 14px;
+  bottom: 5px;
+  left: 14px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--onb-ink);
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.tour-item.is-auto .tour-item-progress {
+  opacity: 0.28;
+  animation: tour-progress var(--tour-advance, 5200ms) linear forwards;
+}
+
+@keyframes tour-progress {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.tour-stage {
+  position: relative;
+  aspect-ratio: 16 / 10.4;
+}
+
+.tour-demo {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: scale(0.97);
+  transition:
+    opacity 450ms var(--ease-out),
+    transform 650ms var(--ease-emphasized);
+}
+
+.tour-demo.is-active {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* The demos' moving parts (onboardingScenes.ts animates them). */
+.demo-command-bar {
+  position: absolute;
+  top: 16%;
+  left: 50%;
+  width: 54%;
+  padding: 1.4cqw;
+  border-radius: 1.8cqw;
+  background: var(--mini-panel);
+  box-shadow: 0 2.4cqw 5cqw -1.6cqw rgba(0, 0, 0, 0.45);
+  transform: translate(-50%, 0);
+  opacity: 0;
+}
+
+.demo-command-field {
+  display: flex;
+  align-items: center;
+  gap: 1.2cqw;
+  padding: 0.6cqw 0.8cqw 1.4cqw;
+  border-bottom: 1px solid var(--mini-page-line);
+  color: var(--onb-ink);
+  font: 600 2.5cqw/1 var(--font-text);
+}
+
+.mini-window:not(.is-dark) .demo-command-field {
+  color: #16151b;
+}
+
+.mini-window.is-dark .demo-command-field {
+  color: #f3f2f7;
+}
+
+.demo-command-search {
+  --symbol-scale: 0.9;
+  opacity: 0.55;
+}
+
+.demo-command-text {
+  clip-path: inset(0 100% 0 0);
+}
+
+.demo-command-results {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding-top: 1cqw;
+}
+
+.demo-command-result {
+  position: relative;
+  height: 3.6cqw;
+  margin: 0 0.6cqw;
+  opacity: 0;
+}
+
+.demo-command-result::before,
+.demo-command-result::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  border-radius: 0.6cqw;
+}
+
+.demo-command-result::before {
+  left: 0.6cqw;
+  width: 2cqw;
+  height: 2cqw;
+  background: #4f7cff;
+}
+
+.demo-command-result-2::before {
+  background: #4fc3a1;
+}
+
+.demo-command-result-3::before {
+  background: #f5b45c;
+}
+
+.demo-command-result::after {
+  left: 3.8cqw;
+  width: 46%;
+  height: 1.1cqw;
+  background: var(--mini-faint);
+}
+
+.demo-command-highlight {
+  position: absolute;
+  top: 1cqw;
+  right: 0;
+  left: 0;
+  height: 3.6cqw;
+  border-radius: 1cqw;
+  background: var(--mini-tile-strong);
+  opacity: 0;
+}
+
+.mini-window:not(.is-dark) .demo-command-highlight {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.demo-space-frame {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(165deg, var(--mini-1), var(--mini-2) 55%, var(--mini-3));
+  opacity: 0;
+}
+
+.demo-space-sidebar {
+  position: absolute;
+  top: 2.2%;
+  bottom: 2.2%;
+  left: 2.2%;
+  width: calc(27% - 2.2% * 27 / 100);
+  opacity: 0;
+}
+
+.demo-space-dots {
+  position: absolute;
+  bottom: 4%;
+  left: calc(2.2% + 27% / 2);
+  display: flex;
+  gap: 1.1cqw;
+  translate: -50% 0;
+}
+
+.demo-space-dot {
+  width: 1.1cqw;
+  height: 1.1cqw;
+  border-radius: 50%;
+  background: var(--mini-faint);
+}
+
+.demo-space-dot.is-active {
+  background: var(--onb-ink);
+  opacity: 0.7;
+}
+
+.demo-split-pane {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: calc(50% - 2px);
+  display: flex;
+  flex-direction: column;
+  background: var(--mini-card-bg);
+  box-shadow: -3px 0 0 var(--mini-2);
+  transform: translateX(104%);
+}
+
+.demo-peek-link {
+  width: 34%;
+  height: 1.4cqw;
+  border-radius: 1cqw;
+  background: #4f7cff;
+  opacity: 0.55;
+}
+
+.demo-peek-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.32);
+  opacity: 0;
+}
+
+.demo-peek-card {
+  position: absolute;
+  top: 9%;
+  right: 9%;
+  bottom: 6%;
+  left: 9%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 1.4cqw;
+  background: var(--mini-card-bg);
+  box-shadow:
+    0 2.4cqw 5cqw -1.6cqw rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(0, 0, 0, 0.08);
+  opacity: 0;
+  /* It grows out of the link (the link sits at the page's left, below the picture). */
+  transform-origin: 20% 62%;
+}
+
+/* On a dark page the Peek's card is a step lighter, so it stands out from the dimmed page under it. */
+.mini-window.is-dark .demo-peek-card {
+  background: #2b2b31;
+  box-shadow:
+    0 2.4cqw 5cqw -1.6cqw rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.demo-archive-badge {
+  margin-left: auto;
+  padding: 0.3cqw 0.7cqw;
+  border-radius: 0.8cqw;
+  background: var(--onb-warning);
+  color: #ffffff;
+  font: 700 1.5cqw/1 var(--font-text);
+  opacity: 0;
+}
+
+.demo-archive-icon {
+  display: grid;
+  place-items: center;
+  width: 4.4cqw;
+  height: 4.4cqw;
+  margin: auto 0 0.6cqw 0.8cqw;
+  border-radius: 1.2cqw;
+  background: var(--mini-tile);
+  color: var(--onb-ink);
+  --symbol-scale: 0.9;
+}
+
+/* ---------- Scene 5: a few good defaults ---------- */
+
+.defaults-list {
+  width: min(640px, 100%);
+  margin-top: clamp(16px, 4vh, 34px);
+  overflow: hidden;
+  border: 1px solid var(--onb-border);
+  border-radius: 18px;
+  background: var(--onb-surface);
+  text-align: left;
+  box-shadow: var(--onb-shadow);
+  backdrop-filter: blur(24px) saturate(1.3);
+}
+
+.default-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+}
+
+.default-row + .default-row {
+  border-top: 1px solid var(--onb-border);
+}
+
+.default-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--onb-surface-strong);
+  color: var(--onb-ink);
+  --symbol-scale: 1.15;
+}
+
+.default-words {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.default-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.default-text {
+  color: var(--onb-ink-soft);
+  font-size: 12.5px;
+}
+
+.default-note {
+  color: var(--onb-warning);
+  font-size: 12px;
+}
+
+.default-note:empty {
+  display: none;
+}
+
+.default-switch {
+  position: relative;
+  flex: none;
+  width: 42px;
+  height: 25px;
+  padding: 0;
+  border: 0;
+  border-radius: 13px;
+  background: var(--onb-faint);
+  transition: background-color 260ms linear;
+}
+
+.default-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+  transition: transform 340ms var(--ease-emphasized);
+}
+
+.default-switch[aria-checked="true"] {
+  background: var(--onb-positive);
+}
+
+.default-switch[aria-checked="true"] .default-switch-knob {
+  transform: translateX(17px);
+}
+
+.default-control {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+
+.default-action {
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 15px;
+  background: var(--onb-accent);
+  color: var(--onb-accent-ink);
+  font: 600 13px/1 var(--font-text);
+  transition: transform 200ms var(--ease-out);
+}
+
+.default-action:hover {
+  transform: translateY(-1px);
+}
+
+.default-done {
+  display: none;
+  align-items: center;
+  gap: 5px;
+  color: var(--onb-positive);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.default-control[data-state="done"] .default-action,
+.default-control[data-state="unavailable"] .default-action {
+  display: none;
+}
+
+.default-control[data-state="done"] .default-done {
+  display: inline-flex;
+  animation: import-check-in 520ms var(--ease-emphasized);
+}
+
+/* ---------- Scene 6: you're all set ---------- */
+
+.ready-icon-holder {
+  position: relative;
+  width: clamp(84px, min(12vw, 20vh), 132px);
+  aspect-ratio: 1;
+  margin-bottom: clamp(16px, 4.5vh, 36px);
+}
+
+.ready-ripple {
+  position: absolute;
+  inset: 4%;
+  border: 1.5px solid color-mix(in srgb, var(--wash-2) 70%, var(--onb-ink));
+  border-radius: 27%;
+  opacity: 0;
+}
+
+/* ---------- Small windows ---------- */
+
+@media (max-width: 820px) {
+  .scene-look {
+    flex-direction: column;
+    gap: 0;
+    text-align: center;
+  }
+
+  .scene-look .onboarding-lede {
+    margin-left: auto;
+  }
+
+  .look-controls {
+    flex: none;
+  }
+
+  .look-swatches {
+    grid-template-columns: repeat(10, 30px);
+    gap: 10px;
+    justify-content: center;
+  }
+
+  .look-swatch {
+    width: 30px;
+    height: 30px;
+  }
+
+  .look-preview {
+    display: none;
+  }
+
+  .tour {
+    grid-template-columns: minmax(0, 1fr);
+    width: min(440px, 100%);
+  }
+
+  .tour-stage {
+    display: none;
+  }
+}
+
+@media (max-height: 620px) {
+  .onboarding-top {
+    height: 44px;
+  }
+
+  .import-card {
+    padding: 9px 12px;
+  }
+
+  .import-mark {
+    width: 34px;
+    height: 34px;
+  }
+
+  .tour-item {
+    padding: 7px 12px 9px;
+  }
+
+  .tour-item-text {
+    font-size: 12px;
+  }
+
+  .default-row {
+    padding: 10px 14px;
+  }
+
+  .onboarding-next,
+  .onboarding-back {
+    height: 40px;
+  }
+}
+
+@media (max-height: 470px) {
+  .onboarding-lede {
+    display: none;
+  }
+
+  .tour {
+    margin-top: 8px;
+  }
+
+  .tour-list {
+    gap: 2px;
+  }
+
+  .tour-item {
+    padding: 5px 12px 7px;
+  }
+
+  .scene-hello .onboarding-lede,
+  .scene-ready .onboarding-lede {
+    display: block;
+  }
+
+  .default-text {
+    display: none;
+  }
+}
+
+/* ---------- Less motion: things fade instead of moving ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .wash-light,
+  .hello-glow,
+  .tour-item.is-auto .tour-item-progress {
+    animation: none;
+  }
+
+  .import-card,
+  .look-swatch,
+  .onboarding-next,
+  .tour-demo {
+    transition-property: opacity, background-color, color;
+  }
+
+  .tour-demo {
+    transform: none;
+  }
+}

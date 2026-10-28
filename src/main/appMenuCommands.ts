@@ -16,7 +16,7 @@ import { checkForUpdatesNow, getReadyUpdateVersion, restartToUpdate } from "./ap
 import { applyChange, getState, getWindow } from "./browserCore";
 import { openLittleWindow } from "./littleWindow";
 import { closeFrontWindow, openNewWindow } from "./mainWindows";
-import { findNextMatch, openCommandBar, openFind, openLibrary, openShortcutSheet, openTabSwitcher, runSiteCommand } from "./overlayController";
+import { findNextMatch, openCommandBar, openFind, openLibrary, openShortcutSheet, openTabSwitcher, openWelcome, runSiteCommand } from "./overlayController";
 import { copyTabUrl, exportPageAsPdf, savePageAs, toggleDevTools, zoomPage } from "./pageCommands";
 import { closePeek, getPeekContents, isPeekClosing, isPeekOpen, openPeekAsTab } from "./peek";
 import { buildImportMenu, showMenuRequest } from "./menus";
@@ -173,6 +173,7 @@ export const appMenuCommands: AppMenuCommands = {
   openLibrary: () => openLibrary(),
   openSettings: () => openLibrary("settings"),
   openShortcutSheet: () => openShortcutSheet(),
+  openWelcome: () => openWelcome(),
   sleepOtherTabs: () => menuHost.runAction({ type: "sleepOtherTabs" }),
   openTaskManager: () => menuHost.runAction({ type: "openTaskManager" }),
   openLittleWindow: () => openLittleWindow(null),

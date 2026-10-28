@@ -15,6 +15,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { IpcRendererEvent } from "electron";
 import type { BrowserAction } from "../shared/actions";
 import type { IPC_CHANNELS } from "../shared/ipcChannels";
+import type { WelcomeData } from "../shared/onboarding";
 import type { CommandBarLine, FindProgress, LibraryData, OVERLAY_CHANNELS, OverlayApi, OverlayShowMessage, PeekClosingMessage } from "../shared/overlay";
 
 /**
@@ -46,6 +47,7 @@ const CHANNELS: typeof OVERLAY_CHANNELS = {
   chooseTab: "overlay:choose-tab",
   mediaCommand: "overlay:media-command",
   librarySection: "overlay:library-section",
+  welcomeUpdate: "overlay:welcome-update",
 };
 
 const DISPATCH_CHANNEL: (typeof IPC_CHANNELS)["dispatch"] = "browser:dispatch";
@@ -70,6 +72,9 @@ function createOverlayApi(): OverlayApi {
     },
     onClosing: (listener) => {
       ipcRenderer.on(CHANNELS.closing, () => listener());
+    },
+    onWelcomeUpdate: (listener) => {
+      ipcRenderer.on(CHANNELS.welcomeUpdate, (_event: IpcRendererEvent, data: WelcomeData) => listener(data));
     },
     onPeekClosing: (listener) => {
       ipcRenderer.on(CHANNELS.peekClosing, (_event: IpcRendererEvent, message: PeekClosingMessage) => listener(message));

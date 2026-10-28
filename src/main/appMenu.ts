@@ -63,6 +63,8 @@ export interface AppMenuCommands {
   /** Bow › Settings… (⌘,): Library › Settings. Help › Keyboard Shortcuts (⌘/): the sheet of the menu's shortcuts. */
   openSettings(): void;
   openShortcutSheet(): void;
+  /** Help › Welcome to Bow…: the first-start onboarding again (overlay/onboarding.ts). */
+  openWelcome(): void;
   /** Tabs › Sleep Other Tabs and Task Manager (tabSleepController.ts, Library › Task Manager). */
   sleepOtherTabs(): void;
   openTaskManager(): void;
@@ -282,6 +284,7 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
     {
       role: "help",
       submenu: [
+        { label: "Welcome to Bow…", click: () => commands.openWelcome() },
         { label: "Keyboard Shortcuts", accelerator: "CommandOrControl+/", click: () => commands.openShortcutSheet() },
         { type: "separator" },
         { label: "Bow on GitHub", click: () => commands.openUrlInNewTab(PROJECT_URL) },

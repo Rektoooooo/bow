@@ -73,6 +73,10 @@ function isBoolean(value: unknown): boolean {
   return typeof value === "boolean";
 }
 
+function isOptionalBoolean(value: unknown): boolean {
+  return value === undefined || isBoolean(value);
+}
+
 /** A point of the screen: any finite number within a few screens of the origin. */
 function isScreenCoordinate(value: unknown): boolean {
   return typeof value === "number" && Number.isFinite(value) && Math.abs(value) < 1_000_000;
@@ -421,7 +425,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   setExtensionEnabled: { profileId: isText, extensionId: isText, isEnabled: isBoolean },
   removeExtension: { profileId: isText, extensionId: isText },
   loadUnpackedExtension: {},
-  importFromArc: {},
+  importFromArc: { fromWelcome: isOptionalBoolean },
   exportBackup: {},
   restoreBackup: {},
   showExtensionsMenu: { anchor: isAnchor },
@@ -432,7 +436,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   setDeveloperMode: { site: isSite, isOn: isBoolean },
   openDeveloperTool: { tool: isDeveloperTool },
   runSiteCommand: { command: isToolbarSiteCommand },
-  importFromBrowser: { sourceId: isImportSource },
+  importFromBrowser: { sourceId: isImportSource, fromWelcome: isOptionalBoolean },
   setAdBlock: { isOn: isBoolean },
   setHttpsOnly: { isOn: isBoolean },
   setForgetSiteDataOnQuit: { profileId: isText, isOn: isBoolean },

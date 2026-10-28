@@ -11,7 +11,7 @@
  *   page events → tabViewEvents → applyChange() / history / menus
  *   a link or an HTML file from another app (open-url / open-file) → handleExternalUrl() → Little Window or a Space
  */
-import { app, session } from "electron";
+import { app, nativeTheme, session } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -76,7 +76,7 @@ import { applyBoostToPage, runBoostJavaScript } from "./boostPages";
 import { createStatusBubble, showLinkStatus } from "./statusBubble";
 import { initializePeek, openPeek } from "./peek";
 import { createOverlayView, getOverlayContents } from "./overlay";
-import { openWelcome, refreshOpenPanel, registerOverlayIpc, setCommandActionRegistry } from "./overlayController";
+import { openWelcome, refreshOpenPanel, refreshWelcome, registerOverlayIpc, setCommandActionRegistry } from "./overlayController";
 import { startHandoff } from "./handoff";
 import { noticeVisitedPage, startLiveFolderRefreshing } from "./liveFolderRefresher";
 import { markSnapshotNeeded, startAutomaticSnapshots } from "./backupController";
@@ -443,6 +443,10 @@ async function handleAppReady(): Promise<void> {
   // The Library's Sync row shows how the last read or write went.
   startSync(() => refreshOpenPanel());
   startHandoff();
+  // The onboarding's default-browser row: macOS asks in its own window, and Bow is active again once it is answered.
+  app.on("did-become-active", () => refreshWelcome());
+  // The onboarding follows the system's light or dark while the Space's look is automatic.
+  nativeTheme.on("updated", () => refreshWelcome());
   const firstWindow = getWindow();
   if (isFirstStart && getState().settings.hasSeenWelcome !== true && firstWindow !== null) {
     // Once the sidebar has drawn, so the tour opens over a finished window.

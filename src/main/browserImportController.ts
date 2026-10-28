@@ -11,7 +11,8 @@
  *
  * Data flow:
  *   menu / Library → listImportSources() → importFromBrowser(sourceId) → read bookmarks → addImportedBookmarks()
- *   → applyChange() → read history → importHistoryEntries() → summary dialog
+ *   → applyChange() → read history → importHistoryEntries() → summary dialog (or, from the onboarding, the summary
+ *   returned to its card)
  */
 import { app, dialog, shell } from "electron";
 import * as fs from "node:fs";
@@ -26,6 +27,7 @@ import type { FirefoxProfile } from "./firefoxImport";
 import { importHistoryEntries } from "./historyStore";
 import { readSafariBookmarks, readSafariHistory } from "./safariImport";
 import { getActiveSpace } from "./tree";
+import type { ImportSummary } from "../shared/onboarding";
 
 /** Something the user can import from, as the menus list it. */
 export interface ImportSource {
@@ -97,22 +99,32 @@ async function showSummary(browserName: string, bookmarkCount: number, historyCo
 }
 
 /**
+ * What a browser import brought over, after the summary dialog when it is wanted.
+ */
+async function finishImport(browserName: string, bookmarkCount: number, historyCount: number, showsSummary: boolean): Promise<ImportSummary> {
+  if (showsSummary) {
+    await showSummary(browserName, bookmarkCount, historyCount);
+  }
+  return { spaces: 0, tabs: 0, bookmarks: bookmarkCount, historyPages: historyCount };
+}
+
+/**
  * Imports one Chromium-family profile.
  */
-async function importChromiumProfile(profile: ChromiumProfile): Promise<void> {
+async function importChromiumProfile(profile: ChromiumProfile, showsSummary: boolean): Promise<ImportSummary> {
   const bookmarkCount = addBookmarksToActiveSpace(`${profile.browserName} Bookmarks`, readChromiumBookmarks(profile));
   const historyCount = importHistoryEntries(await readChromiumHistory(profile));
-  await showSummary(profile.browserName, bookmarkCount, historyCount);
+  return finishImport(profile.browserName, bookmarkCount, historyCount, showsSummary);
 }
 
 /**
  * Imports one Firefox profile.
  */
-async function importFirefoxProfile(profile: FirefoxProfile): Promise<void> {
+async function importFirefoxProfile(profile: FirefoxProfile, showsSummary: boolean): Promise<ImportSummary> {
   const profileData = await readFirefoxProfile(profile);
   const bookmarkCount = addBookmarksToActiveSpace("Firefox Bookmarks", profileData.bookmarks);
   const historyCount = importHistoryEntries(profileData.history);
-  await showSummary("Firefox", bookmarkCount, historyCount);
+  return finishImport("Firefox", bookmarkCount, historyCount, showsSummary);
 }
 
 /**
@@ -140,12 +152,12 @@ async function explainFullDiskAccess(): Promise<void> {
 /**
  * Imports Safari's bookmarks (with the Reading List as a folder of its own) and history.
  */
-async function importSafari(): Promise<void> {
+async function importSafari(showsSummary: boolean): Promise<ImportSummary | null> {
   const homeFolder = app.getPath("home");
   const bookmarks = await readSafariBookmarks(homeFolder);
   if (!bookmarks.ok && bookmarks.reason === "needsFullDiskAccess") {
     await explainFullDiskAccess();
-    return;
+    return null;
   }
   const tree: ImportedBookmarkNode[] = [];
   if (bookmarks.ok) {
@@ -157,26 +169,22 @@ async function importSafari(): Promise<void> {
   const bookmarkCount = addBookmarksToActiveSpace("Safari Bookmarks", tree);
   const history = await readSafariHistory(homeFolder);
   const historyCount = history.ok ? importHistoryEntries(history.value) : 0;
-  await showSummary("Safari", bookmarkCount, historyCount);
+  return finishImport("Safari", bookmarkCount, historyCount, showsSummary);
 }
 
 /**
- * Runs the import of one source from listImportSources().
+ * Runs the import of one source from listImportSources(). Returns what arrived, or null when nothing was imported
+ * (an unknown source, or Safari waiting for Full Disk Access). `showsSummary`: the dialog at the end (the onboarding
+ * shows the summary on its card instead).
  */
-export async function importFromBrowser(sourceId: string): Promise<void> {
+export async function importFromBrowser(sourceId: string, showsSummary: boolean = true): Promise<ImportSummary | null> {
   if (sourceId === SAFARI_SOURCE_ID) {
-    await importSafari();
-    return;
+    return importSafari(showsSummary);
   }
   if (sourceId.startsWith(FIREFOX_SOURCE_PREFIX)) {
     const firefoxProfile = findFirefoxProfiles(app.getPath("home")).find((candidate) => `${FIREFOX_SOURCE_PREFIX}${candidate.folderName}` === sourceId);
-    if (firefoxProfile !== undefined) {
-      await importFirefoxProfile(firefoxProfile);
-    }
-    return;
+    return firefoxProfile === undefined ? null : importFirefoxProfile(firefoxProfile, showsSummary);
   }
   const profile = findChromiumProfiles(app.getPath("home")).find((candidate) => `${CHROMIUM_SOURCE_PREFIX}${candidate.browserId}:${candidate.folderName}` === sourceId);
-  if (profile !== undefined) {
-    await importChromiumProfile(profile);
-  }
+  return profile === undefined ? null : importChromiumProfile(profile, showsSummary);
 }

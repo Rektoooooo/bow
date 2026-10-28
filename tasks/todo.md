@@ -352,6 +352,17 @@ M about a day, L several days.
 - [x] 22. The Control Center no longer rebuilds when nothing changed (an unclickable panel under bursts of
       refreshes, found 2026-10-27; the fix is uncommitted in the main checkout's src/overlay/siteControls.ts) (S)
 
+## Milestone 5 — Onboarding (user-approved 2026-10-28: "really clean and professional, nice animations")
+Plan: a full-window, animated first run replacing the welcome card (six scenes: hello, bring your things, make it
+yours, the essentials, a few good defaults, you're all set). Our own CSS/DOM/SVG only, no sound.
+- [x] 1. Plumbing: welcome panel data (active Space + theme, system dark, sources + Arc, import status, defaults), an
+      in-place `update` message, refresh after actions and around imports, nothing replaces the tour, every way out
+      records hasSeenWelcome, skeleton scenes with navigation, keys and progress; check-app updated
+- [x] 2. Scenes 1–3: hello, import cards with inline status, live theme preview and the aurora re-tint; screenshots
+- [x] 3. Scene 4: the essentials tour with its looping illustrations
+- [x] 4. Scene 5 defaults, scene 6 and the outro, Help › Welcome to Bow… and the Command Bar replay, reduced motion
+- [ ] 5. check-onboarding.mjs (done: 23 checks); screenshots (light/dark, 640×400 and 1280×820) and a slowed recording; polish pass
+
 ## Review (2026-10-28, an unattended night: open source, releases, auto-update, speed, polish)
 - **Works and verified:** open-source setup and repo rename; `npm run release` up to Apple's notarization (signing,
   hardened runtime, DMG checked by hand; notarization waits for the user's credentials); auto-update (a real signed

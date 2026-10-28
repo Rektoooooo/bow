@@ -29,7 +29,9 @@ npm run e2e          # build + drive the real app: check-app, check-overlay, che
                      # check-tab-sleep (a page off screen sleeps, its renderer ends, it wakes scrolled where it was;
                      # Sleep Tab, Keep Awake, Sleep Other Tabs, Task Manager),
                      # check-backup (export, restore by replacing or adding, unsafe files refused),
-                     # check-sync (two copies of Bow sync through one folder: join, both ways, stop)
+                     # check-sync (two copies of Bow sync through one folder: join, both ways, stop),
+                     # check-onboarding (the first-start onboarding: scenes, keys, a look, the tour, the defaults,
+                     # replay from Help, fits a 640 × 400 window)
 node e2e/window-shot.mjs --open  # after npm run package: Bow on the sample profile, for the README's hand-taken
                                  # screenshots (docs/screenshot-*.png); without --open: the views → e2e/output/readme-shots
 node e2e/arc-compare.mjs   # side-by-side crops with the user's Arc screenshots (reference/, local only) → e2e/output

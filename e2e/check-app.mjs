@@ -102,7 +102,8 @@ async function simulateDrag(page, sourceSelector, targetSelector, verticalFracti
 // ---------- first run ----------
 let { app, page, mainLog, consoleErrors } = await launch(userDataDir);
 await page.waitForSelector(".space-title", { timeout: 15000 });
-// The first start shows the welcome tour (import, a look, shortcuts, default browser); Skip ends it for good.
+// The first start shows the onboarding (overlay/onboarding.ts; e2e/check-onboarding.mjs checks it in full); Skip ends
+// it for good.
 const welcomeOverlay = await (async () => {
   for (let attempt = 0; attempt < 50; attempt++) {
     const overlayPage = app.windows().find((candidate) => candidate.url().endsWith("/overlay/overlay.html"));
@@ -111,10 +112,11 @@ const welcomeOverlay = await (async () => {
   }
   return null;
 })();
-const welcomeTitle = welcomeOverlay === null ? null : await welcomeOverlay.waitForSelector(".welcome-title", { timeout: 8000 }).then((title) => title.textContent()).catch(() => null);
-check("the first start shows the welcome tour", welcomeTitle === "Welcome", String(welcomeTitle));
-await welcomeOverlay?.click(".welcome-skip").catch(() => undefined);
-await page.waitForTimeout(500);
+const welcomeTitle = welcomeOverlay === null ? null : await welcomeOverlay.waitForSelector(".onboarding .onboarding-title-hero", { timeout: 8000 }).then((title) => title.getAttribute("aria-label")).catch(() => null);
+check("the first start shows the onboarding", welcomeTitle === "Welcome to Bow", String(welcomeTitle));
+await welcomeOverlay?.click(".onboarding-skip").catch(() => undefined);
+// Skip plays the outro (the scene lifts away, the wash fades) before the overlay closes.
+await page.waitForTimeout(1500);
 check("Skip ends the tour for good", (await getState(page)).settings.hasSeenWelcome === true);
 check("preload exposes window.browserApi", (await page.evaluate(() => typeof window.browserApi)) === "object");
 check("sidebar shows the Personal Space title", (await page.textContent(".space-title-name")).includes("Personal"));
