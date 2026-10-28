@@ -61,6 +61,15 @@ describe("issue pages", () => {
     expect(isIssueSignInPage("https://linear.example/acme/my-issues/assigned", LINEAR_LIST)).toBe(false);
     expect(isIssueSignInPage("https://linear.example/acme/issue/ENG-1/login-button", LINEAR_LIST)).toBe(false);
     expect(isIssueSignInPage("not a url", LINEAR_LIST)).toBe(false);
+    expect(isIssueSignInPage("https://jira.example/login.jsp?os_destination=%2Fissues", "https://jira.example/issues/?filter=1")).toBe(true);
+  });
+
+  it("never take the list's own page, or a project named like a sign-in word, for a sign-in page", () => {
+    const authBoard = "https://acme.atlassian.example/jira/software/projects/AUTH/boards/3";
+    expect(isIssueSignInPage(authBoard, authBoard)).toBe(false);
+    expect(needsSignIn({ pageUrl: authBoard }, authBoard)).toBe(false);
+    expect(isIssueSignInPage("https://acme.atlassian.example/browse/AUTH-1", authBoard)).toBe(false);
+    expect(isIssueSignInPage("https://linear.example/auth/team/ENG/active", "https://linear.example/auth/team/ENG/active")).toBe(false);
   });
 
   it("need a sign-in when the page tried to leave for another site or landed on a sign-in page", () => {

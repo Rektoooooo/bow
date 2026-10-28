@@ -33,8 +33,11 @@ export const ISSUE_PAGE_TITLES: Record<IssuePageKind, string> = {
   linear: "Linear Issues",
 };
 
-/** Words in a path that mean "sign in first" (Atlassian's and Linear's sign-in pages, most sites'). */
-const SIGN_IN_PATH_WORDS = ["login", "signin", "sign-in", "sign_in", "auth"];
+/**
+ * First path segments that mean "sign in first" (Linear's /login, Jira Server's /login.jsp, most sites'). Only the
+ * first segment counts: a Jira project keyed AUTH lives at /projects/AUTH/….
+ */
+const SIGN_IN_PATH_WORDS = ["login", "login.jsp", "signin", "sign-in", "sign_in", "auth"];
 
 /** Link text that is only a number or the issue key itself: never a better title than a sentence. */
 const KEY_ONLY_PATTERN = /^[A-Z][A-Z0-9_]*-[0-9]+$/;
@@ -122,19 +125,25 @@ export function needsSignIn(page: { pageUrl: string; leftFor?: string | null }, 
 }
 
 /**
- * Whether a page is a sign-in page for a list: on another site, or a sign-in path on the same site.
+ * Whether a page is a sign-in page for a list: on another site, or a sign-in path on the same site. The list's own
+ * page never is, whatever its path says.
  * Example: ("https://id.atlassian.com/login?…", "https://acme.atlassian.net/issues/?filter=1") → true
  */
 export function isIssueSignInPage(renderedUrl: string, listUrl: string): boolean {
+  let rendered: URL;
+  let list: URL;
   try {
-    const rendered = new URL(renderedUrl);
-    const list = new URL(listUrl);
-    if (rendered.host !== list.host) {
-      return true;
-    }
-    const path = rendered.pathname.toLowerCase();
-    return SIGN_IN_PATH_WORDS.some((word) => path.split("/").includes(word));
+    rendered = new URL(renderedUrl);
+    list = new URL(listUrl);
   } catch {
     return false;
   }
+  if (rendered.host !== list.host) {
+    return true;
+  }
+  if (rendered.pathname === list.pathname) {
+    return false;
+  }
+  const firstSegment = rendered.pathname.split("/")[1] ?? "";
+  return SIGN_IN_PATH_WORDS.includes(firstSegment.toLowerCase());
 }
