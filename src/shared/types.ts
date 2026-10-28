@@ -77,10 +77,17 @@ export interface FolderItem {
 }
 
 /** The GitHub lists a live folder can show: the signed-in user's lists on github.com/pulls and github.com/issues. */
-export type GitHubLiveList = "pullRequests" | "reviewRequests" | "assignedIssues";
+export type GitHubLiveList = "pullRequests" | "reviewRequests" | "assignedIssues" | "createdIssues" | "notifications";
 
 /** Where a live folder's tabs come from. */
-export type LiveFolderSource = { kind: "github"; list: GitHubLiveList } | { kind: "feed"; url: string };
+/** Whose issues a page lists, for a live folder made from it (main/issuePages.ts). */
+export type IssuePageKind = "jira" | "linear";
+
+export type LiveFolderSource =
+  | { kind: "github"; list: GitHubLiveList }
+  | { kind: "feed"; url: string }
+  /** The issues a Jira or Linear page lists, read through the profile's sign-in (main/issuePages.ts). */
+  | { kind: "issues"; url: string; issueKind: IssuePageKind };
 
 /** What makes a folder live. Only what must survive a restart; how the last refresh went is a RuntimeState fact. */
 export interface LiveFolderData {

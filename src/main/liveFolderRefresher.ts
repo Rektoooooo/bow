@@ -1,7 +1,7 @@
 /**
  * WHY this file exists:
  *   Live folders refresh themselves: shortly after the start, every LIVE_FOLDER_REFRESH_MS, right after one is made,
- *   on "Refresh Now", and when you visit GitHub while a GitHub folder waits for you to sign in. This file reads each
+ *   on "Refresh Now", and when you visit a folder's site while it waits for you to sign in. This file reads each
  *   folder's source with the folder's profile (feeds with a plain request; GitHub lists the way Arc reads them, as
  *   you, with your sign-in cookies) and hands the entries to liveFolders.ts. How the last refresh went is a runtime
  *   fact, shown as the folder's status line.
@@ -9,24 +9,29 @@
  * Data source:
  *   Feeds: the feed address, fetched in the profile's session. GitHub: the `logged_in` cookie GitHub sets for the
  *   profile, then the list page: its HTML, or, when GitHub draws the list with scripts (its newer pages do), the
- *   page rendered in a hidden window (renderedLinks.ts).
+ *   page rendered in a hidden window (renderedLinks.ts). Jira and Linear: the list page the folder was made from,
+ *   rendered in a hidden window with the profile's sign-in (issuePages.ts).
  *
  * Data flow:
  *   timer / action / visit → refreshLiveFolder(folderId) → one refresh at a time → readSource()
  *   → applyChange(applyLiveFolderEntries) + setLiveFolderStatus() (browserCore.ts) → the sidebar's status line
  */
-import { dialog } from "electron";
 import type { Session } from "electron";
 import { LIVE_FOLDER_FIRST_REFRESH_MS, LIVE_FOLDER_REFRESH_MS } from "../shared/settings";
-import type { GitHubLiveList, ItemId } from "../shared/types";
-import { applyChange, getLiveFolderStatuses, getState, getWindow, setLiveFolderStatus } from "./browserCore";
+import type { GitHubLiveList, IssuePageKind, ItemId, LiveFolderSource } from "../shared/types";
+import { applyChange, getLiveFolderStatuses, getState, setLiveFolderStatus } from "./browserCore";
+import { ask } from "./dialogs";
 import { parseFeed, pickFeedLink } from "./feedParser";
 import type { PageFeedLink } from "./feedParser";
 import { findHtmlLinks, getGitHubListUrl, GITHUB_LIST_TITLES, GITHUB_ORIGIN, isGitHubSignInPage, pickGitHubEntries } from "./gitHubLists";
 import { applyLiveFolderEntries, listLiveFolders } from "./liveFolders";
 import type { LiveFolderEntry, LiveFolderTarget } from "./liveFolders";
 import { getProfileSession } from "./profiles";
-import { readRenderedLinks } from "./renderedLinks";
+import { readPageLinks, readRenderedLinks } from "./renderedLinks";
+import type { RenderedPage } from "./renderedLinks";
+import { detectIssueKind, isIssueSignInPage, ISSUE_PAGE_TITLES, needsSignIn, pickIssueEntries } from "./issuePages";
+import { FEED_PRESETS, findKnownFeed } from "./feedPresets";
+import type { FeedPresetId } from "./feedPresets";
 import { createFolder } from "./state";
 import { openLinkInNewTab } from "./tabActions";
 import { getFocusedContents } from "./tabViews";
@@ -155,7 +160,26 @@ function readSource(target: LiveFolderTarget): Promise<SourceResult> {
   if (target.source.kind === "feed") {
     return readFeed(target.source.url, profileSession);
   }
+  if (target.source.kind === "issues") {
+    return readIssuesPage(target.source.url, target.source.issueKind, profileSession);
+  }
   return readGitHubList(target.source.list, profileSession);
+}
+
+/**
+ * A Jira or Linear list page (issuePages.ts): drawn in a hidden window with the profile's sign-in, its issue links
+ * read. A page that sent us to sign in first is "signedOut".
+ */
+async function readIssuesPage(url: string, issueKind: IssuePageKind, profileSession: Session): Promise<SourceResult> {
+  const countIssues = (page: RenderedPage): number => pickIssueEntries(page.links, issueKind, page.pageUrl).length;
+  const page = await readRenderedLinks(url, profileSession, countIssues);
+  if (page === null) {
+    return { state: "failed" };
+  }
+  if (needsSignIn(page, url)) {
+    return { state: "signedOut" };
+  }
+  return { state: "ok", entries: pickIssueEntries(page.links, issueKind, page.pageUrl) };
 }
 
 /**
@@ -247,18 +271,34 @@ export function startLiveFolderRefreshing(): void {
 }
 
 /**
- * A page loaded somewhere: when it is on GitHub (not its sign-in page) and a GitHub folder waits for a sign-in, the
- * user may just have signed in, so those folders try again.
+ * Whether a loaded page is on a source's own site and past its sign-in: GitHub for its lists, the list's or feed's
+ * site for the others.
+ */
+function isPastSignIn(url: string, source: LiveFolderSource): boolean {
+  if (source.kind !== "github") {
+    return !isIssueSignInPage(url, source.url);
+  }
+  const origin = getGitHubOrigin();
+  return new URL(url).origin === origin && !isGitHubSignInPage(url, origin);
+}
+
+/**
+ * A page loaded somewhere: when it is on the site of a folder that waits for a sign-in (and not its sign-in page),
+ * the user may just have signed in, so that folder tries again.
  */
 export function noticeVisitedPage(url: string): void {
-  const origin = getGitHubOrigin();
-  const isOnGitHub = URL.canParse(url) && new URL(url).origin === origin;
-  if (!isOnGitHub || isGitHubSignInPage(url, origin)) {
-    return;
-  }
+  const signedOutIds = new Set<ItemId>();
   for (const [folderId, status] of Object.entries(getLiveFolderStatuses())) {
     if (status.state === "signedOut") {
-      refreshLiveFolder(folderId);
+      signedOutIds.add(folderId);
+    }
+  }
+  if (signedOutIds.size === 0 || !URL.canParse(url)) {
+    return;
+  }
+  for (const target of listLiveFolders(getState())) {
+    if (signedOutIds.has(target.folderId) && isPastSignIn(url, target.source)) {
+      refreshLiveFolder(target.folderId);
     }
   }
 }
@@ -273,17 +313,47 @@ export function createGitHubLiveFolder(list: GitHubLiveList): void {
 }
 
 /**
+ * "New Live Folder › Hacker News" and the other ready-made feeds.
+ */
+export function createPresetFeedLiveFolder(presetId: FeedPresetId): void {
+  const preset = FEED_PRESETS[presetId];
+  const source = { kind: "feed", url: preset.url } as const;
+  applyChange((state) => createFolder(state, preset.title, Date.now(), { source: source, hiddenUrls: [] }));
+  refreshNewLiveFolders();
+}
+
+/**
+ * "New Live Folder › Issues from This Page": the Jira or Linear issues the page on screen lists, kept in step through
+ * the profile's sign-in. A page with no such issues says so.
+ */
+export async function createIssuesLiveFolderFromPage(): Promise<void> {
+  const contents = getFocusedContents();
+  const pageUrl = contents === null ? "" : contents.getURL();
+  const links = contents === null ? [] : await readPageLinks(contents);
+  const issueKind = detectIssueKind(links, pageUrl);
+  if (contents === null || issueKind === null) {
+    showMessage("This page lists no issues", "Open the Jira filter or board, or Linear's My Issues or a project, whose issues you want in the folder, and try again.");
+    return;
+  }
+  const pageTitle = contents.getTitle().trim();
+  const title = pageTitle === "" ? ISSUE_PAGE_TITLES[issueKind] : pageTitle;
+  const source = { kind: "issues", url: pageUrl, issueKind: issueKind } as const;
+  applyChange((state) => createFolder(state, title, Date.now(), { source: source, hiddenUrls: [] }));
+  refreshNewLiveFolders();
+}
+
+/**
+ * Tells the user something about live folders in a sheet over the window.
+ */
+function showMessage(message: string, detail: string): void {
+  ask({ type: "info", message: message, detail: detail }).catch(() => undefined);
+}
+
+/**
  * Tells the user the page on screen has no feed.
  */
 function showNoFeedMessage(): void {
-  const window = getWindow();
-  const options = {
-    type: "info" as const,
-    message: "This page has no feed",
-    detail: "Open a page of a site that offers an RSS or Atom feed (most blogs and news sites do), or the feed itself, and try again.",
-  };
-  const shown = window === null ? dialog.showMessageBox(options) : dialog.showMessageBox(window, options);
-  shown.catch(() => undefined);
+  showMessage("This page has no feed", "Open a page of a site that offers an RSS or Atom feed (most blogs and news sites do), or the feed itself, and try again.");
 }
 
 /**
@@ -320,7 +390,10 @@ export async function createFeedLiveFolderFromPage(): Promise<void> {
   const pageUrl = contents.getURL();
   const result: unknown = await contents.executeJavaScriptInIsolatedWorld(FEED_LINKS_WORLD_ID, [{ code: READ_FEED_LINKS_SCRIPT }]).catch(() => null);
   const pageLinks = toFeedLinks(result);
-  const feed = pageLinks === null ? null : pickFeedLink(pageLinks.contentType, pageLinks.links, pageUrl);
+  const namedFeed = pageLinks === null ? null : pickFeedLink(pageLinks.contentType, pageLinks.links, pageUrl);
+  // A subreddit (and Hacker News) names no feed in its pages but has one at a known address.
+  const knownFeed = findKnownFeed(pageUrl);
+  const feed = namedFeed ?? (knownFeed === null ? null : { url: knownFeed.url, title: knownFeed.title });
   if (feed === null) {
     showNoFeedMessage();
     return;
@@ -334,8 +407,8 @@ export async function createFeedLiveFolderFromPage(): Promise<void> {
 }
 
 /**
- * The status line's "Sign in to GitHub": opens the folder's list page in a new tab. GitHub shows its sign-in page
- * and comes back to the list afterwards; visiting GitHub then refreshes the folder (noticeVisitedPage).
+ * The status line's "Sign in …": opens the folder's list page in a new tab. The site shows its sign-in page and comes
+ * back to the list afterwards; that visit then refreshes the folder (noticeVisitedPage).
  */
 export function openLiveFolderSource(folderId: ItemId): void {
   const target = listLiveFolders(getState()).find((candidate) => candidate.folderId === folderId);

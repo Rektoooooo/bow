@@ -93,6 +93,14 @@ describe("parseAction", () => {
     expect(parseAction("selectTab")).toBeNull();
   });
 
+  it("takes only known live folder lists and ready-made feeds", () => {
+    expect(parseAction({ type: "createGitHubLiveFolder", list: "notifications" })).not.toBeNull();
+    expect(parseAction({ type: "createGitHubLiveFolder", list: "everything" })).toBeNull();
+    expect(parseAction({ type: "createPresetFeedLiveFolder", preset: "hackerNews" })).not.toBeNull();
+    expect(parseAction({ type: "createPresetFeedLiveFolder", preset: "toString" })).toBeNull();
+    expect(parseAction({ type: "createIssuesLiveFolder" })).not.toBeNull();
+  });
+
   it("refuses an archive threshold that is not one of the menu choices", () => {
     expect(parseAction({ type: "setArchiveAfter", archiveAfterMs: 0 })).toBeNull();
     expect(parseAction({ type: "setArchiveAfter", archiveAfterMs: null })).not.toBeNull();

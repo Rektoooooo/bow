@@ -330,8 +330,18 @@ const EMPTY_LIVE_FOLDER_TEXTS = {
   pullRequests: "No open pull requests",
   reviewRequests: "No reviews requested",
   assignedIssues: "No issues assigned to you",
+  createdIssues: "No open issues of yours",
+  notifications: "No notifications",
   feed: "No posts in this feed",
+  issues: "No issues on this page",
 } as const;
+
+/** Where a signed-out live folder asks you to sign in. */
+const SIGN_IN_TEXTS: Record<LiveFolderSource["kind"], string> = {
+  github: "Sign in to GitHub",
+  feed: "Sign in to read this feed",
+  issues: "Sign in to see these issues",
+};
 
 /** What a live folder's status line says and what clicking it does ("" = nothing). */
 interface LiveStatusLine {
@@ -348,6 +358,10 @@ function createLiveSourceGlyph(source: LiveFolderSource): Element {
   if (source.kind === "github") {
     return createFavicon(null, GITHUB_SITE_URL, "live-folder-glyph");
   }
+  // Jira's or Linear's own icon, from the page the folder reads.
+  if (source.kind === "issues") {
+    return createFavicon(null, source.url, "live-folder-glyph");
+  }
   return createIcon("feed", "icon live-folder-glyph");
 }
 
@@ -361,7 +375,7 @@ function describeLiveStatus(folder: FolderItem, source: LiveFolderSource, status
     return isEmpty ? { text: "Loading…", action: "", icon: null } : null;
   }
   if (status.state === "signedOut") {
-    return { text: "Sign in to GitHub", action: "sign-in", icon: "person" };
+    return { text: SIGN_IN_TEXTS[source.kind], action: "sign-in", icon: "person" };
   }
   if (status.state === "failed") {
     return { text: "Couldn’t refresh. Try again", action: "retry", icon: "warning" };
@@ -369,7 +383,7 @@ function describeLiveStatus(folder: FolderItem, source: LiveFolderSource, status
   if (!isEmpty) {
     return null;
   }
-  const emptyText = source.kind === "github" ? EMPTY_LIVE_FOLDER_TEXTS[source.list] : EMPTY_LIVE_FOLDER_TEXTS.feed;
+  const emptyText = source.kind === "github" ? EMPTY_LIVE_FOLDER_TEXTS[source.list] : EMPTY_LIVE_FOLDER_TEXTS[source.kind];
   return { text: emptyText, action: "", icon: null };
 }
 

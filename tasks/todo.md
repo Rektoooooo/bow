@@ -283,7 +283,10 @@ M about a day, L several days.
 - [x] 6. Link menu: Open Link in Little Window, in Peek, in Split View (S)
 - [x] 7. Split view: drag the divider to resize, swap panes, 2×2 grid and keyboard layouts (M)
 - [x] 8. Boosts: share and import as files; a clear badge while a JavaScript Boost runs (S)
-- [ ] 9. Live Folders: GitHub notifications and issues, Linear and Jira through the user's sign-in, ready-made feed
+- [x] 9. (GitHub Notifications and Issues You Opened; Issues from This Page reads a Jira filter or Linear list in a
+      hidden window with the profile's sign-in, asks to sign in and refills on the next visit; Hacker News preset;
+      Feed from This Page falls back to a subreddit's /.rss. Checked against local fakes, not the real services)
+      Live Folders: GitHub notifications and issues, Linear and Jira through the user's sign-in, ready-made feed
       presets (Hacker News, subreddits) (M)
 - [ ] 10. Command Bar: calculator and unit conversion, recently closed tabs and history by date, user-made action
       chains (M)

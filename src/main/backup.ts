@@ -36,7 +36,9 @@ import type {
   BrowserSettings,
   BrowserState,
   FolderItem,
+  GitHubLiveList,
   InstalledExtension,
+  IssuePageKind,
   ItemId,
   LiveFolderData,
   Profile,
@@ -53,6 +55,7 @@ import type {
   TabItem,
 } from "../shared/types";
 import { upgradeToCurrentVersion } from "./migrate";
+import { GITHUB_LIVE_LISTS } from "./gitHubLists";
 import { MAX_NOTE_LENGTH } from "./notesStore";
 import { MAX_EASEL_LENGTH } from "./easelsStore";
 import { repairSelections } from "./state";
@@ -265,13 +268,17 @@ function checkLiveFolder(raw: unknown): LiveFolderData | undefined {
   }
   const hiddenUrls = raw.hiddenUrls.filter((url): url is string => typeof url === "string").map((url) => url.slice(0, MAX_TEXT_LENGTH));
   const source = raw.source;
-  const isGitHubList = source.list === "pullRequests" || source.list === "reviewRequests" || source.list === "assignedIssues";
+  const isGitHubList = GITHUB_LIVE_LISTS.includes(source.list as GitHubLiveList);
   if (source.kind === "github" && isGitHubList) {
-    return { source: { kind: "github", list: source.list as "pullRequests" | "reviewRequests" | "assignedIssues" }, hiddenUrls: hiddenUrls };
+    return { source: { kind: "github", list: source.list as GitHubLiveList }, hiddenUrls: hiddenUrls };
   }
-  const isWebFeed = source.kind === "feed" && isRestorableUrl(source.url) && /^https?:/.test(source.url);
-  if (isWebFeed) {
+  const isWebAddress = typeof source.url === "string" && isRestorableUrl(source.url) && /^https?:/.test(source.url);
+  if (source.kind === "feed" && isWebAddress) {
     return { source: { kind: "feed", url: source.url as string }, hiddenUrls: hiddenUrls };
+  }
+  const isIssueKind = source.issueKind === "jira" || source.issueKind === "linear";
+  if (source.kind === "issues" && isWebAddress && isIssueKind) {
+    return { source: { kind: "issues", url: source.url as string, issueKind: source.issueKind as IssuePageKind }, hiddenUrls: hiddenUrls };
   }
   return undefined;
 }

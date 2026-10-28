@@ -166,6 +166,33 @@ describe("backups", () => {
     expect(listedTwice).toEqual([]);
   });
 
+  it("keep live folders of every kind, and make a damaged one a plain folder", () => {
+    const sources = [
+      { kind: "github", list: "notifications" },
+      { kind: "issues", url: "https://acme.atlassian.example/issues/?filter=1", issueKind: "jira" },
+      { kind: "issues", url: "https://linear.example/acme/my-issues", issueKind: "trello" },
+      { kind: "issues", url: "javascript:alert(1)", issueKind: "linear" },
+    ];
+    const text = craftedBackupText((backup) => {
+      const space = backup.state.spaces[0];
+      if (space === undefined) {
+        throw new Error("setup");
+      }
+      sources.forEach((source, index) => {
+        const folderId = `live-${index}`;
+        backup.state.items[folderId] = { kind: "folder", id: folderId, title: "Live", childIds: [], isOpen: true, live: { source: source, hiddenUrls: [] } } as FolderItem;
+        space.pinnedIds.push(folderId);
+      });
+    });
+    const restored = parseOrFail(text);
+    const liveOf = (folderId: string) => (restored.state.items[folderId] as FolderItem | undefined)?.live?.source;
+    expect(liveOf("live-0")).toEqual({ kind: "github", list: "notifications" });
+    expect(liveOf("live-1")).toEqual({ kind: "issues", url: "https://acme.atlassian.example/issues/?filter=1", issueKind: "jira" });
+    expect(liveOf("live-2")).toBeUndefined();
+    expect(liveOf("live-3")).toBeUndefined();
+    expect(restored.state.items["live-3"]?.kind).toBe("folder");
+  });
+
   it("switch JavaScript Boosts off, and drop rules for Spaces that are not there", () => {
     const text = craftedBackupText((backup) => {
       backup.state.routingRules = [...(backup.state.routingRules ?? []), { id: "rule-2", matchType: "is", value: "x", spaceId: "space-gone" }];

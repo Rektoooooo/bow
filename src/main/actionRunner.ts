@@ -72,7 +72,8 @@ import { openDeveloperTool, translatePage } from "./pageCommands";
 import { setAsDefaultBrowser } from "./defaultBrowser";
 import { setTabSleepAfter } from "./tabSleep";
 import { restartToUpdate } from "./appUpdates";
-import { createFeedLiveFolderFromPage, createGitHubLiveFolder, openLiveFolderSource, refreshLiveFolder } from "./liveFolderRefresher";
+import { createFeedLiveFolderFromPage, createGitHubLiveFolder, createIssuesLiveFolderFromPage, createPresetFeedLiveFolder, openLiveFolderSource, refreshLiveFolder } from "./liveFolderRefresher";
+import type { FeedPresetId } from "./feedPresets";
 import { showHiddenLiveFolderItems } from "./liveFolders";
 import { equalizeSplit, setSplitOrientation, setSplitSizes, separateTabFromSplit, splitTabs, swapSplitPanes, unsplit } from "./split";
 import {
@@ -551,6 +552,12 @@ export function runAction(action: BrowserAction): void {
       return;
     case "createGitHubLiveFolder":
       return createGitHubLiveFolder(action.list);
+    case "createPresetFeedLiveFolder":
+      // ipc.ts checked the id against FEED_PRESETS.
+      return createPresetFeedLiveFolder(action.preset as FeedPresetId);
+    case "createIssuesLiveFolder":
+      createIssuesLiveFolderFromPage().catch((error) => console.error("Making an issues live folder failed:", error));
+      return;
     case "createFeedLiveFolder":
       createFeedLiveFolderFromPage().catch((error) => console.error("Making a feed live folder failed:", error));
       return;

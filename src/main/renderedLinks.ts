@@ -19,6 +19,11 @@ import type { PageLink } from "./gitHubLists";
 export interface RenderedPage {
   pageUrl: string;
   links: PageLink[];
+  /**
+   * The first address on another site the page tried to go to (and was kept from), or null: a list that sends you
+   * to its sign-in page elsewhere (Atlassian's) shows up here.
+   */
+  leftFor?: string | null;
 }
 
 /** The isolated world our reading script runs in (media.ts and boostPages.ts use 1031–1033). */
@@ -82,6 +87,14 @@ function wait(durationMs: number): Promise<void> {
  * with no items: an empty list). Returns null when the page could not load. The window never shows, cannot open
  * other windows or leave the page's site, makes no sound, and is destroyed before this returns.
  */
+/**
+ * The links of a page already on screen (New Live Folder › Issues from This Page reads the tab it is made from).
+ */
+export async function readPageLinks(contents: Electron.WebContents): Promise<PageLink[]> {
+  const result: unknown = await contents.executeJavaScriptInIsolatedWorld(LINKS_WORLD_ID, [{ code: READ_LINKS_SCRIPT }]).catch(() => null);
+  return toRenderedPage(result)?.links ?? [];
+}
+
 export async function readRenderedLinks(url: string, profileSession: Session, countItems: (page: RenderedPage) => number): Promise<RenderedPage | null> {
   const siteOrigin = new URL(url).origin;
   const hiddenWindow = new BrowserWindow({
@@ -93,9 +106,11 @@ export async function readRenderedLinks(url: string, profileSession: Session, co
   const contents = hiddenWindow.webContents;
   contents.setAudioMuted(true);
   contents.setWindowOpenHandler(() => ({ action: "deny" }));
+  let leftFor: string | null = null;
   const keepOnSite = (event: Electron.Event, targetUrl: string): void => {
     const isSameSite = URL.canParse(targetUrl) && new URL(targetUrl).origin === siteOrigin;
     if (!isSameSite) {
+      leftFor = leftFor ?? targetUrl;
       event.preventDefault();
     }
   };
@@ -109,7 +124,8 @@ export async function readRenderedLinks(url: string, profileSession: Session, co
     let lastCount = 0;
     while (Date.now() < deadline) {
       const result: unknown = await contents.executeJavaScriptInIsolatedWorld(LINKS_WORLD_ID, [{ code: READ_LINKS_SCRIPT }]);
-      const page = toRenderedPage(result);
+      const read = toRenderedPage(result);
+      const page = read === null ? null : { ...read, leftFor: leftFor };
       const count = page === null ? 0 : countItems(page);
       if (count > 0 && count === lastCount) {
         return page;

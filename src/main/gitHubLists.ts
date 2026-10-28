@@ -1,7 +1,7 @@
 /**
  * WHY this file exists:
  *   A GitHub live folder shows one of your lists on github.com (your open pull requests, the ones waiting for your
- *   review, or the issues assigned to you), read the way Arc reads it: the list page itself, with the folder's
+ *   review, the issues assigned to you or opened by you, or your notifications), read the way Arc reads it: the list page itself, with the folder's
  *   profile, whose cookies are your GitHub sign-in. No token is stored and private repositories are included.
  *   GitHub's markup is not stable (Arc's own reader failed with "unexpected page structure"), so this file trusts
  *   only addresses: every link on the page whose path is /<owner>/<repo>/pull/<number> (or /issues/<number>) is an
@@ -27,11 +27,16 @@ export interface PageLink {
 /** Where GitHub lives. Tests point live folders at a local server instead (liveFolderRefresher.ts). */
 export const GITHUB_ORIGIN = "https://github.com";
 
+/** Every GitHub list a live folder can show, for checking a list name from a message or a file. */
+export const GITHUB_LIVE_LISTS: GitHubLiveList[] = ["pullRequests", "reviewRequests", "assignedIssues", "createdIssues", "notifications"];
+
 /** The page of each list, under the GitHub origin. */
 const LIST_PATHS: Record<GitHubLiveList, string> = {
   pullRequests: "/pulls",
   reviewRequests: "/pulls/review-requested",
   assignedIssues: "/issues/assigned",
+  createdIssues: "/issues/created",
+  notifications: "/notifications",
 };
 
 /** The name a new folder of each list gets. */
@@ -39,13 +44,17 @@ export const GITHUB_LIST_TITLES: Record<GitHubLiveList, string> = {
   pullRequests: "Pull Requests",
   reviewRequests: "Review Requests",
   assignedIssues: "Assigned Issues",
+  createdIssues: "Your Issues",
+  notifications: "Notifications",
 };
 
-/** The path segment of the items each list holds. */
-const ITEM_SEGMENTS: Record<GitHubLiveList, string> = {
-  pullRequests: "pull",
-  reviewRequests: "pull",
-  assignedIssues: "issues",
+/** The path segments of the items each list holds (notifications are about pull requests and issues alike). */
+const ITEM_SEGMENTS: Record<GitHubLiveList, string[]> = {
+  pullRequests: ["pull"],
+  reviewRequests: ["pull"],
+  assignedIssues: ["issues"],
+  createdIssues: ["issues"],
+  notifications: ["pull", "issues"],
 };
 
 /** An item's path: owner (letters, digits, dashes), repository (also dots and underscores), kind, number. */
@@ -113,7 +122,7 @@ export function pickGitHubEntries(links: PageLink[], list: GitHubLiveList, pageU
   } catch {
     return [];
   }
-  const wantedSegment = ITEM_SEGMENTS[list];
+  const wantedSegments = ITEM_SEGMENTS[list];
   const titlesByAddress = new Map<string, string>();
   for (const link of links) {
     let url: URL;
@@ -125,8 +134,8 @@ export function pickGitHubEntries(links: PageLink[], list: GitHubLiveList, pageU
     if (url.origin !== pageOrigin || !ITEM_PATH_PATTERN.test(url.pathname)) {
       continue;
     }
-    const segment = url.pathname.split("/")[3];
-    if (segment !== wantedSegment) {
+    const segment = url.pathname.split("/")[3] ?? "";
+    if (!wantedSegments.includes(segment)) {
       continue;
     }
     const address = pageOrigin + url.pathname;

@@ -165,6 +165,10 @@ export type BrowserAction =
   | { type: "translatePage" }
   | { type: "createGitHubLiveFolder"; list: GitHubLiveList }
   | { type: "createFeedLiveFolder" }
+  /** A ready-made feed folder (main/feedPresets.ts): "hackerNews". */
+  | { type: "createPresetFeedLiveFolder"; preset: string }
+  /** The Jira or Linear issues the page on screen lists (main/issuePages.ts). */
+  | { type: "createIssuesLiveFolder" }
   | { type: "refreshLiveFolder"; folderId: ItemId }
   | { type: "openLiveFolderSource"; folderId: ItemId }
   | { type: "showHiddenLiveFolderItems"; folderId: ItemId }
@@ -297,6 +301,8 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "translatePage",
   "createGitHubLiveFolder",
   "createFeedLiveFolder",
+  "createPresetFeedLiveFolder",
+  "createIssuesLiveFolder",
   "refreshLiveFolder",
   "openLiveFolderSource",
   "showHiddenLiveFolderItems",

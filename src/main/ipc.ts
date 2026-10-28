@@ -10,6 +10,8 @@
  * Data flow:
  *   click in sidebar → preload sends "browser:dispatch" { type: "selectTab", tabId } → parseAction() → handlers.runAction()
  */
+import { GITHUB_LIVE_LISTS } from "./gitHubLists";
+import { FEED_PRESETS } from "./feedPresets";
 import { APP_ICON_VARIANTS } from "../shared/appIconDrawing";
 import { BOOST_FONTS } from "../shared/boostFonts";
 import { isNoteId } from "../shared/notes";
@@ -26,7 +28,7 @@ import { IPC_CHANNELS } from "../shared/ipcChannels";
 import { ARCHIVE_THRESHOLD_OPTIONS, SPLIT_PANES_LIMIT, TAB_SLEEP_OPTIONS } from "../shared/settings";
 import { isValidKeywordUrl, MAX_KEYWORD_NAME_LENGTH, SEARCH_KEYWORD_PATTERN } from "../shared/searchKeywords";
 import { isSearchEngineId } from "../shared/searchEngines";
-import type { BrowserState, RuntimeState } from "../shared/types";
+import type { BrowserState, GitHubLiveList, RuntimeState } from "../shared/types";
 
 /** What main.ts must provide so the handlers have something to call. */
 export interface IpcHandlers {
@@ -147,7 +149,12 @@ function isAppIconVariant(value: unknown): boolean {
 
 /** The GitHub lists a live folder can show (types.ts GitHubLiveList). */
 function isGitHubLiveList(value: unknown): boolean {
-  return value === "pullRequests" || value === "reviewRequests" || value === "assignedIssues";
+  return GITHUB_LIVE_LISTS.includes(value as GitHubLiveList);
+}
+
+/** A ready-made feed folder's id (feedPresets.ts). */
+function isFeedPreset(value: unknown): boolean {
+  return typeof value === "string" && Object.hasOwn(FEED_PRESETS, value);
 }
 
 function isToolbarSiteCommand(value: unknown): boolean {
@@ -396,6 +403,8 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   translatePage: {},
   createGitHubLiveFolder: { list: isGitHubLiveList },
   createFeedLiveFolder: {},
+  createPresetFeedLiveFolder: { preset: isFeedPreset },
+  createIssuesLiveFolder: {},
   refreshLiveFolder: { folderId: isText },
   openLiveFolderSource: { folderId: isText },
   showHiddenLiveFolderItems: { folderId: isText },

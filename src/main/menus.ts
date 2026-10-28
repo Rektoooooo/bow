@@ -359,8 +359,12 @@ function buildLiveFolderMenu(host: MenuHost): MenuItemConstructorOptions[] {
     { label: "GitHub Pull Requests", click: () => host.runAction({ type: "createGitHubLiveFolder", list: "pullRequests" }) },
     { label: "GitHub Review Requests", click: () => host.runAction({ type: "createGitHubLiveFolder", list: "reviewRequests" }) },
     { label: "GitHub Issues Assigned to You", click: () => host.runAction({ type: "createGitHubLiveFolder", list: "assignedIssues" }) },
+    { label: "GitHub Issues You Opened", click: () => host.runAction({ type: "createGitHubLiveFolder", list: "createdIssues" }) },
+    { label: "GitHub Notifications", click: () => host.runAction({ type: "createGitHubLiveFolder", list: "notifications" }) },
     { type: "separator" },
+    { label: "Issues from This Page (Jira, Linear)", click: () => host.runAction({ type: "createIssuesLiveFolder" }) },
     { label: "Feed from This Page", click: () => host.runAction({ type: "createFeedLiveFolder" }) },
+    { label: "Hacker News", click: () => host.runAction({ type: "createPresetFeedLiveFolder", preset: "hackerNews" }) },
   ];
 }
 

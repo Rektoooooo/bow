@@ -13,6 +13,8 @@ describe("GitHub lists", () => {
     expect(getGitHubListUrl("pullRequests")).toBe("https://github.com/pulls");
     expect(getGitHubListUrl("reviewRequests")).toBe("https://github.com/pulls/review-requested");
     expect(getGitHubListUrl("assignedIssues", "http://127.0.0.1:4000")).toBe("http://127.0.0.1:4000/issues/assigned");
+    expect(getGitHubListUrl("createdIssues")).toBe("https://github.com/issues/created");
+    expect(getGitHubListUrl("notifications")).toBe("https://github.com/notifications");
   });
 
   it("recognize the sign-in page GitHub redirects to", () => {
@@ -54,6 +56,22 @@ describe("GitHub lists", () => {
       { href: "https://github.com/octo-org/sample-app/pull/12", text: "A pull request" },
     ];
     expect(pickGitHubEntries(links, "assignedIssues", "https://github.com/issues/assigned")).toEqual([
+      { url: "https://github.com/octo-org/sample-app/issues/4", title: "Crash on start" },
+    ]);
+  });
+
+  it("take pull requests and issues for notifications, but not the notification settings", () => {
+    const links = [
+      { href: "https://github.com/octo-org/sample-app/pull/12", text: "Add the & sign to titles" },
+      { href: "https://github.com/octo-org/sample-app/issues/4", text: "Crash on start" },
+      { href: "https://github.com/settings/notifications", text: "Settings" },
+      { href: "https://github.com/octo-org/sample-app", text: "octo-org/sample-app" },
+    ];
+    expect(pickGitHubEntries(links, "notifications", "https://github.com/notifications")).toEqual([
+      { url: "https://github.com/octo-org/sample-app/pull/12", title: "Add the & sign to titles" },
+      { url: "https://github.com/octo-org/sample-app/issues/4", title: "Crash on start" },
+    ]);
+    expect(pickGitHubEntries(links, "createdIssues", "https://github.com/issues/created")).toEqual([
       { url: "https://github.com/octo-org/sample-app/issues/4", title: "Crash on start" },
     ]);
   });

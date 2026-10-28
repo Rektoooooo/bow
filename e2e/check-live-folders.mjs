@@ -6,7 +6,13 @@
 //   - GitHub folders: signed out (no `logged_in=yes` cookie) they ask to sign in; the status line opens the list
 //     page, GitHub's redirect lands on its sign-in page; visiting the site once signed in fills the folder. A list
 //     in the HTML is read from it; a list drawn by scripts is read from a hidden window, which is closed afterwards.
-//     An empty list says so. Deleting a live folder does not fill the Archive.
+//     An empty list says so. Notifications and the issues you opened are lists too. Deleting a live folder does not
+//     fill the Archive.
+//   - Issues from This Page: a Jira-like filter (drawn by scripts, behind a sign-in cookie) and a Linear-like list
+//     become folders of their issues; signed out, the folder asks to sign in, and visiting the site again refills it;
+//     a page without issues says so.
+//   - Hacker News and a subreddit: answered by a test-only https handler in the profile's session, so nothing reaches
+//     the real sites. An unknown ready-made feed is refused.
 // usage: npm run build && node e2e/check-live-folders.mjs      (uses a throwaway --user-data-dir)
 import "./background.mjs";
 import { _electron } from "playwright-core";
@@ -59,13 +65,42 @@ const REVIEW_REQUESTS_HTML = page(
    }, 400);</script>`,
 );
 
+/** GitHub's notifications: pull requests and issues, among links to its settings. Their addresses are in no other
+ * folder (a live folder skips addresses open elsewhere). */
+const NOTIFICATIONS_HTML = page(
+  "Notifications",
+  `<a href="/octo-org/sample-app/pull/3">Bump the version</a> <a href="/octo-org/sample-app/issues/5">Crash on start</a> <a href="/settings/notifications">Settings</a>`,
+);
+
+/** The issues of a made-up Jira filter; the test adds one while the user is signed out. */
+let jiraIssues = [
+  { key: "WEB-1", title: "Fix the login page" },
+  { key: "WEB-2", title: "Speed up search" },
+];
+const hasJiraSession = (request) => /(^|;\s*)jira_session=yes/.test(request.headers.cookie ?? "");
+
+/** A Jira-like filter drawn by a script: each issue has a key link and a title link to the same address. */
+function jiraFilterHtml() {
+  const rows = jiraIssues.map((issue) => `<div><a href="/browse/${issue.key}">${issue.key}</a> <a href="/browse/${issue.key}">${issue.title}</a></div>`).join("");
+  return page("Team filter", `<div id="issues">Loading…</div><script>setTimeout(() => { document.getElementById("issues").innerHTML = ${JSON.stringify(rows)}; }, 400);</script>`);
+}
+
+/** A Linear-like list: an issue (with its title slug) and a project. */
+const LINEAR_HTML = page("My issues", `<a href="/acme/issue/ENG-7/fix-the-sync">Fix the sync</a> <a href="/acme/project/sync-1">A project</a>`);
+
 const server = http.createServer((request, response) => {
   const url = new URL(request.url, "http://127.0.0.1");
   const send = (status, type, body, headers = {}) => {
     response.writeHead(status, { "content-type": type, ...headers });
     response.end(body);
   };
-  const githubList = { "/pulls": PULLS_HTML, "/pulls/review-requested": REVIEW_REQUESTS_HTML, "/issues/assigned": page("Assigned issues", "<p>Nothing assigned</p>") };
+  const githubList = {
+    "/pulls": PULLS_HTML,
+    "/pulls/review-requested": REVIEW_REQUESTS_HTML,
+    "/issues/assigned": page("Assigned issues", "<p>Nothing assigned</p>"),
+    "/issues/created": page("Your issues", `<a href="/octo-org/sample-app/issues/6">Dark mode flickers</a>`),
+    "/notifications": NOTIFICATIONS_HTML,
+  };
   if (url.pathname in githubList) {
     if (!isSignedIn(request)) {
       send(302, "text/html", "", { location: `/login?return_to=${encodeURIComponent(url.pathname)}` });
@@ -80,6 +115,26 @@ const server = http.createServer((request, response) => {
   }
   if (url.pathname === "/feed.xml") {
     send(200, "application/rss+xml", rssFeed());
+    return;
+  }
+  if (url.pathname === "/jira/filter") {
+    if (!hasJiraSession(request)) {
+      send(302, "text/html", "", { location: `/login?next=${encodeURIComponent(url.pathname)}` });
+      return;
+    }
+    send(200, "text/html", jiraFilterHtml());
+    return;
+  }
+  if (url.pathname === "/jira-sign-in") {
+    send(200, "text/html", page("Jira", "<p>Signed in to Jira</p>"), { "set-cookie": "jira_session=yes; Path=/" });
+    return;
+  }
+  if (url.pathname === "/jira-sign-out") {
+    send(200, "text/html", page("Jira", "<p>Signed out of Jira</p>"), { "set-cookie": "jira_session=; Path=/; Max-Age=0" });
+    return;
+  }
+  if (url.pathname === "/acme/my-issues") {
+    send(200, "text/html", LINEAR_HTML);
     return;
   }
   if (url.pathname === "/sign-in") {
@@ -266,6 +321,100 @@ state = await getState();
 const issuesFolder = liveFolders(state).find((folder) => folder.live.source.list === "assignedIssues");
 const emptyText = await waitForStatusLine(issuesFolder.id, "No issues assigned to you", 30000);
 check("an empty list says so", emptyText === "No issues assigned to you", String(emptyText));
+
+await dispatch({ type: "createGitHubLiveFolder", list: "notifications" });
+state = await waitForState((current) => liveFolders(current).some((folder) => folder.live.source.list === "notifications" && folder.childIds.length === 2), 20000);
+const notificationsFolder = liveFolders(state).find((folder) => folder.live.source.list === "notifications");
+check(
+  "a notifications folder takes the pull requests and issues, not the settings link",
+  notificationsFolder?.title === "Notifications" && JSON.stringify(childTitles(state, notificationsFolder)) === JSON.stringify(["Bump the version", "Crash on start"]),
+  `${notificationsFolder?.title}: ${notificationsFolder ? childTitles(state, notificationsFolder).join(", ") : "none"}`,
+);
+await dispatch({ type: "createGitHubLiveFolder", list: "createdIssues" });
+state = await waitForState((current) => liveFolders(current).some((folder) => folder.live.source.list === "createdIssues" && folder.childIds.length === 1), 20000);
+const createdFolder = liveFolders(state).find((folder) => folder.live.source.list === "createdIssues");
+check("an issues-you-opened folder takes your issues", createdFolder !== undefined && JSON.stringify(childTitles(state, createdFolder)) === JSON.stringify(["Dark mode flickers"]), createdFolder ? childTitles(state, createdFolder).join(", ") : "none");
+
+// ---------- Issues from This Page ----------
+
+const issueFolders = (current) => liveFolders(current).filter((folder) => folder.live.source.kind === "issues");
+await dispatch({ type: "openTab", typedText: `${origin}/jira-sign-in` });
+await sidebar.waitForTimeout(800);
+await dispatch({ type: "openTab", typedText: `${origin}/jira/filter` });
+await sidebar.waitForTimeout(1500);
+await dispatch({ type: "createIssuesLiveFolder" });
+state = await waitForState((current) => issueFolders(current).some((folder) => folder.childIds.length === 2), 20000);
+const jiraFolder = issueFolders(state)[0];
+check(
+  "Issues from This Page on a Jira filter makes a folder of its issues, named by key and title",
+  jiraFolder?.title === "Team filter" && jiraFolder.live.source.issueKind === "jira" && jiraFolder.live.source.url === `${origin}/jira/filter` &&
+    JSON.stringify(childTitles(state, jiraFolder)) === JSON.stringify(["WEB-1 Fix the login page", "WEB-2 Speed up search"]),
+  jiraFolder ? `${jiraFolder.title} ${JSON.stringify(jiraFolder.live.source)}: ${childTitles(state, jiraFolder).join(", ")}` : "none",
+);
+check("each issue opens the issue itself", jiraFolder !== undefined && state.items[jiraFolder.childIds[0]].homeUrl === `${origin}/browse/WEB-1`);
+
+await dispatch({ type: "openTab", typedText: `${origin}/jira-sign-out` });
+await sidebar.waitForTimeout(800);
+jiraIssues = [{ key: "WEB-3", title: "Write the docs" }, ...jiraIssues];
+await dispatch({ type: "refreshLiveFolder", folderId: jiraFolder.id });
+const jiraSignInText = await waitForStatusLine(jiraFolder.id, "Sign in to see these issues", 20000);
+check("signed out, the issues folder asks to sign in and keeps its issues", jiraSignInText === "Sign in to see these issues" && (await getState()).items[jiraFolder.id].childIds.length === 2, String(jiraSignInText));
+// Another address than the first visit: opening an address already open switches to its tab, loading nothing.
+await dispatch({ type: "openTab", typedText: `${origin}/jira-sign-in?visit=2` });
+state = await waitForState((current) => (current.items[jiraFolder.id]?.childIds.length ?? 0) === 3, 20000);
+check("visiting the site signed in refills it", childTitles(state, state.items[jiraFolder.id])[0] === "WEB-3 Write the docs", childTitles(state, state.items[jiraFolder.id]).join(", "));
+
+await dispatch({ type: "openTab", typedText: `${origin}/acme/my-issues` });
+await sidebar.waitForTimeout(1500);
+await dispatch({ type: "createIssuesLiveFolder" });
+state = await waitForState((current) => issueFolders(current).some((folder) => folder.live.source.issueKind === "linear" && folder.childIds.length === 1), 20000);
+const linearFolder = issueFolders(state).find((folder) => folder.live.source.issueKind === "linear");
+check("Issues from This Page on a Linear list takes its issues, not its projects", linearFolder !== undefined && JSON.stringify(childTitles(state, linearFolder)) === JSON.stringify(["ENG-7 Fix the sync"]), linearFolder ? childTitles(state, linearFolder).join(", ") : "none");
+
+await dispatch({ type: "selectTab", tabId: "tab-plain" });
+await sidebar.waitForTimeout(800);
+const issueFoldersBefore = issueFolders(await getState()).length;
+await dispatch({ type: "createIssuesLiveFolder" });
+await sidebar.waitForTimeout(800);
+const issueMessages = await app.evaluate(() => globalThis.shownMessages);
+check("Issues from This Page on a page without issues says so and makes nothing", issueMessages.includes("This page lists no issues") && issueFolders(await getState()).length === issueFoldersBefore, issueMessages.join(" | "));
+
+// ---------- Ready-made feeds: Hacker News and a subreddit, answered locally ----------
+
+await app.evaluate(({ session, net }) => {
+  const fakeFeed = (title) =>
+    `<?xml version="1.0"?><rss version="2.0"><channel><title>${title}</title><item><title>${title} story</title><link>https://example.com/${encodeURIComponent(title)}</link></item></channel></rss>`;
+  session.fromPartition("persist:profile-default").protocol.handle("https", (request) => {
+    const url = new URL(request.url);
+    if (url.hostname === "news.ycombinator.com") {
+      return new Response(fakeFeed("Hacker News"), { headers: { "content-type": "application/rss+xml" } });
+    }
+    if (url.hostname === "www.reddit.com" && url.pathname.endsWith("/.rss")) {
+      return new Response(fakeFeed("Reddit"), { headers: { "content-type": "application/rss+xml" } });
+    }
+    if (url.hostname === "www.reddit.com") {
+      return new Response("<!doctype html><title>A subreddit</title><p>No feed link here</p>", { headers: { "content-type": "text/html" } });
+    }
+    return net.fetch(request, { bypassCustomProtocolHandlers: true });
+  });
+});
+await dispatch({ type: "createPresetFeedLiveFolder", preset: "hackerNews" });
+state = await waitForState((current) => liveFolders(current).some((folder) => folder.title === "Hacker News" && folder.childIds.length === 1), 20000);
+const hackerNewsFolder = liveFolders(state).find((folder) => folder.title === "Hacker News");
+check("New Live Folder › Hacker News reads its front page feed", hackerNewsFolder?.live.source.url === "https://news.ycombinator.com/rss" && childTitles(state, hackerNewsFolder)[0] === "Hacker News story", JSON.stringify(hackerNewsFolder?.live.source));
+
+await dispatch({ type: "openTab", typedText: "https://www.reddit.com/r/bowtesting/top/" });
+await sidebar.waitForTimeout(1500);
+await dispatch({ type: "createFeedLiveFolder" });
+state = await waitForState((current) => liveFolders(current).some((folder) => folder.title === "r/bowtesting" && folder.childIds.length === 1), 20000);
+const subredditFolder = liveFolders(state).find((folder) => folder.title === "r/bowtesting");
+check("Feed from This Page on a subreddit uses its feed, though the page names none", subredditFolder?.live.source.url === "https://www.reddit.com/r/bowtesting/.rss", JSON.stringify(subredditFolder?.live.source));
+
+const foldersBeforeUnknown = liveFolders(await getState()).length;
+await dispatch({ type: "createPresetFeedLiveFolder", preset: "notAPreset" });
+await sidebar.waitForTimeout(500);
+check("an unknown ready-made feed is refused", liveFolders(await getState()).length === foldersBeforeUnknown);
+await app.evaluate(({ session }) => session.fromPartition("persist:profile-default").protocol.unhandle("https"));
 
 await sidebar.screenshot({ path: path.join(outDir, "live-folders-sidebar.png") });
 const archiveBefore = (await getState()).archive.length;

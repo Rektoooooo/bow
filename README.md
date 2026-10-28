@@ -117,11 +117,13 @@ source never updates itself.
 - Rest the pointer on a closed folder to see its tabs beside it, newest first ("1 minute ago"), with a search field,
   like Arc; click one to open it.
 - Pinned tabs show tidy titles ("Inbox" rather than "(3) Inbox - Mail"), our own rules (Library › Settings).
-- **Live folders** (+ › New Live Folder) fill themselves, like Arc's: your open GitHub pull requests, review requests
-  or assigned issues (read from github.com with the Space's own GitHub sign-in: no token, private repositories
-  included), or the posts of the page's RSS/Atom feed. They refresh every 10 minutes; new items get a dot, items
-  you remove stay hidden (folder menu › Show Removed Items), the page you are reading never disappears. An Arc
-  import keeps Arc's GitHub live folder live.
+- **Live folders** (+ › New Live Folder) fill themselves, like Arc's: your open GitHub pull requests, review
+  requests, assigned issues, issues you opened or notifications (read from github.com with the Space's own GitHub
+  sign-in: no token, private repositories included); the issues of the Jira filter or Linear list on screen (Issues
+  from This Page, read the same way with your sign-in there); the posts of the page's RSS/Atom feed (a subreddit
+  works too), or Hacker News in one click. They refresh every 10 minutes; a folder that needs you to sign in says so
+  and refills once you visit the site; new items get a dot, items you remove stay hidden (folder menu › Show
+  Removed Items), the page you are reading never disappears. An Arc import keeps Arc's GitHub live folder live.
 - Like Arc, the frame is darker while the window is active and lighter grey in the background (measured on the
   real screen against the user's Arc).
 - The look is measured from Arc pixel by pixel (`node e2e/arc-compare.mjs` puts them side by side): Apple's SF
