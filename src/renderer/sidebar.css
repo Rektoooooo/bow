@@ -1642,6 +1642,29 @@ body.sidebar-hidden.library-open .main-column {
   transform: scale(0.85);
 }
 
+/* The link icon copies the address: its own small hover square, and the pill does not light up behind it. */
+.address-copy {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-left: -6px;
+  border-radius: 5px;
+  transition: background-color var(--motion-fast) linear;
+}
+
+.address-copy:hover {
+  background: var(--toolbar-hover);
+}
+
+.address-copy:hover .address-icon {
+  color: var(--toolbar-ink);
+}
+
+.address-pill:has(.address-copy:hover) {
+  background: none;
+}
+
 .address-text {
   min-width: 0;
   overflow: hidden;

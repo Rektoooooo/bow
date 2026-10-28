@@ -752,6 +752,15 @@ const toastGone = await app.evaluate(({ BrowserWindow }) => {
   return !win.contentView.children.some((child) => child.webContents?.getURL().endsWith("/status/status.html"));
 });
 check("and the toast goes away by itself", toastGone);
+// The link icon in the address pill copies the address too (the rest of the pill edits it).
+await app.evaluate(({ clipboard }) => clipboard.writeText("nothing yet"));
+await sidebar.click(".address-copy");
+await sidebar.waitForTimeout(400);
+const copiedByIcon = await app.evaluate(async ({ clipboard }) => await clipboard.readText());
+const toastAfterIcon = (await toastPage?.textContent("#status").catch(() => "")) ?? "";
+const commandBarOpened = await overlay.isVisible(".command-input").catch(() => false);
+check("clicking the address's link icon copies the address, with the toast, without opening the Command Bar", copiedByIcon === copiedTabUrl && toastAfterIcon.includes("Copied link") && !commandBarOpened, `${copiedByIcon} / ${toastAfterIcon} / command bar ${commandBarOpened}`);
+await sidebar.waitForTimeout(2200);
 await app.evaluate(({ clipboard }, text) => clipboard.writeText(text), clipboardTextBefore);
 
 // Live captures, like Arc's Easels: the capture remembers where it came from; put on an easel it is live, and its

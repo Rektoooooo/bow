@@ -44,7 +44,8 @@ function getDisplayAddress(url: string): string {
 
 /**
  * Builds the address pill: a link icon for https pages (Arc's), a globe otherwise, and the address (the whole of it
- * with "Show full URLs"). Clicking edits it.
+ * with "Show full URLs"). Clicking the icon copies the address (with the "Copied link" toast); clicking the rest
+ * edits it. Clicks go to the innermost element with an action (sidebarEvents.ts), so the icon keeps its own.
  */
 function createAddressPill(url: string | null, showsFullUrl: boolean): HTMLElement {
   const pill = document.createElement("button");
@@ -57,7 +58,17 @@ function createAddressPill(url: string | null, showsFullUrl: boolean): HTMLEleme
   pill.setAttribute("aria-label", url === null ? "Search or enter address" : `Edit address ${url}`);
 
   const isSecure = url !== null && url.startsWith("https://");
-  pill.append(createIcon(isSecure ? "link" : "globe", "icon address-icon"));
+  const icon = createIcon(isSecure ? "link" : "globe", "icon address-icon");
+  if (url === null) {
+    pill.append(icon);
+  } else {
+    const copyButton = createElement("span", "address-copy");
+    copyButton.dataset.action = "site-command";
+    copyButton.dataset.command = "copyLink";
+    copyButton.title = "Copy Address (⇧⌘C)";
+    copyButton.append(icon);
+    pill.append(copyButton);
+  }
   const shortAddress = url === null ? "" : getDisplayAddress(url);
   const address = url !== null && showsFullUrl ? getFullAddress(url) : shortAddress;
   const label = address === "" ? url ?? "Search or enter address" : address;
