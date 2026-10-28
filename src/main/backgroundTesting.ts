@@ -3,8 +3,8 @@
  *   `npm run e2e` drives the real app for many minutes. Its windows used to come to the front and take the keyboard
  *   and mouse, so nobody could use the Mac meanwhile, and their typing and clicks landed in the checks (the user,
  *   2026-10-28). With BOW_E2E_BACKGROUND=1 (set by e2e/background.mjs) the app stays out of the way: no Dock icon,
- *   windows never come forward or take the keyboard, they are invisible, and clicks pass through them. The checks
- *   drive the pages through Chromium's DevTools protocol, which needs none of that.
+ *   windows never come forward and can never take the keyboard, they are invisible, and clicks pass through them.
+ *   The checks drive the pages through Chromium's DevTools protocol, which needs none of that.
  *
  *   The app's own focus bookkeeping still runs: asking a window for the focus marks it focused (isFocused, the
  *   "focus" and "blur" events) without asking macOS, so which window is "in front" behaves as in normal use.
@@ -88,6 +88,9 @@ export function keepTestRunInBackground(): void {
   app.on("browser-window-created", (_event, window) => {
     window.setOpacity(0);
     window.setIgnoreMouseEvents(true);
+    // Never the key window: focusing a page or the overlay could otherwise make an invisible window take the
+    // keyboard, and the user's typing in another app would land in the checks (seen 2026-10-28).
+    window.setFocusable(false);
     window.on("closed", () => {
       if (pretendFocusedWindow === window) {
         pretendFocusedWindow = null;
