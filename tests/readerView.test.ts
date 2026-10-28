@@ -102,6 +102,13 @@ describe("Reader view titles", () => {
     expect(article?.blocks).toEqual([paragraph]);
   });
 
+  it("never take a heading that is the site's name (a logo) for the title", () => {
+    const logo = checkReaderArticle({ metaTitle: "The Paper | Paper boats", heading: "The Paper", siteName: "The Paper", blocks: [paragraph] }, PAGE_URL, "");
+    const aboutTheSite = checkReaderArticle({ metaTitle: "Wikipedia - Wikipedia", heading: "Wikipedia", blocks: [paragraph] }, "https://en.wikipedia.org/wiki/Wikipedia", "");
+    expect(logo?.title).toBe("The Paper | Paper boats");
+    expect(aboutTheSite?.title).toBe("Wikipedia");
+  });
+
   it("drop the first heading when it repeats the title, ignoring case and spaces, and keep a different one", () => {
     const repeated = checkReaderArticle(
       { metaTitle: "Web browser", blocks: [{ kind: "image", src: "https://cdn.news.example/lead.jpg", alt: "" }, { kind: "heading", level: 1, text: "Web  Browser" }, paragraph] },

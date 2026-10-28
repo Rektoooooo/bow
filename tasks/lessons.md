@@ -132,6 +132,9 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 - `check-extensions`' native messaging, `check-tab-sleep`'s renderer count and `check-performance`'s redraw time fail
   under concurrent e2e load and pass alone: run suites in a quiet window (no other session's e2e) before treating one
   of them as a regression.
+- A check that needs a real-looking host (a site's name in its address) can use a `.localhost` name: Chromium sends
+  `wikipedia.localhost` to this machine without DNS or `/etc/hosts`, so a local test server answers it
+  (check-overlay's Wikipedia-shaped Reader view page, 2026-10-28).
 
 - `permission-check` leaves macOS's screen-sharing picker open on purpose until it quits the app. If a run's quit
   hangs with the picker up, the next run can get "shared without asking" from that picker session (or from someone
@@ -161,6 +164,9 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   up with `pgrep -fl` in one call, kill it by number in the next.
 - Two macOS accounts; facts differ per account (Homebrew owner, Node location, gh accounts). Check `whoami` and the
   "This Mac" section of `CLAUDE.md` before installing anything.
+- `npm ci` in a fresh worktree (2026-10-28, npm 11 printing install-scripts warnings) left `node_modules/electron`
+  without its binary (no `dist/`, no `path.txt`), so no check could start the app. `node
+  node_modules/electron/install.js` fetches it from the download cache.
 
 - Background e2e runs must never make Bow the active app (the user, 2026-10-28: "every time I type it tabs into
   the test window"). Patching show()/focus() is not enough: `webContents.focus()` focuses the window natively on

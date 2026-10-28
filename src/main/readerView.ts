@@ -266,12 +266,14 @@ function isHeadingWithMore(title: string, heading: string): boolean {
 
 /**
  * The title Reader view shows: the page's og:title, else its heading, else its title; the page's own heading when
- * the title is that heading with more after it, else without the site's name at its end.
+ * the title is that heading with more after it (unless the heading is the site's name, like a logo's), else without
+ * the site's name at its end.
  * Example: ("Web browser - Wikipedia", "Web browser", …) → "Web browser"
  */
 function chooseTitle(metaTitle: string, heading: string, pageTitle: string, siteName: string, host: string): string {
   const title = metaTitle || heading || pageTitle;
-  if (heading !== "" && isHeadingWithMore(title, heading)) {
+  const isArticleHeading = heading !== "" && !namesSite(heading, siteName, host);
+  if (isArticleHeading && isHeadingWithMore(title, heading)) {
     return heading;
   }
   return removeSiteName(title, siteName, host);
