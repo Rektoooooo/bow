@@ -158,8 +158,11 @@ export function openLittleWindow(url: string | null, options: LittleWindowOption
     minHeight: LITTLE_MIN_HEIGHT_PX,
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 14, y: 13 },
+    // Shown just below: a window made showing comes forward before anything can act on it (backgroundTesting.ts).
+    show: false,
     webPreferences: { preload: preloadPath, sandbox: true, contextIsolation: true, nodeIntegration: false },
   });
+  window.show();
   window.webContents.on("will-navigate", (event) => event.preventDefault());
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 

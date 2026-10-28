@@ -2,7 +2,8 @@
 // - a website in a tab runs in a profile partition, gets nothing it was not allowed, and asks with a prompt;
 // - Block is remembered (no second prompt), Reset forgets it, Allow grants it, Escape refuses once and saves nothing;
 // - our own pages are refused without a prompt and cannot be navigated away;
-// - screen sharing goes to macOS's sharing picker for sites (it shows on screen until the app quits), never for ours.
+// - screen sharing goes to macOS's sharing picker for sites (it shows on screen until the app quits; a background run
+//   uses a stand-in that waits the same way: main/backgroundTesting.ts), never for ours.
 // Uses notifications: camera and microphone requests can wait on a macOS system dialog, which a test cannot answer.
 // usage: npm run build && node e2e/permission-check.mjs
 import "./background.mjs";
@@ -157,7 +158,8 @@ await page.evaluate(() => {
 await sleep(1500);
 check("the sidebar page cannot be navigated away", page.url() === sidebarUrlBefore);
 
-// Screen sharing: a site's request opens macOS's sharing picker (the promise waits for the user's choice there);
+// Screen sharing: a site's request opens macOS's sharing picker (the promise waits for the user's choice there; in a
+// background run a stand-in that waits the same way, so the system's picker never takes the keyboard);
 // our own pages are refused. The picker shows on screen until the app quits just below.
 const shareScript = `new Promise((resolve) => {
   const timer = setTimeout(() => resolve("waiting for the picker"), 2500);
