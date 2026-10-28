@@ -18,6 +18,10 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   reworded before a push. Write "three of the user's titles", never the titles.
 
 ## Testing
+- Check that what should be seen is visible, not only where it is: a picture-in-picture video passed "fixed and
+  filling the window" while a broader selector had made it `visibility: hidden` (2026-10-28; the test tone has no
+  picture, so nothing else could notice). In injected style sheets full of `!important`, specificity decides: write the
+  winning rule's selector so it is more specific than the rule it must beat.
 - Synthetic drag events (and Playwright's) prove nothing about a real macOS drag: our HTML drag and drop passed every
   test while the user could not pick a tab up at all (2026-10-27). Sidebar items now move with pointer events, which
   Playwright's mouse drives for real; keep it that way.
