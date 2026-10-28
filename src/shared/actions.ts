@@ -42,6 +42,8 @@ export type SidebarCommand =
   | { kind: "dropItemFromOtherWindow"; itemId: ItemId; clientX: number; clientY: number }
   | { kind: "beginRename"; itemId: ItemId }
   | { kind: "beginSpaceRename"; spaceId: SpaceId }
+  /** The tab or folder menu's "Add Note…" / "Edit Note…": the note field opens under the row's title. */
+  | { kind: "beginItemNote"; itemId: ItemId }
   | { kind: "beginSpaceIconEdit"; spaceId: SpaceId }
   /** Notes and Easels another Mac changed (syncController.ts): an editor showing one reads it again. */
   | { kind: "reloadFiles"; noteIds: string[]; easelIds: string[] };
@@ -104,6 +106,8 @@ export type BrowserAction =
   | { type: "setHttpsOnly"; isOn: boolean }
   /** Forget Site Data on Quit for a profile (Space menu › Profile, Library › Privacy). */
   | { type: "setForgetSiteDataOnQuit"; profileId: ProfileId; isOn: boolean }
+  /** A tab's or folder's note (empty removes it). */
+  | { type: "setItemNote"; itemId: ItemId; note: string }
   | { type: "setSidebarWidth"; width: number; isFinal: boolean }
   | { type: "setSpaceProfile"; spaceId: SpaceId; profileId: string }
   | { type: "createProfileForSpace"; spaceId: SpaceId }
@@ -266,6 +270,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setGlobalShortcut",
   "setHttpsOnly",
   "setForgetSiteDataOnQuit",
+  "setItemNote",
   "setSidebarWidth",
   "setSpaceProfile",
   "createProfileForSpace",

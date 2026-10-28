@@ -25,6 +25,7 @@ import { isDeveloperModeOn } from "../shared/developerMode.js";
 import { tidyTitle } from "../shared/tidyTitles.js";
 import { isNoteUrl } from "../shared/notes.js";
 import { isEaselUrl } from "../shared/easels.js";
+import { ITEM_NOTE_MAX_LENGTH } from "../shared/settings.js";
 
 /** Everything a row needs to know to draw itself. */
 export interface RowContext {
@@ -35,6 +36,9 @@ export interface RowContext {
   renamingItemId: ItemId | null;
   /** Called when an inline rename ends (saved or cancelled), so sidebar.ts can redraw without the input. */
   onRenameFinished: () => void;
+  /** The tab or folder whose note is being written inline, or null; and when that ends. */
+  notingItemId: ItemId | null;
+  onNoteFinished: () => void;
 }
 
 /** Bars in a Favorite's equaliser (sound playing in the background). Our choice. */
@@ -62,6 +66,71 @@ export function getTabDisplayName(tab: TabItem): string {
  */
 function hasLeftHome(tab: TabItem): boolean {
   return tab.homeUrl !== null && tab.url !== tab.homeUrl;
+}
+
+/**
+ * Builds the inline note field, in the line under the title. Enter or leaving the field saves (an empty note removes
+ * it), Escape cancels.
+ */
+function createNoteInput(itemId: ItemId, currentNote: string, context: RowContext): HTMLInputElement {
+  const input = document.createElement("input");
+  input.className = "note-input";
+  input.value = currentNote;
+  input.maxLength = ITEM_NOTE_MAX_LENGTH;
+  input.placeholder = "Add a note";
+  input.setAttribute("aria-label", "Note");
+  let isFinished = false;
+  const finish = (shouldSave: boolean): void => {
+    if (isFinished) {
+      return;
+    }
+    isFinished = true;
+    if (shouldSave) {
+      dispatch({ type: "setItemNote", itemId: itemId, note: input.value });
+    }
+    context.onNoteFinished();
+  };
+  input.addEventListener("keydown", (event) => {
+    event.stopPropagation();
+    if (event.key === "Enter") {
+      finish(true);
+    }
+    if (event.key === "Escape") {
+      finish(false);
+    }
+  });
+  input.addEventListener("blur", () => finish(true));
+  input.addEventListener("click", (event) => event.stopPropagation());
+  requestAnimationFrame(() => {
+    if (input.isConnected) {
+      input.focus();
+    }
+  });
+  return input;
+}
+
+/**
+ * The line under a row's title: the note field while writing, else the note (and the host in Developer Mode, before
+ * it). Null when there is nothing to show.
+ */
+function createSubtitle(itemId: ItemId, note: string | undefined, host: string | null, context: RowContext): HTMLElement | null {
+  if (context.notingItemId === itemId) {
+    const line = createElement("span", "row-subtitle row-note");
+    line.append(createNoteInput(itemId, note ?? "", context));
+    return line;
+  }
+  const parts: string[] = [];
+  if (host !== null) {
+    parts.push(host);
+  }
+  if (note !== undefined) {
+    parts.push(note);
+  }
+  if (parts.length === 0) {
+    return null;
+  }
+  const line = createElement("span", note === undefined ? "row-subtitle" : "row-subtitle row-note", parts.join(" · "));
+  return line;
 }
 
 /**
@@ -210,14 +279,14 @@ function describeTabRowInputs(tab: TabItem, location: ItemLocation, index: numbe
 }
 
 /**
- * One tab row: built, or a placeholder when nothing it shows changed since the last redraw. A row being renamed is
- * always built (its field holds what the user types).
+ * One tab row: built, or a placeholder when nothing it shows changed since the last redraw. A row being renamed or
+ * noted is always built (its field holds what the user types).
  */
 export function renderTabRow(tab: TabItem, location: ItemLocation, index: number, depth: number, context: RowContext): HTMLElement {
-  const isRenaming = context.renamingItemId === tab.id;
+  const isEditing = context.renamingItemId === tab.id || context.notingItemId === tab.id;
   const inputs = describeTabRowInputs(tab, location, index, depth, context);
   const build = (): HTMLElement => buildTabRow(tab, location, index, depth, context, inputs.key);
-  if (isRenaming) {
+  if (isEditing) {
     return build();
   }
   currentTabRowInputs.set(inputs.key, inputs.text);
@@ -259,12 +328,17 @@ function buildTabRow(tab: TabItem, location: ItemLocation, index: number, depth:
   // A site in Developer Mode: Arc outlines its tabs in dashed yellow and puts the host under the title (shot 5).
   const isDeveloper = isDeveloperModeOn(context.state, tab.url);
   row.classList.toggle("is-developer", isDeveloper);
-  if (isDeveloper) {
+  // A line under the title: the note (and the host in Developer Mode), or the note field while writing it.
+  const subtitle = createSubtitle(tab.id, tab.note, isDeveloper ? getDisplayHost(tab.url) : null, context);
+  if (subtitle !== null) {
     const textStack = createElement("span", "row-text-stack");
-    textStack.append(createTabTitle(tab, context, !isToday), createElement("span", "row-subtitle", getDisplayHost(tab.url)));
+    textStack.append(createTabTitle(tab, context, !isToday), subtitle);
     row.append(textStack);
   } else {
     row.append(createTabTitle(tab, context, !isToday));
+  }
+  if (tab.note !== undefined) {
+    row.title = `${tab.url}\n${tab.note}`;
   }
   if (tab.isUnread === true && !isSelected) {
     const unreadDot = createElement("span", "unread-dot");
@@ -453,7 +527,15 @@ export function renderFolderRows(folder: FolderItem, location: ItemLocation, ind
   } else {
     title.textContent = folder.title;
   }
-  row.append(title);
+  const folderSubtitle = createSubtitle(folder.id, folder.note, null, context);
+  if (folderSubtitle !== null) {
+    const textStack = createElement("span", "row-text-stack");
+    textStack.append(title, folderSubtitle);
+    row.append(textStack);
+    row.title = folder.note ?? "";
+  } else {
+    row.append(title);
+  }
   const unreadCount = live === undefined ? 0 : countUnreadChildren(folder, context);
   if (unreadCount > 0) {
     const badge = createElement("span", "live-unread-count", String(unreadCount));

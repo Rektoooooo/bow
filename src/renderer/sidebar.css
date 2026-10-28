@@ -940,6 +940,25 @@ button:disabled {
   font-size: 11px;
 }
 
+/* A note the user wrote on a tab or folder, under its title; the field that writes it sits in the same line. */
+.row-note {
+  font-style: italic;
+}
+
+.note-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-style: normal;
+  outline: none;
+  user-select: text;
+}
+
 .away-slash {
   color: var(--faint);
 }

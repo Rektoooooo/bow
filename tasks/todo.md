@@ -324,7 +324,9 @@ M about a day, L several days.
       HTTPS-Only Mode with "Open with HTTP" only for loads Bow upgraded; Forget Site Data on Quit per profile (a
       Space's profile, from the Space menu), cleared at quit and again at start, extensions' storage kept)
       Privacy report (trackers blocked per site and week), HTTPS-only mode, per-Space "forget cookies on quit" (M)
-- [ ] 18. Tab notes: attach a Note to a tab or folder (S)
+- [x] 18. (Add Note… / Edit Note… in a tab's or folder's menu: a short note written in place, shown in italics under
+      the title, in backups and sync with the item)
+      Tab notes: attach a Note to a tab or folder (S)
 - [ ] 19. Shortcut editor (M)
 
 ### 4.4 Trust and polish

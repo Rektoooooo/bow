@@ -16,7 +16,7 @@
  *
  * Same rules as state.ts: never change what is passed in; `now` is a parameter.
  */
-import { ARCHIVE_LIMIT, BEFORE_RESTORE_SNAPSHOTS_KEPT, DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_LIMIT, GLOBAL_SHORTCUT_CHOICES, READER_TEXT_SIZES, SNAPSHOTS_DAILY_KEPT, SNAPSHOTS_HOURLY_KEPT, SPLIT_PANES_LIMIT } from "../shared/settings";
+import { ARCHIVE_LIMIT, BEFORE_RESTORE_SNAPSHOTS_KEPT, DEFAULT_ARCHIVE_AFTER_MS, DEFAULT_PROFILE_ID, FAVORITES_LIMIT, GLOBAL_SHORTCUT_CHOICES, ITEM_NOTE_MAX_LENGTH, READER_TEXT_SIZES, SNAPSHOTS_DAILY_KEPT, SNAPSHOTS_HOURLY_KEPT, SPLIT_PANES_LIMIT } from "../shared/settings";
 import { isSearchEngineId, SEARCH_ENGINE_IDS } from "../shared/searchEngines";
 import { isValidSearchKeyword } from "../shared/searchKeywords";
 import { createNoteUrl, getNoteId, isNoteId } from "../shared/notes";
@@ -250,6 +250,10 @@ function checkTab(raw: unknown, expectedId: string | null): TabItem | null {
   if (raw.isNeverArchived === true) {
     tab.isNeverArchived = true;
   }
+  const note = readNote(raw.note);
+  if (note !== null) {
+    tab.note = note;
+  }
   return tab;
 }
 
@@ -299,6 +303,10 @@ function checkItem(key: string, raw: unknown): SidebarItem | null {
     const live = checkLiveFolder(raw.live);
     if (live !== undefined) {
       folder.live = live;
+    }
+    const note = readNote(raw.note);
+    if (note !== null) {
+      folder.note = note;
     }
     return folder;
   }
@@ -532,6 +540,14 @@ function checkSitePermissions(raw: unknown, profileIds: Set<ProfileId>, counter:
     permissions.push({ profileId: entry.profileId as string, origin: (entry.origin as string).slice(0, MAX_TEXT_LENGTH), kind: entry.kind as SitePermission["kind"], isAllowed: entry.isAllowed });
   }
   return permissions;
+}
+
+/**
+ * A tab's or folder's note: non-empty text, cut to ITEM_NOTE_MAX_LENGTH; null otherwise.
+ */
+function readNote(value: unknown): string | null {
+  const note = typeof value === "string" ? value.trim().slice(0, ITEM_NOTE_MAX_LENGTH) : "";
+  return note === "" ? null : note;
 }
 
 /**

@@ -574,6 +574,31 @@ await app.evaluate(({ Menu }) => {
   Menu.prototype.popup = globalThis.originalPopup;
 });
 
+// A note on a tab (its menu's Add Note…, which asks the sidebar to open the field): typed and saved with Enter, shown
+// under the title; emptied, it goes.
+state = await getState(page);
+const notedTabId = activeSpace(state).todayIds[0];
+const beginNote = () =>
+  app.evaluate(({ BrowserWindow }, itemId) => {
+    const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+    win.webContents.send("browser:sidebar-command", { kind: "beginItemNote", itemId: itemId });
+  }, notedTabId);
+await beginNote();
+await page.waitForSelector(".note-input", { timeout: 5000 }).catch(() => undefined);
+await page.fill(".note-input", "Read before Friday");
+await page.press(".note-input", "Enter");
+await page.waitForTimeout(400);
+state = await getState(page);
+const noteLine = await page.textContent(`.tab-row[data-key$=":${notedTabId}"] .row-note`).catch(() => null);
+check("a tab's note is written in place and shown under its title", state.items[notedTabId]?.note === "Read before Friday" && noteLine === "Read before Friday", `${state.items[notedTabId]?.note} / ${noteLine}`);
+await beginNote();
+await page.waitForSelector(".note-input", { timeout: 5000 }).catch(() => undefined);
+await page.fill(".note-input", "");
+await page.press(".note-input", "Enter");
+await page.waitForTimeout(400);
+state = await getState(page);
+check("emptying the note removes it", state.items[notedTabId]?.note === undefined && (await page.$(`.tab-row[data-key$=":${notedTabId}"] .row-note`)) === null);
+
 // A site without /favicon.ico answers 404; Chromium logs that as a console error, but it is expected, not a bug.
 const realErrors = consoleErrors.filter((message) => !message.startsWith("Failed to load resource"));
 check("no errors in the sidebar console", realErrors.length === 0, realErrors.join(" | "));

@@ -372,6 +372,8 @@ function buildTabMenu(host: MenuHost, tab: TabItem): MenuItemConstructorOptions[
   const muteLabel = tab.isMuted ? "Unmute Tab" : "Mute Tab";
   const template: MenuItemConstructorOptions[] = [
     { label: "Rename…", click: () => host.sendSidebarCommand({ kind: "beginRename", itemId: tab.id }), enabled: !isFavorite },
+    // A Favorite is a tile without text: its note would not show.
+    { label: tab.note === undefined ? "Add Note…" : "Edit Note…", click: () => host.sendSidebarCommand({ kind: "beginItemNote", itemId: tab.id }), enabled: !isFavorite },
     { label: "Copy Link", click: () => clipboard.writeText(tab.url) },
     { label: "Duplicate", click: () => host.runAction({ type: "duplicateTab", tabId: tab.id }) },
     { type: "separator" },
@@ -397,6 +399,7 @@ function buildFolderMenu(host: MenuHost, folder: FolderItem): MenuItemConstructo
   const folderId = folder.id;
   const template: MenuItemConstructorOptions[] = [
     { label: "Rename…", click: () => host.sendSidebarCommand({ kind: "beginRename", itemId: folderId }) },
+    { label: folder.note === undefined ? "Add Note…" : "Edit Note…", click: () => host.sendSidebarCommand({ kind: "beginItemNote", itemId: folderId }) },
     { label: folder.isOpen ? "Collapse Folder" : "Expand Folder", click: () => host.runAction({ type: "toggleFolder", folderId: folderId }) },
     buildMoveToSpaceMenu(host, folderId),
   ];

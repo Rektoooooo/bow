@@ -120,6 +120,7 @@ import {
   setGlobalShortcut,
   setHttpsOnly,
   setProfileForgetsSiteData,
+  setItemNote,
   setCompactMode,
   isCompactMode,
   setSidebarWidth,
@@ -496,6 +497,8 @@ export function runAction(action: BrowserAction): void {
       return runSiteCommand(action.command);
     case "setHttpsOnly":
       return applyChange((state) => setHttpsOnly(state, action.isOn));
+    case "setItemNote":
+      return applyChange((state) => setItemNote(state, action.itemId, action.note));
     case "setForgetSiteDataOnQuit":
       return applyChange((state) => setProfileForgetsSiteData(state, action.profileId, action.isOn));
     case "setAdBlock":

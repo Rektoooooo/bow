@@ -218,6 +218,21 @@ describe("backups", () => {
     expect(crafted.state.settings.readerTextSize).toBeUndefined();
   });
 
+  it("keep notes on tabs and folders, cut to their length", () => {
+    const text = craftedBackupText((backup) => {
+      const space = backup.state.spaces[0];
+      const tabId = space?.todayIds[0] as ItemId;
+      const folderId = space?.pinnedIds.find((itemId) => backup.state.items[itemId]?.kind === "folder") as ItemId;
+      backup.state.items[tabId] = { ...(backup.state.items[tabId] as TabItem), note: "Read later" };
+      backup.state.items[folderId] = { ...(backup.state.items[folderId] as FolderItem), note: "x".repeat(900) };
+    });
+    const restored = parseOrFail(text);
+    const space = restored.state.spaces[0];
+    const folder = Object.values(restored.state.items).find((item): item is FolderItem => item.kind === "folder");
+    expect((restored.state.items[space?.todayIds[0] as ItemId] as TabItem).note).toBe("Read later");
+    expect(folder?.note?.length).toBe(500);
+  });
+
   it("keep a profile's Forget Site Data on Quit", () => {
     const setup = buildSetup().state;
     const profiles = setup.profiles.map((profile) => ({ ...profile, forgetsSiteDataOnQuit: true }));

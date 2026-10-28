@@ -46,6 +46,9 @@ export const READER_DEFAULT_TEXT_SIZE = 19;
 /** How long the "no secure version · Open with HTTP" offer stays. Our choice: time to read and decide. */
 export const HTTPS_FALLBACK_NOTICE_MS = 30 * 1000;
 
+/** Longest note on a tab or folder. Our choice: a sentence or two, shown on one line under the title. */
+export const ITEM_NOTE_MAX_LENGTH = 500;
+
 /** Most Space templates kept. Our choice. */
 export const SPACE_TEMPLATES_LIMIT = 30;
 

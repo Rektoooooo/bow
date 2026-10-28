@@ -114,6 +114,8 @@ source never updates itself.
   edge slides the sidebar in, its top edge the toolbar. **Focus Mode** (⇧⌘F) shows only the page, filling the
   window, until ⇧⌘F again. Each window has its own.
 - A dot on a Pinned tab or Favorite whose page changed while you were elsewhere (a new mail count), like Arc.
+- **Notes on tabs and folders** (their menu › Add Note…): a line of your own under the title, such as "Read before
+  Friday", written in place; the whole note shows when you rest the pointer on the row.
 - A small player for a tab playing sound in the background.
 - Rest the pointer on a tab for Arc's tooltip (its title; "Double-click to rename" on the selected tab); ⌃Tab shows
   the recently used tabs as cards with pictures.

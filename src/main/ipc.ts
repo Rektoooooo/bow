@@ -27,7 +27,7 @@ import type { WebContents } from "electron";
 import type { BrowserAction } from "../shared/actions";
 import { BROWSER_ACTION_TYPES } from "../shared/actions";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
-import { ARCHIVE_THRESHOLD_OPTIONS, GLOBAL_SHORTCUT_CHOICES, READER_TEXT_SIZES, SPLIT_PANES_LIMIT, TAB_SLEEP_OPTIONS } from "../shared/settings";
+import { ARCHIVE_THRESHOLD_OPTIONS, GLOBAL_SHORTCUT_CHOICES, ITEM_NOTE_MAX_LENGTH, READER_TEXT_SIZES, SPLIT_PANES_LIMIT, TAB_SLEEP_OPTIONS } from "../shared/settings";
 import { isValidKeywordUrl, MAX_KEYWORD_NAME_LENGTH, SEARCH_KEYWORD_PATTERN } from "../shared/searchKeywords";
 import { isSearchEngineId } from "../shared/searchEngines";
 import type { BrowserState, GitHubLiveList, ReaderArticle, RuntimeState } from "../shared/types";
@@ -180,6 +180,11 @@ function isGlobalShortcut(value: unknown): boolean {
 
 function isGlobalShortcutTarget(value: unknown): boolean {
   return value === "commandBar" || value === "littleWindow";
+}
+
+/** A tab's or folder's note: text up to ITEM_NOTE_MAX_LENGTH (an empty note removes it). */
+function isItemNote(value: unknown): boolean {
+  return typeof value === "string" && value.length <= ITEM_NOTE_MAX_LENGTH;
 }
 
 /** One of Reader view's text sizes. */
@@ -420,6 +425,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   setAdBlock: { isOn: isBoolean },
   setHttpsOnly: { isOn: isBoolean },
   setForgetSiteDataOnQuit: { profileId: isText, isOn: isBoolean },
+  setItemNote: { itemId: isText, note: isItemNote },
   setAdBlockForSite: { site: isSite, isOn: isBoolean },
   setAppIcon: { variantId: isAppIconVariant },
   showTabTooltip: { title: isText, showsRenameHint: isBoolean, frame: isAnchor },

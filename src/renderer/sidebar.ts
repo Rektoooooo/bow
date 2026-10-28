@@ -82,6 +82,9 @@ let reportedEditorTabId: ItemId | null = null;
 
 /** The sidebar item, Space name or Space icon being edited inline, or null. */
 let renamingItemId: ItemId | null = null;
+
+/** The tab or folder whose note is being written inline, or null. */
+let notingItemId: ItemId | null = null;
 let renamingSpaceId: SpaceId | null = null;
 
 /** True while a row is being dragged: redraws wait until the drop, so the dragged row is not replaced mid-drag. */
@@ -137,6 +140,11 @@ function createRowContext(state: BrowserState): RowContext {
     renamingItemId: renamingItemId,
     onRenameFinished: () => {
       renamingItemId = null;
+      renderAll();
+    },
+    notingItemId: notingItemId,
+    onNoteFinished: () => {
+      notingItemId = null;
       renderAll();
     },
   };
@@ -811,6 +819,9 @@ function handleSidebarCommand(command: SidebarCommand): void {
   }
   if (command.kind === "beginRename") {
     renamingItemId = command.itemId;
+  }
+  if (command.kind === "beginItemNote") {
+    notingItemId = command.itemId;
   }
   if (command.kind === "beginSpaceRename") {
     renamingSpaceId = command.spaceId;

@@ -12,6 +12,7 @@ import {
   createInitialState,
   setGlobalShortcut,
   setProfileForgetsSiteData,
+  setItemNote,
   deleteItem,
   duplicateTab,
   findNeighbourTabId,
@@ -587,3 +588,15 @@ describe("forgetting a profile's site data on quit", () => {
   });
 });
 
+
+describe("notes on tabs and folders", () => {
+  it("are set trimmed, removed when empty, and never on a split view", () => {
+    const { state, tabIds } = openTabs(["https://docs.example/"]);
+    const tabId = tabIds[0] as ItemId;
+    const noted = setItemNote(state, tabId, "  Read before Friday  ");
+    expect(noted.items[tabId]).toMatchObject({ note: "Read before Friday" });
+    expect(setItemNote(noted, tabId, "Read before Friday")).toBe(noted);
+    expect((setItemNote(noted, tabId, "   ").items[tabId] as TabItem).note).toBeUndefined();
+    expect(setItemNote(state, "tab-missing", "x")).toBe(state);
+  });
+});

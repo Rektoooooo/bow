@@ -58,6 +58,8 @@ export interface TabItem {
    * deleting it still does. Optional: missing means it archives like the others.
    */
   isNeverArchived?: boolean;
+  /** A short note the user wrote on the tab (shown under its title). Optional: missing means none. */
+  note?: string;
 }
 
 /** A folder in the Pinned section. Folders can hold tabs, split views and other folders. */
@@ -74,6 +76,8 @@ export interface FolderItem {
    * have none, and files saved before live folders existed still load without an upgrade step.
    */
   live?: LiveFolderData;
+  /** A short note the user wrote on the folder (shown under its name). Optional: missing means none. */
+  note?: string;
 }
 
 /** The GitHub lists a live folder can show: the signed-in user's lists on github.com/pulls and github.com/issues. */
