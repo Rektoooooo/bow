@@ -196,6 +196,14 @@ export interface SpaceTemplate {
   archiveAfterMs?: number | null;
 }
 
+/** Library › Privacy's numbers (main/privacyReport.ts): the last 7 days, oldest first. */
+export interface PrivacySummary {
+  total: number;
+  byDay: { day: string; count: number }[];
+  topSites: { name: string; count: number }[];
+  topTrackers: { name: string; count: number }[];
+}
+
 /** One block of an article in Reader view (main/readerView.ts), in reading order. Plain text only. */
 export type ReaderBlock =
   | { kind: "heading"; level: number; text: string }

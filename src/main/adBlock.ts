@@ -10,7 +10,8 @@
  *   BrowserState.settings.isAdBlockOn and BrowserState.adBlockOffSites; the list files in <userData>/adblock.
  *
  * Data flow:
- *   profile session created → onBeforeRequest → shouldBlockRequest() → cancel (counted per page)
+ *   profile session created → onBeforeRequest → shouldBlockRequest() → cancel (counted per page, and in the privacy
+ *   report: privacyReportStore.ts)
  *   page "dom-ready" → applyCosmeticFilters() → insertCSS(getCosmeticCss())
  *   setting turned on → ensureFilterLists() → download / read → parseFilterList()
  */
@@ -23,6 +24,7 @@ import { DAY_MS } from "../shared/settings";
 import { getSiteKey } from "../shared/siteKey";
 import { getCosmeticCss, parseFilterList, shouldBlockRequest } from "./adBlockEngine";
 import type { FilterSet } from "./adBlockEngine";
+import { noteBlockedRequest } from "./privacyReportStore";
 
 /** The lists we use. Both are public and free to download; we fetch them, we do not ship them. */
 const FILTER_LISTS = [
@@ -88,6 +90,10 @@ function handleRequest(details: Electron.OnBeforeRequestListenerDetails, callbac
     return;
   }
   blockedCounts.set(contents.id, (blockedCounts.get(contents.id) ?? 0) + 1);
+  // The privacy report counts it, except in private windows (their sessions are not persistent).
+  if (contents.session.isPersistent()) {
+    noteBlockedRequest(pageUrl, details.url);
+  }
   callback({ cancel: true });
 }
 

@@ -27,6 +27,7 @@ import { describeSpaceIconAsText } from "../shared/spaceIcons.js";
 import { describeDay } from "../shared/timeAgo.js";
 import { findMatchingRule } from "../shared/routingRules.js";
 import { haveChainsChanged, renderChainsSection } from "./chainEditor.js";
+import { renderPrivacySection } from "./privacyView.js";
 
 /** How long a Media tile says what its button did: as long as Copy URL's toast (statusBubble.ts TOAST_SHOWN_MS). */
 const MEDIA_FEEDBACK_MS = 1600;
@@ -53,6 +54,7 @@ const SECTIONS: { id: LibrarySection; label: string; icon: IconName }[] = [
   { id: "chains", label: "Chains", icon: "chains" },
   { id: "archive", label: "Archived Tabs", icon: "archiveOutline" },
   { id: "history", label: "History", icon: "clock" },
+  { id: "privacy", label: "Privacy", icon: "privacy" },
   { id: "extensions", label: "Extensions", icon: "puzzle" },
   { id: "tasks", label: "Task Manager", icon: "taskManager" },
   { id: "settings", label: "Settings", icon: "gear" },
@@ -1352,6 +1354,10 @@ function renderBody(data: LibraryData): void {
   if (section === "boosts") {
     renderBoostsSection(body, data);
   }
+  if (section === "privacy") {
+    const emptyState = createEmptyState("privacy", "Blocking is off", "Turn on blocking of ads and trackers to see what Bow stops, site by site.");
+    renderPrivacySection(body, data, emptyState, []);
+  }
   if (section === "chains") {
     const emptyState = createEmptyState("chains", "No chains yet", "A chain runs several Command Bar actions and pages in one go. Build one here, then type its name in the Command Bar.");
     renderChainsSection(body, data, emptyState);
@@ -1423,7 +1429,7 @@ function handleLibraryUpdate(updated: LibraryData): void {
   if (section === "archive") {
     drawArchiveLines(updated);
   }
-  if (section === "downloads" || section === "settings" || section === "media" || section === "spaces" || section === "boosts") {
+  if (section === "downloads" || section === "settings" || section === "media" || section === "spaces" || section === "boosts" || section === "privacy") {
     renderBody(updated);
   }
   // Chains have text fields: drawn again only when the chains changed (an edit was saved), not on every update.

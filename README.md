@@ -225,6 +225,9 @@ source never updates itself.
   from its page (same size, scroll and region) when the easel opens, or when you click its **Live** badge.
 - **Ad and tracker blocking** with EasyList and EasyPrivacy (off until you turn it on in Library › Settings), allowed
   per site in the Control Center.
+- **Privacy report** (Library › Privacy): how many trackers the blocker stopped in the last 7 days, a bar per day, and
+  the sites and tracker hosts with the most blocks, like Safari's report. Counts only, kept 30 days, never from
+  private windows.
 - **Air Traffic Control**: rules such as "address contains github.com → Work" or "link comes from Slack → Work" send
   links from other apps to a Space (Library › Settings, which lists your running apps). The sender is the app in front
   when the link arrives, read with macOS's own `lsappinfo` (no permission needed). **Test a link** there shows where

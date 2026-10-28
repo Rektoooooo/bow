@@ -15,7 +15,7 @@ import type { SearchEngineId } from "./searchEngines";
 import type { ShortcutGroup } from "./shortcuts";
 import type { SymbolImage } from "./symbols";
 import type { LinkSourceApp } from "./routingRules";
-import type { ArchivedTab, CommandChain, GlobalShortcutTarget, ItemId, RoutingRule, SearchKeyword, SitePermissionKind, SpaceTheme, ThemeAppearance } from "./types";
+import type { ArchivedTab, CommandChain, GlobalShortcutTarget, PrivacySummary, ItemId, RoutingRule, SearchKeyword, SitePermissionKind, SpaceTheme, ThemeAppearance } from "./types";
 
 /** What a Command Bar line does when chosen. */
 /** "answer": a worked-out sum or unit conversion; Return copies it. "closed": a tab you closed; Return reopens it. */
@@ -24,7 +24,7 @@ export type CommandBarResultKind = "navigate" | "search" | "tab" | "history" | "
 /** "tabs" is tab search (⇧⌘A): only tabs, every Space. */
 export type CommandBarMode = "newTab" | "editUrl" | "splitWith" | "tabs";
 
-export const LIBRARY_SECTIONS = ["archive", "history", "media", "downloads", "spaces", "boosts", "chains", "extensions", "tasks", "settings"] as const;
+export const LIBRARY_SECTIONS = ["archive", "history", "media", "downloads", "spaces", "boosts", "chains", "privacy", "extensions", "tasks", "settings"] as const;
 
 export type LibrarySection = (typeof LIBRARY_SECTIONS)[number];
 
@@ -252,6 +252,8 @@ export interface LibraryData {
   /** Library › Chains: the chains, and the Command Bar actions a step may run (main/commandChains.ts). */
   commandChains: CommandChain[];
   chainActions: { id: string; title: string }[];
+  /** Library › Privacy: the blocker's week (main/privacyReport.ts), and whether blocking is on at all. */
+  privacy: { summary: PrivacySummary; isAdBlockOn: boolean };
   /** The shortcut from any app (main/globalShortcutController.ts): its keys (null: off), what it opens, its state. */
   globalShortcut: string | null;
   globalShortcutOpens: GlobalShortcutTarget;

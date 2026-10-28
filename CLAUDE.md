@@ -25,6 +25,7 @@ npm run e2e          # build + drive the real app: check-app, check-overlay, che
                      # check-motion (layout changes glide instead of jumping), check-live-folders (local feed + fake
                      # GitHub via --github-origin), check-performance (331-tab sidebar redraws within a frame),
                      # check-windows (⌘N, a Space and selection per window, restart restores every window),
+                     # check-privacy (the privacy report, HTTPS-only mode, forgetting a profile's site data on quit),
                      # check-tab-sleep (a page off screen sleeps, its renderer ends, it wakes scrolled where it was;
                      # Sleep Tab, Keep Awake, Sleep Other Tabs, Task Manager),
                      # check-backup (export, restore by replacing or adding, unsafe files refused),

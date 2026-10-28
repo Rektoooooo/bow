@@ -39,6 +39,7 @@ import { rankCommandBarResults, rankTabSearchResults } from "./commandBar";
 import { isChainableActionId } from "./commandChains";
 import { listKnownSourceApps, refreshRunningApps } from "./linkSourceApps";
 import { getGlobalShortcutStatus } from "./globalShortcutController";
+import { getPrivacySummary } from "./privacyReportStore";
 import { RESTART_TO_UPDATE_ID } from "./commandBarActions";
 import { focusMainWindow } from "./mainWindows";
 import type { CommandBarResult } from "./commandBar";
@@ -331,6 +332,7 @@ function buildLibraryData(state: BrowserState): LibraryData {
     searchKeywords: state.searchKeywords ?? [],
     commandChains: state.commandChains ?? [],
     linkSourceApps: listKnownSourceApps(),
+    privacy: { summary: getPrivacySummary(Date.now()), isAdBlockOn: state.settings.isAdBlockOn === true },
     globalShortcut: state.settings.globalShortcut ?? null,
     globalShortcutOpens: state.settings.globalShortcutOpens ?? "commandBar",
     globalShortcutStatus: getGlobalShortcutStatus(),

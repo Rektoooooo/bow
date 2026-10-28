@@ -807,6 +807,93 @@ body.dark .command-info-button {
   margin-top: 10px;
 }
 
+/* Library › Privacy: the week's total, a bar per day, then the sites and trackers with the most blocks. */
+.privacy-report {
+  padding: 4px 4px 8px;
+}
+
+.privacy-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.privacy-total {
+  font-size: 34px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.privacy-total-label {
+  color: var(--muted);
+}
+
+.privacy-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 90px;
+  margin: 14px 0 6px;
+}
+
+.privacy-bar-column {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+}
+
+.privacy-bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 4px 4px 2px 2px;
+  background: var(--chip-active);
+  opacity: 0.75;
+}
+
+.privacy-bar-label {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.privacy-lists {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.privacy-list-title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.privacy-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+}
+
+.privacy-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.privacy-row-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* The shortcut from any app: its keys and what it opens, side by side. */
 .global-shortcut {
   display: flex;

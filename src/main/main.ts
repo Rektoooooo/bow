@@ -63,6 +63,7 @@ import { archiveIdleLittleWindows, handleExternalUrl, registerLittleWindowIpc } 
 import { readFrontApp } from "./linkSourceApps";
 import { startGlobalShortcut } from "./globalShortcutController";
 import { handleBowUrl } from "./bowUrlController";
+import { loadPrivacyReport, savePrivacyReportNow } from "./privacyReportStore";
 import { getReaderArticle, noticeReaderPageChanged, probeReaderPage } from "./readerController";
 import type { LinkSourceApp } from "../shared/routingRules";
 import { showPageContextMenu } from "./menus";
@@ -322,6 +323,7 @@ async function handleAppReady(): Promise<void> {
   const isFirstStart = !fs.existsSync(getStateFilePath()) && !process.argv.includes(SKIP_WELCOME_FLAG);
   initializeState(getStateFilePath(), Date.now());
   loadHistory();
+  loadPrivacyReport();
   loadToolbarColors(path.join(app.getPath("userData"), TOOLBAR_COLORS_FILE_NAME), scheduleRuntimePush);
   // The selected Favorite's border takes its icon's colour, like Arc's.
   initializeFaviconAccents(scheduleRuntimePush);
@@ -513,7 +515,10 @@ function startApp(): void {
     readFrontApp().then((sourceApp) => receiveExternalUrl(url, sourceApp));
   });
   app.whenReady().then(handleAppReady);
-  app.on("before-quit", () => saveHistoryNow());
+  app.on("before-quit", () => {
+    saveHistoryNow();
+    savePrivacyReportNow();
+  });
   // After the windows have closed (closing one changes the state), so the last change reaches the file.
   app.on("will-quit", () => {
     saveStateNow();
