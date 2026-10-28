@@ -283,6 +283,11 @@ export interface BrowserSettings {
    */
   globalShortcut?: string;
   globalShortcutOpens?: GlobalShortcutTarget;
+  /**
+   * Your keys for app-menu commands (Library › Shortcuts): a command's place in the menu ("View › Toggle Sidebar") →
+   * its keys in Electron's form, or "" for none (main/shortcutOverrides.ts). Optional: missing means the defaults.
+   */
+  shortcutOverrides?: Record<string, string>;
   /** HTTPS-Only Mode (Library › Privacy): pages asked for over http load over https (main/httpsOnly.ts). */
   isHttpsOnly?: boolean;
   /** Reader view's text size in pixels (READER_TEXT_SIZES). Optional: missing means READER_DEFAULT_TEXT_SIZE. */

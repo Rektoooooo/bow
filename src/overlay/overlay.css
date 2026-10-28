@@ -894,6 +894,30 @@ body.dark .command-info-button {
   font-variant-numeric: tabular-nums;
 }
 
+/* Library › Shortcuts: a row per command, its keys on a chip that records new ones. */
+.shortcut-row {
+  min-height: 34px;
+  gap: 6px;
+}
+
+.shortcut-row .library-line-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.shortcut-keys {
+  min-width: 64px;
+  font-variant-numeric: tabular-nums;
+}
+
+.shortcut-keys.is-empty {
+  color: var(--muted);
+}
+
+.shortcut-problem {
+  color: var(--danger);
+}
+
 /* The shortcut from any app: its keys and what it opens, side by side. */
 .global-shortcut {
   display: flex;

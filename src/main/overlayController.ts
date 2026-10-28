@@ -40,6 +40,7 @@ import { isChainableActionId } from "./commandChains";
 import { listKnownSourceApps, refreshRunningApps } from "./linkSourceApps";
 import { getGlobalShortcutStatus } from "./globalShortcutController";
 import { getPrivacySummary } from "./privacyReportStore";
+import { buildShortcutEditorData, cancelShortcutRecording } from "./shortcutEditor";
 import { describeSpaceIconAsText } from "../shared/spaceIcons";
 import { RESTART_TO_UPDATE_ID } from "./commandBarActions";
 import { focusMainWindow } from "./mainWindows";
@@ -350,6 +351,7 @@ function buildLibraryData(state: BrowserState): LibraryData {
     searchKeywords: state.searchKeywords ?? [],
     commandChains: state.commandChains ?? [],
     linkSourceApps: listKnownSourceApps(),
+    shortcuts: buildShortcutEditorData(state),
     privacy: {
       summary: getPrivacySummary(Date.now()),
       isAdBlockOn: state.settings.isAdBlockOn === true,
@@ -778,6 +780,8 @@ export function findNextMatch(forward: boolean): void {
  * focus, `returnsKeyboard` is false: focusing this window's page would pull the focus back.
  */
 export function closeOverlay(returnsKeyboard: boolean = true): void {
+  // A shortcut being recorded stops with the Library (the menu's keys come back).
+  cancelShortcutRecording();
   const window = getWindow();
   if (window === null) {
     return;
@@ -1359,6 +1363,8 @@ export function registerOverlayIpc(): void {
       return;
     }
     setLibrarySection(section as LibrarySection);
+    // Leaving Library › Shortcuts stops a recording there.
+    cancelShortcutRecording();
     relayoutOverlay();
   });
   ipcMain.handle(OVERLAY_CHANNELS.peekCommand, (event, command: unknown, peekNumber: unknown) => {

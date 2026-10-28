@@ -50,6 +50,7 @@ import { GITHUB_LIVE_LISTS } from "./gitHubLists";
 import { checkCommandChains } from "./commandChains";
 import { checkSpaceTemplates } from "./spaceTemplates";
 import { BUNDLE_ID_PATTERN } from "./linkSourceApps";
+import { checkShortcutOverrides } from "./shortcutOverrides";
 import { MAX_NOTE_LENGTH } from "./notesStore";
 import { MAX_EASEL_LENGTH } from "./easelsStore";
 import { repairSelections } from "./state";
@@ -569,6 +570,9 @@ function checkSettings(raw: unknown): BrowserSettings {
   }
   if (source.globalShortcutOpens === "commandBar" || source.globalShortcutOpens === "littleWindow") {
     settings.globalShortcutOpens = source.globalShortcutOpens;
+  }
+  if (isRecord(source.shortcutOverrides)) {
+    settings.shortcutOverrides = checkShortcutOverrides(source.shortcutOverrides);
   }
   if (READER_TEXT_SIZES.some((size) => size === source.readerTextSize)) {
     settings.readerTextSize = source.readerTextSize as number;

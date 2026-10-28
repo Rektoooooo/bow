@@ -34,6 +34,7 @@ import {
 import { focusMainWindow } from "./mainWindows";
 import { showToast } from "./statusBubble";
 import { toggleReaderView } from "./readerController";
+import { beginShortcutRecording, cancelShortcutRecording, recordShortcutKeys, resetAllShortcuts, setShortcut } from "./shortcutEditor";
 import { dismissMedia, toggleMediaPlayback } from "./media";
 import { addRoutingRule, removeRoutingRule } from "./routing";
 import { deleteBoost, setBoostCss, setBoostEnabled, setBoostJavaScript, setBoostStyle } from "./boosts";
@@ -497,6 +498,16 @@ export function runAction(action: BrowserAction): void {
       return runSiteCommand(action.command);
     case "setHttpsOnly":
       return applyChange((state) => setHttpsOnly(state, action.isOn));
+    case "beginShortcutRecording":
+      return beginShortcutRecording(action.path);
+    case "cancelShortcutRecording":
+      return cancelShortcutRecording();
+    case "recordShortcutKeys":
+      return recordShortcutKeys({ code: action.code, meta: action.meta, control: action.control, alt: action.alt, shift: action.shift });
+    case "setShortcut":
+      return setShortcut(action.path, action.accelerator);
+    case "resetAllShortcuts":
+      return resetAllShortcuts();
     case "setItemNote":
       return applyChange((state) => setItemNote(state, action.itemId, action.note));
     case "setForgetSiteDataOnQuit":

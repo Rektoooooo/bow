@@ -24,7 +24,6 @@ import {
 import type { ItemId } from "../shared/types";
 import { menuHost, runAction, runActionFromWindow } from "./actionRunner";
 import { findTabsInUse, markTabsActive } from "./activity";
-import { installAppMenu } from "./appMenu";
 import { offerMoveToApplications, startAppUpdates } from "./appUpdates";
 import { appMenuCommands } from "./appMenuCommands";
 import { findTabsArchivingSoon, findTabsToArchive, pruneArchive } from "./autoArchive";
@@ -66,6 +65,7 @@ import { handleBowUrl } from "./bowUrlController";
 import { loadPrivacyReport, savePrivacyReportNow } from "./privacyReportStore";
 import { noticeLoadFailed } from "./httpsOnlyController";
 import { clearForgettingProfiles, clearSiteDataOnQuit } from "./siteDataCleaner";
+import { reinstallAppMenu, startShortcutEditing } from "./shortcutEditor";
 import { getReaderArticle, noticeReaderPageChanged, probeReaderPage } from "./readerController";
 import type { LinkSourceApp } from "../shared/routingRules";
 import { showPageContextMenu } from "./menus";
@@ -387,7 +387,8 @@ async function handleAppReady(): Promise<void> {
   registerSymbolIpc();
   registerPictureInPictureIpc();
   setCommandActionRegistry(createCommandActionRegistry({ commands: appMenuCommands, runAction: runAction, getState: getState }));
-  installAppMenu(appMenuCommands);
+  // The menu bar, with your own keys (Library › Shortcuts), built again when they change.
+  startShortcutEditing(appMenuCommands, () => refreshOpenPanel());
   // Hosts that password managers registered for other Chromium browsers (Arc, Brave, …) are found by extensions here.
   linkHostsOfOtherBrowsers();
   // Profiles that forget their site data start clean, even after a crash or an update restart skipped the quit's
@@ -428,7 +429,7 @@ async function handleAppReady(): Promise<void> {
   startAutoArchiveTimers();
   startExtensionUpdates();
   // Once an update has downloaded, the app menu offers the restart instead of a check.
-  startAppUpdates(() => installAppMenu(appMenuCommands));
+  startAppUpdates(() => reinstallAppMenu());
   offerMoveToApplications().catch((error) => console.error("Moving to Applications failed:", error));
   startLiveFolderRefreshing();
   startGlobalShortcut();

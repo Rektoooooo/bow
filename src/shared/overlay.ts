@@ -24,7 +24,7 @@ export type CommandBarResultKind = "navigate" | "search" | "tab" | "history" | "
 /** "tabs" is tab search (⇧⌘A): only tabs, every Space. */
 export type CommandBarMode = "newTab" | "editUrl" | "splitWith" | "tabs";
 
-export const LIBRARY_SECTIONS = ["archive", "history", "media", "downloads", "spaces", "boosts", "chains", "privacy", "extensions", "tasks", "settings"] as const;
+export const LIBRARY_SECTIONS = ["archive", "history", "media", "downloads", "spaces", "boosts", "chains", "privacy", "extensions", "tasks", "shortcuts", "settings"] as const;
 
 export type LibrarySection = (typeof LIBRARY_SECTIONS)[number];
 
@@ -259,6 +259,12 @@ export interface LibraryData {
     isHttpsOnly: boolean;
     /** Each profile, the Spaces that use it ("✦ Personal, 💼 Work"), and whether it forgets its site data on quit. */
     profiles: { id: string; name: string; spaces: string; forgetsSiteDataOnQuit: boolean }[];
+  };
+  /** Library › Shortcuts (main/shortcutEditor.ts): each menu's commands, their keys now, the one being recorded. */
+  shortcuts: {
+    groups: { title: string; items: { path: string; label: string; keys: string; isChanged: boolean }[] }[];
+    recordingPath: string | null;
+    problem: string | null;
   };
   /** The shortcut from any app (main/globalShortcutController.ts): its keys (null: off), what it opens, its state. */
   globalShortcut: string | null;

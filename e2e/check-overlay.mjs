@@ -1755,6 +1755,53 @@ await dispatch({ type: "setGlobalShortcut", accelerator: null, opens: "commandBa
 await sidebar.waitForTimeout(300);
 check("Off lets the keys go", !(await isShortcutRegistered()));
 
+// Library › Shortcuts: click a command's keys and press new ones; the menu bar takes them at once. Keys another command
+// uses are refused and said so; × removes the keys; Reset All brings back every default.
+const menuKeysOf = (label) =>
+  app.evaluate(({ Menu }, wanted) => {
+    const find = (items) => {
+      for (const item of items) {
+        if (item.label === wanted && item.visible) return item.accelerator ?? "";
+        const inner = item.submenu ? find(item.submenu.items) : null;
+        if (inner !== null) return inner;
+      }
+      return null;
+    };
+    return find(Menu.getApplicationMenu().items);
+  }, label);
+const shortcutRow = (path) => `.shortcut-row[data-path="${path}"]`;
+await dispatch({ type: "openLibrary" });
+await overlay.waitForSelector(".library-tab[data-section='shortcuts']", { timeout: 5000 });
+await overlay.click(".library-tab[data-section='shortcuts']");
+await overlay.waitForSelector(shortcutRow("View › Toggle Sidebar"), { timeout: 5000 });
+const keysBefore = await overlay.textContent(`${shortcutRow("View › Toggle Sidebar")} .shortcut-keys`);
+await overlay.click(`${shortcutRow("View › Toggle Sidebar")} .shortcut-keys`);
+await overlay.waitForTimeout(300);
+const recordingLabel = await overlay.textContent(`${shortcutRow("View › Toggle Sidebar")} .shortcut-keys`);
+await overlay.keyboard.press("Shift+Meta+KeyY");
+await overlay.waitForTimeout(500);
+const keysAfter = await overlay.textContent(`${shortcutRow("View › Toggle Sidebar")} .shortcut-keys`).catch(() => null);
+check(
+  "Library › Shortcuts records new keys for a command, and the menu bar takes them",
+  keysBefore === "⌘S" && recordingLabel === "Press keys…" && keysAfter === "⇧⌘Y" && (await menuKeysOf("Toggle Sidebar")) === "Shift+Command+Y" && (await getState()).settings.shortcutOverrides?.["View › Toggle Sidebar"] === "Shift+Command+Y",
+  `${keysBefore} → ${recordingLabel} → ${keysAfter} / menu ${await menuKeysOf("Toggle Sidebar")}`,
+);
+await overlay.click(`${shortcutRow("View › Toggle Toolbar")} .shortcut-keys`);
+await overlay.waitForTimeout(300);
+await overlay.keyboard.press("Meta+KeyT");
+await overlay.waitForTimeout(500);
+const conflictText = await overlay.textContent(".shortcut-problem").catch(() => null);
+check("keys another command uses are refused, saying which", conflictText === "⌘T is already File › New Tab." && (await getState()).settings.shortcutOverrides?.["View › Toggle Toolbar"] === undefined, String(conflictText));
+await overlay.keyboard.press("Escape");
+await overlay.waitForTimeout(300);
+await overlay.click(`${shortcutRow("View › Toggle Sidebar")} .shortcut-remove`);
+await overlay.waitForTimeout(400);
+check("× removes a command's keys", (await menuKeysOf("Toggle Sidebar")) === "" && (await overlay.textContent(`${shortcutRow("View › Toggle Sidebar")} .shortcut-keys`)) === "None");
+await overlay.click(".shortcut-reset-all");
+await overlay.waitForTimeout(400);
+check("Reset All brings back every default", (await menuKeysOf("Toggle Sidebar")) === "CommandOrControl+S" && (await getState()).settings.shortcutOverrides === undefined);
+await overlay.press("body", "Escape");
+
 // Space templates: save the Space as one (Space menu › Save as Template), make a new Space from it in
 // Library › Spaces, then delete the template there.
 const templateSourceState = await getState();

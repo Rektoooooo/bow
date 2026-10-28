@@ -46,6 +46,7 @@ export const SYMBOL_NAMES = {
   copy: "doc.on.doc",
   reader: "doc.plaintext",
   privacy: "hand.raised",
+  keyboard: "keyboard",
   calculator: "plus.forwardslash.minus",
   chains: "bolt.horizontal",
   code: "chevron.left.forwardslash.chevron.right",

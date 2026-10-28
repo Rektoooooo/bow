@@ -294,6 +294,8 @@ Same keys as Arc. ⌘T new tab, ⌘N new window, ⇧⌘W close window, ⌘L edit
 (⌥⇧⌘C as Markdown), ⌘S sidebar, ⌘[ / ⌘] back/forward, ⌘R reload, ⌥⌘↑ / ⌥⌘↓ previous/next tab, ⌘1–⌘9 tab N,
 ⌃Tab / ⌃⇧Tab recent tabs, ⌃⌘N new note, ⌥⌘← / ⌥⌘→ previous/next Space, ⌃1–⌃9 Space N, ⇧⌘K clear Today, ⌃⇧= split view, ⌃⇧- close pane,
 ⌘O open Peek as tab, ⌥⌘N Little Window, ⌘F find, ⇧⌘L Library, ⌘+ / ⌘- / ⌘0 zoom, ⌥⌘I developer tools.
+Library › Shortcuts changes them: click a command's keys and press new ones (keys another command or macOS uses are
+refused, saying which), × removes them, Reset All brings back every default.
 Beyond Arc: ⌘, Settings, ⇧⌘S Save Page As, ⇧⌘A **Search Tabs** (every tab in every Space, with where it lives), ⌘/
 **Keyboard Shortcuts**, a sheet of every shortcut read from the menu itself, so it is always right.
 

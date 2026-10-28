@@ -1021,6 +1021,36 @@ export function setProfileForgetsSiteData(state: BrowserState, profileId: Profil
 }
 
 /**
+ * Gives an app-menu command your own keys ("" for none), or back to its default (null). The caller checks the keys.
+ */
+export function setShortcutOverride(state: BrowserState, path: string, accelerator: string | null): BrowserState {
+  const overrides = state.settings.shortcutOverrides ?? {};
+  const current = Object.hasOwn(overrides, path) ? overrides[path] : null;
+  if (current === accelerator) {
+    return state;
+  }
+  const changed = { ...overrides };
+  if (accelerator === null) {
+    delete changed[path];
+  } else {
+    changed[path] = accelerator;
+  }
+  return { ...state, settings: { ...state.settings, shortcutOverrides: changed } };
+}
+
+/**
+ * Every app-menu command back to its default keys.
+ */
+export function resetShortcutOverrides(state: BrowserState): BrowserState {
+  if (state.settings.shortcutOverrides === undefined) {
+    return state;
+  }
+  const settings = { ...state.settings };
+  delete settings.shortcutOverrides;
+  return { ...state, settings: settings };
+}
+
+/**
  * HTTPS-Only Mode on or off (httpsOnlyController.ts).
  */
 export function setHttpsOnly(state: BrowserState, isOn: boolean): BrowserState {

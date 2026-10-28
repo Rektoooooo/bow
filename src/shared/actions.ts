@@ -108,6 +108,13 @@ export type BrowserAction =
   | { type: "setForgetSiteDataOnQuit"; profileId: ProfileId; isOn: boolean }
   /** A tab's or folder's note (empty removes it). */
   | { type: "setItemNote"; itemId: ItemId; note: string }
+  /** Library › Shortcuts: record keys for a command, stop, set keys ("" none, null its default), reset them all. */
+  | { type: "beginShortcutRecording"; path: string }
+  | { type: "cancelShortcutRecording" }
+  /** A key press the Library recorded (its key's place and modifiers). */
+  | { type: "recordShortcutKeys"; code: string; meta: boolean; control: boolean; alt: boolean; shift: boolean }
+  | { type: "setShortcut"; path: string; accelerator: string | null }
+  | { type: "resetAllShortcuts" }
   | { type: "setSidebarWidth"; width: number; isFinal: boolean }
   | { type: "setSpaceProfile"; spaceId: SpaceId; profileId: string }
   | { type: "createProfileForSpace"; spaceId: SpaceId }
@@ -271,6 +278,11 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setHttpsOnly",
   "setForgetSiteDataOnQuit",
   "setItemNote",
+  "beginShortcutRecording",
+  "cancelShortcutRecording",
+  "recordShortcutKeys",
+  "setShortcut",
+  "resetAllShortcuts",
   "setSidebarWidth",
   "setSpaceProfile",
   "createProfileForSpace",

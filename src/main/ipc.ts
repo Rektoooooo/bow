@@ -14,6 +14,7 @@ import { GITHUB_LIVE_LISTS } from "./gitHubLists";
 import { FEED_PRESETS } from "./feedPresets";
 import { checkCommandChain } from "./commandChains";
 import { BUNDLE_ID_PATTERN } from "./linkSourceApps";
+import { isValidAccelerator } from "./shortcutOverrides";
 import { APP_ICON_VARIANTS } from "../shared/appIconDrawing";
 import { BOOST_FONTS } from "../shared/boostFonts";
 import { isNoteId } from "../shared/notes";
@@ -185,6 +186,16 @@ function isGlobalShortcutTarget(value: unknown): boolean {
 /** A tab's or folder's note: text up to ITEM_NOTE_MAX_LENGTH (an empty note removes it). */
 function isItemNote(value: unknown): boolean {
   return typeof value === "string" && value.length <= ITEM_NOTE_MAX_LENGTH;
+}
+
+/** A key's place on the keyboard, as the page reports it ("KeyT", "Digit1", "BracketLeft", "F5"). */
+function isKeyCode(value: unknown): boolean {
+  return typeof value === "string" && /^[A-Za-z0-9]{1,24}$/.test(value);
+}
+
+/** A command's keys from the editor: none (""), its default (null), or a valid accelerator. */
+function isShortcutKeys(value: unknown): boolean {
+  return value === null || value === "" || (typeof value === "string" && isValidAccelerator(value));
 }
 
 /** One of Reader view's text sizes. */
@@ -426,6 +437,11 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   setHttpsOnly: { isOn: isBoolean },
   setForgetSiteDataOnQuit: { profileId: isText, isOn: isBoolean },
   setItemNote: { itemId: isText, note: isItemNote },
+  beginShortcutRecording: { path: isText },
+  cancelShortcutRecording: {},
+  recordShortcutKeys: { code: isKeyCode, meta: isBoolean, control: isBoolean, alt: isBoolean, shift: isBoolean },
+  setShortcut: { path: isText, accelerator: isShortcutKeys },
+  resetAllShortcuts: {},
   setAdBlockForSite: { site: isSite, isOn: isBoolean },
   setAppIcon: { variantId: isAppIconVariant },
   showTabTooltip: { title: isText, showsRenameHint: isBoolean, frame: isAnchor },

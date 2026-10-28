@@ -161,3 +161,11 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   up with `pgrep -fl` in one call, kill it by number in the next.
 - Two macOS accounts; facts differ per account (Homebrew owner, Node location, gh accounts). Check `whoami` and the
   "This Mac" section of `CLAUDE.md` before installing anything.
+
+- Background e2e runs must never make Bow the active app (the user, 2026-10-28: "every time I type it tabs into
+  the test window"). Patching show()/focus() is not enough: `webContents.focus()` focuses the window natively on
+  macOS and activates the app; detached developer tools activate themselves when they show a panel; a window made
+  with `show: true` is activated by macOS before any patch runs; system pickers and dialogs take the keyboard.
+  Verify with the frontmost-app watcher, not by reasoning: `/private/tmp/claude-501/bin/watch-front.sh <log> <stop>
+  <check log>` logs every change of `lsappinfo front` with the check that had just passed. Any new window: make it
+  with `show: false`.

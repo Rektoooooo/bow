@@ -327,7 +327,10 @@ M about a day, L several days.
 - [x] 18. (Add Note… / Edit Note… in a tab's or folder's menu: a short note written in place, shown in italics under
       the title, in backups and sync with the item)
       Tab notes: attach a Note to a tab or folder (S)
-- [ ] 19. Shortcut editor (M)
+- [x] 19. (Library › Shortcuts: every app-menu command by menu; click its keys and press new ones (the menu's keys are
+      unregistered while recording, so ⌘T can be recorded); keys in use or macOS's own are refused and recording goes
+      on; × removes, Reset, Reset All; the menu bar is rebuilt with your keys; in backups)
+      Shortcut editor (M)
 
 ### 4.4 Trust and polish
 - [ ] 20. Crash-proof restore: scroll positions come back; snapshots from item 1 cover the sidebar (S)

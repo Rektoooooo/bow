@@ -28,6 +28,7 @@ import { describeDay } from "../shared/timeAgo.js";
 import { findMatchingRule } from "../shared/routingRules.js";
 import { haveChainsChanged, renderChainsSection } from "./chainEditor.js";
 import { renderPrivacySection } from "./privacyView.js";
+import { renderShortcutsSection } from "./shortcutEditorView.js";
 
 /** How long a Media tile says what its button did: as long as Copy URL's toast (statusBubble.ts TOAST_SHOWN_MS). */
 const MEDIA_FEEDBACK_MS = 1600;
@@ -57,6 +58,7 @@ const SECTIONS: { id: LibrarySection; label: string; icon: IconName }[] = [
   { id: "privacy", label: "Privacy", icon: "privacy" },
   { id: "extensions", label: "Extensions", icon: "puzzle" },
   { id: "tasks", label: "Task Manager", icon: "taskManager" },
+  { id: "shortcuts", label: "Shortcuts", icon: "keyboard" },
   { id: "settings", label: "Settings", icon: "gear" },
 ];
 
@@ -1354,6 +1356,9 @@ function renderBody(data: LibraryData): void {
   if (section === "boosts") {
     renderBoostsSection(body, data);
   }
+  if (section === "shortcuts") {
+    renderShortcutsSection(body, data);
+  }
   if (section === "privacy") {
     const emptyState = createEmptyState("privacy", "Blocking is off", "Turn on blocking of ads and trackers to see what Bow stops, site by site.");
     const connections = createSettingGroup("Connections", [
@@ -1446,7 +1451,7 @@ function handleLibraryUpdate(updated: LibraryData): void {
   if (section === "archive") {
     drawArchiveLines(updated);
   }
-  if (section === "downloads" || section === "settings" || section === "media" || section === "spaces" || section === "boosts" || section === "privacy") {
+  if (section === "downloads" || section === "settings" || section === "media" || section === "spaces" || section === "boosts" || section === "privacy" || section === "shortcuts") {
     renderBody(updated);
   }
   // Chains have text fields: drawn again only when the chains changed (an edit was saved), not on every update.

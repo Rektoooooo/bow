@@ -11,11 +11,13 @@
  * Data flow:
  *   app ready → installAppMenu(commands) → user presses ⌘T → commands.openCommandBar("newTab")
  *   an update has downloaded → installAppMenu(commands) again → "Restart to Update to Bow …"
+ *   a shortcut changed (Library › Shortcuts) → installAppMenu(commands, overrides) again (shortcutOverrides.ts)
  */
 import { Menu } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
 import type { NavigationCommand } from "../shared/actions";
 import type { SplitOrientation } from "../shared/types";
+import { applyShortcutOverrides, withoutRegisteredKeys } from "./shortcutOverrides";
 
 /** What the menu items do. main.ts implements each one. */
 export interface AppMenuCommands {
@@ -289,9 +291,26 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
 }
 
 /**
- * Installs the menu bar. Called again when an update has downloaded, so the app menu offers the restart.
+ * The menu bar's template with your keys (Library › Shortcuts) in place of the defaults.
  */
-export function installAppMenu(commands: AppMenuCommands): void {
-  const menu = Menu.buildFromTemplate(buildTemplate(commands));
+export function buildMenuTemplate(commands: AppMenuCommands, overrides: Record<string, string>): MenuItemConstructorOptions[] {
+  return applyShortcutOverrides(buildTemplate(commands), overrides);
+}
+
+/**
+ * The menu bar's template as appMenu.ts sets it, without your keys: the defaults the editor shows and resets to.
+ */
+export function buildDefaultMenuTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] {
+  return buildTemplate(commands);
+}
+
+/**
+ * Installs the menu bar with your keys. Called again when an update has downloaded (the app menu offers the restart)
+ * and when you change a shortcut.
+ */
+export function installAppMenu(commands: AppMenuCommands, overrides: Record<string, string> = {}, isRecordingKeys: boolean = false): void {
+  const template = buildMenuTemplate(commands, overrides);
+  // While Library › Shortcuts records, no key runs a menu command: the press goes to the page that records it.
+  const menu = Menu.buildFromTemplate(isRecordingKeys ? withoutRegisteredKeys(template) : template);
   Menu.setApplicationMenu(menu);
 }
