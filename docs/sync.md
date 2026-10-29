@@ -10,14 +10,14 @@ folder every Mac can reach (iCloud Drive, Dropbox, a shared drive); Bow makes a 
 | --- | --- |
 | Spaces (name, icon, theme, profile) and their order | Today tabs and the Archive |
 | Pinned tabs, folders and split views (address, names, home address) | Where a tab has browsed to since it was pinned |
-| Favorites and profile names | Windows, sidebar width, which folders are open |
+| A Space's Favorites, and profile names | Windows, sidebar width, which folders are open |
 | Notes and Easels that pinned tabs or Favorites show | Extensions, site permissions, settings |
 | Boosts (JavaScript arrives switched off), Air Traffic Control rules, command chains and Space templates | A live folder's items (each Mac fills them from the source) |
 
 ## How changes merge
 
 The setup is cut into small units: a tab, a folder, a split view, a Space's name and look, a Space's Pinned order, the
-Space order, a profile's Favorites, a Boost, the rules, the command chains, the Space templates, a Note, an Easel.
+Space order, a Space's Favorites, a Boost, the rules, the command chains, the Space templates, a Note, an Easel.
 Each Mac records a fingerprint of every unit and when it last changed there (`src/main/sync.ts`). When another Mac's file changes:
 
 - A unit changed later on the other Mac takes its version. Units this Mac doesn't have are added.
@@ -26,6 +26,8 @@ Each Mac records a fingerprint of every unit and when it last changed there (`sr
 - Changes on two Macs less than 3 seconds apart may be ordered wrongly by clocks that differ: the Library counts them
   as conflicts. Both Macs still decide them the same way (the later time, then the larger fingerprint), so they always
   end up alike.
+- A file from a Mac whose Bow still keeps Favorites per profile (saved-data version below 5) is skipped whole, with a
+  notice in the Library to update Bow on that Mac: its Favorites cannot be placed in a Space.
 - A Note changed on both Macs keeps the losing Mac's text as a copy next to it, named "… (before <Mac>'s change)",
   and that copy syncs too: no text is lost.
 - Renaming a tab on one Mac and pinning a page on the other keeps both: they are different units.
@@ -43,7 +45,7 @@ the joining Mac has are added for the others. **Stop Syncing** leaves this Mac's
   "deviceId": "<random id>",
   "deviceName": "<the Mac's network name>",
   "writtenAt": 1793190000000,
-  "state": { "version": 4, "items": { … }, "spaces": [ … ], … },
+  "state": { "version": 5, "items": { … }, "spaces": [ … ], … },
   "stamps": { "item:<id>": { "hash": "<fingerprint>", "updatedAt": 1793190000000 }, … },
   "tombstones": { "item:<id>": 1793190000000 },
   "notes": { "<note id>": "<HTML>" },

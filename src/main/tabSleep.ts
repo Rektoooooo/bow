@@ -54,7 +54,7 @@ export function isKeptAwake(state: BrowserState, url: string): boolean {
  */
 export function findTabsAllowedToSleep(state: BrowserState, awakeTabIds: ItemId[], inUseTabIds: ItemId[]): ItemId[] {
   const inUse = new Set(inUseTabIds);
-  const favoriteIds = areFavoritesKeptAwake(state.settings) ? state.profiles.flatMap((profile) => profile.favoriteIds) : [];
+  const favoriteIds = areFavoritesKeptAwake(state.settings) ? state.spaces.flatMap((space) => space.favoriteIds) : [];
   const keptFavoriteIds = new Set(favoriteIds);
   return awakeTabIds.filter((tabId) => {
     const item = state.items[tabId];

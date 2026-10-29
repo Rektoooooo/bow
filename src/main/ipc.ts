@@ -260,10 +260,7 @@ function isLocation(value: unknown): boolean {
   if (!isRecord(value)) {
     return false;
   }
-  if (value.kind === "favorites") {
-    return isText(value.profileId);
-  }
-  if (value.kind === "pinned" || value.kind === "today") {
+  if (value.kind === "favorites" || value.kind === "pinned" || value.kind === "today") {
     return isText(value.spaceId);
   }
   if (value.kind === "folder") {

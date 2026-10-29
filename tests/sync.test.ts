@@ -8,7 +8,8 @@ import { describe, expect, it } from "vitest";
 import { buildSyncPayload, CLOCK_SKEW_GUARD_MS, collectUnits, createSyncMeta, mergePeer, parseSyncPayload, stampLocalChanges, TOMBSTONE_LIFETIME_MS } from "../src/main/sync";
 import type { SyncMeta, SyncPayload } from "../src/main/sync";
 import { createSpace, renameSpace } from "../src/main/spaces";
-import { createFolder, createNote, renameItem } from "../src/main/state";
+import { addToFavorites, createFolder, createNote, renameItem } from "../src/main/state";
+import { findLocation } from "../src/main/tree";
 import { createNoteUrl } from "../src/shared/notes";
 import type { BrowserState, FolderItem, ItemId, TabItem } from "../src/shared/types";
 import { getPinnedIds, ONE_PM, openPinnedTabs, PERSONAL_SPACE_ID, WORK_SPACE_ID } from "./builders";
@@ -36,11 +37,11 @@ function stamp(mac: Mac, now: number): Mac {
 /** A Mac's file, written and read back the way another Mac reads it. */
 function fileOf(mac: Mac, now: number): SyncPayload {
   const payload = buildSyncPayload(mac.state, mac.meta, mac.notes, {}, mac.name, now);
-  const parsed = parseSyncPayload(JSON.stringify(payload));
-  if (parsed === null) {
+  const parsed = parseSyncPayload(JSON.stringify(payload), now);
+  if (parsed.payload === null) {
     throw new Error("A Mac's own file must read back");
   }
-  return parsed;
+  return parsed.payload;
 }
 
 /** One Mac reads another's file. */
@@ -210,13 +211,43 @@ describe("folder sync", () => {
     crafted.state.items[tabIds[0] as ItemId].url = "javascript:alert(1)";
     crafted.state.items[tabIds[0] as ItemId].homeUrl = "javascript:alert(1)";
     crafted.stamps[`item:${tabIds[0]}`].updatedAt = ONE_PM + 10 * MINUTE_MS;
-    const parsed = parseSyncPayload(JSON.stringify(crafted));
-    expect(parsed).not.toBeNull();
-    const bAfter = receive(macB, parsed as SyncPayload, ONE_PM + 11 * MINUTE_MS);
+    const parsed = parseSyncPayload(JSON.stringify(crafted), ONE_PM + 11 * MINUTE_MS);
+    expect(parsed.payload).not.toBeNull();
+    const bAfter = receive(macB, parsed.payload as SyncPayload, ONE_PM + 11 * MINUTE_MS);
     const anyScript = Object.values(bAfter.state.items).some((item) => item.kind === "tab" && item.url.startsWith("javascript:"));
     expect(anyScript).toBe(false);
-    expect(parseSyncPayload(JSON.stringify({ ...payload, deviceId: "../../etc" }))).toBeNull();
-    expect(parseSyncPayload(JSON.stringify({ ...payload, formatVersion: 99 }))).toBeNull();
+    expect(parseSyncPayload(JSON.stringify({ ...payload, deviceId: "../../etc" }), ONE_PM).payload).toBeNull();
+    expect(parseSyncPayload(JSON.stringify({ ...payload, formatVersion: 99 }), ONE_PM).payload).toBeNull();
+  });
+});
+
+describe("Favorites per Space", () => {
+  it("syncs a Space's Favorites as one unit of that Space, and the other Space's row stays", () => {
+    const { macA, macB, tabIds } = sharedMacs();
+    const favoriteId = tabIds[0] as ItemId;
+    const favoriteState = addToFavorites(macA.state, favoriteId);
+    const changed = stamp({ ...macA, state: favoriteState }, ONE_PM + MINUTE_MS);
+
+    expect(collectUnits(favoriteState, {}, {}).has(`favorites:${PERSONAL_SPACE_ID}`)).toBe(true);
+    expect(collectUnits(favoriteState, {}, {}).has(`favorites:${WORK_SPACE_ID}`)).toBe(true);
+    const bAfter = receive(macB, fileOf(changed, ONE_PM + 2 * MINUTE_MS), ONE_PM + 2 * MINUTE_MS);
+
+    expect(bAfter.state.spaces.find((space) => space.id === PERSONAL_SPACE_ID)?.favoriteIds).toEqual([favoriteId]);
+    expect(bAfter.state.spaces.find((space) => space.id === WORK_SPACE_ID)?.favoriteIds).toEqual([]);
+    expect(findLocation(bAfter.state, favoriteId)).toEqual({ kind: "favorites", spaceId: PERSONAL_SPACE_ID });
+  });
+
+  it("skips a file whose Mac still keeps Favorites per profile, and reads a current one", () => {
+    const { macA } = sharedMacs();
+    const payload = buildSyncPayload(macA.state, macA.meta, {}, {}, "Mac A", ONE_PM + MINUTE_MS);
+    const version4Text = JSON.stringify({ ...payload, state: { ...payload.state, version: 4 } });
+
+    const older = parseSyncPayload(version4Text, ONE_PM + 2 * MINUTE_MS);
+    const current = parseSyncPayload(JSON.stringify(payload), ONE_PM + 2 * MINUTE_MS);
+
+    expect(older).toEqual({ payload: null, problem: "older" });
+    expect(current.problem).toBeNull();
+    expect(current.payload?.state.version).toBe(5);
   });
 });
 

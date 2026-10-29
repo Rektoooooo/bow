@@ -17,7 +17,7 @@ import type { BrowserAction, MenuRequest, SidebarCommand } from "../shared/actio
 import type { BrowserState, FolderItem, ItemId, Space, TabItem } from "../shared/types";
 import { getSelectedTabId, listVisibleTabIds } from "./state";
 import { applyPreset, GRAIN_CHOICES, THEME_PRESETS } from "./themePresets";
-import { findLocation, findRootLocation, findSpace, findSplitOfTab, findTab } from "./tree";
+import { findLocation, findRootLocation, findSpace, findSpaceIdOfItem, findSplitOfTab, findTab } from "./tree";
 import { buildSearchUrl, findSearchEngine, findSpaceSearchEngine, SEARCH_ENGINE_IDS, SEARCH_ENGINES } from "../shared/searchEngines";
 import { importAllProfiles, listImportSources } from "./browserImportController";
 import { formatCount, profileNounFor } from "../shared/onboarding";
@@ -80,8 +80,7 @@ function getMenuLabel(tab: TabItem): string {
  */
 function buildMoveToSpaceMenu(host: MenuHost, itemId: ItemId): MenuItemConstructorOptions {
   const state = host.getState();
-  const root = findRootLocation(state, itemId);
-  const currentSpaceId = root !== null && (root.kind === "pinned" || root.kind === "today") ? root.spaceId : null;
+  const currentSpaceId = findSpaceIdOfItem(state, itemId);
   const otherSpaces = state.spaces.filter((space) => space.id !== currentSpaceId);
   const submenu: MenuItemConstructorOptions[] = otherSpaces.map((space) => ({
     label: `${describeSpaceIconAsText(space.icon)}  ${space.name}`,
@@ -443,7 +442,7 @@ function buildLiveFolderMenu(host: MenuHost): MenuItemConstructorOptions[] {
  */
 function confirmDeleteSpace(host: MenuHost, space: Space): void {
   const window = host.getWindow();
-  const hasItems = space.pinnedIds.length > 0 || space.todayIds.length > 0;
+  const hasItems = space.favoriteIds.length > 0 || space.pinnedIds.length > 0 || space.todayIds.length > 0;
   if (window !== null && hasItems) {
     const deleteButtonIndex = 0;
     const answer = dialog.showMessageBoxSync(window, {
@@ -517,7 +516,7 @@ function buildSpaceMenu(host: MenuHost, space: Space): MenuItemConstructorOption
     { label: "Theme Presets", submenu: themeMenu },
     { label: "Appearance", submenu: appearanceMenu },
     { label: "Grain", submenu: grainMenu },
-    { label: "Profile (cookies, logins, Favorites)", submenu: profileMenu },
+    { label: "Profile (cookies, logins)", submenu: profileMenu },
     { label: "Archive Today Tabs After", submenu: buildSpaceArchiveMenu(host, space) },
     { label: "Search Engine", submenu: buildSpaceSearchMenu(host, space) },
     { label: "New Tab Opens", submenu: buildSpaceNewTabMenu(host, space) },

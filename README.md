@@ -101,7 +101,7 @@ source never updates itself.
 ## What works
 
 **Sidebar**
-- Favorites as tiles at the top, shared by every Space that uses the same profile (up to 12, like Arc). The selected
+- Favorites as tiles at the top, kept per Space, so two Spaces with the same profile can have different rows (up to 12 each). The selected
   one gets a border in the colour that appears most in its icon, like Arc's.
 - A Space title (click to collapse Pinned), Pinned tabs and nested folders, a divider with **Clear**, **+ New Tab**,
   and the Today list. A closed folder still shows the tab you are on.
@@ -142,7 +142,7 @@ source never updates itself.
   Emoji tab and an Icon tab of SF Symbols), edit the theme (Space menu › Edit Theme…: Arc's popover beside the
   sidebar's bottom, a dotted pad with one handle per color (up to three), automatic / light / dark, preset colors,
   an intensity slider and a grain dial), reorder, delete. Two-finger swipe on the sidebar or ⌃1–⌃9 switches Spaces.
-- Each profile has its own cookies, logins and Favorites (an Electron session partition). Space menu › Profile
+- Each profile has its own cookies and logins (an Electron session partition). Space menu › Profile
   moves a Space to another profile or a new one.
 - Each Space can have its own defaults (Space menu): **Search Engine** (Work searches with Google, the rest with
   DuckDuckGo) and **New Tab Opens** a page of its own (Use Current Page) instead of the Command Bar; ⌘L still opens

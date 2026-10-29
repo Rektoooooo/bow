@@ -104,9 +104,6 @@ function notifyDragState(isDragging: boolean): void {
  * Writes a list location as text for a data attribute. Example: { kind: "today", spaceId: "s1" } → "today:s1"
  */
 export function encodeLocation(location: ItemLocation): string {
-  if (location.kind === "favorites") {
-    return `favorites:${location.profileId}`;
-  }
   if (location.kind === "folder") {
     return `folder:${location.folderId}`;
   }
@@ -130,7 +127,7 @@ export function decodeLocation(text: string | undefined): ItemLocation | null {
     return null;
   }
   if (kind === "favorites") {
-    return { kind: "favorites", profileId: id };
+    return { kind: "favorites", spaceId: id };
   }
   if (kind === "folder") {
     return { kind: "folder", folderId: id };

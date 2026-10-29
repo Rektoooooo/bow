@@ -77,7 +77,8 @@ const dispatch = (page, action) => page.evaluate((value) => window.browserApi.di
 const activeSpace = (state) => state.spaces.find((space) => space.id === state.activeSpaceId);
 const todayTabs = (state) => activeSpace(state).todayIds.map((id) => state.items[id]);
 const pinnedItems = (state) => activeSpace(state).pinnedIds.map((id) => state.items[id]);
-const favorites = (state) => state.profiles[0].favoriteIds.map((id) => state.items[id]);
+// Favorites belong to the Space (shown at the top of the sidebar for the active one).
+const favorites = (state) => activeSpace(state).favoriteIds.map((id) => state.items[id]);
 const itemCount = (state) => Object.keys(state.items).length;
 // Only web pages: our own overlay and status bubble (file: pages) can be on screen too, e.g. with a site's
 // permission prompt (DuckDuckGo asks for the location on a "best pizza" search).
@@ -175,6 +176,17 @@ await page.waitForTimeout(400);
 state = await getState(page);
 check("dragging a Today tab to the top makes it a Favorite", favorites(state).length === 1 && todayTabs(state).length === 0, JSON.stringify(favorites(state).map((tab) => tab?.url)));
 check("the Favorite shows as a tile", (await page.locator(".favorite-tile").count()) === 1);
+// Two Spaces share the default profile, yet each has its own Favorites row: the row swaps with the Space.
+const favoriteSpaceId = state.activeSpaceId;
+const otherSpaceId = state.spaces.find((space) => space.id !== favoriteSpaceId && space.profileId === activeSpace(state).profileId).id;
+await dispatch(page, { type: "switchSpace", spaceId: otherSpaceId });
+await page.waitForFunction(() => document.querySelectorAll(".favorite-tile").length === 0, null, { timeout: 5000 });
+state = await getState(page);
+check("a Favorite added in one Space is not in the other Space of the same profile", favorites(state).length === 0 && state.spaces.find((space) => space.id === favoriteSpaceId).favoriteIds.length === 1);
+await dispatch(page, { type: "switchSpace", spaceId: favoriteSpaceId });
+await page.waitForFunction(() => document.querySelectorAll(".favorite-tile").length === 1, null, { timeout: 5000 });
+check("switching back brings the Favorites row back", true);
+state = await getState(page);
 await dispatch(page, { type: "unpinTab", tabId: favorites(state)[0].id });
 await page.waitForTimeout(300);
 
@@ -638,7 +650,7 @@ fs.writeFileSync(path.join(upgradeDir, "browser-state.json"), JSON.stringify(ver
 const upgraded = await launch(upgradeDir);
 await upgraded.page.waitForSelector(".pinned-list .tab-row", { timeout: 30000 });
 state = await getState(upgraded.page);
-check("a milestone 1 (version 1) file opens and is upgraded", state.version === 4 && state.focusedWindowId === "window-1" && state.spaces[0].pinnedIds[0] === "tab-old" && state.settings.archiveAfterMs === 21600000);
+check("a milestone 1 (version 1) file opens and is upgraded", state.version === 5 && state.focusedWindowId === "window-1" && state.spaces[0].pinnedIds[0] === "tab-old" && state.settings.archiveAfterMs === 21600000);
 await upgraded.app.close();
 fs.rmSync(importHome, { recursive: true, force: true });
 

@@ -352,15 +352,38 @@ describe("importing Pinned and Today items", () => {
 });
 
 describe("importing Favorites", () => {
-  it("maps each Favorites container to its profile", () => {
+  it("gives each Arc profile's Favorites to the first imported Space that uses the profile", () => {
     const { state: imported, report } = importArcSidebar(buildTwoSpaceFile(), createInitialState(), ONE_PM);
 
-    const defaultProfile = imported.profiles.find((profile) => profile.id === DEFAULT_PROFILE_ID);
-    const customProfile = imported.profiles.find((profile) => profile.id === "arc-profile-profile-1");
-    expect(defaultProfile?.favoriteIds).toEqual(["arc-fav-one"]);
-    expect(customProfile?.favoriteIds).toEqual(["arc-fav-two"]);
+    const alpha = imported.spaces.find((space) => space.id === "arc-space-alpha");
+    const beta = imported.spaces.find((space) => space.id === "arc-space-beta");
+    expect(alpha?.profileId).toBe(DEFAULT_PROFILE_ID);
+    expect(alpha?.favoriteIds).toEqual(["arc-fav-one"]);
+    expect(beta?.profileId).toBe("arc-profile-profile-1");
+    expect(beta?.favoriteIds).toEqual(["arc-fav-two"]);
+    expect(imported.spaces.slice(0, 2).every((space) => space.favoriteIds.length === 0)).toBe(true);
     expect(getTabFrom(imported, "arc-fav-one").homeUrl).toBe("https://fav-one.example/");
     expect(report.favoritesImported).toBe(2);
+  });
+
+  it("keeps the other Spaces of the same profile without Favorites", () => {
+    const items = [
+      arcContainer("one-pinned", []),
+      arcContainer("one-unpinned", []),
+      arcContainer("two-pinned", []),
+      arcContainer("two-unpinned", []),
+      arcContainer("fav", ["fav-a"]),
+      arcTab("fav-a", "https://fav-a.example/"),
+    ];
+    const spaces: Array<[string, unknown]> = [
+      ["one", arcSpace("one", "One", DEFAULT_PROFILE_KEY, "one-pinned", "one-unpinned", {})],
+      ["two", arcSpace("two", "Two", DEFAULT_PROFILE_KEY, "two-pinned", "two-unpinned", {})],
+    ];
+
+    const { state: imported } = importArcSidebar(buildArcFile(spaces, items, [[DEFAULT_PROFILE_KEY, "fav"]]), createInitialState(), ONE_PM);
+
+    expect(imported.spaces.find((space) => space.id === "arc-space-one")?.favoriteIds).toEqual(["arc-fav-a"]);
+    expect(imported.spaces.find((space) => space.id === "arc-space-two")?.favoriteIds).toEqual([]);
   });
 
   it("stops at the Favorites limit and counts the rest as dropped", () => {
@@ -370,7 +393,8 @@ describe("importing Favorites", () => {
 
     const { state: imported, report } = importArcSidebar(buildArcFile([], items, [[DEFAULT_PROFILE_KEY, "fav"]]), createInitialState(), ONE_PM);
 
-    expect(imported.profiles[0].favoriteIds).toHaveLength(FAVORITES_LIMIT);
+    // No Arc Space came along, so the Space that was active takes them, up to its own limit.
+    expect(imported.spaces[0].favoriteIds).toHaveLength(FAVORITES_LIMIT);
     expect(report.favoritesImported).toBe(FAVORITES_LIMIT);
     expect(report.favoritesDropped).toBe(3);
   });
@@ -383,7 +407,8 @@ describe("choosing the parts", () => {
     expect(report.spacesImported).toBe(0);
     expect(imported.spaces.map((space) => space.id)).toEqual(["space-personal", "space-work"]);
     expect(report.favoritesImported).toBe(2);
-    expect(imported.profiles[0].favoriteIds).toEqual(["arc-fav-one"]);
+    expect(imported.activeSpaceId).toBe("space-personal");
+    expect(imported.spaces[0].favoriteIds).toEqual(["arc-fav-one", "arc-fav-two"]);
   });
 
   it("brings only the Spaces when the Favorites are left out", () => {
@@ -391,7 +416,7 @@ describe("choosing the parts", () => {
 
     expect(report.spacesImported).toBe(2);
     expect(report.favoritesImported).toBe(0);
-    expect(imported.profiles.every((profile) => profile.favoriteIds.every((id) => !id.startsWith("arc-fav")))).toBe(true);
+    expect(imported.spaces.every((space) => space.favoriteIds.length === 0)).toBe(true);
   });
 
   it("changes nothing when both are left out", () => {

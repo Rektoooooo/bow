@@ -19,7 +19,7 @@ import {
 import { addToFavorites, createInitialState, getSelectedTabId, setSpaceNewTabUrl, setSpaceSearchEngine } from "../src/main/state";
 import { rankCommandBarResults } from "../src/main/commandBar";
 import { findSpaceSearchEngine } from "../src/shared/searchEngines";
-import { HOUR_MS } from "../src/shared/settings";
+import { FAVORITES_LIMIT, HOUR_MS } from "../src/shared/settings";
 import type { BrowserState, ItemId, SpaceTheme } from "../src/shared/types";
 import { getPinnedIds, getTodayIds, ONE_PM, openPinnedTabs, openTabs, PERSONAL_SPACE_ID, WORK_SPACE_ID } from "./builders";
 
@@ -87,6 +87,19 @@ describe("deleteSpace", () => {
     expect(state.selectedTabIdBySpace[PERSONAL_SPACE_ID]).toBeUndefined();
   });
 
+  it("archives the Space's Favorites with its other tabs and leaves another Space's row alone", () => {
+    const { state: withTabs, tabIds } = openTabs(["https://a.example", "https://b.example"]);
+    const favoriteState = addToFavorites(addToFavorites(withTabs, tabIds[0] as ItemId), tabIds[1] as ItemId);
+    const workTab = openTabs(["https://c.example"], { ...favoriteState, activeSpaceId: WORK_SPACE_ID });
+    const withWorkFavorite = addToFavorites(workTab.state, workTab.tabIds[0] as ItemId);
+
+    const state = deleteSpace(withWorkFavorite, PERSONAL_SPACE_ID, TWO_PM);
+
+    expect(state.archive.map((entry) => entry.tab.id).sort()).toEqual([...tabIds].sort());
+    expect(state.archive.every((entry) => entry.fromSpaceId === PERSONAL_SPACE_ID)).toBe(true);
+    expect(state.spaces[0]?.favoriteIds).toEqual(workTab.tabIds);
+  });
+
   it("never deletes the last Space", () => {
     const onlyOne = deleteSpace(createInitialState(), WORK_SPACE_ID, ONE_PM);
 
@@ -105,6 +118,22 @@ describe("moveItemToSpace", () => {
     expect(getPinnedIds(state, WORK_SPACE_ID)).toEqual(pinnedIds);
     expect(getTodayIds(state, WORK_SPACE_ID)).toEqual(todayIds);
     expect(getPinnedIds(state, PERSONAL_SPACE_ID)).toEqual([]);
+  });
+
+  it("makes a Favorite a Favorite of the target Space, or Pinned there when that row is full", () => {
+    const { state: withTab, tabIds } = openTabs(["https://a.example"]);
+    const favoriteState = addToFavorites(withTab, tabIds[0] as ItemId);
+
+    const moved = moveItemToSpace(favoriteState, tabIds[0] as ItemId, WORK_SPACE_ID);
+    const fullWorkRow = Array.from({ length: FAVORITES_LIMIT }, (_unused, index) => `full-${index}`);
+    const fullState: BrowserState = { ...favoriteState, spaces: favoriteState.spaces.map((space) => (space.id === WORK_SPACE_ID ? { ...space, favoriteIds: fullWorkRow } : space)) };
+    const movedToFullRow = moveItemToSpace(fullState, tabIds[0] as ItemId, WORK_SPACE_ID);
+
+    expect(moved.spaces[0]?.favoriteIds).toEqual([]);
+    expect(moved.spaces[1]?.favoriteIds).toEqual([tabIds[0]]);
+    expect(moveItemToSpace(moved, tabIds[0] as ItemId, WORK_SPACE_ID)).toBe(moved);
+    expect(getPinnedIds(movedToFullRow, WORK_SPACE_ID)).toEqual([tabIds[0]]);
+    expect(movedToFullRow.spaces[1]?.favoriteIds).toEqual(fullWorkRow);
   });
 
   it("moves the selection when the selected tab leaves the Space", () => {
@@ -127,10 +156,19 @@ describe("removeEmptySpaces", () => {
     expect(state.spaces.map((space) => space.id)).toEqual([PERSONAL_SPACE_ID]);
     expect(onlyOneLeft.spaces).toHaveLength(1);
   });
+
+  it("keeps a Space that holds only Favorites", () => {
+    const { state: withTab, tabIds } = openTabs(["https://a.example"]);
+    const withWorkFavorite: BrowserState = { ...withTab, spaces: withTab.spaces.map((space) => (space.id === WORK_SPACE_ID ? { ...space, favoriteIds: [tabIds[0] as ItemId] } : space)) };
+
+    const state = removeEmptySpaces(withWorkFavorite, [WORK_SPACE_ID]);
+
+    expect(state).toBe(withWorkFavorite);
+  });
 });
 
 describe("profiles", () => {
-  it("creates a profile and moves a Space to it; its Favorites change with it", () => {
+  it("creates a profile and moves a Space to it; its Favorites stay with the Space", () => {
     const { state: withTab, tabIds } = openTabs(["https://mail.example"]);
     const withFavorite = addToFavorites(withTab, tabIds[0] as ItemId);
     const created = createProfile(withFavorite, "  ", ONE_PM);
@@ -139,8 +177,8 @@ describe("profiles", () => {
 
     expect(created.state.profiles.map((profile) => profile.name)).toEqual(["Default", "Profile 2"]);
     expect(state.spaces[0]?.profileId).toBe(created.profileId);
-    // The Favorite belongs to the old profile, so the Space no longer shows it selected.
-    expect(getSelectedTabId(state)).toBeNull();
+    expect(state.spaces[0]?.favoriteIds).toEqual([tabIds[0]]);
+    expect(getSelectedTabId(state)).toBe(getSelectedTabId(withFavorite));
   });
 });
 

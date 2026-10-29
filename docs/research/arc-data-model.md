@@ -101,6 +101,7 @@ For each Space in `spaces` order:
 
 - **Favorites belong to a profile, not a Space.** Every Space that uses the same profile shows the same Favorites.
   Arc's help center gives a maximum of 12.
+  Arc keeps Favorites per profile; Bow keeps them per Space (the user's choice, 2026-10-29).
 - Space order also lives in `sidebarSyncState.container.value.orderedSpaceIDs`; the order of `spaces` matched it.
 
 ### Space theme (`windowTheme`)

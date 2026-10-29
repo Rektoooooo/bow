@@ -123,6 +123,8 @@ const conflictKeys = new Set<string>();
 let folderProblem: string | null = null;
 let writeProblem: string | null = null;
 const unreadableFiles = new Set<string>();
+/** Files of Macs that still run a Bow with Favorites per profile: skipped whole until those Macs update. */
+const olderBowFiles = new Set<string>();
 
 /** The problem the Library was last told about. */
 let reportedProblem: string | null = null;
@@ -288,10 +290,14 @@ function describeProblem(): string | null {
   if (writeProblem !== null) {
     return writeProblem;
   }
+  const notices: string[] = [];
   if (unreadableFiles.size > 0) {
-    return `Bow can't read ${[...unreadableFiles].join(", ")} in the sync folder (damaged, or from a newer Bow).`;
+    notices.push(`Bow can't read ${[...unreadableFiles].join(", ")} in the sync folder (damaged, or from a newer Bow).`);
   }
-  return null;
+  if (olderBowFiles.size > 0) {
+    notices.push(`Bow skipped ${[...olderBowFiles].join(", ")} in the sync folder (from an older Bow; update Bow on that Mac).`);
+  }
+  return notices.length === 0 ? null : notices.join(" ");
 }
 
 /**
@@ -397,9 +403,10 @@ function requestDownload(placeholderPath: string): void {
 async function readPeerFiles(folder: string, onlyChanged: boolean): Promise<SyncPayload[]> {
   const payloads: SyncPayload[] = [];
   const names = await withTimeout(fs.promises.readdir(folder));
-  for (const name of [...unreadableFiles]) {
+  for (const name of [...unreadableFiles, ...olderBowFiles]) {
     if (!names.includes(name)) {
       unreadableFiles.delete(name);
+      olderBowFiles.delete(name);
     }
   }
   for (const name of names) {
@@ -417,12 +424,18 @@ async function readPeerFiles(folder: string, onlyChanged: boolean): Promise<Sync
     }
     peerFileTimes.set(name, stats.mtimeMs);
     const text = stats.size > MAX_SYNC_FILE_BYTES ? "" : await withTimeout(fs.promises.readFile(filePath, "utf8"));
-    const payload = parseSyncPayload(text);
+    const parsed = parseSyncPayload(text, Date.now());
+    const payload = parsed.payload;
+    unreadableFiles.delete(name);
+    olderBowFiles.delete(name);
+    if (parsed.problem === "older") {
+      olderBowFiles.add(name);
+      continue;
+    }
     if (payload === null || payload.deviceId === deviceId) {
       unreadableFiles.add(name);
       continue;
     }
-    unreadableFiles.delete(name);
     peerNames.set(payload.deviceId, payload.deviceName);
     payloads.push(payload);
   }
@@ -656,6 +669,7 @@ export async function chooseSyncFolder(): Promise<void> {
   // The first read of the new folder reads every file again (and reports damaged ones); merged ones change nothing.
   peerFileTimes.clear();
   unreadableFiles.clear();
+  olderBowFiles.clear();
   peerNames.clear();
   for (const peer of peers) {
     peerNames.set(peer.deviceId, peer.deviceName);
@@ -692,6 +706,7 @@ export function stopSyncing(): void {
   peerFileTimes.clear();
   peerNames.clear();
   unreadableFiles.clear();
+  olderBowFiles.clear();
   folderProblem = null;
   writeProblem = null;
   reportedProblem = null;

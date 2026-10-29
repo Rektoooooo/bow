@@ -50,7 +50,7 @@ function craftedBackupText(change: (backup: BowBackup) => void): string {
 }
 
 function parseOrFail(text: string) {
-  const result = parseBackup(text);
+  const result = parseBackup(text, LATER);
   if (!result.isValid) {
     throw new Error(`Expected a valid backup: ${result.error}`);
   }
@@ -116,17 +116,17 @@ describe("backups", () => {
   });
 
   it("refuse files that are not Bow backups, or from a newer Bow", () => {
-    expect(parseBackup("not json").isValid).toBe(false);
-    expect(parseBackup(JSON.stringify({ hello: 1 })).isValid).toBe(false);
+    expect(parseBackup("not json", LATER).isValid).toBe(false);
+    expect(parseBackup(JSON.stringify({ hello: 1 }), LATER).isValid).toBe(false);
     const newer = craftedBackupText((backup) => {
       backup.formatVersion = BACKUP_FORMAT_VERSION + 1;
     });
-    const newerResult = parseBackup(newer);
+    const newerResult = parseBackup(newer, LATER);
     expect(newerResult.isValid === false && newerResult.error).toContain("newer Bow");
     const noSpaces = craftedBackupText((backup) => {
       backup.state = { ...backup.state, spaces: [] };
     });
-    expect(parseBackup(noSpaces).isValid).toBe(false);
+    expect(parseBackup(noSpaces, LATER).isValid).toBe(false);
   });
 
   it("keep only web, note and easel addresses", () => {
@@ -316,15 +316,38 @@ describe("backups", () => {
     const built = openTabs(urls);
     let backupState = built.state;
     const favoriteIds = built.tabIds;
-    backupState = { ...backupState, profiles: backupState.profiles.map((profile) => ({ ...profile, favoriteIds: favoriteIds })), spaces: backupState.spaces.map((space) => ({ ...space, todayIds: space.todayIds.filter((itemId) => !favoriteIds.includes(itemId)) })) };
+    const favoriteIdsWithRepeat = [...favoriteIds, ...favoriteIds.slice(0, 1)];
+    backupState = {
+      ...backupState,
+      spaces: backupState.spaces.map((space, index) => ({ ...space, favoriteIds: index === 0 ? favoriteIdsWithRepeat : [], todayIds: space.todayIds.filter((itemId) => !favoriteIds.includes(itemId)) })),
+    };
     const restored = parseOrFail(backupText(backupState)).state;
     const currentBuilt = openTabs(["https://site-0.example/"]);
-    const current = { ...currentBuilt.state, profiles: currentBuilt.state.profiles.map((profile) => ({ ...profile, favoriteIds: currentBuilt.tabIds })), spaces: currentBuilt.state.spaces.map((space) => ({ ...space, todayIds: [] })) };
+    const current = currentBuilt.state;
     const added = addSpacesFromBackup(current, restored, LATER).state;
-    const favorites = added.profiles[0]?.favoriteIds ?? [];
+    // Each copied Space brings its own Favorites; the Spaces already here keep theirs.
+    const addedSpaces = added.spaces.slice(current.spaces.length);
+    const favorites = addedSpaces[0]?.favoriteIds ?? [];
     expect(favorites.length).toBe(FAVORITES_LIMIT);
+    expect(addedSpaces.slice(1).every((space) => space.favoriteIds.length === 0)).toBe(true);
+    expect(added.spaces.slice(0, current.spaces.length)).toEqual(current.spaces);
     const addresses = favorites.map((favoriteId) => getTab(added, favoriteId).url);
     expect(new Set(addresses).size).toBe(addresses.length);
+  });
+
+  it("restore a version 4 backup by moving its profile's Favorites to one Space", () => {
+    const built = openTabs(["https://site-a.example/", "https://site-b.example/"]);
+    const version4State = {
+      ...built.state,
+      version: 4,
+      profiles: built.state.profiles.map((profile) => ({ ...profile, favoriteIds: built.tabIds })),
+      spaces: built.state.spaces.map(({ favoriteIds: _unused, ...space }) => ({ ...space, todayIds: [] })),
+    };
+
+    const restored = parseOrFail(backupText(version4State as unknown as BrowserState)).state;
+
+    expect(restored.version).toBe(5);
+    expect(restored.spaces.map((space) => space.favoriteIds)).toEqual([built.tabIds, []]);
   });
 
   it("keep Today and the archive of the backup when replacing", () => {

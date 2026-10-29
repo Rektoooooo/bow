@@ -142,15 +142,17 @@ export interface SpaceTheme {
   intensity?: number;
 }
 
-/** A named workspace with its own Pinned and Today tabs. */
+/** A named workspace with its own Favorites, Pinned and Today tabs. */
 export interface Space {
   id: SpaceId;
   name: string;
   /** One emoji shown in the Space switcher and heading. */
   icon: string;
   theme: SpaceTheme;
-  /** Whose cookies, logins and Favorites this Space uses. */
+  /** Whose cookies and logins this Space uses. */
   profileId: ProfileId;
+  /** Favorite tabs (the tiles at the top of the sidebar) in order, kept per Space. Only tab ids. */
+  favoriteIds: ItemId[];
   /** Top-level Pinned items in sidebar order (tabs, folders, split views). */
   pinnedIds: ItemId[];
   /** Today items in sidebar order, newest first (tabs and split views). */
@@ -174,12 +176,10 @@ export interface Space {
   newTabUrl?: string;
 }
 
-/** A browsing identity: its own cookies and logins, and its own Favorites shared by every Space that uses it. */
+/** A browsing identity: its own cookies and logins, shared by every Space that uses it. */
 export interface Profile {
   id: ProfileId;
   name: string;
-  /** Favorite tabs (the tiles at the top of the sidebar), in order. Only tab ids. */
-  favoriteIds: ItemId[];
   /**
    * Forget Site Data on Quit (main/siteDataCleaner.ts): cookies, sign-ins and site storage go every time Bow quits.
    * Optional: missing means kept. Stays on each Mac (sync's profile unit is the name only).
@@ -434,7 +434,7 @@ export interface ParkedWindow extends WindowSidebar {
 /** Everything the browser saves to disk. */
 export interface BrowserState {
   /** Raise this number when the saved shape changes, and add an upgrade step to migrate.ts. */
-  version: 4;
+  version: 5;
   /** Every sidebar item, by id. Where an item sits is decided by the lists that contain its id. */
   items: Record<ItemId, SidebarItem>;
   profiles: Profile[];
@@ -587,7 +587,7 @@ export interface MediaInfo {
 
 /** Where an item lives. Exactly one list in the state contains each item's id. */
 export type ItemLocation =
-  | { kind: "favorites"; profileId: ProfileId }
+  | { kind: "favorites"; spaceId: SpaceId }
   | { kind: "pinned"; spaceId: SpaceId }
   | { kind: "today"; spaceId: SpaceId }
   | { kind: "folder"; folderId: ItemId }

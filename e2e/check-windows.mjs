@@ -450,7 +450,7 @@ check(
 );
 await dragAcrossWindows(firstSidebar, "tab-delta", secondSidebar, ".favorites-end-zone");
 secondState = await getState(secondSidebar);
-check("onto another window's Favorites", secondState.profiles[0].favoriteIds.includes("tab-delta") && selectedTabId(secondState) === "tab-delta");
+check("onto another window's Favorites", secondState.spaces.find((space) => space.id === "space-work").favoriteIds.includes("tab-delta") && selectedTabId(secondState) === "tab-delta");
 await dispatch(secondSidebar, { type: "switchSpace", spaceId: "space-main" });
 await secondSidebar.waitForTimeout(300);
 await dragAcrossWindows(firstSidebar, "tab-epsilon", secondSidebar, '[data-drop="item"][data-item-id="folder-reading"]');
