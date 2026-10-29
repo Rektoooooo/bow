@@ -25,6 +25,7 @@ import { closeOverlay, openCommandBar, relayoutOverlay } from "./overlayControll
 import { leaveWindow as overlayLeaveWindow } from "./overlay";
 import { closePeekIn, refreshPeekFrame, relayoutPeek } from "./peek";
 import { leaveWindow as statusBubbleLeaveWindow } from "./statusBubble";
+import { closeAutofillPopup, leaveWindow as autofillLeaveWindow } from "./autofillPopup";
 import { createId } from "./tree";
 import { closeWindow, focusWindow, listWindowIds, openWindow } from "./windows";
 import { forgetWindowBounds, loadWindowBounds, rememberWindowBounds } from "./windowState";
@@ -68,6 +69,8 @@ function handleWindowFocus(windowId: WindowId): void {
     return;
   }
   closeOverlay(false);
+  // The field list belongs to the window it opened in.
+  closeAutofillPopup();
   applyChange((current) => focusWindow(current, windowId));
 }
 
@@ -81,6 +84,7 @@ function handleWindowClose(windowId: WindowId, window: BrowserWindow): void {
   }
   overlayLeaveWindow(window);
   statusBubbleLeaveWindow(window);
+  autofillLeaveWindow(window);
   closePeekIn(window);
   detachWindow(windowId);
   if (isQuitting) {
@@ -162,6 +166,7 @@ function createMainWindow(windowId: WindowId, bounds: Rectangle | null): Browser
   // Arc draws an active window darker than an inactive one: the sidebar hears of every change (also to another app).
   window.on("focus", () => scheduleRuntimePush());
   window.on("blur", () => scheduleRuntimePush());
+  window.on("blur", () => autofillLeaveWindow(window));
   window.on("focus", () => refreshPeekFrame(window));
   window.on("blur", () => refreshPeekFrame(window));
   // The frame is darker in the active window, and so are the card's rounded corners drawn over the page.

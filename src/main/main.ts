@@ -51,6 +51,7 @@ import { restoreMainWindows } from "./mainWindows";
 import { createCommandActionRegistry } from "./commandBarActions";
 import { startTrackingDownloads } from "./downloads";
 import { getExtensionMenuItems, initializeExtensionHost, prepareExtensions } from "./extensionHost";
+import { initializeAutofill } from "./autofillPopup";
 import { initializePasswordOffers } from "./passwordOffers";
 import { initializePermissionPrompts } from "./permissionPrompts";
 import { registerFormsHelper, registerFormsIpc } from "./formsBridge";
@@ -353,6 +354,8 @@ async function handleAppReady(): Promise<void> {
   // Sites ask before using the camera, microphone, location, notifications or the clipboard.
   initializePermissionPrompts();
   initializePasswordOffers();
+  // The list under a sign-in or address field (saved logins, remembered values).
+  initializeAutofill();
   // Ad blocking checks requests in every profile session; the lists load now when it is on.
   initializeAdBlocking(app.getPath("userData"), getState, () => refreshOpenPanel());
   onProfileSessionCreated(installAdBlocker);

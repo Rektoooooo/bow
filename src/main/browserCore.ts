@@ -29,6 +29,7 @@ import { findMediaInfo, handleShownTabsChanged } from "./media";
 import type { CardLayoutOptions } from "./layout";
 import { computeLibraryWidth } from "./layout";
 import type { LibrarySection } from "../shared/overlay";
+import { raiseAutofillPopupIfShown } from "./autofillPopup";
 import { raiseOverlayIfShown } from "./overlay";
 import { getSelectedTabId } from "./state";
 import { findTab } from "./tree";
@@ -536,6 +537,8 @@ export function syncViews(): void {
   for (const windowId of changedWindowIds) {
     const window = getMainWindow(windowId);
     if (window !== null) {
+      // The field list stays above the pages; the overlay stays above the list.
+      raiseAutofillPopupIfShown(window);
       raiseOverlayIfShown(window);
     }
   }

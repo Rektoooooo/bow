@@ -43,6 +43,7 @@ import { getPrivacySummary } from "./privacyReportStore";
 import { buildShortcutEditorData, cancelShortcutRecording } from "./shortcutEditor";
 import { describeSpaceIconAsText } from "../shared/spaceIcons";
 import { RESTART_TO_UPDATE_ID } from "./commandBarActions";
+import { closeAutofillPopup } from "./autofillPopup";
 import { focusMainWindow } from "./mainWindows";
 import type { CommandBarResult } from "./commandBar";
 import type { CommandActionRegistry } from "./commandBarActions";
@@ -481,6 +482,8 @@ function startZapping(site: string, tabId: string): void {
  * Opens a panel in the overlay.
  */
 function openPanel(panel: OverlayPanel): void {
+  // The field list and a panel never share the screen.
+  closeAutofillPopup();
   const window = getWindow();
   const bounds = computeOverlayBounds(panel);
   if (window === null || bounds === null) {

@@ -1,0 +1,24 @@
+<!doctype html>
+<!--
+  WHY this file exists:
+    The list under a form field: saved logins and remembered emails or addresses. It is a small transparent view of
+    our own above the web page, so a page can neither read nor restyle it.
+
+  Data source:
+    popup.ts draws the rows autofillPopup.ts sends through window.autofillApi.
+
+  Data flow:
+    autofillPopup.ts → "autofill:show" → popup.ts → #autofill-list
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+    <title>Autofill</title>
+    <link rel="stylesheet" href="./popup.css">
+  </head>
+  <body>
+    <div id="autofill-list" class="autofill-list" role="listbox"></div>
+    <script type="module" src="./popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,138 @@
+/*
+  WHY this file exists:
+    Look of the list under a form field. A card inside a transparent view: the view leaves room around the card for
+    its shadow. THE SIZES BELOW MUST MATCH src/main/autofillPlacement.ts (margins, padding, border, row heights); the
+    main process sizes the view from them. Colors and radius follow the overlay's panels (overlay.css).
+*/
+:root {
+  --card: #fbfbfb;
+  --card-border: rgba(0, 0, 0, 0.12);
+  /* Ends inside the view's margins (12 px at the sides, 14 px on the far side): a shadow cut off at the view's edge shows as a grey box. */
+  --card-shadow: 0 4px 10px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.12);
+  --ink: rgba(0, 0, 0, 0.88);
+  --muted: rgba(0, 0, 0, 0.45);
+  --highlight: rgba(0, 0, 0, 0.07);
+  color-scheme: light dark;
+}
+
+:root.is-dark {
+  --card: #18191a;
+  --card-border: rgba(255, 255, 255, 0.2);
+  --card-shadow: 0 4px 10px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --ink: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.42);
+  --highlight: rgba(255, 255, 255, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  color: var(--ink);
+  font: 13px/1.3 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  -webkit-font-smoothing: auto;
+  user-select: none;
+  cursor: default;
+}
+
+/* Margins: 12 px at the sides (POPUP_SIDE_MARGIN_PX), 4 px on the field's side (POPUP_NEAR_MARGIN_PX) and 14 px on the
+   far side (POPUP_FAR_MARGIN_PX). The card fills the rest of the view. */
+.autofill-list {
+  position: fixed;
+  inset: 4px 12px 14px;
+  padding: 4px;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  box-shadow: var(--card-shadow);
+  animation: list-in 110ms ease-out;
+}
+
+body.is-above .autofill-list {
+  inset: 14px 12px 4px;
+}
+
+.autofill-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+/* POPUP_LOGIN_ROW_HEIGHT_PX and POPUP_VALUE_ROW_HEIGHT_PX */
+.autofill-row.is-login {
+  height: 44px;
+}
+
+.autofill-row.is-value {
+  height: 30px;
+}
+
+.autofill-row:hover,
+.autofill-row.is-highlighted {
+  background: var(--highlight);
+}
+
+.autofill-icon {
+  color: var(--muted);
+}
+
+.autofill-icon.icon-symbol {
+  width: var(--symbol-width, 16px);
+  height: var(--symbol-height, 16px);
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  flex: none;
+}
+
+.autofill-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.autofill-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.autofill-row.is-value .autofill-title {
+  font-weight: 400;
+}
+
+.autofill-dots {
+  font-size: 11px;
+  line-height: 1.2;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+
+@keyframes list-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .autofill-list {
+    animation: none;
+  }
+}

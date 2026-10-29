@@ -3,7 +3,11 @@
 //   profile's encrypted vault (the file on disk shows neither the password nor the username);
 // - the same password asks nothing, a changed one asks to update, "Never for this site" is remembered per site;
 // - a page script that fills and sends a form is never offered, a single-page sign-in (no navigation) is;
-// - Not now and Escape save nothing, the setting turns the offers off, and only the tab that signed in asks.
+// - Not now and Escape save nothing, the setting turns the offers off, and only the tab that signed in asks;
+// - the list under the field (Bow's own view above the page): nothing is filled on load, a real click shows the saved
+//   login below the field and inside the page's area, a script focus shows nothing, arrow keys + Return, Escape and a
+//   click on a row work, Return with nothing highlighted still sends the form, typing past the match closes it, the
+//   password field shows it too, a site without a saved login shows nothing, and near the page's bottom it opens above.
 // usage: npm run build && node e2e/check-passwords.mjs
 import "./background.mjs";
 import { _electron } from "playwright-core";
@@ -11,6 +15,7 @@ import { createRequire } from "node:module";
 import * as fs from "node:fs";
 import * as http from "node:http";
 import * as path from "node:path";
+import { captureWindow } from "./composite.mjs";
 
 const appDir = path.resolve(import.meta.dirname, "..");
 const outDir = process.env.E2E_OUTPUT_DIR || path.join(appDir, "e2e", "output");
@@ -28,10 +33,21 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const FIELDS = `<input type="email" name="email" autocomplete="username" style="width:300px;height:30px">
   <input type="password" name="password" autocomplete="current-password" style="width:300px;height:30px">
   <button>Sign in</button>`;
+// Counts the input events each field heard, so a check can see that a fill looks like typing to the page.
+const INPUT_COUNTER = `<script>
+  window.inputCounts = { email: 0, password: 0 };
+  document.querySelector("input[type=email]").addEventListener("input", () => { window.inputCounts.email++; });
+  document.querySelector("input[type=password]").addEventListener("input", () => { window.inputCounts.password++; });
+</script>`;
 const server = http.createServer((request, response) => {
   response.setHeader("content-type", "text/html");
+  // A tall page with the form at its very bottom: scrolled down, the fields are at the view's bottom edge.
+  if (request.url.startsWith("/login-bottom")) {
+    response.end(`<!doctype html><title>Login bottom</title><body style="margin:0;height:3000px"><form method="post" action="/welcome" style="position:absolute;top:2900px">${FIELDS}</form></body>`);
+    return;
+  }
   if (request.url.startsWith("/login")) {
-    response.end(`<!doctype html><title>Login</title><body style="margin:0"><form method="post" action="/welcome">${FIELDS}</form></body>`);
+    response.end(`<!doctype html><title>Login</title><body style="margin:0"><form method="post" action="/welcome">${FIELDS}</form>${INPUT_COUNTER}</body>`);
     return;
   }
   if (request.url.startsWith("/spa-login")) {
@@ -269,6 +285,192 @@ if (hiddenTabId === undefined) {
   await overlay.keyboard.press("Escape");
   await waitForOverlayGone();
 }
+
+// ---------- 11. The list under the field ----------
+// Bow's own view above the page, found among the main window's views by its page.
+const readAutofillView = (tabAddressPart) =>
+  app.evaluate(({ BrowserWindow }, addressPart) => {
+    const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+    const views = win.contentView.children.filter((child) => child.webContents);
+    const popup = views.find((child) => child.webContents.getURL().endsWith("/autofill/popup.html"));
+    const tab = views.find((child) => child.webContents.getURL().includes(addressPart));
+    if (!popup || !tab) return null;
+    return { popup: popup.getBounds(), tab: tab.getBounds() };
+  }, tabAddressPart);
+const waitForList = async (tabPage, timeoutMs = 2500) => {
+  const addressPart = `run=${new URL(tabPage.url()).searchParams.get("run")}`;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const found = await readAutofillView(addressPart);
+    if (found !== null) return found;
+    await sleep(100);
+  }
+  return null;
+};
+const isListGone = async (tabPage, timeoutMs = 1500) => {
+  const addressPart = `run=${new URL(tabPage.url()).searchParams.get("run")}`;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if ((await readAutofillView(addressPart)) === null) return true;
+    await sleep(100);
+  }
+  return false;
+};
+// Keys that Bow's list takes are sent through the tab's web contents: Playwright's keyboard goes straight to the page
+// (the DevTools protocol) and never passes the browser-side "before-input-event" where the list listens, as a real key
+// press does. A Return is followed by a "char" event, which is what sends a form.
+const pressKeyLikeUser = (tabPage, keyCode) =>
+  app.evaluate(
+    async ({ webContents }, { addressPart, code }) => {
+      const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL().includes(addressPart));
+      contents.sendInputEvent({ type: "keyDown", keyCode: code });
+      if (code === "Return") contents.sendInputEvent({ type: "char", keyCode: "\r" });
+      contents.sendInputEvent({ type: "keyUp", keyCode: code });
+    },
+    { addressPart: `run=${new URL(tabPage.url()).searchParams.get("run")}`, code: keyCode },
+  );
+const fieldValues = (tabPage) =>
+  tabPage.evaluate(() => ({
+    email: document.querySelector("input[type=email]").value,
+    password: document.querySelector("input[type=password]").value,
+    counts: { ...window.inputCounts },
+  }));
+const clearFields = (tabPage) =>
+  tabPage.evaluate(() => {
+    document.querySelector("input[type=email]").value = "";
+    document.querySelector("input[type=password]").value = "";
+  });
+const readTimesUsed = () =>
+  app.evaluate(async (_electron, modulePath) => {
+    const access = await process.mainModule.require(modulePath).openVault("profile-default");
+    return access.vault.logins.map((login) => login.timesUsed ?? 0);
+  }, vaultModulePath);
+const popupPage = await findPage("/autofill/popup.html").catch(() => null);
+let listPage = popupPage;
+
+// 11a. Nothing is filled on load.
+const listTab = await openSignIn(mainOrigin, "login");
+await listTab.reload();
+await listTab.waitForSelector("input[type=email]");
+await sleep(1000);
+const afterLoad = await fieldValues(listTab);
+check("a page with a saved login fills nothing on load", afterLoad.email === "" && afterLoad.password === "", JSON.stringify({ email: afterLoad.email, password: afterLoad.password }));
+
+// 11b. A real click shows the login below the field, inside the page's area, without the password.
+await listTab.click("input[type=email]");
+const shownList = await waitForList(listTab);
+const emailBox = await listTab.evaluate(() => {
+  const box = document.querySelector("input[type=email]").getBoundingClientRect();
+  return { x: box.x, y: box.y, width: box.width, height: box.height };
+});
+const isBelowField = shownList !== null && shownList.popup.y >= shownList.tab.y + emailBox.y + emailBox.height - 1;
+const isInsidePage =
+  shownList !== null &&
+  shownList.popup.x >= shownList.tab.x &&
+  shownList.popup.y >= shownList.tab.y &&
+  shownList.popup.x + shownList.popup.width <= shownList.tab.x + shownList.tab.width &&
+  shownList.popup.y + shownList.popup.height <= shownList.tab.y + shownList.tab.height;
+check("a click into the email field shows the list below it, inside the page's area", isBelowField && isInsidePage, JSON.stringify(shownList));
+listPage = await findPage("/autofill/popup.html");
+await sleep(300);
+const listText = await listPage.evaluate(() => document.body.innerText.replace(/\s+/g, " ").trim());
+const listHtml = await listPage.content();
+check("the list shows the username and no password", listText.includes("alex@example.com") && !listHtml.includes("second-pass-2") && !listHtml.includes("first-pass-1"), listText);
+await listPage.screenshot({ path: path.join(outDir, "autofill-list.png"), omitBackground: true }).catch(() => undefined);
+await fs.promises.writeFile(path.join(outDir, "autofill-window.png"), await captureWindow(app)).catch(() => undefined);
+
+// 11c. Leaving the field closes it; a page script's focus shows nothing.
+await listTab.mouse.click(700, 500);
+const closedByClickElsewhere = await isListGone(listTab);
+await listTab.evaluate(() => document.querySelector("input[type=email]").focus());
+await sleep(1000);
+check("a click elsewhere closes the list, and a script's focus() shows none", closedByClickElsewhere && (await isListGone(listTab, 300)));
+
+// 11d. Arrow down + Return fills both fields, the page hears input events, the use is counted.
+const timesUsedBefore = (await readTimesUsed())[0];
+await listTab.click("input[type=email]");
+await waitForList(listTab);
+await pressKeyLikeUser(listTab, "Down");
+await pressKeyLikeUser(listTab, "Return");
+const filledByKeys = await fieldValues(listTab);
+check(
+  "ArrowDown and Return fill the email and the password, and the page heard input events",
+  filledByKeys.email === "alex@example.com" && filledByKeys.password === "second-pass-2" && filledByKeys.counts.email > 0 && filledByKeys.counts.password > 0,
+  JSON.stringify({ email: filledByKeys.email, counts: filledByKeys.counts }),
+);
+check("the list is gone after the pick", await isListGone(listTab));
+let timesUsedAfter = (await readTimesUsed())[0];
+for (let attempt = 0; attempt < 20 && timesUsedAfter === timesUsedBefore; attempt++) {
+  await sleep(100);
+  timesUsedAfter = (await readTimesUsed())[0];
+}
+check("the pick is counted as a use of the login", timesUsedAfter === timesUsedBefore + 1, `${timesUsedBefore} → ${timesUsedAfter}`);
+
+// 11e. Escape closes the list and fills nothing.
+await clearFields(listTab);
+await listTab.click("input[type=email]");
+await waitForList(listTab);
+await pressKeyLikeUser(listTab, "Escape");
+const closedByEscape = await isListGone(listTab);
+const afterEscapeKey = await fieldValues(listTab);
+check("Escape closes the list and the fields stay empty", closedByEscape && afterEscapeKey.email === "" && afterEscapeKey.password === "");
+
+// 11f. A click on the row fills.
+await listTab.click("input[type=email]");
+await waitForList(listTab);
+await listPage.click(".autofill-row");
+await sleep(400);
+const filledByClick = await fieldValues(listTab);
+check("a click on the row fills the email and the password", filledByClick.email === "alex@example.com" && filledByClick.password === "second-pass-2", filledByClick.email);
+
+// 11g. Return with nothing highlighted still sends the form.
+await clearFields(listTab);
+await listTab.click("input[type=email]");
+await waitForList(listTab);
+await pressKeyLikeUser(listTab, "Return");
+let navigatedToWelcome = false;
+for (let attempt = 0; attempt < 40 && !navigatedToWelcome; attempt++) {
+  navigatedToWelcome = listTab.url().includes("/welcome");
+  if (!navigatedToWelcome) await sleep(150);
+}
+check("Return with nothing highlighted sends the form", navigatedToWelcome, listTab.url());
+
+// 11h. Typing past the match closes the list; the password field shows it again.
+const typingTab = await openSignIn(mainOrigin, "login");
+await typingTab.click("input[type=email]");
+await waitForList(typingTab);
+await typingTab.keyboard.type("zzz");
+check("typing something that matches no login closes the list", await isListGone(typingTab));
+await typingTab.click("input[type=password]");
+const listAtPassword = await waitForList(typingTab);
+check("a click into the password field shows the login too", listAtPassword !== null);
+await pressKeyLikeUser(typingTab, "Escape");
+
+// 11i. A site without a saved login shows nothing, though its field was reported.
+const reportsBefore = await app.evaluate(async (_electron, modulePath) => process.mainModule.require(modulePath).getFormsMessageCounts().fieldFocused, path.join(appDir, "dist", "node", "main", "formsBridge.js"));
+const strangerTab = await openSignIn(otherOrigin, "login");
+await strangerTab.click("input[type=email]");
+await sleep(800);
+const reportsAfter = await app.evaluate(async (_electron, modulePath) => process.mainModule.require(modulePath).getFormsMessageCounts().fieldFocused, path.join(appDir, "dist", "node", "main", "formsBridge.js"));
+check("a site with no saved login shows no list (the field was reported)", reportsAfter > reportsBefore && (await isListGone(strangerTab, 300)), `${reportsBefore} → ${reportsAfter}`);
+
+// 11j. Near the page's bottom the list opens above the field, still inside the page's area.
+const bottomTab = await openSignIn(mainOrigin, "login-bottom");
+await bottomTab.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+await sleep(300);
+await bottomTab.click("input[type=email]");
+const bottomList = await waitForList(bottomTab);
+const bottomBox = await bottomTab.evaluate(() => {
+  const box = document.querySelector("input[type=email]").getBoundingClientRect();
+  return { y: box.y, height: box.height };
+});
+const isAboveField = bottomList !== null && bottomList.popup.y + bottomList.popup.height <= bottomList.tab.y + bottomBox.y + 1;
+const staysInside =
+  bottomList !== null &&
+  bottomList.popup.y >= bottomList.tab.y &&
+  bottomList.popup.y + bottomList.popup.height <= bottomList.tab.y + bottomList.tab.height;
+check("near the page's bottom the list opens above the field, inside the page's area", isAboveField && staysInside, JSON.stringify(bottomList));
+await pressKeyLikeUser(bottomTab, "Escape");
 
 // ---------- Done ----------
 const appPid = app.process().pid;

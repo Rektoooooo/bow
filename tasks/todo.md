@@ -410,7 +410,7 @@ page of a profile (isolated world, never in private windows), passwords encrypte
       sender check by identity
 - [x] 4. "Save password for example.com?" (overlay panel like the permission prompt): Save, Not now, Never for this
       site; Update when the password changed; only typed passwords
-- [ ] 5. The suggestion list under the field (its own view, never takes focus, clamped inside the page), fill on a
+- [x] 5. The suggestion list under the field (its own view, never takes focus, clamped inside the page), fill on a
       pick only, ↓ ↑ Return Escape; check-passwords (save and fill) → full suite, push
 - [ ] 6. Form memory: emails, names, phones, addresses come back as suggestions; Shift+Delete removes one
 - [ ] 7. Library › Passwords: list, search, Show / Copy / Edit behind Touch ID (fails closed), delete, never-saved
