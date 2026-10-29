@@ -372,8 +372,9 @@ yours, the essentials, a few good defaults, you're all set). Our own CSS/DOM/SVG
 - [x] 3. The cleaner look: bold sans titles, left column with a live preview, the whole window takes the picked colour,
       "Make Bow your browser?" with a message bubble, "You're all set."; no dashes in any text (done with 2: the
       import scene needed the new layout; check-onboarding 33 checks with real imports from a made-up home folder)
-- [ ] 4. The startup: a glow on the desktop that grows into the onboarding window, Bow's mark drawing itself; the
-      onboarding fading into the browser window
+- [x] 4. The startup: a glow on the desktop that grows into the onboarding window, Bow's mark drawing itself; the
+      onboarding fading into the browser window (and, from the user's note: every browser's real logo, shipped with
+      Bow, Arc's included; no "Not on this Mac" text under the dimmed ones)
 - [ ] 5. Screenshots and a recording for the user; polish
 
 ## Review (2026-10-28, an unattended night: open source, releases, auto-update, speed, polish)

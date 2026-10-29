@@ -25,6 +25,7 @@ import type { ONBOARDING_CHANNELS, OnboardingApi, WelcomeData } from "../shared/
 const CHANNELS: typeof ONBOARDING_CHANNELS = {
   getData: "onboarding:get-data",
   data: "onboarding:data",
+  shown: "onboarding:shown",
   close: "onboarding:close",
   readSource: "onboarding:read-source",
   bringOver: "onboarding:bring-over",
@@ -42,6 +43,9 @@ function createOnboardingApi(): OnboardingApi {
     getData: () => ipcRenderer.invoke(CHANNELS.getData),
     onData: (listener) => {
       ipcRenderer.on(CHANNELS.data, (_event: IpcRendererEvent, data: WelcomeData) => listener(data));
+    },
+    onShown: (listener) => {
+      ipcRenderer.on(CHANNELS.shown, (_event: IpcRendererEvent, isAfterIntro: boolean) => listener(isAfterIntro));
     },
     close: () => ipcRenderer.invoke(CHANNELS.close),
     getSymbols: () => ipcRenderer.invoke(SYMBOLS_CHANNEL),

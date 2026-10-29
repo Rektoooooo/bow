@@ -1,0 +1,169 @@
+/*
+  WHY this file exists:
+    The first start's intro (intro.html): a see-through page, a glow of three soft blobs in Bow's colors that breathe
+    and turn slowly, and the sheet it grows into. The sheet is drawn like the onboarding's own background
+    (onboarding.css: the base color, three soft lights at the same places, grain), sized by the onboarding window, so
+    the real window takes over without a jump.
+
+  Data source:
+    body.dark, and the frame's place and size (intro.ts sets them).
+*/
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+.intro-frame {
+  --intro-base: #f5f4f8;
+  --intro-wash-opacity: 0.55;
+  --intro-grain-opacity: 0.22;
+  /* The sheet's corners at the end: about a macOS window's. Our choice, by eye on macOS 26. */
+  --intro-corner: 16px;
+  position: absolute;
+  container-type: size;
+}
+
+body.dark .intro-frame {
+  --intro-base: #0c0c11;
+  --intro-wash-opacity: 0.5;
+  --intro-grain-opacity: 0.3;
+}
+
+.intro-shadow {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--intro-corner);
+  box-shadow: 0 24px 70px -10px rgba(10, 8, 30, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  opacity: 0;
+}
+
+.intro-sheet {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--intro-base);
+  opacity: 0;
+  clip-path: inset(50% 50% 50% 50% round 50%);
+}
+
+/* The same lights as the onboarding's wash (onboarding.css), measured by the sheet instead of the window. */
+.intro-wash {
+  position: absolute;
+  inset: -12%;
+  opacity: var(--intro-wash-opacity);
+}
+
+.intro-light {
+  position: absolute;
+  width: 78cqmax;
+  height: 78cqmax;
+  border-radius: 50%;
+}
+
+.intro-light-1 {
+  left: -18cqmax;
+  top: -34cqmax;
+  background: radial-gradient(circle at center, #ff8a7a 0%, transparent 62%);
+}
+
+.intro-light-2 {
+  right: -26cqmax;
+  top: -4cqmax;
+  background: radial-gradient(circle at center, #b56cff 0%, transparent 60%);
+  transform: scale(1.08);
+}
+
+.intro-light-3 {
+  left: 4cqmax;
+  bottom: -46cqmax;
+  background: radial-gradient(circle at center, #4f7cff 0%, transparent 60%);
+  transform: scale(0.96);
+}
+
+.intro-grain {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: overlay;
+  opacity: var(--intro-grain-opacity);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='grain'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23grain)'/></svg>");
+}
+
+/* The glow: three blobs around the middle of where the window will be, blurred into one light. */
+.intro-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 240px;
+  height: 240px;
+  margin: -120px 0 0 -120px;
+  filter: blur(34px);
+  opacity: 0;
+}
+
+.intro-blob {
+  position: absolute;
+  width: 62%;
+  height: 62%;
+  border-radius: 50%;
+  mix-blend-mode: screen;
+}
+
+body.dark .intro-blob {
+  mix-blend-mode: normal;
+}
+
+.intro-blob-1 {
+  top: 6%;
+  left: 4%;
+  background: #ff8a7a;
+}
+
+.intro-blob-2 {
+  top: 4%;
+  right: 2%;
+  background: #b56cff;
+}
+
+.intro-blob-3 {
+  bottom: 2%;
+  left: 20%;
+  background: #4f7cff;
+}
+
+/* While it waits, the glow breathes and its colors turn around each other. */
+.intro-glow.is-breathing {
+  animation: intro-breathe 2.6s ease-in-out infinite alternate;
+}
+
+.intro-glow.is-breathing .intro-blob {
+  animation: intro-turn 7s linear infinite;
+}
+
+@keyframes intro-breathe {
+  from {
+    transform: scale(0.92);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes intro-turn {
+  from {
+    transform: rotate(0deg) translateX(10px) rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg) translateX(10px) rotate(-360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro-glow.is-breathing,
+  .intro-glow.is-breathing .intro-blob {
+    animation: none;
+  }
+}

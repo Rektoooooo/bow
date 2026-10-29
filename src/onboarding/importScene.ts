@@ -1,14 +1,15 @@
 /**
  * WHY this file exists:
- *   "Bring your things." lists every browser Bow imports from, each with its own app icon (those not on this Mac
+ *   "Bring your things." lists every browser Bow imports from, each with its own logo (those not on this Mac
  *   dimmed). Picking one reads it first and says, in one sentence with the numbers in bold, what it holds; then one
  *   click brings it all over, or a checklist lets the user leave parts out. While it imports, each part's circle turns
  *   into a spinner and then a check, and the glass sidebar beside it (sidebarPreview.ts) fills in. Nothing is imported
  *   before the user says so.
  *
  * Data source:
- *   WelcomeData.browsers (every supported browser, its icon and its profiles here) and WelcomeData.imports (each
- *   source's progress, from main/onboardingWindow.ts).
+ *   WelcomeData.browsers (every supported browser and its profiles here), WelcomeData.imports (each source's progress,
+ *   from main/onboardingWindow.ts), and the browsers' logos next to the page (browser-logos/<id>.png: Arc's from its
+ *   app, the others from the open browser-logos collection; each a trademark of its maker, shown only to name it).
  *
  * Data flow:
  *   tile picked → onboardingApi.readSource() → "reading" → "found" (counts) → Import → onboardingApi.bringOver(parts)
@@ -54,9 +55,10 @@ interface ImportView {
 interface BrowserTile {
   browserId: string;
   button: HTMLButtonElement;
-  iconHolder: HTMLElement;
-  iconUrl: string | null;
 }
+
+/** Where the browsers' logos are, next to the page (the build copies src/onboarding/browser-logos). */
+const BROWSER_LOGO_FOLDER = "./browser-logos";
 
 /** One checklist row and the parts an update changes. */
 interface ChecklistRow {
@@ -66,22 +68,19 @@ interface ChecklistRow {
 }
 
 /**
- * A browser's icon: the app's own (drawn by macOS), or a neutral globe when it has none.
+ * A browser's logo, in a holder of the tile's (or the picked browser's) size.
  */
-function fillBrowserIcon(holder: HTMLElement, iconUrl: string | null): void {
-  if (iconUrl === null) {
-    holder.replaceChildren(createIcon("globe", "icon browser-icon-mark"));
-    return;
-  }
+function fillBrowserLogo(holder: HTMLElement, browserId: string): void {
   const image = document.createElement("img");
   image.alt = "";
-  image.src = iconUrl;
+  image.src = `${BROWSER_LOGO_FOLDER}/${browserId}.png`;
   image.className = "browser-icon-image";
   holder.replaceChildren(image);
 }
 
 /**
- * One tile of the grid: the icon, the name, and "Not on this Mac" for a browser with nothing to import here.
+ * One tile of the grid: the logo and the name; a browser with nothing to import here is dimmed (its tooltip and
+ * VoiceOver say why).
  */
 function createBrowserTile(browser: WelcomeBrowser, onPick: (browserId: string) => void): BrowserTile {
   const button = createTextButton("", "browser-tile", () => onPick(browser.id));
@@ -89,14 +88,16 @@ function createBrowserTile(browser: WelcomeBrowser, onPick: (browserId: string) 
   const isHere = browser.sources.length > 0;
   button.disabled = !isHere;
   button.classList.toggle("is-missing", !isHere);
+  if (!isHere) {
+    button.title = "Not on this Mac";
+    button.setAttribute("aria-label", `${browser.name}, not on this Mac`);
+  }
   const iconHolder = createElement("span", "browser-icon");
-  fillBrowserIcon(iconHolder, browser.iconUrl);
-  const name = createElement("span", "browser-name", browser.name);
-  const status = createElement("span", "browser-status", isHere ? "" : "Not on this Mac");
+  fillBrowserLogo(iconHolder, browser.id);
   const doneMark = createElement("span", "browser-done");
   doneMark.append(createIcon("checkmark", "icon"));
-  button.append(iconHolder, name, status, doneMark);
-  return { browserId: browser.id, button: button, iconHolder: iconHolder, iconUrl: browser.iconUrl };
+  button.append(iconHolder, createElement("span", "browser-name", browser.name), doneMark);
+  return { browserId: browser.id, button: button };
 }
 
 /**
@@ -186,7 +187,7 @@ export function createImportScene(data: WelcomeData, goNext: () => void): SceneV
     view.browserId = browserId;
     pickPane.hidden = true;
     sourcePane.hidden = false;
-    fillBrowserIcon(sourceIcon, browser.iconUrl);
+    fillBrowserLogo(sourceIcon, browser.id);
     sourceName.textContent = browser.name;
     drawProfiles(browser);
     pickSource(firstSource.id);
@@ -415,10 +416,6 @@ export function createImportScene(data: WelcomeData, goNext: () => void): SceneV
       if (browser === undefined) {
         continue;
       }
-      if (browser.iconUrl !== tile.iconUrl) {
-        tile.iconUrl = browser.iconUrl;
-        fillBrowserIcon(tile.iconHolder, browser.iconUrl);
-      }
       const isImported = browser.sources.some((source) => current.imports[source.id]?.phase === "done");
       tile.button.classList.toggle("is-imported", isImported);
     }
@@ -427,10 +424,6 @@ export function createImportScene(data: WelcomeData, goNext: () => void): SceneV
   const draw = (): void => {
     frame.element.dataset.view = view.browserId === null ? "pick" : "source";
     drawTiles();
-    const browser = findBrowser();
-    if (browser !== undefined && browser.iconUrl !== null && sourceIcon.querySelector("img") === null) {
-      fillBrowserIcon(sourceIcon, browser.iconUrl);
-    }
     if (view.browserId !== null) {
       drawSource();
     }

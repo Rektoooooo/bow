@@ -9,7 +9,7 @@
  *   The command line, else the user's home folder.
  *
  * Data flow:
- *   browserImportController.ts / arcImportController.ts / browserIcons.ts → getImportHomeFolder() → their paths
+ *   browserImportController.ts / arcImportController.ts → getImportHomeFolder() → their paths
  */
 import { app } from "electron";
 import * as fs from "node:fs";

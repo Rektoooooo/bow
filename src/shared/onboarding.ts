@@ -54,8 +54,6 @@ export interface WelcomeBrowser {
   /** One of SUPPORTED_BROWSERS' ids. */
   id: string;
   name: string;
-  /** The installed app's own icon (a data: URL drawn by macOS), or null (not installed, or not drawn). */
-  iconUrl: string | null;
   /** Its profiles that have something to import (several for a browser with profiles); none: not on this Mac. */
   sources: { id: string; profileName: string | null }[];
 }
@@ -308,6 +306,11 @@ export interface OnboardingApi {
   getData(): Promise<WelcomeData | null>;
   /** Something it shows changed (a theme, an import, a switch, the system's appearance): update in place. */
   onData(listener: (data: WelcomeData) => void): void;
+  /**
+   * Its window is on screen now: the entrance may play. `isAfterIntro`: it took over from the first start's intro,
+   * whose sheet already showed the background.
+   */
+  onShown(listener: (isAfterIntro: boolean) => void): void;
   /** The onboarding is done (its outro has played): its window closes and the browser shows. */
   close(): Promise<void>;
   /** The SF Symbols the icons use, rendered by macOS (the same as every page of ours). */
@@ -324,6 +327,7 @@ export interface OnboardingApi {
 export const ONBOARDING_CHANNELS = {
   getData: "onboarding:get-data",
   data: "onboarding:data",
+  shown: "onboarding:shown",
   close: "onboarding:close",
   readSource: "onboarding:read-source",
   bringOver: "onboarding:bring-over",

@@ -35,15 +35,28 @@ const SCENE_LEAVE_MS = 220;
 const SCENE_ENTER_DELAY_MS = 140;
 const SCENE_SHIFT_PX = 24;
 
-/** The first scene's entrance: the icon settles, the title sharpens out of a blur, then the button. Our choice. */
-const ICON_ENTER_MS = 1100;
-const TITLE_ENTER_DELAY_MS = 420;
+/**
+ * The first scene's entrance: Bow's mark draws itself and settles, the title sharpens out of a blur, then the sentence
+ * and the small round button. Our choice, timed by eye against the user's recording of Arc's first launch.
+ */
+const MARK_DRAW_MS = 1150;
+const MARK_SETTLE_MS = 1500;
+const TITLE_ENTER_DELAY_MS = 850;
 const TITLE_ENTER_MS = 900;
-const HELLO_BUTTON_DELAY_MS = 1100;
+const LEDE_ENTER_DELAY_MS = 1150;
+const HELLO_BUTTON_DELAY_MS = 1500;
 
-/** The outro: the scene lifts away and the wash opens up and fades. Our choice. */
+/** The frame's parts (Skip setup, the dots) and, without the intro, the wash fade in this long. Our choice. */
+const CHROME_ENTER_MS = 600;
+const WASH_ENTER_MS = 1100;
+
+/** The outro: the scene lifts away; then main fades the window out (and the browser in). Our choice. */
 const OUTRO_CONTENT_MS = 320;
-const OUTRO_WASH_MS = 700;
+
+/** Bow's mark as the app icon draws it (shared/appIconDrawing.ts): a half circle, thick and rounded, in Bow's colors. */
+const MARK_VIEW_BOX = "190 318 644 394";
+const MARK_PATH = "M262 640 A250 250 0 0 1 762 640";
+const MARK_STROKE_WIDTH = 116;
 
 /** The tour moves to its next item after one loop of the demo, until an item is picked by hand. */
 const TOUR_ADVANCE_MS = TOUR_DEMO_CYCLE_MS;
@@ -72,6 +85,8 @@ interface Onboarding {
   /** The wash keeps Bow's colors until a color is picked here; then it takes the Space's. */
   hasPickedLook: boolean;
   isLeaving: boolean;
+  /** The entrance has played (it waits until the window is on screen: onboardingApi.onShown). */
+  hasEntered: boolean;
   dots: HTMLButtonElement[];
   skipButton: HTMLButtonElement;
   preview: SidebarPreview;
@@ -94,34 +109,71 @@ function createAppIcon(className: string): HTMLElement {
 
 // ---------- Scene 1: welcome ----------
 
+const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+
 /**
- * The first scene: the icon settles in with its glow, the title sharpens out of a blur, then a small round button.
+ * Bow's mark as a drawing whose stroke can draw itself: the half circle with a gradient in Bow's colors.
+ */
+function createBowMark(): { element: SVGSVGElement; stroke: SVGPathElement } {
+  const element = document.createElementNS(SVG_NAMESPACE, "svg");
+  element.setAttribute("viewBox", MARK_VIEW_BOX);
+  element.setAttribute("class", "hello-mark");
+  element.setAttribute("role", "img");
+  element.setAttribute("aria-label", "Bow");
+  const gradient = document.createElementNS(SVG_NAMESPACE, "linearGradient");
+  gradient.id = "hello-mark-colors";
+  BOW_WASH_COLORS.forEach((color, index) => {
+    const stop = document.createElementNS(SVG_NAMESPACE, "stop");
+    stop.setAttribute("offset", String(index / (BOW_WASH_COLORS.length - 1)));
+    stop.setAttribute("stop-color", color);
+    gradient.append(stop);
+  });
+  const definitions = document.createElementNS(SVG_NAMESPACE, "defs");
+  definitions.append(gradient);
+  const stroke = document.createElementNS(SVG_NAMESPACE, "path");
+  stroke.setAttribute("d", MARK_PATH);
+  stroke.setAttribute("fill", "none");
+  stroke.setAttribute("stroke", "url(#hello-mark-colors)");
+  stroke.setAttribute("stroke-width", String(MARK_STROKE_WIDTH));
+  stroke.setAttribute("stroke-linecap", "round");
+  // Measured as 1, so drawing it is a dash offset from 1 to 0.
+  stroke.setAttribute("pathLength", "1");
+  stroke.setAttribute("stroke-dasharray", "1");
+  element.append(definitions, stroke);
+  return { element: element, stroke: stroke };
+}
+
+/**
+ * The first scene: Bow's mark draws itself and settles in its glow, the title sharpens out of a blur, then a small
+ * round button.
  */
 function createHelloScene(goNext: () => void): SceneView {
   const frame = createSceneFrame("hello", true);
-  const iconHolder = createElement("div", "hello-icon-holder");
+  const markHolder = createElement("div", "hello-mark-holder");
   const glow = createElement("span", "hello-glow");
-  const icon = createAppIcon("hello-icon");
-  iconHolder.append(glow, icon);
+  const mark = createBowMark();
+  markHolder.append(glow, mark.element);
   const title = createElement("h1", "scene-title scene-title-hero", "Welcome to Bow.");
   const lede = createElement("p", "scene-lede", "A calm browser for your tabs, your Spaces and your day.");
   const goButton = createTextButton("", "hello-go scene-primary", goNext);
   goButton.setAttribute("aria-label", "Get started");
   goButton.append(createIcon("forward", "icon"));
-  frame.text.append(iconHolder, title, lede, goButton);
+  frame.text.append(markHolder, title, lede, goButton);
   const enter = (): void => {
     if (prefersLessMotion()) {
-      [iconHolder, title, lede, goButton].forEach((part) => reveal(part, 0));
+      [markHolder, title, lede, goButton].forEach((part) => reveal(part, 0));
       return;
     }
-    icon.animate(
+    mark.stroke.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: MARK_DRAW_MS, easing: "cubic-bezier(0.65, 0, 0.35, 1)", fill: "backwards" });
+    mark.element.animate(
       [
-        { opacity: 0, transform: "translateY(16px) scale(0.84)", filter: "blur(10px)" },
-        { opacity: 1, transform: "translateY(0) scale(1)", filter: "blur(0)" },
+        { opacity: 0, transform: "scale(0.9)" },
+        { opacity: 1, transform: "scale(0.96)", offset: 0.15 },
+        { opacity: 1, transform: "scale(1)" },
       ],
-      { duration: ICON_ENTER_MS, easing: "cubic-bezier(0.16, 1, 0.3, 1)", fill: "backwards" },
+      { duration: MARK_SETTLE_MS, easing: EASE_OUT, fill: "backwards" },
     );
-    glow.animate([{ opacity: 0, transform: "scale(0.6)" }, { opacity: 1, transform: "scale(1)" }], { duration: ICON_ENTER_MS * 1.4, easing: EASE_OUT, fill: "backwards" });
+    glow.animate([{ opacity: 0, transform: "scale(0.6)" }, { opacity: 1, transform: "scale(1)" }], { duration: MARK_SETTLE_MS, delay: MARK_DRAW_MS / 2, easing: EASE_OUT, fill: "backwards" });
     title.animate(
       [
         { opacity: 0, filter: "blur(14px)", transform: "scale(1.03)" },
@@ -129,7 +181,7 @@ function createHelloScene(goNext: () => void): SceneView {
       ],
       { duration: TITLE_ENTER_MS, delay: TITLE_ENTER_DELAY_MS, easing: EASE_OUT, fill: "backwards" },
     );
-    reveal(lede, TITLE_ENTER_DELAY_MS + 260, TITLE_ENTER_MS);
+    reveal(lede, LEDE_ENTER_DELAY_MS, TITLE_ENTER_MS);
     goButton.animate([{ opacity: 0, transform: "scale(0.8)" }, { opacity: 1, transform: "scale(1)" }], { duration: 520, delay: HELLO_BUTTON_DELAY_MS, easing: EASE_EMPHASIZED, fill: "backwards" });
   };
   return { element: frame.element, update: () => undefined, enter: enter, leave: () => undefined };
@@ -497,8 +549,8 @@ function goToScene(state: Onboarding, nextIndex: number): void {
 }
 
 /**
- * Ends the onboarding: the scene lifts away, the wash opens up and fades, then its window closes
- * (main records that the onboarding was seen).
+ * Ends the onboarding: the scene lifts away, then main fades the window out (at the first start while the browser
+ * fades in) and closes it, and records that the onboarding was seen.
  */
 function finishOnboarding(state: Onboarding): void {
   if (state.isLeaving) {
@@ -506,19 +558,16 @@ function finishOnboarding(state: Onboarding): void {
   }
   state.isLeaving = true;
   state.scenes[state.sceneIndex]?.leave();
-  if (prefersLessMotion()) {
-    const fade = state.root.animate([{ opacity: 1 }, { opacity: 0 }], { duration: REDUCED_FADE_MS, fill: "forwards" });
-    fade.finished.then(() => window.onboardingApi.close()).catch(() => window.onboardingApi.close());
+  const content = state.root.querySelector(".onboarding-content");
+  if (prefersLessMotion() || content === null) {
+    window.onboardingApi.close().catch(() => undefined);
     return;
   }
-  const content = state.root.querySelector(".onboarding-content");
-  const wash = state.root.querySelector(".onboarding-wash");
-  content?.animate([{ opacity: 1, transform: "translateY(0) scale(1)" }, { opacity: 0, transform: "translateY(-12px) scale(0.985)" }], { duration: OUTRO_CONTENT_MS, easing: EASE_IN, fill: "forwards" });
-  const washAnimation = wash?.animate([{ opacity: 1, transform: "scale(1)" }, { opacity: 0, transform: "scale(1.12)" }], { duration: OUTRO_WASH_MS, delay: OUTRO_CONTENT_MS / 2, easing: EASE_OUT, fill: "forwards" });
-  const backdrop = state.root.querySelector(".onboarding-base");
-  backdrop?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: OUTRO_WASH_MS, delay: OUTRO_CONTENT_MS / 2, easing: EASE_OUT, fill: "forwards" });
-  const done = washAnimation?.finished ?? Promise.resolve();
-  done.then(() => window.onboardingApi.close()).catch(() => window.onboardingApi.close());
+  const lift = content.animate([{ opacity: 1, transform: "translateY(0) scale(1)" }, { opacity: 0, transform: "translateY(-12px) scale(0.985)" }], { duration: OUTRO_CONTENT_MS, easing: EASE_IN, fill: "forwards" });
+  lift.finished
+    .catch(() => undefined)
+    .then(() => window.onboardingApi.close())
+    .catch(() => undefined);
 }
 
 /**
@@ -619,6 +668,7 @@ export function renderOnboarding(host: HTMLElement, data: WelcomeData): void {
     data: data,
     hasPickedLook: false,
     isLeaving: false,
+    hasEntered: false,
     dots: dots,
     skipButton: skipButton,
     preview: preview,
@@ -646,13 +696,28 @@ export function renderOnboarding(host: HTMLElement, data: WelcomeData): void {
   preview.update(data);
   paintAtmosphere(state);
   drawChrome(state);
-  if (!prefersLessMotion()) {
-    root.querySelector(".onboarding-wash")?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ICON_ENTER_MS, easing: EASE_OUT });
-    top.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600, delay: ICON_ENTER_MS * 0.8, fill: "backwards" });
-    dotsElement.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600, delay: ICON_ENTER_MS * 0.9, fill: "backwards" });
-  }
-  state.scenes[0]?.enter();
   root.focus({ preventScroll: true });
+}
+
+/**
+ * Plays the entrance once the window is on screen (until then the scene stays hidden, so nothing plays unseen). After
+ * the first start's intro the background is already there (the intro's sheet showed it); otherwise it fades in.
+ */
+export function startEntrance(isAfterIntro: boolean): void {
+  if (onboarding === null || onboarding.hasEntered) {
+    return;
+  }
+  const state = onboarding;
+  state.hasEntered = true;
+  state.root.classList.add("has-entered");
+  if (!prefersLessMotion()) {
+    if (!isAfterIntro) {
+      state.root.querySelector(".onboarding-wash")?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: WASH_ENTER_MS, easing: EASE_OUT });
+    }
+    state.root.querySelector(".onboarding-top")?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: CHROME_ENTER_MS, delay: HELLO_BUTTON_DELAY_MS, fill: "backwards" });
+    state.root.querySelector(".onboarding-dots")?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: CHROME_ENTER_MS, delay: HELLO_BUTTON_DELAY_MS, fill: "backwards" });
+  }
+  state.scenes[state.sceneIndex]?.enter();
 }
 
 /**

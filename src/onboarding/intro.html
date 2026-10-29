@@ -1,0 +1,39 @@
+<!doctype html>
+<!--
+  WHY this file exists:
+    Bow's first start begins on the desktop (main/onboardingIntro.ts): this see-through page over the screen shows a
+    glow in Bow's colors that breathes, then grows into a sheet at the onboarding window's place, which takes over.
+
+  Data source:
+    The onboarding window's place and whether it is dark, in the address's query (onboardingIntro.ts).
+
+  Data flow:
+    onboardingIntro.ts → intro.html → intro.ts breathes → window.growIntoWindow() (asked by main) → resolves when grown
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+    <title>Bow</title>
+    <link rel="stylesheet" href="./intro.css">
+  </head>
+  <body>
+    <div class="intro-frame" id="intro-frame">
+      <div class="intro-shadow"></div>
+      <div class="intro-sheet">
+        <div class="intro-wash">
+          <span class="intro-light intro-light-1"></span>
+          <span class="intro-light intro-light-2"></span>
+          <span class="intro-light intro-light-3"></span>
+        </div>
+        <span class="intro-grain"></span>
+      </div>
+      <div class="intro-glow">
+        <span class="intro-blob intro-blob-1"></span>
+        <span class="intro-blob intro-blob-2"></span>
+        <span class="intro-blob intro-blob-3"></span>
+      </div>
+    </div>
+    <script type="module" src="./intro.js"></script>
+  </body>
+</html>

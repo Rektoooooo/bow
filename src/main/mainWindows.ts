@@ -28,6 +28,7 @@ import { leaveWindow as statusBubbleLeaveWindow } from "./statusBubble";
 import { createId } from "./tree";
 import { closeWindow, focusWindow, listWindowIds, openWindow } from "./windows";
 import { forgetWindowBounds, loadWindowBounds, rememberWindowBounds } from "./windowState";
+import { fadeWindow, prepareFadeIn } from "./windowFade";
 
 /** Starting window size in pixels. Our choice: fits a 13-inch laptop screen. */
 const WINDOW_WIDTH_PX = 1280;
@@ -210,19 +211,28 @@ export function restoreMainWindows(isHidden: boolean = false): void {
 
 /**
  * Shows the main windows that were kept hidden while the first start's onboarding ran: the focused one in front.
+ * `fadeMs`: they fade in over this long (the onboarding fades out meanwhile); 0 shows them at once. Resolves when shown.
  */
-export function showMainWindows(): void {
+export async function showMainWindows(fadeMs: number = 0): Promise<void> {
   const state = getState();
+  const fades: Promise<void>[] = [];
   for (const { windowId, window } of listMainWindows()) {
     if (window.isDestroyed() || window.isVisible()) {
       continue;
+    }
+    if (fadeMs > 0) {
+      prepareFadeIn(window);
     }
     if (windowId === state.focusedWindowId) {
       window.show();
     } else {
       window.showInactive();
     }
+    if (fadeMs > 0) {
+      fades.push(fadeWindow(window, 1, fadeMs));
+    }
   }
+  await Promise.all(fades);
 }
 
 /**

@@ -92,8 +92,11 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   a window of its own too (`onboardingWindow.ts`, page in `src/onboarding`, preload `onboardingPreload.ts`): at the
   first start the browser window stays hidden until it ends; Help › Welcome to Bow… opens it again. Its imports read
   first and count (`prepareArcImport` / `prepareBrowserImport`), then bring only the chosen parts
-  (`applyArcImport` / `applyBrowserImport`); the File menu runs the same two steps with every part. Browser logos are
-  the installed apps' own icons, drawn by macOS at runtime (`browserIcons.ts`); none are in the repo.
+  (`applyArcImport` / `applyBrowserImport`); the File menu runs the same two steps with every part. The browsers'
+  logos ship in `src/onboarding/browser-logos/` (sources in its `SOURCES.md`). At the first start a see-through
+  intro window (`onboardingIntro.ts`, page `src/onboarding/intro.*`) grows a glow into the onboarding window's place;
+  the page's entrance waits for `onboarding:shown`. Window fades go through `windowFade.ts`, which does nothing in
+  the e2e background mode (windows stay invisible).
 - **Render from state.** `src/renderer/sidebar.ts` redraws the sidebar and toolbar on every state; redraws wait while
   a drag is in progress.
 - **Constants** live in `src/shared/settings.ts` with a comment on where each value comes from (measured from Arc,
@@ -187,3 +190,6 @@ One Mac, two macOS accounts. Check which one you are on (`whoami`).
 
 Use Arc only to understand behavior. Never copy Arc's code, icons, Lottie files, sounds, videos, shaders, or rule
 lists (tidy titles, ad-block list, keepalive list) into this project, and never use Arc's name or logo for it.
+One exception, the user's choice (2026-10-29): Arc's app icon is the Arc tile in the onboarding's "Bring your things."
+(`src/onboarding/browser-logos/arc.png`), only to name the browser an import comes from, like the other browsers'
+logos there.

@@ -1,12 +1,13 @@
 // End-to-end check of the first-start onboarding (onboarding/onboarding.ts, in its own window, onboardingWindow.ts):
-// a real first start opens it in a window of its own (about 70 % of the screen, centred) while the browser window stays
-// hidden; ↩, → and ← and the dots move through its six scenes; "Bring your things." lists every browser Bow imports
+// a real first start plays the intro (a see-through window whose glow grows into the onboarding window's place) and
+// opens it in a window of its own (about 70 % of the screen, centred) while the browser window stays hidden; ↩, → and ← and the dots move through its six scenes; "Bring your things." lists every browser Bow imports
 // from (those not here dimmed), reads one before importing anything, lets parts be left out, ticks each part off as it
 // lands and fills the glass sidebar (real imports, from a made-up home folder: e2e/fixtures/importHome.mjs); picking
 // a color changes the Space in place and the whole window takes it; the tour's demos run, and hold still with reduced
 // motion; the default-browser scene's switches turn ad blocking and the shortcut from any app on; Open Bow closes it
 // and shows the browser, for good; Help › Welcome to Bow… opens it again and Escape ends it; a restart does not show
-// it; every scene fits its smallest window; no text has a dash.
+// it; every scene fits its smallest window; no text has a dash; no window was made visible by a fade in the e2e
+// background mode.
 // usage: npm run build && node e2e/check-onboarding.mjs      (uses a throwaway --user-data-dir and home folder)
 import "./background.mjs";
 import { _electron } from "playwright-core";
@@ -53,6 +54,22 @@ async function launch() {
 
 let { app, sidebar, findPage } = await launch();
 const ONBOARDING_PAGE = "/onboarding/onboarding.html";
+const INTRO_PAGE = "/onboarding/intro.html";
+// The intro's window comes and goes in the first seconds: note whether it was there while the onboarding was hidden.
+const introSeen = await (async () => {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const found = await app.evaluate(({ BrowserWindow }, pages) => {
+      const windows = BrowserWindow.getAllWindows().filter((candidate) => !candidate.isDestroyed());
+      const intro = windows.find((candidate) => candidate.webContents.getURL().includes(pages.intro));
+      const onboarding = windows.find((candidate) => candidate.webContents.getURL().endsWith(pages.onboarding));
+      if (intro === undefined) return null;
+      return { isTransparentClickThrough: !intro.isFocusable(), coversScreen: intro.getBounds().width > (onboarding?.getBounds().width ?? 0), isOnboardingShown: onboarding?.isVisible() ?? false };
+    }, { intro: INTRO_PAGE, onboarding: ONBOARDING_PAGE });
+    if (found !== null) return found;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return null;
+})();
 const pageErrors = [];
 /** The onboarding's page; a new window (Help › Welcome to Bow…) brings a new page. */
 let page = null;
@@ -137,6 +154,19 @@ const dashesSeen = [];
 // ---------- First start ----------
 
 await page.waitForSelector(".onboarding", { timeout: 10000 });
+// The intro breathes (at least 1.5 s), grows (1 s), then the onboarding window shows and plays its entrance.
+const shownAt = Date.now();
+let isEntered = false;
+while (!isEntered && Date.now() - shownAt < 10000) {
+  isEntered = await page.evaluate(() => document.querySelector(".onboarding")?.classList.contains("has-entered") ?? false);
+  await page.waitForTimeout(100);
+}
+const introGone = await app.evaluate(({ BrowserWindow }, introPage) => !BrowserWindow.getAllWindows().some((candidate) => !candidate.isDestroyed() && candidate.webContents.getURL().includes(introPage)), INTRO_PAGE);
+check(
+  "a first start plays the intro over the screen (never taking the keyboard), then the onboarding window takes over and the intro goes",
+  introSeen !== null && introSeen.isTransparentClickThrough && introSeen.coversScreen && !introSeen.isOnboardingShown && isEntered && introGone,
+  JSON.stringify({ introSeen, isEntered, introGone }),
+);
 await page.waitForTimeout(1600);
 const heroTitle = await page.textContent(".scene-hello .scene-title");
 const firstPlace = await onboardingWindowInfo();
@@ -176,14 +206,11 @@ check(
 // ---------- Bring your things: the browsers ----------
 
 const tiles = await waitInPage(() => {
-  const found = Array.from(document.querySelectorAll(".browser-tile")).map((tile) => ({
-    id: tile.dataset.browser,
-    isMissing: tile.disabled,
-    status: tile.querySelector(".browser-status").textContent,
-    hasIcon: tile.querySelector("img") !== null,
-  }));
-  // The app icons arrive a moment after the scene (macOS draws them).
-  return found.find((tile) => tile.id === "safari")?.hasIcon ? found : null;
+  const found = Array.from(document.querySelectorAll(".browser-tile")).map((tile) => {
+    const logo = tile.querySelector("img");
+    return { id: tile.dataset.browser, isMissing: tile.disabled, text: tile.innerText.trim(), title: tile.title, hasLogo: logo !== null && logo.complete && logo.naturalWidth > 0 };
+  });
+  return found.every((tile) => tile.hasLogo) ? found : null;
 });
 const tileIds = (tiles ?? []).map((tile) => tile.id);
 check(
@@ -192,9 +219,9 @@ check(
   tileIds.join(),
 );
 check(
-  "a browser with nothing to import here is dimmed with Not on this Mac, and installed apps show their own icon",
-  tiles !== null && tiles.slice(2).every((tile) => tile.isMissing && tile.status === "Not on this Mac") && tiles.find((tile) => tile.id === "safari").hasIcon,
-  JSON.stringify(tiles?.slice(2, 4)),
+  "every browser shows its own logo; one with nothing to import here is dimmed, with no extra text under it",
+  tiles !== null && tiles.every((tile) => tile.hasLogo) && tiles.slice(2).every((tile) => tile.isMissing && tile.title === "Not on this Mac" && !tile.text.includes("Not on this Mac")),
+  JSON.stringify(tiles?.slice(1, 4)),
 );
 
 // ---------- Bring your things: Chrome, read first, then only the bookmarks ----------
@@ -455,6 +482,8 @@ check(
   !afterOpen.isOpen && afterOpen.isBrowserVisible && (await getState()).settings.hasSeenWelcome === true,
   JSON.stringify(afterOpen),
 );
+const opacities = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((candidate) => !candidate.isDestroyed()).map((candidate) => candidate.getOpacity()));
+check("the hand-over fades left every window invisible in the e2e background mode", opacities.every((opacity) => opacity === 0), JSON.stringify(opacities));
 
 // ---------- Help › Welcome to Bow… and Escape ----------
 

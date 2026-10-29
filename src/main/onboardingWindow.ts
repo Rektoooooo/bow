@@ -8,14 +8,14 @@
  *   page's messages, from that page only.
  *
  * Data source:
- *   The state (browserCore.ts), the import sources (browserImportController.ts, arcImportController.ts), the browsers'
- *   app icons (browserIcons.ts), whether Bow is the default browser, the global shortcut's status, the screen's work
- *   area.
+ *   The state (browserCore.ts), the import sources (browserImportController.ts, arcImportController.ts), whether Bow
+ *   is the default browser, the global shortcut's status, the screen's work area.
  *
  * Data flow:
- *   main.ts first start → openOnboarding(true) → the window → its page asks getData → "onboarding:data" on changes
- *   (refreshOnboarding, after every action) → the page closes it → finishWelcome → showMainWindows() (first start)
- *   Help › Welcome to Bow… / Command Bar → openOnboarding(false)
+ *   main.ts first start → openOnboarding(true) → the intro (onboardingIntro.ts) grows into the window's place → the
+ *   window shows → "onboarding:shown" → its entrance; its page asks getData → "onboarding:data" on changes
+ *   (refreshOnboarding, after every action) → the page closes it → the browser fades in as it fades out → finishWelcome
+ *   Help › Welcome to Bow… / Command Bar → openOnboarding(false): shown when painted, no intro
  *   the page → readSource → prepare…Import() → "found" → bringOver(parts) → apply…Import() → each part done → "done"
  */
 import { app, BrowserWindow, ipcMain, nativeTheme, screen } from "electron";
@@ -29,15 +29,16 @@ import type { BrowserState, SidebarItem, TabItem } from "../shared/types";
 import { applyArcImport, findArcSidebarFile, prepareArcImport } from "./arcImportController";
 import type { PreparedArcImport } from "./arcImportController";
 import { applyChange, getState, getWindow } from "./browserCore";
-import { getBrowserIcon, loadBrowserIcons } from "./browserIcons";
 import { applyBrowserImport, listImportSources, openFullDiskAccessSettings, prepareBrowserImport } from "./browserImportController";
 import type { PreparedBrowserImport } from "./browserImportController";
 import { isDefaultBrowser } from "./defaultBrowser";
 import { getGlobalShortcutStatus } from "./globalShortcutController";
 import { showMainWindows } from "./mainWindows";
+import { playIntro } from "./onboardingIntro";
 import { finishWelcome } from "./state";
 import { THEME_PRESETS } from "./themePresets";
 import { getActiveSpace } from "./tree";
+import { fadeWindow } from "./windowFade";
 
 /** The page's colour before it paints (onboarding.css --onb-base), so the window never flashes another colour. */
 const LIGHT_BASE_COLOR = "#f5f4f8";
@@ -48,6 +49,15 @@ const TRAFFIC_LIGHT_POSITION = { x: 18, y: 18 };
 
 /** The shortcut from any app the onboarding offers when none is set: ⌥⌘Space (⌥Space is Raycast's and Alfred's). */
 const WELCOME_GLOBAL_SHORTCUT = GLOBAL_SHORTCUT_CHOICES[1];
+
+/**
+ * The handovers: the intro stays a moment after the onboarding window shows over it (so no frame shows the desktop
+ * between them); at the end the onboarding fades out while the browser fades in, or (opened again from Help) just
+ * fades out. Our choice.
+ */
+const INTRO_HANDOVER_MS = 150;
+const BROWSER_HANDOVER_MS = 420;
+const REPLAY_FADE_OUT_MS = 260;
 
 /** The sidebar preview shows at most this many Favorites (a row's worth) and Pinned items. Our choice. */
 const PREVIEW_FAVORITES_LIMIT = 8;
@@ -66,7 +76,7 @@ const preparedSources = new Map<string, PreparedSource>();
 
 /**
  * Every browser Bow imports from and its profiles on this Mac, read once when the onboarding opens (it reads the
- * disk); the icons arrive a moment later (browserIcons.ts).
+ * disk).
  */
 let welcomeBrowsers: WelcomeBrowser[] = [];
 
@@ -96,7 +106,7 @@ function listWelcomeBrowsers(): WelcomeBrowser[] {
     if (browser.id === ARC_IMPORT_SOURCE_ID && findArcSidebarFile() !== null) {
       sourceList.push({ id: ARC_IMPORT_SOURCE_ID, profileName: null });
     }
-    return { id: browser.id, name: browser.name, iconUrl: null, sources: sourceList };
+    return { id: browser.id, name: browser.name, sources: sourceList };
   });
   return orderBrowsers(browsers);
 }
@@ -160,7 +170,7 @@ function buildWelcomeData(state: BrowserState): WelcomeData {
     spaceId: space.id,
     theme: space.theme,
     isSystemDark: nativeTheme.shouldUseDarkColors,
-    browsers: welcomeBrowsers.map((browser) => ({ ...browser, iconUrl: getBrowserIcon(browser.id) })),
+    browsers: welcomeBrowsers,
     imports: Object.fromEntries(welcomeImports),
     sidebar: buildSidebarPreview(state),
     presets: presets,
@@ -204,7 +214,7 @@ function handleOnboardingClosed(): void {
   applyChange((state) => finishWelcome(state));
   if (isFirstStartOnboarding) {
     isFirstStartOnboarding = false;
-    showMainWindows();
+    showMainWindows().catch((error) => console.error("The browser window could not show:", error));
   }
 }
 
@@ -221,10 +231,6 @@ export function openOnboarding(isFirstStart: boolean): void {
   welcomeImports.clear();
   preparedSources.clear();
   welcomeBrowsers = listWelcomeBrowsers();
-  const browserIds = welcomeBrowsers.map((browser) => browser.id);
-  loadBrowserIcons(browserIds)
-    .then(() => refreshOnboarding())
-    .catch((error) => console.error("The browsers' icons could not be drawn:", error));
   const theme = getActiveSpace(getState()).theme;
   const isDark = isThemeDark(theme, nativeTheme.shouldUseDarkColors);
   const bounds = computeOnboardingBounds();
@@ -247,9 +253,55 @@ export function openOnboarding(isFirstStart: boolean): void {
   // Our own page with a bridge: it never navigates away and opens no windows.
   window.webContents.on("will-navigate", (event) => event.preventDefault());
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  window.once("ready-to-show", () => window.show());
+  const isPainted = new Promise<void>((resolve) => window.once("ready-to-show", () => resolve()));
   window.on("closed", () => handleOnboardingClosed());
+  if (isFirstStart) {
+    showAfterIntro(window, bounds, isDark, isPainted).catch((error) => console.error("The onboarding could not show:", error));
+  } else {
+    isPainted.then(() => showOnboardingWindow(window, false)).catch(() => undefined);
+  }
   window.loadFile(pagePath).catch((error) => console.error("The onboarding could not load:", error));
+}
+
+/**
+ * Shows the onboarding window and tells its page, which then plays its entrance.
+ */
+function showOnboardingWindow(window: BrowserWindow, isAfterIntro: boolean): void {
+  if (window.isDestroyed()) {
+    return;
+  }
+  window.show();
+  window.webContents.send(ONBOARDING_CHANNELS.shown, isAfterIntro);
+}
+
+/**
+ * The first start: the intro's glow grows into the onboarding window's place, then the window takes over there.
+ */
+async function showAfterIntro(window: BrowserWindow, bounds: Rectangle, isDark: boolean, isPainted: Promise<void>): Promise<void> {
+  const closeIntro = await playIntro(bounds, isDark, isPainted);
+  showOnboardingWindow(window, true);
+  setTimeout(closeIntro, INTRO_HANDOVER_MS);
+}
+
+/**
+ * The page's outro has played: at the first start the onboarding fades out while the browser fades in; opened again,
+ * it just fades out. Then its window closes (handleOnboardingClosed records it was seen).
+ */
+async function closeWithHandover(): Promise<void> {
+  const window = onboardingWindow;
+  if (window === null || window.isDestroyed()) {
+    return;
+  }
+  if (isFirstStartOnboarding) {
+    // The browser shows here, faded in; handleOnboardingClosed need not show it again.
+    isFirstStartOnboarding = false;
+    await Promise.all([showMainWindows(BROWSER_HANDOVER_MS), fadeWindow(window, 0, BROWSER_HANDOVER_MS)]);
+  } else {
+    await fadeWindow(window, 0, REPLAY_FADE_OUT_MS);
+  }
+  if (!window.isDestroyed()) {
+    window.close();
+  }
 }
 
 /**
@@ -382,9 +434,9 @@ function isFromOnboarding(event: IpcMainInvokeEvent): boolean {
  */
 export function registerOnboardingIpc(): void {
   ipcMain.handle(ONBOARDING_CHANNELS.getData, (event) => (isFromOnboarding(event) ? buildWelcomeData(getState()) : null));
-  ipcMain.handle(ONBOARDING_CHANNELS.close, (event) => {
+  ipcMain.handle(ONBOARDING_CHANNELS.close, async (event) => {
     if (isFromOnboarding(event)) {
-      onboardingWindow?.close();
+      await closeWithHandover();
     }
   });
   ipcMain.handle(ONBOARDING_CHANNELS.readSource, async (event, sourceId: unknown) => {

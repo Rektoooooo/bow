@@ -110,7 +110,7 @@ describe("the browsers", () => {
   });
 
   it("puts the browsers with something to import first, each group in the usual order", () => {
-    const browsers: WelcomeBrowser[] = SUPPORTED_BROWSERS.map((browser) => ({ ...browser, iconUrl: null, sources: [] }));
+    const browsers: WelcomeBrowser[] = SUPPORTED_BROWSERS.map((browser) => ({ ...browser, sources: [] }));
     const withSafari = browsers.map((browser) => (browser.id === "safari" || browser.id === "brave" ? { ...browser, sources: [{ id: browser.id, profileName: null }] } : browser));
     const ordered = orderBrowsers(withSafari).map((browser) => browser.id);
     expect(ordered).toEqual(["safari", "brave", "arc", "chrome", "firefox", "edge", "vivaldi", "chromium"]);

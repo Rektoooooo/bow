@@ -380,6 +380,11 @@ button {
   outline: none;
 }
 
+/* Until the window is on screen, only the background shows: the entrance plays when it can be seen. */
+.onboarding:not(.has-entered) .onboarding-content {
+  visibility: hidden;
+}
+
 .onboarding-announcer {
   position: absolute;
   width: 1px;
@@ -552,25 +557,33 @@ button {
 
 /* ---------- Welcome ---------- */
 
-.hello-icon-holder {
+.hello-mark-holder {
   position: relative;
-  width: clamp(76px, 12vh, 104px);
-  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  width: clamp(96px, 15vh, 132px);
   margin-bottom: clamp(18px, 3.6vh, 30px);
 }
 
-.hello-icon,
-.ready-icon {
+.hello-mark {
   position: relative;
   width: 100%;
-  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 10px 22px rgba(120, 80, 220, 0.25));
+}
+
+.ready-icon {
+  position: relative;
+  width: clamp(64px, 10vh, 84px);
+  aspect-ratio: 1;
+  margin-bottom: clamp(16px, 3vh, 26px);
   background: center / contain no-repeat;
   filter: drop-shadow(0 14px 26px rgba(30, 20, 60, 0.28));
 }
 
 .hello-glow {
   position: absolute;
-  inset: -70%;
+  inset: -60%;
   border-radius: 50%;
   background: radial-gradient(circle, color-mix(in srgb, var(--wash-2) 55%, transparent) 0%, transparent 62%);
   animation: hello-breathe 5.5s ease-in-out infinite alternate;
@@ -595,13 +608,6 @@ button {
   margin-top: clamp(20px, 4vh, 32px);
   padding: 0;
   border-radius: 50%;
-}
-
-.ready-icon {
-  width: clamp(64px, 10vh, 84px);
-  height: auto;
-  aspect-ratio: 1;
-  margin-bottom: clamp(16px, 3vh, 26px);
 }
 
 /* ---------- Bring your things: the browsers ---------- */
@@ -669,19 +675,9 @@ button {
   line-height: 1.2;
 }
 
-.browser-status {
-  color: var(--onb-muted);
-  font-size: 10.5px;
-  line-height: 1.2;
-}
-
-.browser-status:empty {
-  display: none;
-}
-
+/* Not on this Mac: the logo stays itself, only quieter. */
 .browser-tile.is-missing .browser-icon {
-  opacity: 0.45;
-  filter: grayscale(1);
+  opacity: 0.42;
 }
 
 .browser-tile.is-missing .browser-name {
@@ -1968,12 +1964,6 @@ body.dark .link-bubble-url {
   .browser-grid {
     grid-template-columns: repeat(4, minmax(0, 84px));
     gap: 4px;
-  }
-
-  .browser-status {
-    font-size: 10px;
-    letter-spacing: -0.01em;
-    white-space: nowrap;
   }
 }
 
