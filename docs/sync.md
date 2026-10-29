@@ -12,6 +12,7 @@ folder every Mac can reach (iCloud Drive, Dropbox, a shared drive); Bow makes a 
 | Pinned tabs, folders and split views (address, names, home address) | Where a tab has browsed to since it was pinned |
 | A Space's Favorites, and profile names | Windows, sidebar width, which folders are open |
 | Notes and Easels that pinned tabs or Favorites show | Extensions, site permissions, settings |
+| | Saved passwords and remembered form entries (encrypted with this Mac's Keychain key) |
 | Boosts (JavaScript arrives switched off), Air Traffic Control rules, command chains and Space templates | A live folder's items (each Mac fills them from the source) |
 
 ## How changes merge

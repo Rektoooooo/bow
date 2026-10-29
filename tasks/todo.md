@@ -419,7 +419,7 @@ a Keychain key, per profile.
       browser), move the file to the Trash afterwards
 - [x] 9. The rest of check-passwords; check-onboarding's Passwords block (done with steps 6 to 8: check-passwords 60,
       check-onboarding 46)
-- [ ] 10. Docs (CLAUDE.md security rule and architecture, README, backup and sync docs, handoff) → full suite, push;
+- [x] 10. Docs (CLAUDE.md security rule and architecture, README, backup and sync docs, handoff) → full suite, push;
       screenshots for the user
 - [ ] 11. Live check with the user's go: the real Keychain item and Touch ID in a packaged build
 
@@ -427,11 +427,20 @@ a Keychain key, per profile.
 The user: "each space needs its own favorites". Arc keeps Favorites per profile (the user's Arc: 3 Spaces on 3
 profiles, so each looks separate); on the other macOS account Bow's Spaces share a profile and so a row. The user chose
 (asked twice): every Space has its own Favorites, also when Spaces share a profile. Saved data version 5.
-- [ ] 1. Types, upgrade v4 → v5 (the shared row goes to the active Space, else another window's, else the first; a
+- [x] 1. Types, upgrade v4 → v5 (the shared row goes to the active Space, else another window's, else the first; a
       profile without a Space: its Favorites to the Archive; selections repaired), tree / state / spaces, imports,
       backup, sync (a peer from an older Bow is skipped with a notice), sidebar (the row slides with the Space), docs
       (worktree favorites-per-space, built while Passwords step 8 runs here)
 - [ ] 2. Merge into bow-next, full suite, push
+
+## Review (2026-10-29, Google sign-in, Bow Passwords, Favorites per Space)
+- **Google sign-in**: the cause measured on accounts.google.com (Chrome user agent → GlifWebSignIn, Electron's →
+  WebLiteSignIn); the header and navigator.userAgent change only there. A real sign-in by the user is still open.
+- **Bow Passwords**: save, fill, form memory, Library › Passwords (Touch ID), CSV import; the vault per profile
+  encrypted with a Keychain key; the page helper isolated and untrusted. 60 password checks, permission-check covers
+  the helpers. Open: the live Keychain and Touch ID check in a packaged build (step 11).
+- **Favorites per Space**: saved data version 5 with a pre-upgrade copy; Sync skips peers from an older Bow.
+- Under a load average near 60, two overlay checks failed once each and passed on re-runs (timing, not these changes).
 
 ## Review (2026-10-28, an unattended night: open source, releases, auto-update, speed, polish)
 - **Works and verified:** open-source setup and repo rename; `npm run release` up to Apple's notarization (signing,

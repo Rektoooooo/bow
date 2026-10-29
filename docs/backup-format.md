@@ -43,7 +43,9 @@ Things that only mean something on the Mac that made it:
 - other windows' places and choices (`otherWindows` is empty);
 - installed extensions' files: `extensions` lists them by name with an empty `path`, so a restore can tell you what to
   install again;
-- pictures in the Library (screenshots and captures) and browsing history.
+- pictures in the Library (screenshots and captures) and browsing history;
+- saved passwords and remembered form entries (Bow Passwords): they are encrypted with a key in this Mac's Keychain,
+  which another Mac does not have. Library › Passwords imports a CSV file on the new Mac instead.
 
 ## Restoring
 

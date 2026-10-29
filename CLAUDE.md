@@ -5,7 +5,8 @@ Public repo: https://github.com/Rektoooooo/bow
 
 ## Start here
 
-1. Read the newest file in `.handoffs/` (`2026-10-28-night.md`: open source, releases, auto-update, sleeping tabs,
+1. Read the newest file in `.handoffs/` (`2026-10-29-passwords.md`: onboarding v2 and 0.1.1, Google sign-in, Bow
+   Passwords, Favorites per Space; then `2026-10-28-night.md`: open source, releases, auto-update, sleeping tabs,
    speed; then `2026-10-27-arc-polish.md`, `2026-10-27-multiple-windows.md`, `2026-10-26-arc-look.md`,
    `2026-10-26-arc-parity.md` and the oldest).
    They have the history, decisions, how the look is measured, status and next steps.
@@ -32,6 +33,8 @@ npm run e2e          # build + drive the real app: check-app, check-overlay, che
                      # check-sync (two copies of Bow sync through one folder: join, both ways, stop),
                      # check-google-sign-in (Google's sign-in pages get Electron's own user agent in headers and
                      # scripts, Google serves its lighter sign-in, other sites keep Chrome's; needs the network),
+                     # check-passwords (Bow Passwords: the save prompt, the list under a field, filling, form memory,
+                     # Library › Passwords, CSV import, a restart, a vault that can't be opened; mock keychain),
                      # check-onboarding (the first-start onboarding in its own window: scenes, keys, real imports
                      # from a made-up home folder via --import-home (e2e/fixtures/importHome.mjs), a color, the
                      # tour, the defaults, replay from Help, fits a 760 × 520 window, no dashes in its text)
@@ -101,6 +104,18 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   intro window (`onboardingIntro.ts`, page `src/onboarding/intro.*`) grows a glow into the onboarding window's place;
   the page's entrance waits for `onboarding:shown`. Window fades go through `windowFade.ts`, which does nothing in
   the e2e background mode (windows stay invisible).
+- **Bow Passwords** (Electron has no password manager): one vault per profile, outside the state
+  (`passwordVault.ts`: `<userData>/Passwords/<profile>.vault`, the whole JSON encrypted with safeStorage, key in the
+  Keychain; a vault that can't be opened is never written; rules in `passwords.ts`, `formMemory.ts`,
+  `passwordCsv.ts`). The save prompt (`passwordOffers.ts`, overlay panel `savePassword`, never holds the password) comes
+  after a typed sign-in goes through; the list under a field is its own small view (`autofillPopup.ts`, page
+  `src/autofill`), never focused, always inside the page's own area, and holds login ids only (the password is read at
+  the pick). Form memory: `formMemoryRecorder.ts`. Library › Passwords: `passwordsLibrary.ts` / `passwordsView.ts`;
+  Show, Copy password and Edit go through `passwordAuth.ts` (macOS's Touch ID or password prompt, unlocked 5 minutes,
+  fails closed). Import: `passwordImport.ts` (CSV from the Library, File › Import From Browser, the onboarding).
+  Backups and Sync leave passwords out (another Mac can't decrypt them). e2e runs set `BOW_E2E_MOCK_KEYCHAIN`
+  (e2e/background.mjs), so tests use Chromium's mock keychain and never touch the real Keychain; under it the Library
+  skips Touch ID (no real vault can be opened with the test key).
 - **Render from state.** `src/renderer/sidebar.ts` redraws the sidebar and toolbar on every state; redraws wait while
   a drag is in progress.
 - **Constants** live in `src/shared/settings.ts` with a comment on where each value comes from (measured from Arc,
@@ -117,12 +132,20 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   and non-Chrome versions, writes the key so the id stays the Web Store id); copies live in
   `<userData>/Extensions/<id>/<version>/`, are shared by every profile that adds the extension (never downloaded
   again into a folder a session has loaded), and are deleted only one by one when nothing uses them.
-- **Security:** web pages stay sandboxed. Every web page session (profiles and private windows) has one preload of
-  ours, `googleSignInPreload.ts`, which does nothing except on https://accounts.google.com: Google refuses to sign in
-  a browser that says it is Chrome but fails desktop Chrome's checks ("This browser or app may not be secure",
-  2026-10-29), so its sign-in pages get Electron's own user agent in the request headers (`googleSignIn.ts`,
-  `signInUserAgent.ts`) and in `navigator.userAgent`; every other site sees Chrome's. In a profile that has
-  extensions the extension library's preload runs too, in an isolated world (page scripts see nothing new).
+- **Security:** web pages stay sandboxed. Pages get at most these preloads, all in isolated worlds (page scripts see
+  nothing new; `permission-check` proves it):
+  - `googleSignInPreload.ts`, in every web page session (profiles and private windows), does nothing except on
+    https://accounts.google.com: Google refuses to sign in a browser that says it is Chrome but fails desktop Chrome's
+    checks ("This browser or app may not be secure", 2026-10-29), so its sign-in pages get Electron's own user agent in
+    the request headers (`googleSignIn.ts`, `signInUserAgent.ts`) and in `navigator.userAgent`; every other site sees
+    Chrome's.
+  - `formsPreload.ts` (Bow Passwords), in profile sessions only (never private windows), in top frames of http(s)
+    pages: it reports a field only after a real click, Tab or typing, reports sent forms with only allow-listed fields
+    the user typed into, and fills only when main sends a login or value. `formsBridge.ts` trusts none of it: only a
+    tab's own top frame in a profile session, the site taken from the sending frame (never the message), rate
+    limited, payloads parsed strictly (`formsMessages.ts`); a fill goes only to a frame still on the site the list was
+    opened for.
+  - In a profile that has extensions, the extension library's preload.
   Website permissions are installed per session in `profiles.ts`: `fullscreen` and `clipboard-sanitized-write`
   are allowed, camera, microphone, location, notifications and clipboard reading go to a prompt
   (`permissionPrompts.ts`, answers in `BrowserState.sitePermissions` per profile and origin; private windows never

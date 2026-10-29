@@ -230,6 +230,15 @@ source never updates itself.
 - **Notes** and **Easels**: rich-text notes and boards (text, drawing, pictures, captures) that sit in the sidebar
   like tabs (File › New Note / New Easel). A capture placed on an easel is live, like Arc's: it is taken again
   from its page (same size, scroll and region) when the easel opens, or when you click its **Live** badge.
+- **Passwords**: after you sign in on a site, Bow asks "Save password for example.com?" (Save, Not now, Never for
+  this site; Update when the password changed). Click or Tab into the sign-in field next time and a small list under
+  it offers your saved logins; pick one and the email and password are filled (nothing is filled before you pick).
+  Bow also remembers what you type into forms (emails, names, phone numbers, addresses, never card numbers, codes or
+  searches) and offers it again on any site. Library › Passwords lists everything per profile; Show, Copy and Edit
+  ask for Touch ID or your Mac's password. Import the CSV file Chrome, Arc, Dia, Brave, Edge, Vivaldi, Opera,
+  Safari's Passwords app or Firefox exports (Library › Passwords, File › Import From Browser, or the first start).
+  Passwords are encrypted with a key in your Keychain, stay on this Mac and are never in backups or sync. Private
+  windows never save anything.
 - **Ad and tracker blocking** with EasyList and EasyPrivacy (off until you turn it on in Library › Settings), allowed
   per site in the Control Center.
 - **Privacy report** (Library › Privacy): how many trackers the blocker stopped in the last 7 days, a bar per day, and
@@ -338,9 +347,14 @@ Three ideas keep it simple:
 
 ## Security
 
-- Web pages run sandboxed and cannot talk to the app. They get no preload script, except in a profile that has
-  extensions: there the extension library's preload runs in an isolated world, so page scripts see nothing new.
-  Our own pages only accept their own messages, and every message field is checked.
+- Web pages run sandboxed. Their only scripts of ours run in an isolated world, so page scripts see nothing new: one
+  that gives Google's sign-in pages Electron's own user agent (Google refuses Bow's Chrome one there), and in
+  profiles (never private windows) the helper that notices sign-in fields and fills a login you picked. The app
+  trusts nothing that helper says about where it is: the site comes from the page's own frame, and a login is only
+  ever sent to the page it was picked for. In a profile that has extensions, the extension library's preload runs
+  too. Our own pages only accept their own messages, and every message field is checked.
+- Saved passwords are encrypted with a key in the macOS Keychain (one file per profile); showing, copying or editing
+  one asks for Touch ID or your Mac's password.
 - Websites get nothing they were not allowed: camera, microphone, location, notifications and clipboard reading
   need the user's Allow (remembered per profile and site), screen sharing goes through macOS's sharing picker,
   everything else is refused, except full screen and clipboard writes. Our own pages are refused without asking. `e2e/permission-check.mjs` proves it.
