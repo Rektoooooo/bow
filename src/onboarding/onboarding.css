@@ -1132,18 +1132,22 @@ button {
 
 /* ---------- Choose a color ---------- */
 
+/* Six light colors on the first row, the dark ones on the second (onboarding.ts marks where it starts). */
 .look-swatches {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  max-width: 380px;
+  display: grid;
+  grid-template-columns: repeat(6, 36px);
+  gap: 12px 14px;
   margin-top: clamp(16px, 3vh, 26px);
+}
+
+.look-swatch.starts-row {
+  grid-column-start: 1;
 }
 
 .look-swatch {
   position: relative;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border: 0;
   border-radius: 50%;

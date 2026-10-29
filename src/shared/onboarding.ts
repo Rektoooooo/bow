@@ -216,6 +216,32 @@ export function vividWashColor(color: string, isDark: boolean): string {
   return hslToHex(hue, keptSaturation, keptLightness);
 }
 
+/**
+ * How a color preset's swatch is drawn: its own colors are near white (light presets) or near black (dark ones) and
+ * vanish on a light or a dark window, so each swatch keeps the hue with enough color, a light preset clearly light and
+ * a dark one clearly dark but never black. Our choice, by eye on the onboarding's three backgrounds (the user, 2026-10-29:
+ * "the dark colors are super dark and the light ones almost not visible").
+ */
+const SWATCH_MIN_SATURATION = 0.5;
+const SWATCH_LIGHTNESS_LIGHT: [number, number] = [0.7, 0.78];
+const SWATCH_LIGHTNESS_DARK: [number, number] = [0.34, 0.42];
+
+/**
+ * A preset's color as its swatch shows it: the same hue, clear on any window.
+ * Examples: ("#cfe0f4", light preset) → a soft sky blue; ("#1f3a2e", dark preset) → a forest green you can see
+ */
+export function swatchColor(color: string, isDarkPreset: boolean): string {
+  const hsl = hexToHsl(color);
+  if (hsl === null) {
+    return color;
+  }
+  const [hue, saturation, lightness] = hsl;
+  const band = isDarkPreset ? SWATCH_LIGHTNESS_DARK : SWATCH_LIGHTNESS_LIGHT;
+  const keptLightness = Math.min(Math.max(lightness, band[0]), band[1]);
+  const keptSaturation = saturation < WASH_GREY_SATURATION ? saturation : Math.max(saturation, SWATCH_MIN_SATURATION);
+  return hslToHex(hue, keptSaturation, keptLightness);
+}
+
 /** Every browser Bow imports from, in the order the onboarding lists them (those on this Mac come first). */
 export const SUPPORTED_BROWSERS: { id: string; name: string }[] = [
   { id: "arc", name: "Arc" },

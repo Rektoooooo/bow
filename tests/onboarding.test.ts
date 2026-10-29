@@ -17,6 +17,7 @@ import {
   orderBrowsers,
   pickWashColors,
   stepScene,
+  swatchColor,
   vividWashColor,
 } from "../src/shared/onboarding";
 import type { ImportFound, WelcomeBrowser } from "../src/shared/onboarding";
@@ -130,6 +131,32 @@ describe("wash colors", () => {
     expect(pickWashColors(["#cfe0f4"])).toEqual(["#cfe0f4", "#cfe0f4", "#cfe0f4"]);
     expect(pickWashColors(["#f3d5d3", "#e8c6dc"])).toEqual(["#f3d5d3", "#e8c6dc", "#f3d5d3"]);
     expect(pickWashColors(["#111111", "#222222", "#333333"])).toEqual(["#111111", "#222222", "#333333"]);
+  });
+});
+
+describe("swatch colors", () => {
+  /** HSL lightness (0…1) of "#rrggbb". */
+  const lightnessOf = (hex: string): number => {
+    const channels = [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16) / 255);
+    return (Math.max(...channels) + Math.min(...channels)) / 2;
+  };
+
+  it("draws a near-white preset clearly light, but visible", () => {
+    const lightness = lightnessOf(swatchColor("#cfe0f4", false));
+    expect(lightness).toBeGreaterThanOrEqual(0.69);
+    expect(lightness).toBeLessThanOrEqual(0.79);
+  });
+
+  it("draws a near-black preset clearly dark, but never black", () => {
+    const lightness = lightnessOf(swatchColor("#1f3a2e", true));
+    expect(lightness).toBeGreaterThanOrEqual(0.33);
+    expect(lightness).toBeLessThanOrEqual(0.43);
+  });
+
+  it("keeps greys grey and leaves what is not a color alone", () => {
+    const grey = swatchColor("#3a3a3c", true);
+    expect(grey.slice(1, 3)).toBe(grey.slice(3, 5));
+    expect(swatchColor("red", false)).toBe("red");
   });
 });
 

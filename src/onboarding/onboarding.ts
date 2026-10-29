@@ -16,7 +16,7 @@
  *   Open Bow / Skip setup / Escape → the outro plays → onboardingApi.close() → main records that it was seen
  */
 import type { OnboardingScene, WelcomeData, WelcomePreset } from "../shared/onboarding";
-import { BOW_WASH_COLORS, ONBOARDING_SCENES, pickWashColors, stepScene, vividWashColor } from "../shared/onboarding.js";
+import { BOW_WASH_COLORS, ONBOARDING_SCENES, pickWashColors, stepScene, swatchColor, vividWashColor } from "../shared/onboarding.js";
 import type { SpaceTheme, ThemeAppearance } from "../shared/types";
 import { isThemeDark } from "../shared/themePalette.js";
 import { buildAppIconSvg, findAppIconVariant } from "../shared/appIconDrawing.js";
@@ -235,7 +235,8 @@ function createLookScene(data: WelcomeData, onLookPicked: () => void, goNext: ()
   const swatches = markReveal(createElement("div", "look-swatches"));
   swatches.setAttribute("role", "radiogroup");
   swatches.setAttribute("aria-label", "Colors");
-  const swatchButtons = data.presets.map((preset) => {
+  const firstDarkIndex = data.presets.findIndex((preset) => preset.appearance === "dark");
+  const swatchButtons = data.presets.map((preset, index) => {
     const swatch = createTextButton("", "look-swatch", () => {
       onLookPicked();
       const theme: SpaceTheme = { ...current.theme, colors: preset.colors, appearance: preset.appearance };
@@ -244,8 +245,13 @@ function createLookScene(data: WelcomeData, onLookPicked: () => void, goNext: ()
     swatch.setAttribute("role", "radio");
     swatch.setAttribute("aria-label", preset.label);
     swatch.title = preset.label;
-    const fill = preset.colors.length === 1 ? `${preset.colors[0]}, ${preset.colors[0]}` : preset.colors.join(", ");
+    // The presets' own colors are near white or near black and vanish on a light or a dark window (swatchColor).
+    const isDarkPreset = preset.appearance === "dark";
+    const litColors = preset.colors.map((color) => swatchColor(color, isDarkPreset));
+    const fill = litColors.length === 1 ? `${litColors[0]}, ${litColors[0]}` : litColors.join(", ");
     swatch.style.setProperty("--swatch", `linear-gradient(135deg, ${fill})`);
+    // The light colors on one row, the dark ones on the next.
+    swatch.classList.toggle("starts-row", index === firstDarkIndex);
     swatches.append(swatch);
     return { preset: preset, button: swatch };
   });
