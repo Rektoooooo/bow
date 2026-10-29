@@ -426,6 +426,7 @@ a Keychain key, per profile.
       passwords it should tell it here"; chose to read them directly): counted in the summary and a Passwords row,
       macOS asks once for the browser's Safe Storage key, logins into the right Bow profiles; Safari and Firefox keep
       the CSV way, which stays as the fallback when macOS says no
+      (Checked by the user on the real Arc data, 2026-10-29: macOS's dialog once, all 34 logins in Library › Passwords.)
 
 ## Milestone 7 — Favorites per Space (user-approved 2026-10-29)
 The user: "each space needs its own favorites". Arc keeps Favorites per profile (the user's Arc: 3 Spaces on 3
