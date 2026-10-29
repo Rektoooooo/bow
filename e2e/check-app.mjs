@@ -1,7 +1,8 @@
 // End-to-end check of the real app: launch it, drive the sidebar, take screenshots, relaunch to check saving,
 // and open a version 1 state file to check the upgrade.
 // usage: npm run e2e        (builds first; output in e2e/output, or set E2E_OUTPUT_DIR)
-// Uses throwaway --user-data-dir folders, so your real browser state is never touched.
+// Uses throwaway --user-data-dir folders, so your real browser state is never touched, and a made-up home folder
+// (--import-home, e2e/fixtures/importHome.mjs), so the onboarding and imports never read your other browsers' files.
 // The sidebar page runs with reduced motion (emulated): rows appear and disappear at once, so checks never meet a
 // row that is still animating. e2e/check-motion.mjs checks the animations themselves.
 // Playwright emulates light mode by default, so screenshots here are light.
@@ -10,6 +11,7 @@ import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { IMPORT_HOME_COUNTS, createImportHome } from "./fixtures/importHome.mjs";
 
 const appDir = path.resolve(import.meta.dirname, "..");
 const outDir = process.env.E2E_OUTPUT_DIR || path.join(appDir, "e2e", "output");
@@ -17,6 +19,8 @@ const electronBinary = createRequire(import.meta.url)("electron");
 const userDataDir = path.join(outDir, "user-data");
 fs.rmSync(userDataDir, { recursive: true, force: true });
 fs.mkdirSync(userDataDir, { recursive: true });
+// Absolute, or the app ignores it and reads the real home folder (src/main/importHome.ts).
+const importHome = createImportHome(path.resolve(outDir, "home-app"));
 
 const results = [];
 function check(name, ok, detail = "") {
@@ -39,7 +43,7 @@ async function findSidebarPage(app) {
 async function launch(dataDir) {
   const app = await _electron.launch({
     executablePath: electronBinary,
-    args: [`--user-data-dir=${dataDir}`, appDir],
+    args: [`--user-data-dir=${dataDir}`, `--import-home=${importHome}`, appDir],
     timeout: 30000,
   });
   const mainLog = [];
@@ -400,46 +404,38 @@ await windowShot(app, "04-work-space");
 await page.click(".space-button:nth-child(1)");
 await page.waitForTimeout(400);
 
-// Import From Browser: a made-up Chrome profile in a throwaway home folder. Its bookmarks arrive as one folder at
-// the end of Pinned, keeping their folders; non-web addresses are left out. The summary dialog is answered here.
-const fakeHome = path.join(outDir, "fake-home");
-const chromeProfile = path.join(fakeHome, "Library", "Application Support", "Google", "Chrome", "Default");
-fs.rmSync(fakeHome, { recursive: true, force: true });
-fs.mkdirSync(chromeProfile, { recursive: true });
-const chromeBookmarks = {
-  roots: {
-    bookmark_bar: {
-      type: "folder",
-      name: "Bookmarks bar",
-      children: [
-        { type: "url", name: "Example", url: "https://example.com/" },
-        { type: "folder", name: "Reading", children: [{ type: "url", name: "Wikipedia", url: "https://www.wikipedia.org/" }] },
-        { type: "url", name: "Settings", url: "chrome://settings/" },
-      ],
-    },
-    other: { type: "folder", name: "Other bookmarks", children: [] },
-  },
-};
-fs.writeFileSync(path.join(chromeProfile, "Bookmarks"), JSON.stringify(chromeBookmarks));
-const realHome = await app.evaluate(({ app: electronApp, dialog }, home) => {
-  const previousHome = electronApp.getPath("home");
-  electronApp.setPath("home", home);
+// Import From Browser: Chrome's "Personal" profile in the made-up home (e2e/fixtures/importHome.mjs). Its bookmarks
+// arrive as one folder at the end of Pinned and its history joins ours (nested folders and non-web addresses are
+// checked in tests/chromiumImport.test.ts). The summary dialog is answered here.
+await app.evaluate(({ dialog }) => {
   dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false });
-  return previousHome;
-}, fakeHome);
+});
+// main's own module: the built file by its full path is the instance the app runs.
+const historyStorePath = path.join(appDir, "dist", "node", "main", "historyStore.js");
+const countChromeHistory = async () => {
+  const historyUrls = await app.evaluate((_electron, modulePath) => process.mainModule.require(modulePath).getHistory().map((entry) => entry.url), historyStorePath);
+  return historyUrls.filter((url) => url.includes("chrome.example.com")).length;
+};
 await dispatch(page, { type: "importFromBrowser", sourceId: "chromium:chrome:Default" });
-await page.waitForTimeout(800);
-await app.evaluate(({ app: electronApp }, home) => electronApp.setPath("home", home), realHome);
+// The import reads Chrome's history with sqlite3 before anything arrives, so wait for it instead of a fixed time.
+const importDeadline = Date.now() + 10000;
+let chromeHistory = await countChromeHistory();
+while (chromeHistory < IMPORT_HOME_COUNTS.chromeDefault.history && Date.now() < importDeadline) {
+  await page.waitForTimeout(200);
+  chromeHistory = await countChromeHistory();
+}
 state = await getState(page);
 const importedFolder = pinnedItems(state).at(-1);
 const importedChildren = importedFolder?.kind === "folder" ? importedFolder.childIds.map((id) => state.items[id]) : [];
 const barFolder = importedChildren[0];
 const barChildren = barFolder?.kind === "folder" ? barFolder.childIds.map((id) => state.items[id]) : [];
+const barTabs = barChildren.filter((item) => item.kind === "tab");
 check(
-  "Import From Browser adds Chrome's bookmarks as one folder, keeping its folders and only web addresses",
-  importedFolder?.title === "Google Chrome Bookmarks" && barChildren.map((item) => item.title).join(",") === "Example,Reading",
-  `${importedFolder?.title} › ${barFolder?.title} › ${barChildren.map((item) => item.title).join(",")}`,
+  "Import From Browser adds Chrome's bookmarks as one folder at the end of Pinned, keeping the bookmarks bar",
+  importedFolder?.title === "Google Chrome Bookmarks" && barFolder?.title === "Bookmarks bar" && barTabs.length === IMPORT_HOME_COUNTS.chromeDefault.bookmarks,
+  `${importedFolder?.title} › ${barFolder?.title} › ${barTabs.map((item) => item.title).join(",")}`,
 );
+check("Import From Browser brings Chrome's history over", chromeHistory === IMPORT_HOME_COUNTS.chromeDefault.history, `${chromeHistory} sites`);
 
 // Notes, like Arc's: a note sits in Today like a tab, its editor fills the page card, its first line names it, and
 // its text is kept (in its own file) when you switch away and back. Pasted text arrives plain.
@@ -644,6 +640,7 @@ await upgraded.page.waitForSelector(".pinned-list .tab-row", { timeout: 30000 })
 state = await getState(upgraded.page);
 check("a milestone 1 (version 1) file opens and is upgraded", state.version === 4 && state.focusedWindowId === "window-1" && state.spaces[0].pinnedIds[0] === "tab-old" && state.settings.archiveAfterMs === 21600000);
 await upgraded.app.close();
+fs.rmSync(importHome, { recursive: true, force: true });
 
 // Chromium prints its own internal log lines ("[pid:date/time:ERROR:base/…]"); only our app's output counts.
 const appLogLines = (firstRunLog + mainLog.join("")).split("\n").filter((line) => !/^\[\d+:\d+\/\d+\.\d+:/.test(line));

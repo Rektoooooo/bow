@@ -2,15 +2,17 @@
 //   The onboarding imports for real: it reads a browser's files first, counts them, then brings the chosen parts
 //   over. The e2e checks need something to read that is not the user's own browsers, so this builds a stand-in home
 //   folder with made-up data where Bow looks for it: Google Chrome with two profiles (bookmarks and history), and Arc
-//   (a sidebar with two Spaces, Favorites and Pinned tabs, and a history). The app is started with HOME pointing here.
+//   (a sidebar with two Spaces, Favorites and Pinned tabs, and a history). The app is started with
+//   --import-home=<this folder> (src/main/importHome.ts).
 //
 // Data source:
 //   Invented sites on example.com / example.org / example.net (reserved for examples). No real browser data.
 //   The file shapes follow docs/research/arc-data-model.md and Chromium's Bookmarks / History formats.
 //
 // Data flow:
-//   check-onboarding.mjs → createImportHome(folder) → files under folder/Library/Application Support → the app
-//   (HOME=folder) → listImportSources() / findArcSidebarFile() → the onboarding's browser tiles
+//   check-onboarding.mjs / check-app.mjs → createImportHome(folder) → files under folder/Library/Application Support
+//   → the app (--import-home=folder) → listImportSources() / findArcSidebarFile() → the onboarding's browser tiles
+//   and File › Import From Browser
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
