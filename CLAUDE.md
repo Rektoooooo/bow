@@ -30,6 +30,8 @@ npm run e2e          # build + drive the real app: check-app, check-overlay, che
                      # Sleep Tab, Keep Awake, Sleep Other Tabs, Task Manager),
                      # check-backup (export, restore by replacing or adding, unsafe files refused),
                      # check-sync (two copies of Bow sync through one folder: join, both ways, stop),
+                     # check-google-sign-in (Google's sign-in pages get Electron's own user agent in headers and
+                     # scripts, Google serves its lighter sign-in, other sites keep Chrome's; needs the network),
                      # check-onboarding (the first-start onboarding in its own window: scenes, keys, real imports
                      # from a made-up home folder via --import-home (e2e/fixtures/importHome.mjs), a color, the
                      # tour, the defaults, replay from Help, fits a 760 × 520 window, no dashes in its text)
@@ -115,13 +117,17 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   and non-Chrome versions, writes the key so the id stays the Web Store id); copies live in
   `<userData>/Extensions/<id>/<version>/`, are shared by every profile that adds the extension (never downloaded
   again into a folder a session has loaded), and are deleted only one by one when nothing uses them.
-- **Security:** web pages stay sandboxed and get no preload, except in a profile that has extensions: there the
-  extension library's preload runs in an isolated world (page scripts see nothing new); website permissions are
-  installed per session in `profiles.ts`: `fullscreen` and `clipboard-sanitized-write` are allowed, camera,
-  microphone, location, notifications and clipboard reading go to a prompt (`permissionPrompts.ts`, answers in
-  `BrowserState.sitePermissions` per profile and origin; private windows never save), screen sharing goes to
-  macOS's sharing picker (`setDisplayMediaRequestHandler` with `useSystemPicker`), everything else and anything
-  from our own pages is refused. Our pages block `will-navigate` and `window.open`, with one exception: a window's
+- **Security:** web pages stay sandboxed. Every web page session (profiles and private windows) has one preload of
+  ours, `googleSignInPreload.ts`, which does nothing except on https://accounts.google.com: Google refuses to sign in
+  a browser that says it is Chrome but fails desktop Chrome's checks ("This browser or app may not be secure",
+  2026-10-29), so its sign-in pages get Electron's own user agent in the request headers (`googleSignIn.ts`,
+  `signInUserAgent.ts`) and in `navigator.userAgent`; every other site sees Chrome's. In a profile that has
+  extensions the extension library's preload runs too, in an isolated world (page scripts see nothing new).
+  Website permissions are installed per session in `profiles.ts`: `fullscreen` and `clipboard-sanitized-write`
+  are allowed, camera, microphone, location, notifications and clipboard reading go to a prompt
+  (`permissionPrompts.ts`, answers in `BrowserState.sitePermissions` per profile and origin; private windows never
+  save), screen sharing goes to macOS's sharing picker (`setDisplayMediaRequestHandler` with `useSystemPicker`),
+  everything else and anything from our own pages is refused. Our pages block `will-navigate` and `window.open`, with one exception: a window's
   sidebar page opens the card's two corner pages main asks it for (`cornerMasks.ts`, allowed by window name and
   address only), so they share its process. `e2e/permission-check.mjs` proves it. Keep it passing.
 - **Updates** (`appUpdates.ts`): Electron's Squirrel.Mac reads `update-darwin-<arch>.json` from the newest published

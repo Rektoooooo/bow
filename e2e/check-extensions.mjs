@@ -65,7 +65,13 @@ const getState = (sidebar) => sidebar.evaluate(() => window.browserApi.getState(
 const dispatch = (sidebar, action) => sidebar.evaluate((value) => window.browserApi.dispatch(value), action);
 const loadedNames = (app, partition = PROFILE_PARTITION) =>
   app.evaluate(({ session }, name) => session.fromPartition(name).extensions.getAllExtensions().map((extension) => extension.name), partition);
-const preloadCount = (app) => app.evaluate(({ session }, partition) => session.fromPartition(partition).getPreloadScripts().length, PROFILE_PARTITION);
+// Read through Bow's own getProfileSession, the way a tab gets its session (it installs Bow's hooks on first use).
+const profilesModulePath = path.join(appDir, "dist", "node", "main", "profiles.js");
+const preloadIds = (app) =>
+  app.evaluate((_electron, modulePath) => {
+    const profiles = process.mainModule.require(modulePath);
+    return profiles.getProfileSession("profile-default").getPreloadScripts().map((script) => script.id);
+  }, profilesModulePath);
 // The fixture's content script sets data-fixture-marker="on" on the shown page.
 const pageMarker = (app) =>
   app.evaluate(async ({ BrowserWindow }) => {
@@ -78,7 +84,12 @@ const pageMarker = (app) =>
 // ---------- first run: add, use, turn off and on ----------
 let { app, sidebar, pageErrors } = await launch();
 
-check("a profile without extensions gives its pages no preload script", (await preloadCount(app)) === 0);
+const idsWithoutExtensions = await preloadIds(app);
+check(
+  "a profile without extensions gives its pages only Bow's Google sign-in helper",
+  idsWithoutExtensions.length === 1 && idsWithoutExtensions[0] === "bow-google-sign-in",
+  JSON.stringify(idsWithoutExtensions),
+);
 
 // Load Unpacked asks for a folder; answer with the fixture instead of showing the dialog.
 await app.evaluate(({ dialog }, folder) => {
@@ -89,7 +100,8 @@ let state = await waitFor(() => getState(sidebar), (value) => (value.extensions 
 const added = state.extensions?.[0];
 check("Load Unpacked adds the extension to the profile, with its localized name", added?.name === "Fixture Marker" && added.isEnabled && added.source === "unpacked", JSON.stringify(added));
 check("it is loaded into the profile's session", (await waitFor(() => loadedNames(app), (names) => names.includes("Fixture Marker"))).includes("Fixture Marker"));
-check("a profile with extensions gets the extension bridge", (await preloadCount(app)) > 0);
+const idsWithExtensions = await preloadIds(app);
+check("a profile with extensions gets the extension bridge as well", idsWithExtensions.length > 1 && idsWithExtensions.includes("bow-google-sign-in"), JSON.stringify(idsWithExtensions));
 
 const overlay = await findPage(app, "/overlay/overlay.html");
 const libraryLine = await overlay.waitForSelector(".extension-line .library-line-title", { timeout: 5000 }).catch(() => null);

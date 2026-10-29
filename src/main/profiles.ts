@@ -175,15 +175,25 @@ export function onProfileSessionCreated(listener: (profileSession: Session) => v
   sessionCreatedListeners.push(listener);
 }
 
+/** Electron's own user agent without our app's name; empty until useChromeUserAgent() has run. */
+let electronUserAgent = "";
+
 /**
- * Removes "Electron/x.y.z" and our app name from the user agent. Some sites (Google sign-in among them) refuse
- * browsers that announce themselves as embedded, so we present the plain Chrome user agent Electron is built on.
- * Must run before the first page loads.
+ * Removes "Electron/x.y.z" and our app name from the user agent: sites treat Bow like the plain Chrome Electron is
+ * built on. One exception: Google's sign-in pages get Electron's own user agent (googleSignIn.ts), because Google
+ * refuses a browser that says it is Chrome but fails desktop Chrome's checks. Must run before the first page loads.
  */
 export function useChromeUserAgent(): void {
-  const electronUserAgent = app.userAgentFallback;
-  const withoutElectron = electronUserAgent.replace(/ Electron\/\S+/, "");
   const appToken = ` ${app.getName()}/${app.getVersion()}`;
-  const plainUserAgent = withoutElectron.replace(appToken, "");
-  app.userAgentFallback = plainUserAgent;
+  electronUserAgent = app.userAgentFallback.replace(appToken, "");
+  app.userAgentFallback = electronUserAgent.replace(/ Electron\/\S+/, "");
+}
+
+/**
+ * Electron's own user agent, without our app's name, e.g.
+ * "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.7977.167
+ * Electron/44.9.3 Safari/537.36". Empty before useChromeUserAgent() ran.
+ */
+export function getElectronUserAgent(): string {
+  return electronUserAgent;
 }
