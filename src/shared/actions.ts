@@ -178,6 +178,16 @@ export type BrowserAction =
   | { type: "setAskWhereToSave"; isOn: boolean }
   | { type: "setOffersToSavePasswords"; isOn: boolean }
   | { type: "setRemembersFormEntries"; isOn: boolean }
+  /**
+   * Library › Passwords (main/passwordsLibrary.ts). Nothing here carries a password: those travel only through the
+   * overlay's own reveal / copy / edit calls, after Touch ID.
+   */
+  | { type: "openPasswords" }
+  | { type: "choosePasswordsProfile"; profileId: ProfileId }
+  | { type: "removeSavedLogin"; profileId: ProfileId; loginId: string }
+  | { type: "removeNeverSave"; profileId: ProfileId; origin: string }
+  | { type: "forgetFormEntries"; profileId: ProfileId }
+  | { type: "retryPasswordVault"; profileId: ProfileId }
   | { type: "setTabNeverArchived"; tabId: ItemId; isNeverArchived: boolean }
   | { type: "setSpaceArchiveAfter"; spaceId: SpaceId; archiveAfterMs: number | null | "default" }
   /** A Space's own search engine, or the one in Settings ("default"). */
@@ -346,6 +356,12 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "setAskWhereToSave",
   "setOffersToSavePasswords",
   "setRemembersFormEntries",
+  "openPasswords",
+  "choosePasswordsProfile",
+  "removeSavedLogin",
+  "removeNeverSave",
+  "forgetFormEntries",
+  "retryPasswordVault",
   "setTabNeverArchived",
   "setSpaceArchiveAfter",
   "setSpaceSearchEngine",

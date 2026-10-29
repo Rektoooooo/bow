@@ -173,6 +173,7 @@ export const appMenuCommands: AppMenuCommands = {
   findNext: (forward) => findNextMatch(forward),
   openLibrary: () => openLibrary(),
   openSettings: () => openLibrary("settings"),
+  openPasswords: () => menuHost.runAction({ type: "openPasswords" }),
   openShortcutSheet: () => openShortcutSheet(),
   openWelcome: () => openOnboarding(false),
   sleepOtherTabs: () => menuHost.runAction({ type: "sleepOtherTabs" }),

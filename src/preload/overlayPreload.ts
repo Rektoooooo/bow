@@ -46,6 +46,10 @@ const CHANNELS: typeof OVERLAY_CHANNELS = {
   chooseTab: "overlay:choose-tab",
   mediaCommand: "overlay:media-command",
   librarySection: "overlay:library-section",
+  revealPassword: "overlay:reveal-password",
+  copyPassword: "overlay:copy-password",
+  copyUsername: "overlay:copy-username",
+  editLogin: "overlay:edit-login",
 };
 
 const DISPATCH_CHANNEL: (typeof IPC_CHANNELS)["dispatch"] = "browser:dispatch";
@@ -95,6 +99,10 @@ function createOverlayApi(): OverlayApi {
     captureRegion: (region) => ipcRenderer.invoke(CHANNELS.captureRegion, region),
     activateExtension: (extensionId, anchor) => ipcRenderer.invoke(CHANNELS.activateExtension, extensionId, anchor),
     showSiteMenu: (anchor) => ipcRenderer.invoke(CHANNELS.showSiteMenu, anchor),
+    revealPassword: (profileId, loginId) => ipcRenderer.invoke(CHANNELS.revealPassword, profileId, loginId),
+    copyPassword: (profileId, loginId) => ipcRenderer.invoke(CHANNELS.copyPassword, profileId, loginId),
+    copyUsername: (profileId, loginId) => ipcRenderer.invoke(CHANNELS.copyUsername, profileId, loginId),
+    editLogin: (profileId, loginId, username, password) => ipcRenderer.invoke(CHANNELS.editLogin, profileId, loginId, username, password),
     setLibrarySection: (section) => ipcRenderer.invoke(CHANNELS.librarySection, section),
     getSymbols: () => ipcRenderer.invoke(SYMBOLS_CHANNEL),
   };

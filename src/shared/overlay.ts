@@ -24,7 +24,7 @@ export type CommandBarResultKind = "navigate" | "search" | "tab" | "history" | "
 /** "tabs" is tab search (⇧⌘A): only tabs, every Space. */
 export type CommandBarMode = "newTab" | "editUrl" | "splitWith" | "tabs";
 
-export const LIBRARY_SECTIONS = ["archive", "history", "media", "downloads", "spaces", "boosts", "chains", "privacy", "extensions", "tasks", "shortcuts", "settings"] as const;
+export const LIBRARY_SECTIONS = ["archive", "history", "media", "downloads", "spaces", "boosts", "chains", "passwords", "privacy", "extensions", "tasks", "shortcuts", "settings"] as const;
 
 export type LibrarySection = (typeof LIBRARY_SECTIONS)[number];
 
@@ -230,6 +230,34 @@ export interface LibraryBoost {
   hasCss: boolean;
 }
 
+/**
+ * Library › Passwords. "loading": the vault is not read yet. "locked": it exists but could not be opened (the Keychain
+ * refused, or the file is damaged). "unavailable": this Mac has no Keychain to hold the key.
+ */
+export type PasswordsStatus = "loading" | "ready" | "locked" | "unavailable";
+
+/** A saved login as the Library lists it. It never carries the password: that is fetched on demand after Touch ID. */
+export interface PasswordsLogin {
+  id: string;
+  /** The site to show: the host without "www.". */
+  site: string;
+  username: string;
+}
+
+/** What Library › Passwords draws for one profile. Never holds a password. */
+export interface PasswordsData {
+  profiles: { id: string; name: string }[];
+  profileId: string;
+  status: PasswordsStatus;
+  /** A to Z by site, then username. */
+  logins: PasswordsLogin[];
+  /** Sites with "Never for this site"; `origin` goes back to main to remove one. */
+  neverSaveSites: { origin: string; site: string }[];
+  formEntryCount: number;
+  offersToSavePasswords: boolean;
+  remembersFormEntries: boolean;
+}
+
 export interface LibraryData {
   archive: ArchivedTab[];
   spaces: LibrarySpace[];
@@ -252,6 +280,8 @@ export interface LibraryData {
   /** Library › Chains: the chains, and the Command Bar actions a step may run (main/commandChains.ts). */
   commandChains: CommandChain[];
   chainActions: { id: string; title: string }[];
+  /** Library › Passwords; filled only while that section is shown (reading the vault can ask the Keychain). */
+  passwords: PasswordsData;
   /** Library › Privacy: the blocker's week (main/privacyReport.ts), and whether blocking is on at all. */
   privacy: {
     summary: PrivacySummary;
@@ -383,6 +413,16 @@ export interface OverlayApi {
    * worked (the Library says "Copied" or "Saved to Downloads").
    */
   mediaCommand(mediaId: string, command: MediaCommand): Promise<boolean>;
+  /**
+   * Library › Passwords. The password of one login, or null when the user did not prove it is them (Touch ID or the
+   * Mac's password) or the login is gone.
+   */
+  revealPassword(profileId: string, loginId: string): Promise<string | null>;
+  /** Main puts the password on the clipboard itself (it never travels to this page) and clears it later. */
+  copyPassword(profileId: string, loginId: string): Promise<boolean>;
+  copyUsername(profileId: string, loginId: string): Promise<boolean>;
+  /** Saves a login's new username and password; false when the user did not prove it is them or the edit is refused. */
+  editLogin(profileId: string, loginId: string, username: string, password: string): Promise<boolean>;
   /** The Library shows another section (Spaces widens its column). */
   setLibrarySection(section: LibrarySection): Promise<void>;
   /** The SF Symbols our icons use, rendered by macOS. */
@@ -415,4 +455,8 @@ export const OVERLAY_CHANNELS = {
   chooseTab: "overlay:choose-tab",
   mediaCommand: "overlay:media-command",
   librarySection: "overlay:library-section",
+  revealPassword: "overlay:reveal-password",
+  copyPassword: "overlay:copy-password",
+  copyUsername: "overlay:copy-username",
+  editLogin: "overlay:edit-login",
 } as const;

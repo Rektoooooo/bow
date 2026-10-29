@@ -81,7 +81,7 @@ import { applyBoostToPage, runBoostJavaScript } from "./boostPages";
 import { createStatusBubble, showLinkStatus } from "./statusBubble";
 import { initializePeek, openPeek } from "./peek";
 import { createOverlayView, getOverlayContents } from "./overlay";
-import { refreshOpenPanel, registerOverlayIpc, setCommandActionRegistry } from "./overlayController";
+import { openPasswords, refreshOpenPanel, registerOverlayIpc, setCommandActionRegistry } from "./overlayController";
 import { getOnboardingContents, openOnboarding, refreshOnboarding, registerOnboardingIpc } from "./onboardingWindow";
 import { startHandoff } from "./handoff";
 import { noticeVisitedPage, startLiveFolderRefreshing } from "./liveFolderRefresher";
@@ -356,7 +356,7 @@ async function handleAppReady(): Promise<void> {
   initializePermissionPrompts();
   initializePasswordOffers();
   // The list under a sign-in or address field (saved logins, remembered values).
-  initializeAutofill();
+  initializeAutofill((profileId) => openPasswords(profileId));
   // Bow Passwords: what the user types into forms (emails, names, addresses) is remembered and offered again.
   initializeFormMemory();
   // Ad blocking checks requests in every profile session; the lists load now when it is on.

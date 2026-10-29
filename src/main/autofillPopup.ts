@@ -15,6 +15,7 @@
  *   page helper → formsBridge onFieldFocused → rows from the vault → the list's view above the tab → AUTOFILL show
  *   arrow keys / Return / Escape on the tab's page (before-input-event) or a pointer press on a row (AUTOFILL choose)
  *   → pickRow() → vault read → fillLogin / fillValue (formsBridge.ts) → the page helper writes into the field
+ *   the "Manage passwords…" footer (a press: AUTOFILL manage; keys: pickRow) → closeAutofillPopup() → Library › Passwords
  *   field left, navigation, tab switch, another window or an open panel → closeAutofillPopup()
  */
 import { ipcMain, nativeTheme, WebContentsView } from "electron";
@@ -50,9 +51,12 @@ const FIELD_LEFT_GRACE_MS = 150;
 /** What a login without a username is called in the list. */
 const NO_USERNAME_TITLE = "No username";
 
+/** The footer under a list of logins. */
+const MANAGE_PASSWORDS_TITLE = "Manage passwords…";
+
 /** A row of the list: what main knows about it (a login's id, never its password) and what the page draws. */
 interface ListRow {
-  entry: { kind: "login"; loginId: string } | { kind: "value"; fieldKind: FormFieldKind; value: string };
+  entry: { kind: "login"; loginId: string } | { kind: "value"; fieldKind: FormFieldKind; value: string } | { kind: "manage" };
   item: AutofillItem;
 }
 
@@ -74,6 +78,9 @@ let popupView: WebContentsView | null = null;
 let popupReady: Promise<void> = Promise.resolve();
 let shownList: ShownList | null = null;
 
+/** Opens Library › Passwords for a profile (given at startup; the list does not know the Library). */
+let openPasswordsFor: (profileId: ProfileId) => void = () => undefined;
+
 /** Counts field reports and closings, so an answer from the vault that arrives late can tell it is out of date. */
 let requestCounter = 0;
 let fieldLeftTimer: NodeJS.Timeout | null = null;
@@ -81,7 +88,8 @@ let fieldLeftTimer: NodeJS.Timeout | null = null;
 /**
  * Connects the list to the forms bridge, to its page and to layout changes. Runs once at startup.
  */
-export function initializeAutofill(): void {
+export function initializeAutofill(openPasswords: (profileId: ProfileId) => void): void {
+  openPasswordsFor = openPasswords;
   onFieldFocused((report) => {
     showForField(report).catch((error) => {
       console.error("Could not show the autofill list:", error instanceof Error ? error.name : "");
@@ -89,6 +97,7 @@ export function initializeAutofill(): void {
   });
   onFieldLeft(handleFieldLeft);
   ipcMain.handle(AUTOFILL_CHANNELS.choose, handleChoose);
+  ipcMain.handle(AUTOFILL_CHANNELS.manage, handleManage);
   addAfterSyncHook(closeWhenTabMoved);
 }
 
@@ -132,6 +141,10 @@ function makeValueRows(vault: PasswordVault, fieldKind: FormFieldKind, typed: st
   }));
 }
 
+function makeManageRow(): ListRow {
+  return { entry: { kind: "manage" }, item: { kind: "manage", title: MANAGE_PASSWORDS_TITLE } };
+}
+
 /** Saved logins of the site; for the username field only those that start with what was typed. */
 function makeLoginRows(vault: PasswordVault, report: FieldReport): ListRow[] {
   const { role, typed } = report.message;
@@ -151,7 +164,11 @@ function makeRows(vault: PasswordVault, report: FieldReport, remembersFormEntrie
   if (role === "username" || role === "password") {
     const loginRows = makeLoginRows(vault, report);
     const showsEmailsInstead = loginRows.length === 0 && role === "username" && remembersFormEntries;
-    return showsEmailsInstead ? makeValueRows(vault, "email", typed) : loginRows;
+    if (showsEmailsInstead) {
+      return makeValueRows(vault, "email", typed);
+    }
+    // The footer only follows logins: a list of nothing else has no reason to open the Library.
+    return loginRows.length === 0 ? [] : [...loginRows, makeManageRow()];
   }
   return remembersFormEntries ? makeValueRows(vault, role, typed) : [];
 }
@@ -422,6 +439,24 @@ function handleChoose(event: IpcMainInvokeEvent, index: unknown): void {
   pickRow(index);
 }
 
+/** The page's pointer press on the "Manage passwords…" footer. Only our own list page may ask, while a list is shown. */
+function handleManage(event: IpcMainInvokeEvent): void {
+  const isFromPopup = popupView !== null && event.sender === popupView.webContents;
+  const list = shownList;
+  if (!isFromPopup || list === null) {
+    return;
+  }
+  const hasManageRow = list.rows.some((row) => row.entry.kind === "manage");
+  if (hasManageRow) {
+    openManagePasswords(list);
+  }
+}
+
+function openManagePasswords(list: ShownList): void {
+  closeAutofillPopup();
+  openPasswordsFor(list.profileId);
+}
+
 /**
  * Fills the picked row and closes the list. The list goes first: filling gives the keyboard back to the page.
  */
@@ -431,6 +466,10 @@ function pickRow(index: number): void {
   if (list === null || row === undefined) {
     return;
   }
+  if (row.entry.kind === "manage") {
+    openManagePasswords(list);
+    return;
+  }
   closeAutofillPopup();
   fillRow(list, row).catch((error) => {
     console.error("Could not fill the picked entry:", error instanceof Error ? error.name : "");
@@ -438,6 +477,9 @@ function pickRow(index: number): void {
 }
 
 async function fillRow(list: ShownList, row: ListRow): Promise<void> {
+  if (row.entry.kind === "manage") {
+    return;
+  }
   if (row.entry.kind === "value") {
     fillValue(list.tabId, list.origin, { value: row.entry.value });
     return;

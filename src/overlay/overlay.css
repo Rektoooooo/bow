@@ -2872,3 +2872,57 @@ body.is-closing .peek-buttons {
 .setting-switch[aria-checked="true"]::after {
   transform: translateX(16px);
 }
+
+/* ---------- Library › Passwords ---------- */
+
+.library-passwords {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.password-list {
+  padding: 4px 0 0;
+}
+
+/* The row's second and third lines: the username, then dots or the password shown. */
+.password-row .password-secret {
+  font-variant-numeric: tabular-nums;
+  user-select: text;
+}
+
+.password-row .library-line-icon-button {
+  flex: none;
+  width: 26px;
+}
+
+.password-row {
+  gap: 8px;
+}
+
+.password-edit-form {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.password-edit-form .library-search {
+  flex: 1 1 140px;
+}
+
+.password-group {
+  margin-top: 6px;
+}
+
+.password-problem {
+  margin: 0 0 8px;
+  color: var(--danger);
+}
+
+.password-unreadable {
+  margin-top: 8vh;
+}
+
+.password-note {
+  margin-top: 22px;
+}

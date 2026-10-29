@@ -1,7 +1,7 @@
 /**
  * WHY this file exists:
  *   Draws the list under a form field: a key icon, the username and dots for a saved login, one line for a remembered
- *   value. It never sees a password (main sends titles only). A press on a row (pointer down, so it beats the web
+ *   value, and a "Manage passwords…" footer under logins. It never sees a password (main sends titles only). A press on a row (pointer down, so it beats the web
  *   page's blur) tells main which row; main fills the field.
  *
  * Data source:
@@ -20,6 +20,7 @@ import { createIcon, installSymbols } from "../renderer/icons.js";
 interface AutofillApi {
   onShow(listener: (message: AutofillShowMessage) => void): void;
   choose(index: number): Promise<void>;
+  manage(): Promise<void>;
   getSymbols(): Promise<Record<string, SymbolImage>>;
 }
 
@@ -34,7 +35,7 @@ const HIDDEN_PASSWORD_DOTS = "••••••••";
 
 function buildRow(item: AutofillItem, index: number): HTMLElement {
   const row = document.createElement("div");
-  row.className = item.kind === "login" ? "autofill-row is-login" : "autofill-row is-value";
+  row.className = `autofill-row is-${item.kind}`;
   row.setAttribute("role", "option");
   row.dataset.index = String(index);
   const title = document.createElement("span");
@@ -42,6 +43,10 @@ function buildRow(item: AutofillItem, index: number): HTMLElement {
   title.textContent = item.title;
   if (item.kind === "value") {
     row.append(title);
+    return row;
+  }
+  if (item.kind === "manage") {
+    row.append(createIcon("gear", "icon autofill-icon"), title);
     return row;
   }
   const dots = document.createElement("span");
@@ -76,6 +81,10 @@ function chooseRowUnderPointer(event: PointerEvent): void {
     return;
   }
   event.preventDefault();
+  if (row.classList.contains("is-manage")) {
+    window.autofillApi.manage().catch(() => undefined);
+    return;
+  }
   const index = Number(row.dataset.index);
   window.autofillApi.choose(index).catch(() => undefined);
 }

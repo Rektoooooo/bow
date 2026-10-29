@@ -413,7 +413,7 @@ a Keychain key, per profile.
 - [x] 5. The suggestion list under the field (its own view, never takes focus, clamped inside the page), fill on a
       pick only, ↓ ↑ Return Escape; check-passwords (save and fill) → full suite, push
 - [x] 6. Form memory: emails, names, phones, addresses come back as suggestions; Shift+Delete removes one
-- [ ] 7. Library › Passwords: list, search, Show / Copy / Edit behind Touch ID (fails closed), delete, never-saved
+- [x] 7. Library › Passwords: list, search, Show / Copy / Edit behind Touch ID (fails closed), delete, never-saved
       sites, forget form memory, the two switches
 - [ ] 8. Import from a CSV file: Library, File › Import From Browser, the onboarding's done view (export steps per
       browser), move the file to the Trash afterwards

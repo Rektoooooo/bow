@@ -8,6 +8,10 @@
 //   login below the field and inside the page's area, a script focus shows nothing, arrow keys + Return, Escape and a
 //   click on a row work, Return with nothing highlighted still sends the form, typing past the match closes it, the
 //   password field shows it too, a site without a saved login shows nothing, and near the page's bottom it opens above.
+// - Library › Passwords: opens from an action, lists logins without any password in the page, search, Show / Hide and
+//   Copy (the mock keychain stands in for Touch ID), Edit, "Never saved for", form memory with Forget all, the trash
+//   button, "Manage passwords…" under the field's list (click and keys), the logins surviving a restart, and a vault
+//   that cannot be opened (the section says so, no save prompt, the file stays byte for byte as it was).
 // usage: npm run build && node e2e/check-passwords.mjs
 import "./background.mjs";
 import { _electron } from "playwright-core";
@@ -93,11 +97,14 @@ const port = server.address().port;
 const mainOrigin = `http://127.0.0.1:${port}`;
 const otherOrigin = `http://login.test:${port}`;
 
-const app = await _electron.launch({
-  executablePath: createRequire(import.meta.url)("electron"),
-  args: [`--user-data-dir=${userDataDir}`, "--skip-welcome", "--host-resolver-rules=MAP login.test 127.0.0.1", appDir],
-  timeout: 30000,
-});
+const launchApp = () =>
+  _electron.launch({
+    executablePath: createRequire(import.meta.url)("electron"),
+    args: [`--user-data-dir=${userDataDir}`, "--skip-welcome", "--host-resolver-rules=MAP login.test 127.0.0.1", appDir],
+    timeout: 30000,
+  });
+// Reassigned when a check restarts the app; every helper below reads these at the time it runs.
+let app = await launchApp();
 async function findPage(urlEnding) {
   for (let attempt = 0; attempt < 150; attempt++) {
     const found = app.windows().find((candidate) => candidate.url().endsWith(urlEnding));
@@ -106,10 +113,10 @@ async function findPage(urlEnding) {
   }
   throw new Error(`${urlEnding} did not open`);
 }
-const page = await findPage("/renderer/index.html");
+let page = await findPage("/renderer/index.html");
 await page.emulateMedia({ reducedMotion: "reduce" });
 await page.waitForSelector(".space-title");
-const overlay = await findPage("/overlay/overlay.html");
+let overlay = await findPage("/overlay/overlay.html");
 const dispatch = (action) => page.evaluate((value) => window.browserApi.dispatch(value), action);
 
 // ---------- Helpers ----------
@@ -585,10 +592,209 @@ await sleep(1500);
 check("with form memory off, a sent form is not remembered", !isRemembered(await readFormEntries(), "name", "Sam Off"));
 await dispatch({ type: "setRemembersFormEntries", isOn: true });
 
-// ---------- Done ----------
-const appPid = app.process().pid;
-const quitResult = await Promise.race([app.close().then(() => "quit"), sleep(15000).then(() => "still running")]);
-if (quitResult !== "quit") process.kill(appPid);
+// ---------- 13. Library › Passwords ----------
+const libraryRows = () => overlay.locator(".password-row");
+const waitForRowCount = async (count, timeoutMs = 5000) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if ((await libraryRows().count()) === count) return true;
+    await sleep(100);
+  }
+  return false;
+};
+const rowText = async (rowIndex) => ((await libraryRows().nth(rowIndex).innerText()) ?? "").replace(/\s+/g, " ").trim();
+const readClipboard = () => app.evaluate(async ({ clipboard }) => await clipboard.readText());
+const waitForClipboard = async (wanted, timeoutMs = 3000) => {
+  const deadline = Date.now() + timeoutMs;
+  let text = await readClipboard();
+  while (text !== wanted && Date.now() < deadline) {
+    await sleep(100);
+    text = await readClipboard();
+  }
+  return text;
+};
+const waitForText = async (selector, isWanted, timeoutMs = 5000) => {
+  const deadline = Date.now() + timeoutMs;
+  let text = "";
+  while (Date.now() < deadline) {
+    const element = await overlay.$(selector);
+    text = element === null ? "" : ((await element.innerText()) ?? "").replace(/\s+/g, " ").trim();
+    if (isWanted(text)) return text;
+    await sleep(100);
+  }
+  return text;
+};
+const readFormEntryCount = async () => (await readFormEntries()).length;
+
+// The pictures are of the whole window: the overlay alone is see-through and draws light text on nothing.
+// 13a. The action opens the section; the page shows the login's site and username and no password.
+await overlay.keyboard.press("Escape").catch(() => undefined);
+await waitForOverlayGone();
+await dispatch({ type: "openPasswords" });
+await overlay.waitForSelector(".password-row", { timeout: 8000 }).catch(() => undefined);
+const firstRowText = (await libraryRows().count()) > 0 ? await rowText(0) : "";
+const libraryHtml = await overlay.content();
+check(
+  "openPasswords shows the saved login's site and username, and no password anywhere in the page",
+  /127\.0\.0\.1:\d+/.test(firstRowText) && firstRowText.includes("alex@example.com") && firstRowText.includes("••••••••") && !libraryHtml.includes("second-pass-2") && !libraryHtml.includes("first-pass-1"),
+  firstRowText,
+);
+await fs.promises.writeFile(path.join(outDir, "library-passwords.png"), await captureWindow(app)).catch(() => undefined);
+
+// 13b. The search field filters by site or username.
+await overlay.fill(".library-search[data-keep=passwords-search]", "no-such-site-anywhere");
+const rowsForNothing = await waitForRowCount(0, 2000);
+await overlay.fill(".library-search[data-keep=passwords-search]", "ALEX");
+const rowsForUsername = await waitForRowCount(1, 2000);
+await overlay.fill(".library-search[data-keep=passwords-search]", "");
+const rowsAfterClearing = await waitForRowCount(1, 2000);
+check("the search field filters the rows and clearing it brings them back", rowsForNothing && rowsForUsername && rowsAfterClearing);
+
+// 13c. Show reveals the password in its row (the mock keychain stands in for Touch ID); Hide hides it again.
+await overlay.click(".password-row button[aria-label='Show password']");
+const shownSecret = await waitForText(".password-secret", (text) => text === "second-pass-2");
+await fs.promises.writeFile(path.join(outDir, "library-passwords-shown.png"), await captureWindow(app)).catch(() => undefined);
+await overlay.click(".password-row button[aria-label='Hide password']");
+const hiddenSecret = await waitForText(".password-secret", (text) => text === "••••••••");
+check("Show reveals the password in its row and Hide hides it again", shownSecret === "second-pass-2" && hiddenSecret === "••••••••" && !(await overlay.content()).includes("second-pass-2"), `${shownSecret} / ${hiddenSecret}`);
+
+// 13d. Copy password and Copy username put the text on the clipboard (main writes it; the page never holds it).
+await app.evaluate(({ clipboard }) => clipboard.clear());
+await overlay.click(".password-row button[aria-label='Copy password']");
+const copiedPassword = await waitForClipboard("second-pass-2");
+check("Copy password puts the password on the clipboard", copiedPassword === "second-pass-2", copiedPassword);
+await overlay.click(".password-row button[aria-label='Copy username']");
+const copiedUsername = await waitForClipboard("alex@example.com");
+check("Copy username puts the username on the clipboard", copiedUsername === "alex@example.com", copiedUsername);
+await app.evaluate(({ clipboard }) => clipboard.clear());
+
+// 13e. Edit… opens a form with the password filled in; Save keeps the new username in the vault.
+await overlay.click(".password-row button[aria-label='Edit…']");
+await overlay.waitForSelector(".password-edit-form");
+const editedPasswordField = await overlay.inputValue(".password-edit-form input[type=password]");
+await overlay.fill(".password-edit-form input[aria-label=Username]", "alex.renamed@example.com");
+await overlay.click(".password-edit-form button[type=submit]");
+const afterEdit = await waitForVault((vault) => vault.logins.some((login) => login.username === "alex.renamed@example.com"));
+check(
+  "Edit… fills the password, and Save puts the new username in the vault",
+  editedPasswordField === "second-pass-2" && afterEdit.logins.length === 1 && afterEdit.logins[0].username === "alex.renamed@example.com" && afterEdit.logins[0].password === "second-pass-2",
+  JSON.stringify({ editedPasswordField, logins: afterEdit.logins.map((login) => login.username) }),
+);
+await waitForRowCount(1);
+
+// 13f. "Never saved for" lists login.test; removing it empties the vault's list.
+const neverRowText = await waitForText(".password-never-row", (text) => text.includes("login.test"));
+await overlay.click(".password-never-row button");
+const afterNeverRemoved = await waitForVault((vault) => vault.neverSave.length === 0);
+check("'Never saved for' lists login.test, and removing it empties the vault's list", neverRowText.includes("login.test") && afterNeverRemoved.neverSave.length === 0, neverRowText);
+
+// 13g. The form memory count matches the vault; Forget all asks once more, then forgets.
+const entryCount = await readFormEntryCount();
+const countText = await waitForText(".password-form-memory-count", (text) => /\d/.test(text));
+await overlay.click(".password-forget-all");
+const confirmText = await waitForText(".password-forget-all", (text) => text.startsWith("Click again"));
+await overlay.click(".password-forget-all");
+const entriesAfterForgetting = await (async () => {
+  const deadline = Date.now() + 5000;
+  let count = await readFormEntryCount();
+  while (count !== 0 && Date.now() < deadline) {
+    await sleep(150);
+    count = await readFormEntryCount();
+  }
+  return count;
+})();
+const emptiedText = await waitForText(".password-form-memory-count", (text) => text.startsWith("Nothing"));
+check(
+  "the remembered-entry count matches the vault, and Forget all (after a second click) empties it",
+  entryCount > 0 && countText.startsWith(String(entryCount)) && confirmText.startsWith("Click again") && entriesAfterForgetting === 0 && emptiedText.startsWith("Nothing"),
+  `${entryCount} / ${countText} / ${confirmText} / ${entriesAfterForgetting} / ${emptiedText}`,
+);
+
+// 13h. The trash button removes a login from the vault.
+await app.evaluate(
+  async (_electron, { vaultPath, passwordsPath }) => {
+    const vaultModule = process.mainModule.require(vaultPath);
+    const passwordsModule = process.mainModule.require(passwordsPath);
+    await vaultModule.changeVault("profile-default", (vault) =>
+      passwordsModule.saveLogin(vault, { origin: "https://trash.example", username: "trash@example.com", password: "trash-pass-1" }, "login-trash", Date.now()),
+    );
+  },
+  { vaultPath: vaultModulePath, passwordsPath: path.join(appDir, "dist", "node", "main", "passwords.js") },
+);
+const twoRows = await waitForRowCount(2);
+await overlay.click(".password-row[data-login-id='login-trash'] button[aria-label='Delete password']");
+const afterTrash = await waitForVault((vault) => !vault.logins.some((login) => login.username === "trash@example.com"));
+check("with two logins listed, the trash button removes exactly that login", twoRows && afterTrash.logins.length === 1 && afterTrash.logins[0].username === "alex.renamed@example.com", JSON.stringify(afterTrash.logins.map((login) => login.username)));
+
+// 13i. The list under a field ends with "Manage passwords…": a click, and the keys, open the section.
+await overlay.keyboard.press("Escape");
+await waitForOverlayGone();
+const manageTab = await openSignIn(mainOrigin, "login");
+await manageTab.click("input[type=email]");
+await waitForList(manageTab);
+listPage = await findPage("/autofill/popup.html");
+await sleep(300);
+const manageText = await listPage.evaluate(() => document.body.innerText.replace(/\s+/g, " ").trim());
+await listPage.screenshot({ path: path.join(outDir, "autofill-list-manage.png"), omitBackground: true }).catch(() => undefined);
+await listPage.click(".autofill-row.is-manage");
+await overlay.waitForSelector(".password-row", { timeout: 8000 }).catch(() => undefined);
+const openedByClick = (await isOverlayOnScreen()) && (await libraryRows().count()) === 1 && (await isListGone(manageTab));
+check("the list ends with 'Manage passwords…', and a click on it opens Library › Passwords", manageText.includes("Manage passwords…") && openedByClick, manageText);
+await overlay.keyboard.press("Escape");
+await waitForOverlayGone();
+await manageTab.click("input[type=email]");
+await waitForList(manageTab);
+await pressKeyLikeUser(manageTab, "Down");
+await pressKeyLikeUser(manageTab, "Down");
+await pressKeyLikeUser(manageTab, "Return");
+await overlay.waitForSelector(".password-row", { timeout: 8000 }).catch(() => undefined);
+check("ArrowDown to the footer and Return open Library › Passwords too", (await isOverlayOnScreen()) && (await libraryRows().count()) === 1 && (await isListGone(manageTab)));
+await overlay.keyboard.press("Escape");
+await waitForOverlayGone();
+
+// ---------- 14. A restart keeps the logins ----------
+const quitApp = async () => {
+  const appPid = app.process().pid;
+  const quitResult = await Promise.race([app.close().then(() => "quit"), sleep(15000).then(() => "still running")]);
+  if (quitResult !== "quit") process.kill(appPid);
+};
+const restartApp = async () => {
+  app = await launchApp();
+  page = await findPage("/renderer/index.html");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.waitForSelector(".space-title");
+  overlay = await findPage("/overlay/overlay.html");
+};
+await quitApp();
+await restartApp();
+await dispatch({ type: "openPasswords" });
+await overlay.waitForSelector(".password-row", { timeout: 8000 }).catch(() => undefined);
+const restartedRowText = (await libraryRows().count()) > 0 ? await rowText(0) : "";
+check("after a restart, Passwords lists the remaining login", (await libraryRows().count()) === 1 && restartedRowText.includes("alex.renamed@example.com"), restartedRowText);
+await overlay.keyboard.press("Escape");
+await waitForOverlayGone();
+
+// ---------- 15. A vault that cannot be opened ----------
+await quitApp();
+const garbageBytes = Buffer.from("this is not an encrypted vault \u0000\u0001\u0002 and must stay exactly as it is", "utf8");
+fs.writeFileSync(vaultFile, garbageBytes);
+await restartApp();
+await dispatch({ type: "openPasswords" });
+await overlay.waitForSelector(".password-unreadable", { timeout: 8000 }).catch(() => undefined);
+const unreadableText = await waitForText(".password-unreadable", (text) => text.includes("couldn't open your saved passwords"));
+const hasTryAgain = (await overlay.$(".password-try-again")) !== null;
+check("a vault that cannot be opened says so and offers Try again", unreadableText.includes("couldn't open your saved passwords") && hasTryAgain, unreadableText);
+await fs.promises.writeFile(path.join(outDir, "library-passwords-locked.png"), await captureWindow(app)).catch(() => undefined);
+await overlay.click(".password-try-again");
+await sleep(800);
+check("Try again keeps saying so while the file stays unreadable", (await overlay.$(".password-try-again")) !== null);
+await overlay.keyboard.press("Escape");
+await waitForOverlayGone();
+const lockedTab = await openSignIn(mainOrigin, "login");
+await signIn(lockedTab, "locked@example.com", "locked-pass-1");
+check("with a locked vault a typed sign-in shows no save prompt", await noPromptWithin(3500));
+await quitApp();
+check("and after quitting the vault file is byte for byte what it was", fs.readFileSync(vaultFile).equals(garbageBytes));
 server.close();
 fs.rmSync(userDataDir, { recursive: true, force: true });
 

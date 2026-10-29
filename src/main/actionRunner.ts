@@ -66,9 +66,11 @@ import {
   openBoostEditor,
   openCommandBar,
   openLibrary,
+  openPasswords,
   openSiteControls,
   openSpaceIconPicker,
   openThemeEditor,
+  refreshOpenPanel,
   runCommandBarAction,
   runSiteCommand,
   setFolderListPointer,
@@ -148,6 +150,7 @@ import { takeItemIntoFocusedWindow } from "./windows";
 import { closeSplitByUser, closeTabByUser, navigateFocusedPage, openLinkInNewTab, openLinkInSplitView, openOrSwitchToTab, resetTabToHome, setMuted } from "./tabActions";
 import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
 import { createId } from "./tree";
+import { allowSavingOnSite, choosePasswordsProfile, deleteSavedLogin, forgetAllFormEntries, retryPasswordVault } from "./passwordsLibrary";
 import { checkCommandChain, createCommandChain, deleteCommandChain, saveCommandChain, toChainActionId } from "./commandChains";
 import { openPeek } from "./peek";
 import { openLittleWindow } from "./littleWindow";
@@ -627,6 +630,19 @@ export function runAction(action: BrowserAction): void {
       return applyChange((state) => setFavoritesKeptAwake(state, action.isOn));
     case "openTaskManager":
       return openLibrary("tasks");
+    case "openPasswords":
+      return openPasswords(null);
+    case "choosePasswordsProfile":
+      choosePasswordsProfile(getState(), action.profileId);
+      return refreshOpenPanel();
+    case "removeSavedLogin":
+      return deleteSavedLogin(getState(), action.profileId, action.loginId);
+    case "removeNeverSave":
+      return allowSavingOnSite(getState(), action.profileId, action.origin);
+    case "forgetFormEntries":
+      return forgetAllFormEntries(getState(), action.profileId);
+    case "retryPasswordVault":
+      return retryPasswordVault(getState(), action.profileId, refreshOpenPanel);
     case "chooseSyncFolder":
       chooseSyncFolder().catch((error) => console.error("Starting sync failed:", error));
       return;

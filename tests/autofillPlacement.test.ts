@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AutofillItem } from "../src/shared/autofill";
-import { POPUP_MAX_WIDTH_PX, POPUP_MIN_WIDTH_PX, POPUP_SIDE_MARGIN_PX, computePopupPlacement } from "../src/main/autofillPlacement";
+import { POPUP_MANAGE_ROW_HEIGHT_PX, POPUP_MAX_WIDTH_PX, POPUP_MIN_WIDTH_PX, POPUP_SIDE_MARGIN_PX, computePopupHeight, computePopupPlacement } from "../src/main/autofillPlacement";
 
 const tabView = { x: 200, y: 80, width: 800, height: 600 };
 const oneLogin: AutofillItem[] = [{ kind: "login", title: "alex@example.com" }];
@@ -47,5 +47,12 @@ describe("computePopupPlacement", () => {
   it("scales the field's place with the page zoom", () => {
     const placement = computePopupPlacement({ x: 20, y: 40, width: 300, height: 30 }, 2, tabView, oneLogin);
     expect(placement?.bounds.y).toBe(80 + 80 + 60);
+  });
+});
+
+describe("computePopupHeight", () => {
+  it("adds the height of the Manage passwords footer under the logins", () => {
+    const withFooter: AutofillItem[] = [...oneLogin, { kind: "manage", title: "Manage passwords…" }];
+    expect(computePopupHeight(withFooter) - computePopupHeight(oneLogin)).toBe(POPUP_MANAGE_ROW_HEIGHT_PX);
   });
 });

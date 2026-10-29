@@ -11,16 +11,21 @@
  * Data flow:
  *   autofillPopup.ts → AUTOFILL_CHANNELS.show → autofillPopupPreload.ts → popup.ts draws the rows
  *   popup.ts (pointer down on a row) → AUTOFILL_CHANNELS.choose(index) → autofillPopup.ts fills the field
+ *   popup.ts (pointer down on the footer) → AUTOFILL_CHANNELS.manage → autofillPopup.ts opens Library › Passwords
  */
 
 /** Channel names. The sandboxed preload cannot import our files, so it repeats them typed as `typeof AUTOFILL_CHANNELS`. */
 export const AUTOFILL_CHANNELS = {
   show: "autofill:show",
   choose: "autofill:choose",
+  manage: "autofill:manage",
 } as const;
 
-/** One row. `title` is a login's username ("No username" for none) or the remembered value itself. Never a password. */
-export type AutofillItem = { kind: "login"; title: string } | { kind: "value"; title: string };
+/**
+ * One row. `title` is a login's username ("No username" for none) or the remembered value itself. Never a password.
+ * "manage" is the footer under a list of logins: it opens Library › Passwords.
+ */
+export type AutofillItem = { kind: "login"; title: string } | { kind: "value"; title: string } | { kind: "manage"; title: string };
 
 /**
  * What the list shows. `highlightedIndex` is -1 while nothing is highlighted. `isAbove` is true when the list sits

@@ -409,3 +409,16 @@ export const TASK_MANAGER_REFRESH_MS = 2000;
 export const ONBOARDING_SCREEN_SHARE = 0.7;
 export const ONBOARDING_MIN_WIDTH_PX = 760;
 export const ONBOARDING_MIN_HEIGHT_PX = 520;
+
+/**
+ * Library › Passwords: after Touch ID (or the Mac's password) the saved passwords stay available this long, then the
+ * user is asked again. Our choice: long enough to look something up and copy a few passwords, short enough that a
+ * Mac left open does not give them away. The Mac locking or sleeping ends it at once.
+ */
+export const PASSWORD_UNLOCK_MS = 5 * MINUTE_MS;
+
+/**
+ * A copied password leaves the clipboard after this long, if the clipboard still holds it. Our choice, in the range
+ * password managers use (Safari's Passwords clears after 30 s, 1Password after 90 s).
+ */
+export const CLIPBOARD_CLEAR_MS = 60 * 1000;

@@ -186,3 +186,6 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 - "Real logos" means each browser's recognizable brand mark for every option, the same on every Mac, not an icon
   macOS draws from whatever is installed (2026-10-29: macOS 26 boxes Chrome's own icon file into a grey tile, and
   browsers that are not installed had none). Ask early where brand assets come from and whether they may ship.
+- Never write an absolute local path into a committed file (2026-10-29: a to-do entry named the plan file under
+  `/Users/<name>/.claude/plans/`, which carries the macOS user name; the personal-data check before the push caught
+  it). Describe where something lives in words, or use a path inside the repo.

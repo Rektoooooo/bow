@@ -77,6 +77,26 @@ body.is-above .autofill-list {
   height: 30px;
 }
 
+/* POPUP_MANAGE_ROW_HEIGHT_PX (32 px and the 2 px margin above). The hairline above it sits in the empty bottom edge of the row before, so the row's
+   own highlight stays a plain rounded box. */
+.autofill-row.is-manage {
+  position: relative;
+  height: 32px;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.autofill-row.is-manage::before {
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--card-border);
+}
+
 .autofill-row:hover,
 .autofill-row.is-highlighted {
   background: var(--highlight);

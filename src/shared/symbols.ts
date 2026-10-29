@@ -97,6 +97,9 @@ export const SYMBOL_NAMES = {
   taskManager: "cpu",
   // The onboarding's import checklist: Favorites and bookmarks.
   star: "star",
+  // Library › Passwords: Show and Hide a password.
+  eye: "eye",
+  eyeSlash: "eye.slash",
   book: "book",
 } as const;
 

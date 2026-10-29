@@ -27,6 +27,7 @@ import { describeSpaceIconAsText } from "../shared/spaceIcons.js";
 import { describeDay } from "../shared/timeAgo.js";
 import { findMatchingRule } from "../shared/routingRules.js";
 import { haveChainsChanged, renderChainsSection } from "./chainEditor.js";
+import { renderPasswordsSection, resetPasswordsView } from "./passwordsView.js";
 import { renderPrivacySection } from "./privacyView.js";
 import { renderShortcutsSection } from "./shortcutEditorView.js";
 
@@ -54,6 +55,7 @@ const SECTIONS: { id: LibrarySection; label: string; icon: IconName }[] = [
   { id: "boosts", label: "Boosts", icon: "boost" },
   { id: "chains", label: "Chains", icon: "chains" },
   { id: "archive", label: "Archived Tabs", icon: "archiveOutline" },
+  { id: "passwords", label: "Passwords", icon: "key" },
   { id: "history", label: "History", icon: "clock" },
   { id: "privacy", label: "Privacy", icon: "privacy" },
   { id: "extensions", label: "Extensions", icon: "puzzle" },
@@ -1322,6 +1324,33 @@ function restoreKeptFields(body: HTMLElement, kept: KeptFields): void {
 }
 
 /**
+ * Draws the open section again from the newest data (Passwords asks after a click changed what it shows).
+ */
+function redrawLibraryBody(): void {
+  if (library !== null) {
+    renderBody(library);
+  }
+}
+
+/**
+ * The two switches at the top of Library › Passwords.
+ */
+function createPasswordSwitches(data: LibraryData): HTMLElement {
+  return createSettingGroup("Passwords and forms", [
+    createSettingRow(
+      "Offer to save passwords",
+      "After you sign in, Bow asks whether to keep the password.",
+      createSwitch(data.passwords.offersToSavePasswords, "Offer to save passwords", (isOn) => dispatch({ type: "setOffersToSavePasswords", isOn: isOn })),
+    ),
+    createSettingRow(
+      "Remember what I type in forms",
+      "Names, emails, phone numbers and addresses come back as suggestions. Searches, comments and card numbers never do.",
+      createSwitch(data.passwords.remembersFormEntries, "Remember what I type in forms", (isOn) => dispatch({ type: "setRemembersFormEntries", isOn: isOn })),
+    ),
+  ]);
+}
+
+/**
  * Draws the selected section into the panel body.
  */
 function renderBody(data: LibraryData): void {
@@ -1359,6 +1388,16 @@ function renderBody(data: LibraryData): void {
   if (section === "shortcuts") {
     renderShortcutsSection(body, data);
   }
+  if (section === "passwords") {
+    renderPasswordsSection(body, data, {
+      redraw: redrawLibraryBody,
+      createSwitches: createPasswordSwitches,
+      createEmptyState: () => createEmptyState("passwords", "No saved passwords yet", "When you sign in on a site, Bow offers to save the password."),
+    });
+  }
+  if (section !== "passwords") {
+    resetPasswordsView();
+  }
   if (section === "privacy") {
     const emptyState = createEmptyState("privacy", "Blocking is off", "Turn on blocking of ads and trackers to see what Bow stops, site by site.");
     const connections = createSettingGroup("Connections", [
@@ -1373,7 +1412,7 @@ function renderBody(data: LibraryData): void {
       data.privacy.profiles.map((profile) =>
         createSettingRow(
           `${profile.name}${profile.spaces === "" ? "" : `: ${profile.spaces}`}`,
-          "Cookies, sign-ins and what sites store in this profile are cleared every time Bow quits (and at the next start, should it crash). You sign in again each time; live folders that read GitHub ask too. Extensions keep their own data.",
+          "Cookies, sign-ins and what sites store in this profile are cleared every time Bow quits (and at the next start, should it crash). You sign in again each time; live folders that read GitHub ask too. Extensions keep their own data. Saved passwords and remembered form entries stay.",
           createSwitch(profile.forgetsSiteDataOnQuit, `Forget site data of ${profile.name} on quit`, (isOn) => dispatch({ type: "setForgetSiteDataOnQuit", profileId: profile.id, isOn: isOn })),
         ),
       ),
@@ -1407,6 +1446,7 @@ export function renderLibrary(host: HTMLElement, data: LibraryData, requestedSec
   library = data;
   section = requestedSection;
   isConfirmingClearHistory = false;
+  resetPasswordsView();
 
   const panel = createElement("div", "panel library");
   panel.setAttribute("role", "dialog");
@@ -1451,7 +1491,7 @@ function handleLibraryUpdate(updated: LibraryData): void {
   if (section === "archive") {
     drawArchiveLines(updated);
   }
-  if (section === "downloads" || section === "settings" || section === "media" || section === "spaces" || section === "boosts" || section === "privacy" || section === "shortcuts") {
+  if (section === "downloads" || section === "settings" || section === "media" || section === "spaces" || section === "boosts" || section === "privacy" || section === "shortcuts" || section === "passwords") {
     renderBody(updated);
   }
   // Chains have text fields: drawn again only when the chains changed (an edit was saved), not on every update.

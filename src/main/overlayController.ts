@@ -20,7 +20,7 @@ import { getSnapshot } from "./tabSnapshots";
 import { copyPngToClipboard, listCaptures, runCaptureCommand, saveCapture } from "./captures";
 import { describeCaptureSource } from "./liveCaptures";
 import type { CaptureCommand } from "./captures";
-import type { BrowserState, ItemId, SitePermissionKind, SpaceTemplateItem, SpaceTheme } from "../shared/types";
+import type { BrowserState, ItemId, ProfileId, SitePermissionKind, SpaceTemplateItem, SpaceTheme } from "../shared/types";
 import {
   applyChange,
   getLayoutOptions,
@@ -44,6 +44,9 @@ import { buildShortcutEditorData, cancelShortcutRecording } from "./shortcutEdit
 import { describeSpaceIconAsText } from "../shared/spaceIcons";
 import { RESTART_TO_UPDATE_ID } from "./commandBarActions";
 import { closeAutofillPopup } from "./autofillPopup";
+import { MAX_LOGIN_FIELD_LENGTH } from "./passwords";
+import { onVaultChanged } from "./passwordVault";
+import { buildPasswordsData, choosePasswordsProfile, copyPassword, copyUsername, revealPassword, saveEditedLogin } from "./passwordsLibrary";
 import { focusMainWindow } from "./mainWindows";
 import type { CommandBarResult } from "./commandBar";
 import type { CommandActionRegistry } from "./commandBarActions";
@@ -361,6 +364,7 @@ function buildLibraryData(state: BrowserState): LibraryData {
     commandChains: state.commandChains ?? [],
     linkSourceApps: listKnownSourceApps(),
     shortcuts: buildShortcutEditorData(state),
+    passwords: buildPasswordsData(state, getLibrarySection() === "passwords", refreshOpenPanel),
     privacy: {
       summary: getPrivacySummary(Date.now()),
       isAdBlockOn: state.settings.isAdBlockOn === true,
@@ -576,6 +580,14 @@ export function openLibrary(section: LibrarySection = "archive"): void {
   openPanel({ kind: "library", section: section });
   // The rule form's app list: read in the background, then the Library draws again with it.
   refreshRunningApps(() => refreshOpenPanel());
+}
+
+/**
+ * Opens Library › Passwords on a profile, or (null) on the focused window's active Space's profile.
+ */
+export function openPasswords(profileId: ProfileId | null): void {
+  choosePasswordsProfile(getState(), profileId);
+  openLibrary("passwords");
 }
 
 /**
@@ -1297,8 +1309,39 @@ function refreshTaskManager(): void {
   }
 }
 
+/** A password or username typed into the Library's edit form: any text up to the vault's limit. */
+function isLoginField(value: unknown): value is string {
+  return typeof value === "string" && value.length <= MAX_LOGIN_FIELD_LENGTH;
+}
+
 export function registerOverlayIpc(): void {
   setInterval(refreshTaskManager, TASK_MANAGER_REFRESH_MS);
+  onVaultChanged(() => refreshOpenPanel());
+  // The secrets of Library › Passwords: only our overlay page may ask, and passwordsLibrary.ts asks for Touch ID first.
+  ipcMain.handle(OVERLAY_CHANNELS.revealPassword, (event, profileId: unknown, loginId: unknown) => {
+    if (!isFromOverlay(event) || !isShortText(profileId) || !isShortText(loginId)) {
+      return null;
+    }
+    return revealPassword(getState(), profileId, loginId);
+  });
+  ipcMain.handle(OVERLAY_CHANNELS.copyPassword, (event, profileId: unknown, loginId: unknown) => {
+    if (!isFromOverlay(event) || !isShortText(profileId) || !isShortText(loginId)) {
+      return false;
+    }
+    return copyPassword(getState(), profileId, loginId);
+  });
+  ipcMain.handle(OVERLAY_CHANNELS.copyUsername, (event, profileId: unknown, loginId: unknown) => {
+    if (!isFromOverlay(event) || !isShortText(profileId) || !isShortText(loginId)) {
+      return false;
+    }
+    return copyUsername(getState(), profileId, loginId);
+  });
+  ipcMain.handle(OVERLAY_CHANNELS.editLogin, (event, profileId: unknown, loginId: unknown, username: unknown, password: unknown) => {
+    if (!isFromOverlay(event) || !isShortText(profileId) || !isShortText(loginId) || !isLoginField(username) || !isLoginField(password)) {
+      return false;
+    }
+    return saveEditedLogin(getState(), profileId, loginId, username, password);
+  });
   ipcMain.handle(OVERLAY_CHANNELS.query, (event, text: unknown, mode: unknown) => {
     if (!isFromOverlay(event) || !isShortText(text) || !isMode(mode)) {
       return [];
@@ -1386,6 +1429,8 @@ export function registerOverlayIpc(): void {
     // Leaving Library › Shortcuts stops a recording there.
     cancelShortcutRecording();
     relayoutOverlay();
+    // Passwords reads its vault only while shown, so the page gets fresh data now that it is.
+    refreshOpenPanel();
   });
   ipcMain.handle(OVERLAY_CHANNELS.peekCommand, (event, command: unknown, peekNumber: unknown) => {
     if (!isFromOverlay(event)) {

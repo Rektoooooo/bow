@@ -73,6 +73,7 @@ function buildFixedActions(host: CommandActionHost): FixedAction[] {
     { entry: { id: "export-pdf", title: "Export as PDF…", keywords: ["pdf", "print"] }, run: () => commands.exportPdf() },
     { entry: { id: "search-tabs", title: "Search Tabs", keywords: ["find tab", "all tabs", "tab list"] }, run: () => commands.openCommandBar("tabs") },
     { entry: { id: "settings", title: "Settings", keywords: ["preferences", "options"] }, run: () => commands.openSettings() },
+    { entry: { id: "passwords", title: "Passwords", keywords: ["password", "login", "keychain", "autofill"] }, run: () => commands.openPasswords() },
     { entry: { id: "shortcuts", title: "Keyboard Shortcuts", keywords: ["keys", "hotkeys", "help"] }, run: () => commands.openShortcutSheet() },
     { entry: { id: "welcome-tour", title: "Welcome Tour", keywords: ["welcome", "onboarding", "tour", "getting started"] }, run: () => commands.openWelcome() },
     { entry: { id: "task-manager", title: "Task Manager", keywords: ["memory", "cpu", "activity", "slow"] }, run: () => commands.openTaskManager() },

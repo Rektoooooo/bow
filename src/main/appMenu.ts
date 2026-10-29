@@ -62,6 +62,8 @@ export interface AppMenuCommands {
   openLibrary(): void;
   /** Bow › Settings… (⌘,): Library › Settings. Help › Keyboard Shortcuts (⌘/): the sheet of the menu's shortcuts. */
   openSettings(): void;
+  /** Bow › Passwords…: Library › Passwords. */
+  openPasswords(): void;
   openShortcutSheet(): void;
   /** Help › Welcome to Bow…: the first-start onboarding again, in its own window (onboardingWindow.ts). */
   openWelcome(): void;
@@ -141,6 +143,7 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
         buildUpdateItem(commands),
         { type: "separator" },
         { label: "Settings…", accelerator: "CommandOrControl+,", click: () => commands.openSettings() },
+        { label: "Passwords…", click: () => commands.openPasswords() },
         { type: "separator" },
         { label: "Set as Default Browser…", click: () => commands.setAsDefaultBrowser() },
         { type: "separator" },

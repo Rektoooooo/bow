@@ -9,6 +9,7 @@
  * Data flow:
  *   autofillPopup.ts → "autofill:show" → listener → popup.ts draws the rows
  *   popup.ts → window.autofillApi.choose(index) → "autofill:choose" → autofillPopup.ts
+ *   popup.ts → window.autofillApi.manage() → "autofill:manage" → autofillPopup.ts
  */
 import { contextBridge, ipcRenderer } from "electron";
 import type { IpcRendererEvent } from "electron";
@@ -19,6 +20,7 @@ import type { IPC_CHANNELS } from "../shared/ipcChannels";
 const CHANNELS: typeof AUTOFILL_CHANNELS = {
   show: "autofill:show",
   choose: "autofill:choose",
+  manage: "autofill:manage",
 };
 
 const SYMBOLS_CHANNEL: (typeof IPC_CHANNELS)["getSymbols"] = "browser:get-symbols";
@@ -28,5 +30,6 @@ contextBridge.exposeInMainWorld("autofillApi", {
     ipcRenderer.on(CHANNELS.show, (_event: IpcRendererEvent, message: AutofillShowMessage) => listener(message));
   },
   choose: (index: number) => ipcRenderer.invoke(CHANNELS.choose, index),
+  manage: () => ipcRenderer.invoke(CHANNELS.manage),
   getSymbols: () => ipcRenderer.invoke(SYMBOLS_CHANNEL),
 });

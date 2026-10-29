@@ -42,6 +42,8 @@ export const POPUP_CARD_BORDER_PX = 1;
 /** A login shows two lines (username and dots), a remembered value one. */
 export const POPUP_LOGIN_ROW_HEIGHT_PX = 44;
 export const POPUP_VALUE_ROW_HEIGHT_PX = 30;
+/** The "Manage passwords…" footer: a 32 px row and a 2 px gap above it, where a hairline sits. */
+export const POPUP_MANAGE_ROW_HEIGHT_PX = 34;
 
 /** Where the list goes. */
 export interface PopupPlacement {
@@ -49,11 +51,17 @@ export interface PopupPlacement {
   isAbove: boolean;
 }
 
+const ROW_HEIGHT_BY_KIND: Record<AutofillItem["kind"], number> = {
+  login: POPUP_LOGIN_ROW_HEIGHT_PX,
+  value: POPUP_VALUE_ROW_HEIGHT_PX,
+  manage: POPUP_MANAGE_ROW_HEIGHT_PX,
+};
+
 /** The view's height for these rows, with the card's margins. */
 export function computePopupHeight(items: readonly AutofillItem[]): number {
   let rowsHeight = 0;
   for (const item of items) {
-    rowsHeight += item.kind === "login" ? POPUP_LOGIN_ROW_HEIGHT_PX : POPUP_VALUE_ROW_HEIGHT_PX;
+    rowsHeight += ROW_HEIGHT_BY_KIND[item.kind];
   }
   const cardHeight = rowsHeight + 2 * POPUP_CARD_PADDING_PX + 2 * POPUP_CARD_BORDER_PX;
   return cardHeight + POPUP_NEAR_MARGIN_PX + POPUP_FAR_MARGIN_PX;
