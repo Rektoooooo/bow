@@ -21,6 +21,7 @@ import { IMPORT_PART_LABELS, describeFound, describePartCount } from "../shared/
 import { createElement, createTextButton } from "../renderer/dom.js";
 import { createIcon } from "../renderer/icons.js";
 import type { IconName } from "../renderer/icons.js";
+import { createPasswordsBlock } from "./passwordsBlock.js";
 import { createProfilesPane } from "./profilesImport.js";
 import { createSceneActions, createSceneFrame, createSceneLede, createSceneNote, createSceneTitle, markReveal, revealParts } from "./sceneParts.js";
 import type { SceneView } from "./sceneParts.js";
@@ -142,7 +143,8 @@ export function createImportScene(data: WelcomeData, goNext: () => void): SceneV
   const checklist = createElement("div", "import-checklist");
   const sourceActions = createSceneActions("", () => runPrimary(), "", () => runSecondary());
   const sourceNote = createSceneNote("");
-  sourcePane.append(sourceBar, sentence, checklist, sourceActions.element, sourceNote);
+  const passwordsBlock = createPasswordsBlock();
+  sourcePane.append(sourceBar, sentence, checklist, sourceActions.element, sourceNote, passwordsBlock.element);
   sourcePane.hidden = true;
 
   // A browser with several profiles (Dia's spaces): all of them at once, each as a Space (profilesImport.ts).
@@ -379,6 +381,7 @@ export function createImportScene(data: WelcomeData, goNext: () => void): SceneV
     secondary.hidden = isWorking;
     sourceNote.classList.toggle("is-positive", isDoneShown);
     sourceNote.textContent = isDoneShown ? `Done. Your things from ${browser.name} are in Bow.` : "Everything stays on this Mac.";
+    passwordsBlock.update(isDoneShown ? browser.id : null);
     if (phase === "needsAccess") {
       primary.textContent = "Open System Settings";
       secondary.textContent = "Try again";

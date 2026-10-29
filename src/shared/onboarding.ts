@@ -12,6 +12,7 @@
  *   onboardingWindow.ts buildWelcomeData() → "onboarding:data" → onboarding/onboarding.ts → these helpers → the scenes
  *   the page → onboardingApi (preload/onboardingPreload.ts) → ONBOARDING_CHANNELS → onboardingWindow.ts
  */
+import type { PasswordImportOutcome } from "./passwords";
 import type { SymbolImage } from "./symbols";
 import type { SpaceTheme, ThemeAppearance } from "./types";
 
@@ -407,6 +408,10 @@ export interface OnboardingApi {
   openFullDiskAccess(): Promise<void>;
   /** Brings several profiles of one browser that were read over, each as its own Space with its own profile. */
   bringOverAll(browserId: string, sourceIds: string[]): Promise<void>;
+  /** Asks for a passwords export (CSV) and adds it to the active Space's profile; counts only come back. */
+  importPasswords(): Promise<PasswordImportOutcome>;
+  /** Moves the file imported last to the Trash; false when there is none or it could not be moved. */
+  trashImportedPasswords(): Promise<boolean>;
 }
 
 /** Channel names between the onboarding's page and main (onboardingWindow.ts checks every sender is that page). */
@@ -419,4 +424,6 @@ export const ONBOARDING_CHANNELS = {
   bringOver: "onboarding:bring-over",
   openFullDiskAccess: "onboarding:open-full-disk-access",
   bringOverAll: "onboarding:bring-over-all",
+  importPasswords: "onboarding:import-passwords",
+  trashImportedPasswords: "onboarding:trash-imported-passwords",
 } as const;

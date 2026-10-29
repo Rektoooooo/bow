@@ -478,6 +478,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   removeNeverSave: { profileId: isText, origin: isText },
   forgetFormEntries: { profileId: isText },
   retryPasswordVault: { profileId: isText },
+  importPasswordsFromFile: { profileId: isText },
   setTabNeverArchived: { tabId: isText, isNeverArchived: isBoolean },
   setSpaceArchiveAfter: { spaceId: isText, archiveAfterMs: isSpaceArchiveAfter },
   setSpaceSearchEngine: { spaceId: isText, engineId: isSpaceSearchEngine },

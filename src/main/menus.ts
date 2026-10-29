@@ -17,7 +17,7 @@ import type { BrowserAction, MenuRequest, SidebarCommand } from "../shared/actio
 import type { BrowserState, FolderItem, ItemId, Space, TabItem } from "../shared/types";
 import { getSelectedTabId, listVisibleTabIds } from "./state";
 import { applyPreset, GRAIN_CHOICES, THEME_PRESETS } from "./themePresets";
-import { findLocation, findRootLocation, findSpace, findSplitOfTab, findTab } from "./tree";
+import { findLocation, findRootLocation, getActiveSpace, findSpace, findSplitOfTab, findTab } from "./tree";
 import { buildSearchUrl, findSearchEngine, findSpaceSearchEngine, SEARCH_ENGINE_IDS, SEARCH_ENGINES } from "../shared/searchEngines";
 import { importAllProfiles, listImportSources } from "./browserImportController";
 import { formatCount, profileNounFor } from "../shared/onboarding";
@@ -554,7 +554,18 @@ export function buildImportMenu(host: MenuHost): MenuItemConstructorOptions[] {
   if (browserItems.length === 0) {
     browserItems.push({ label: "No other browsers found", enabled: false });
   }
-  return [{ label: "Arc…", click: () => host.runAction({ type: "importFromArc" }) }, { type: "separator" }, ...browserItems];
+  const passwordsItem = buildPasswordsFileImportItem(host);
+  return [{ label: "Arc…", click: () => host.runAction({ type: "importFromArc" }) }, { type: "separator" }, ...browserItems, { type: "separator" }, passwordsItem];
+}
+
+/**
+ * The import menu's last item: a passwords export file, into the profile of the active Space.
+ */
+function buildPasswordsFileImportItem(host: MenuHost): MenuItemConstructorOptions {
+  return {
+    label: "Passwords from a File…",
+    click: () => host.runAction({ type: "importPasswordsFromFile", profileId: getActiveSpace(host.getState()).profileId }),
+  };
 }
 
 /**

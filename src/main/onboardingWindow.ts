@@ -24,6 +24,7 @@ import * as path from "node:path";
 import { ARC_IMPORT_SOURCE_ID, BOW_BRAND_BASE, IMPORT_PART_ORDER, ONBOARDING_CHANNELS, SUPPORTED_BROWSERS, orderBrowsers } from "../shared/onboarding";
 import type { ImportPart, WelcomeBrowser, WelcomeData, WelcomeImport, WelcomeSidebar } from "../shared/onboarding";
 import { GLOBAL_SHORTCUT_CHOICES, ONBOARDING_MIN_HEIGHT_PX, ONBOARDING_MIN_WIDTH_PX, ONBOARDING_SCREEN_SHARE } from "../shared/settings";
+import type { PasswordImportOutcome } from "../shared/passwords";
 import type { BrowserState, SidebarItem, TabItem } from "../shared/types";
 import { applyArcImport, findArcSidebarFile, prepareArcImport } from "./arcImportController";
 import type { PreparedArcImport } from "./arcImportController";
@@ -38,6 +39,7 @@ import { finishWelcome } from "./state";
 import { THEME_PRESETS } from "./themePresets";
 import { getActiveSpace } from "./tree";
 import { fadeWindow } from "./windowFade";
+import { importPasswordsFromFile, moveImportedFileToTrash } from "./passwordImport";
 
 
 /** Where macOS draws the close/minimize/zoom buttons: as in the browser window (mainWindows.ts). */
@@ -505,6 +507,13 @@ export function registerOnboardingIpc(): void {
       await bringProfilesOver(browserId, sourceIdList);
     }
   });
+  ipcMain.handle(ONBOARDING_CHANNELS.importPasswords, async (event): Promise<PasswordImportOutcome> => {
+    if (!isFromOnboarding(event)) {
+      return { kind: "cancelled" };
+    }
+    return importPasswordsFromFile(getActiveSpace(getState()).profileId, onboardingWindow);
+  });
+  ipcMain.handle(ONBOARDING_CHANNELS.trashImportedPasswords, async (event) => (isFromOnboarding(event) ? moveImportedFileToTrash() : false));
   ipcMain.handle(ONBOARDING_CHANNELS.openFullDiskAccess, async (event) => {
     if (isFromOnboarding(event)) {
       await openFullDiskAccessSettings();

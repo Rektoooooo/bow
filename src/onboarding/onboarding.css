@@ -2071,3 +2071,78 @@ body.dark .link-bubble-url {
     transform: none;
   }
 }
+
+/* ---------- Bring your things: the passwords block under the done note ---------- */
+
+.passwords-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(420px, 100%);
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--onb-border);
+}
+
+.passwords-title {
+  margin: 0;
+  font: 600 13px/1.3 var(--font-text);
+  color: var(--onb-ink);
+}
+
+.passwords-steps,
+.passwords-result {
+  margin: 0;
+  color: var(--onb-muted);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.passwords-result:empty {
+  display: none;
+}
+
+.passwords-result {
+  color: var(--onb-positive);
+  font-weight: 550;
+}
+
+.passwords-result.is-problem {
+  color: var(--onb-muted);
+  font-weight: 400;
+}
+
+.passwords-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+}
+
+.passwords-choose,
+.passwords-trash {
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--onb-ink-soft);
+  font: 600 13px/1 var(--font-text);
+  transition: color 200ms linear;
+}
+
+.passwords-choose:hover:not(:disabled),
+.passwords-trash:hover:not(:disabled) {
+  color: var(--onb-ink);
+}
+
+.passwords-choose:disabled,
+.passwords-trash:disabled {
+  opacity: 0.55;
+}
+
+/* In the smallest window the finished list of spaces makes room for the passwords block under it. */
+@media (max-height: 560px) {
+  .import-profiles[data-phase="done"] .import-checklist {
+    display: none;
+  }
+}

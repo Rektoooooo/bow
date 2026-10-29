@@ -10,7 +10,9 @@
 //   password field shows it too, a site without a saved login shows nothing, and near the page's bottom it opens above.
 // - Library › Passwords: opens from an action, lists logins without any password in the page, search, Show / Hide and
 //   Copy (the mock keychain stands in for Touch ID), Edit, "Never saved for", form memory with Forget all, the trash
-//   button, "Manage passwords…" under the field's list (click and keys), the logins surviving a restart, and a vault
+//   button, passwords imported from a CSV file (Chrome's and Safari's formats, the Library's button and the File menu;
+//   the saved login keeps its password, the file goes to the Trash on request, a file that is no export changes
+//   nothing), "Manage passwords…" under the field's list (click and keys), the logins surviving a restart, and a vault
 //   that cannot be opened (the section says so, no save prompt, the file stays byte for byte as it was).
 // usage: npm run build && node e2e/check-passwords.mjs
 import "./background.mjs";
@@ -752,6 +754,129 @@ check("ArrowDown to the footer and Return open Library › Passwords too", (awai
 await overlay.keyboard.press("Escape");
 await waitForOverlayGone();
 
+// ---------- 13j. Importing passwords from a CSV file ----------
+// The open sheet, the message sheet and the Trash are stood in for: nothing is shown and nothing is really trashed.
+const importFolder = path.join(outDir, "passwords-import-files");
+fs.rmSync(importFolder, { recursive: true, force: true });
+fs.mkdirSync(importFolder, { recursive: true });
+const chromeCsvPath = path.join(importFolder, "Chrome Passwords.csv");
+const safariCsvPath = path.join(importFolder, "Passwords.csv");
+const notPasswordsPath = path.join(importFolder, "notes.csv");
+fs.writeFileSync(
+  chromeCsvPath,
+  ["name,url,username,password,note", `local,${mainOrigin}/,alex.renamed@example.com,another-pass-9,`, "shop,https://shop.example.com/login,imp@example.com,imported-pass-1,"].join("\n") + "\n",
+);
+fs.writeFileSync(safariCsvPath, ["Title,URL,Username,Password,Notes,OTPAuth", "News,https://news.example.org/,reader@example.org,safari-pass-1,,"].join("\n") + "\n");
+fs.writeFileSync(notPasswordsPath, "just,some,notes\n1,2,3\n");
+const stubImportSheets = () =>
+  app.evaluate(({ dialog, shell }) => {
+    const stub = { chosenPath: "", messages: [], trashed: [] };
+    globalThis.passwordImportStub = stub;
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [stub.chosenPath] });
+    dialog.showMessageBox = async (...parts) => {
+      const options = parts.at(-1);
+      stub.messages.push({ message: options.message, detail: options.detail ?? "", buttons: options.buttons ?? [] });
+      return { response: 0, checkboxChecked: false };
+    };
+    shell.trashItem = async (filePath) => {
+      stub.trashed.push(filePath);
+    };
+  });
+const chooseImportFile = (filePath) => app.evaluate((_electron, value) => { globalThis.passwordImportStub.chosenPath = value; }, filePath);
+const readImportStub = () => app.evaluate(() => JSON.parse(JSON.stringify(globalThis.passwordImportStub)));
+const waitForImportMessages = async (count, timeoutMs = 8000) => {
+  const deadline = Date.now() + timeoutMs;
+  let stub = await readImportStub();
+  while (stub.messages.length < count && Date.now() < deadline) {
+    await sleep(150);
+    stub = await readImportStub();
+  }
+  return stub;
+};
+await stubImportSheets();
+
+// The Library's button imports the Chrome file: the new login arrives, the saved one keeps its password.
+await dispatch({ type: "openPasswords" });
+await overlay.waitForSelector(".password-import-button", { timeout: 8000 }).catch(() => undefined);
+const importButtonText = (await overlay.$(".password-import-button")) === null ? "" : await overlay.innerText(".password-import-button");
+await fs.promises.writeFile(path.join(outDir, "library-passwords-import.png"), await captureWindow(app)).catch(() => undefined);
+await chooseImportFile(chromeCsvPath);
+await overlay.click(".password-import-button");
+const afterChromeImport = await waitForVault((vault) => vault.logins.some((login) => login.username === "imp@example.com"));
+const chromeStub = await waitForImportMessages(1);
+const chromeMessage = chromeStub.messages[0] ?? { message: "", detail: "", buttons: [] };
+const keptLogin = afterChromeImport.logins.find((login) => login.username === "alex.renamed@example.com");
+check(
+  "Library › Passwords › Import passwords… adds the new login from a Chrome file and keeps the saved one as it was",
+  importButtonText.startsWith("Import passwords") &&
+    afterChromeImport.logins.length === 2 &&
+    afterChromeImport.logins.some((login) => login.origin === "https://shop.example.com" && login.password === "imported-pass-1") &&
+    keptLogin?.password === "second-pass-2",
+  JSON.stringify(afterChromeImport.logins.map((login) => `${login.origin} ${login.username}`)),
+);
+check(
+  "the sheet says 'Imported 1 password.', that one stayed as it was, and offers to move the file to the Trash",
+  chromeMessage.message === "Imported 1 password. 1 was already in Bow with another password and stayed as it was." &&
+    chromeMessage.detail === "The file holds your passwords in plain text. Move it to the Trash?" &&
+    chromeMessage.buttons.join() === "Move to Trash,Keep File",
+  JSON.stringify(chromeMessage),
+);
+const chromeStubAfterTrash = await (async () => {
+  const deadline = Date.now() + 5000;
+  let stub = await readImportStub();
+  while (stub.trashed.length === 0 && Date.now() < deadline) {
+    await sleep(100);
+    stub = await readImportStub();
+  }
+  return stub;
+})();
+check("answering 'Move to Trash' moves exactly that file to the Trash (never deletes it)", chromeStubAfterTrash.trashed.join() === chromeCsvPath && fs.existsSync(chromeCsvPath), JSON.stringify(chromeStubAfterTrash.trashed));
+check("the page never held the imported passwords", !(await overlay.content()).includes("imported-pass-1") && !(await overlay.content()).includes("another-pass-9"));
+
+// File › Import From Browser › Passwords from a File… imports the Safari file into the active Space's profile.
+await overlay.keyboard.press("Escape").catch(() => undefined);
+await waitForOverlayGone();
+await chooseImportFile(safariCsvPath);
+const clickedMenuItem = await app.evaluate(({ Menu }) => {
+  const find = (items) => {
+    for (const item of items) {
+      if (item.label === "Passwords from a File…") return item;
+      const inside = item.submenu ? find(item.submenu.items) : null;
+      if (inside) return inside;
+    }
+    return null;
+  };
+  const item = find(Menu.getApplicationMenu().items);
+  item?.click();
+  return item !== null;
+});
+const afterSafariImport = await waitForVault((vault) => vault.logins.some((login) => login.username === "reader@example.org"));
+const safariStub = await waitForImportMessages(2);
+check(
+  "File › Import From Browser › Passwords from a File… imports a Safari file",
+  clickedMenuItem && afterSafariImport.logins.some((login) => login.origin === "https://news.example.org" && login.password === "safari-pass-1") && safariStub.messages[1]?.message === "Imported 1 password.",
+  JSON.stringify(safariStub.messages[1]),
+);
+
+// A file that is no passwords export changes nothing and says so.
+const importedLoginCountBefore = (await readVault()).logins.length;
+await chooseImportFile(notPasswordsPath);
+await dispatch({ type: "importPasswordsFromFile", profileId: "profile-default" });
+const unrecognizedStub = await waitForImportMessages(3);
+const importedLoginCountAfter = (await readVault()).logins.length;
+const trashedCount = unrecognizedStub.trashed.length;
+check(
+  "a file that is no passwords export shows 'doesn't look like a passwords export' and changes nothing",
+  unrecognizedStub.messages[2]?.message === "This file doesn't look like a passwords export. Choose the CSV file your browser saved." && unrecognizedStub.messages[2].detail === "" && importedLoginCountAfter === importedLoginCountBefore,
+  JSON.stringify(unrecognizedStub.messages[2]),
+);
+check("an action for a profile that does not exist asks nothing and changes nothing", await (async () => {
+  await dispatch({ type: "importPasswordsFromFile", profileId: "no-such-profile" });
+  await sleep(500);
+  const stub = await readImportStub();
+  return stub.messages.length === 3 && stub.trashed.length === trashedCount;
+})());
+
 // ---------- 14. A restart keeps the logins ----------
 const quitApp = async () => {
   const appPid = app.process().pid;
@@ -769,8 +894,13 @@ await quitApp();
 await restartApp();
 await dispatch({ type: "openPasswords" });
 await overlay.waitForSelector(".password-row", { timeout: 8000 }).catch(() => undefined);
-const restartedRowText = (await libraryRows().count()) > 0 ? await rowText(0) : "";
-check("after a restart, Passwords lists the remaining login", (await libraryRows().count()) === 1 && restartedRowText.includes("alex.renamed@example.com"), restartedRowText);
+const restartedRowsText = (await libraryRows().allInnerTexts()).join(" ");
+// The renamed login and the two brought over from files (13j) are what is left.
+check(
+  "after a restart, Passwords lists the remaining login and the two imported ones",
+  (await libraryRows().count()) === 3 && restartedRowsText.includes("alex.renamed@example.com") && restartedRowsText.includes("imp@example.com") && restartedRowsText.includes("reader@example.org"),
+  restartedRowsText,
+);
 await overlay.keyboard.press("Escape");
 await waitForOverlayGone();
 

@@ -31,6 +31,8 @@ const CHANNELS: typeof ONBOARDING_CHANNELS = {
   bringOver: "onboarding:bring-over",
   openFullDiskAccess: "onboarding:open-full-disk-access",
   bringOverAll: "onboarding:bring-over-all",
+  importPasswords: "onboarding:import-passwords",
+  trashImportedPasswords: "onboarding:trash-imported-passwords",
 };
 
 const DISPATCH_CHANNEL: (typeof IPC_CHANNELS)["dispatch"] = "browser:dispatch";
@@ -54,6 +56,8 @@ function createOnboardingApi(): OnboardingApi {
     bringOver: (sourceId, parts) => ipcRenderer.invoke(CHANNELS.bringOver, sourceId, parts),
     openFullDiskAccess: () => ipcRenderer.invoke(CHANNELS.openFullDiskAccess),
     bringOverAll: (browserId, sourceIds) => ipcRenderer.invoke(CHANNELS.bringOverAll, browserId, sourceIds),
+    importPasswords: () => ipcRenderer.invoke(CHANNELS.importPasswords),
+    trashImportedPasswords: () => ipcRenderer.invoke(CHANNELS.trashImportedPasswords),
   };
 }
 

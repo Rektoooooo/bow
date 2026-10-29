@@ -188,6 +188,8 @@ export type BrowserAction =
   | { type: "removeNeverSave"; profileId: ProfileId; origin: string }
   | { type: "forgetFormEntries"; profileId: ProfileId }
   | { type: "retryPasswordVault"; profileId: ProfileId }
+  /** Asks for a passwords export (CSV) and adds its logins to this profile (main/passwordImport.ts). */
+  | { type: "importPasswordsFromFile"; profileId: ProfileId }
   | { type: "setTabNeverArchived"; tabId: ItemId; isNeverArchived: boolean }
   | { type: "setSpaceArchiveAfter"; spaceId: SpaceId; archiveAfterMs: number | null | "default" }
   /** A Space's own search engine, or the one in Settings ("default"). */
@@ -362,6 +364,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "removeNeverSave",
   "forgetFormEntries",
   "retryPasswordVault",
+  "importPasswordsFromFile",
   "setTabNeverArchived",
   "setSpaceArchiveAfter",
   "setSpaceSearchEngine",

@@ -249,6 +249,17 @@ function createToolbar(passwords: PasswordsData, list: HTMLElement): HTMLElement
   return toolbar;
 }
 
+/** The row at the top of the list: bring passwords over from the CSV file another browser or app exported. */
+function createImportGroup(passwords: PasswordsData): HTMLElement {
+  const group = createElement("section", "password-group password-import");
+  const row = createElement("div", "library-line password-import-row");
+  const text = createElement("span", "library-line-text");
+  text.append(createElement("span", "library-line-title", "Import passwords"), createElement("span", "library-line-meta", "From the CSV file your browser or password manager exported."));
+  row.append(text, createTextButton("Import passwords…", "library-chip is-active password-import-button", () => dispatch({ type: "importPasswordsFromFile", profileId: passwords.profileId })));
+  group.append(row);
+  return group;
+}
+
 function createNeverSavedGroup(passwords: PasswordsData): HTMLElement | null {
   if (passwords.neverSaveSites.length === 0) {
     return null;
@@ -328,7 +339,7 @@ function drawSection(body: HTMLElement, data: LibraryData, builders: SectionBuil
     scrolling.append(createUnreadableNote(passwords));
   }
   if (passwords.status === "ready") {
-    scrolling.append(builders.createSwitches(data));
+    scrolling.append(createImportGroup(passwords), builders.createSwitches(data));
     drawLoginRows(list, passwords);
     scrolling.append(list);
     if (passwords.logins.length === 0) {

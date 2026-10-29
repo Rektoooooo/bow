@@ -17,6 +17,7 @@ import type { WelcomeBrowser, WelcomeData, WelcomeImport } from "../shared/onboa
 import { describeImportProfilesButton, describeProfileCounts, describeProfilesDone, describeProfilesFound, profileNounFor } from "../shared/onboarding.js";
 import { createElement, createTextButton } from "../renderer/dom.js";
 import { createIcon } from "../renderer/icons.js";
+import { createPasswordsBlock } from "./passwordsBlock.js";
 import { createSceneActions, createSceneNote, markReveal, revealParts } from "./sceneParts.js";
 
 /** Each row's check waits its turn, this far after the one before (the same rhythm as importScene.ts). Our choice. */
@@ -63,7 +64,8 @@ export function createProfilesPane(data: WelcomeData, goNext: () => void, showGr
   const checklist = markReveal(createElement("div", "import-checklist"));
   const actions = createSceneActions("", () => runPrimary(), "", () => runSecondary());
   const note = createSceneNote("");
-  element.append(sourceBar, sentence, checklist, actions.element, note);
+  const passwordsBlock = createPasswordsBlock();
+  element.append(sourceBar, sentence, checklist, actions.element, note, passwordsBlock.element);
 
   let current: WelcomeData = data;
   let browser: WelcomeBrowser | null = null;
@@ -214,6 +216,7 @@ export function createProfilesPane(data: WelcomeData, goNext: () => void, showGr
     actions.element.hidden = !isAllRead;
     note.classList.toggle("is-positive", isDoneShown);
     note.textContent = isDoneShown ? describeProfilesDone(takenIds.length, picked.id, picked.name) : `Everything stays on this Mac. Each ${profileNounFor(picked.id)} becomes a Space of its own.`;
+    passwordsBlock.update(isDoneShown ? picked.id : null);
     actions.secondary.hidden = isImporting && !isDoneShown;
     actions.secondary.textContent = isDoneShown ? "Import from another browser" : "Choose another browser";
     actions.primary.disabled = (isImporting && !isDoneShown) || takenIds.length === 0;

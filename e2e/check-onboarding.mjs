@@ -7,7 +7,7 @@
 // motion; the default-browser scene's switches turn ad blocking and the shortcut from any app on; Open Bow closes it
 // and shows the browser, for good; Help › Welcome to Bow… opens it again and Escape ends it; a restart does not show
 // it; every scene fits its smallest window; no text has a dash; no window was made visible by a fade in the e2e
-// background mode.
+// background mode. The done view of an import holds a "Your passwords" block: the browser's export steps, a CSV chosen and imported (stand-in sheet), moved to the Trash (stand-in), and fitting 760 × 520.
 // usage: npm run build && node e2e/check-onboarding.mjs      (uses a throwaway --user-data-dir and home folder)
 import "./background.mjs";
 import { _electron } from "playwright-core";
@@ -309,6 +309,101 @@ check(
 );
 dashesSeen.push(...(await dashedTexts()));
 
+
+// ---------- Bring your things: the passwords block under the done note ----------
+// The open sheet and the Trash are stood in for: nothing is shown and nothing is really trashed.
+const passwordsFolder = path.join(outDir, "passwords-onboarding");
+fs.rmSync(passwordsFolder, { recursive: true, force: true });
+fs.mkdirSync(passwordsFolder, { recursive: true });
+const vaultModulePath = path.join(appDir, "dist", "node", "main", "passwordVault.js");
+await app.evaluate(({ dialog, shell }) => {
+  const stub = { chosenPath: "", trashed: [] };
+  globalThis.onboardingPasswordsStub = stub;
+  dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [stub.chosenPath] });
+  shell.trashItem = async (filePath) => {
+    stub.trashed.push(filePath);
+  };
+});
+const readPasswordsStub = () => app.evaluate(() => JSON.parse(JSON.stringify(globalThis.onboardingPasswordsStub)));
+/** The logins in the vault of the active Space's profile (Dia's import may have made another Space the active one). */
+const readActiveVaultLogins = async () => {
+  const state = await getState();
+  const profileId = state.spaces.find((space) => space.id === state.activeSpaceId).profileId;
+  return app.evaluate(
+    async (_electron, { modulePath, activeProfileId }) => {
+      const access = await process.mainModule.require(modulePath).openVault(activeProfileId);
+      return access.vault.logins.map((login) => `${login.origin} ${login.username}`);
+    },
+    { modulePath: vaultModulePath, activeProfileId: profileId },
+  );
+};
+/**
+ * Runs the passwords block in a scene that is done: it shows the browser's export steps, "Choose the file…" brings
+ * the CSV over (the block says how many), and "Move the file to the Trash" trashes that file and says so.
+ */
+async function checkPasswordsBlock({ pane, browserName, expectedSteps, fileName, origins }) {
+  const block = `${pane} .passwords-block`;
+  const csvPath = path.join(passwordsFolder, fileName);
+  const rows = origins.map((origin, index) => `${browserName},${origin},user${index}@example.com,${browserName.toLowerCase()}-pass-${index},`);
+  fs.writeFileSync(csvPath, ["name,url,username,password,note", ...rows].join("\n") + "\n");
+  const shown = await page.evaluate((selector) => {
+    const element = document.querySelector(selector);
+    return { isShown: element !== null && !element.hidden, title: element?.querySelector(".passwords-title")?.textContent, steps: element?.querySelector(".passwords-steps")?.textContent };
+  }, block);
+  check(
+    `${browserName}: the done scene shows 'Your passwords' with the steps to export them`,
+    shown.isShown && shown.title === "Your passwords" && shown.steps === expectedSteps,
+    JSON.stringify(shown),
+  );
+  const vaultBefore = await readActiveVaultLogins();
+  await app.evaluate((_electron, value) => { globalThis.onboardingPasswordsStub.chosenPath = value; }, csvPath);
+  await page.click(`${block} .passwords-choose`);
+  const importedText = await waitInPage((selector) => document.querySelector(`${selector} .passwords-result`)?.textContent || null, block, 8000);
+  const vaultAfter = await readActiveVaultLogins();
+  check(
+    `${browserName}: 'Choose the file…' imports the file and the block says how many`,
+    importedText === `Imported ${origins.length} passwords.` && vaultAfter.length === vaultBefore.length + origins.length && origins.every((origin) => vaultAfter.some((login) => login.startsWith(origin))),
+    JSON.stringify({ importedText, before: vaultBefore.length, after: vaultAfter.length }),
+  );
+  await page.screenshot({ path: path.join(outDir, `onboarding-passwords-${browserName.toLowerCase()}.png`) }).catch(() => undefined);
+  await page.click(`${block} .passwords-trash`);
+  const trashedText = await waitInPage((selector) => (document.querySelector(`${selector} .passwords-result`)?.textContent === "Moved to the Trash." ? "Moved to the Trash." : null), block, 5000);
+  const stub = await readPasswordsStub();
+  const isTrashButtonGone = await page.evaluate((selector) => document.querySelector(`${selector} .passwords-trash`).hidden, block);
+  check(
+    `${browserName}: 'Move the file to the Trash' trashes exactly that file and says so`,
+    trashedText === "Moved to the Trash." && stub.trashed.at(-1) === csvPath && fs.existsSync(csvPath) && isTrashButtonGone,
+    JSON.stringify({ trashedText, trashed: stub.trashed }),
+  );
+  dashesSeen.push(...(await dashedTexts()));
+}
+
+/** The done scene at the onboarding window's smallest size (760 × 520): everything above the dots, nothing scrolls. */
+async function checkDoneSceneFits(browserName, sceneSelector) {
+  const previousSize = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/onboarding/onboarding.html")).getSize());
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/onboarding/onboarding.html")).setSize(760, 520));
+  await page.waitForTimeout(1200);
+  const fit = await page.evaluate((selector) => {
+    const dotsTop = document.querySelector(".onboarding-dots").getBoundingClientRect().top;
+    const boxes = Array.from(document.querySelectorAll(`${selector} *`)).map((element) => element.getBoundingClientRect()).filter((box) => box.width > 0 && box.height > 0);
+    const bottom = Math.max(...boxes.map((box) => box.bottom));
+    const isScrolling = document.documentElement.scrollHeight > window.innerHeight + 1;
+    return { fits: bottom <= dotsTop - 4 && !isScrolling, bottom: Math.round(bottom), dotsTop: Math.round(dotsTop), isScrolling };
+  }, sceneSelector);
+  await page.screenshot({ path: path.join(outDir, `onboarding-passwords-${browserName.toLowerCase()}-small.png`) }).catch(() => undefined);
+  await app.evaluate(({ BrowserWindow }, size) => BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/onboarding/onboarding.html")).setSize(size[0], size[1]), previousSize);
+  await page.waitForTimeout(800);
+  check(`${browserName}: the done scene with the passwords block fits the smallest window`, fit.fits, JSON.stringify(fit));
+}
+await checkPasswordsBlock({
+  pane: ".import-source",
+  browserName: "Chrome",
+  expectedSteps: "In Chrome, open Settings, find Passwords and choose Export passwords. Then choose the file it saved.",
+  fileName: "Chrome Passwords.csv",
+  origins: ["https://chrome-one.example.com", "https://chrome-two.example.com"],
+});
+await checkDoneSceneFits("Chrome", ".import-source");
+
 // ---------- Bring your things: Dia, every space at once, each as a Space of its own ----------
 
 await page.click(".import-source .source-back");
@@ -379,6 +474,14 @@ check(
   JSON.stringify({ diaHistory, expectedDiaHistory, diaDone }),
 );
 dashesSeen.push(...(await dashedTexts()));
+await checkPasswordsBlock({
+  pane: ".import-profiles",
+  browserName: "Dia",
+  expectedSteps: "In Dia, open Settings, find Passwords and choose Export passwords. Then choose the file it saved.",
+  fileName: "Dia Passwords.csv",
+  origins: ["https://dia-one.example.com", "https://dia-two.example.com"],
+});
+await checkDoneSceneFits("Dia", ".import-profiles");
 
 // ---------- Bring your things: Arc, everything, filling the sidebar ----------
 

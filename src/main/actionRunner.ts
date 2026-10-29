@@ -150,6 +150,7 @@ import { takeItemIntoFocusedWindow } from "./windows";
 import { closeSplitByUser, closeTabByUser, navigateFocusedPage, openLinkInNewTab, openLinkInSplitView, openOrSwitchToTab, resetTabToHome, setMuted } from "./tabActions";
 import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
 import { createId } from "./tree";
+import { offerPasswordsFileImport } from "./passwordImport";
 import { allowSavingOnSite, choosePasswordsProfile, deleteSavedLogin, forgetAllFormEntries, retryPasswordVault } from "./passwordsLibrary";
 import { checkCommandChain, createCommandChain, deleteCommandChain, saveCommandChain, toChainActionId } from "./commandChains";
 import { openPeek } from "./peek";
@@ -643,6 +644,9 @@ export function runAction(action: BrowserAction): void {
       return forgetAllFormEntries(getState(), action.profileId);
     case "retryPasswordVault":
       return retryPasswordVault(getState(), action.profileId, refreshOpenPanel);
+    case "importPasswordsFromFile":
+      offerPasswordsFileImport(getState(), action.profileId).catch((error) => console.error("Importing passwords failed:", error instanceof Error ? error.name : ""));
+      return;
     case "chooseSyncFolder":
       chooseSyncFolder().catch((error) => console.error("Starting sync failed:", error));
       return;

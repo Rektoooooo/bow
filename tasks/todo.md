@@ -415,12 +415,22 @@ a Keychain key, per profile.
 - [x] 6. Form memory: emails, names, phones, addresses come back as suggestions; Shift+Delete removes one
 - [x] 7. Library › Passwords: list, search, Show / Copy / Edit behind Touch ID (fails closed), delete, never-saved
       sites, forget form memory, the two switches
-- [ ] 8. Import from a CSV file: Library, File › Import From Browser, the onboarding's done view (export steps per
+- [x] 8. Import from a CSV file: Library, File › Import From Browser, the onboarding's done view (export steps per
       browser), move the file to the Trash afterwards
 - [ ] 9. The rest of check-passwords; check-onboarding's Passwords block
 - [ ] 10. Docs (CLAUDE.md security rule and architecture, README, backup and sync docs, handoff) → full suite, push;
       screenshots for the user
 - [ ] 11. Live check with the user's go: the real Keychain item and Touch ID in a packaged build
+
+## Milestone 7 — Favorites per Space (user-approved 2026-10-29)
+The user: "each space needs its own favorites". Arc keeps Favorites per profile (the user's Arc: 3 Spaces on 3
+profiles, so each looks separate); on the other macOS account Bow's Spaces share a profile and so a row. The user chose
+(asked twice): every Space has its own Favorites, also when Spaces share a profile. Saved data version 5.
+- [ ] 1. Types, upgrade v4 → v5 (the shared row goes to the active Space, else another window's, else the first; a
+      profile without a Space: its Favorites to the Archive; selections repaired), tree / state / spaces, imports,
+      backup, sync (a peer from an older Bow is skipped with a notice), sidebar (the row slides with the Space), docs
+      (worktree favorites-per-space, built while Passwords step 8 runs here)
+- [ ] 2. Merge into bow-next, full suite, push
 
 ## Review (2026-10-28, an unattended night: open source, releases, auto-update, speed, polish)
 - **Works and verified:** open-source setup and repo rename; `npm run release` up to Apple's notarization (signing,
