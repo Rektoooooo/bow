@@ -11,7 +11,7 @@ import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { IMPORT_HOME_COUNTS, createImportHome } from "./fixtures/importHome.mjs";
+import { IMPORT_HOME_COUNTS, IMPORT_HOME_LOGINS, createImportHome } from "./fixtures/importHome.mjs";
 
 const appDir = path.resolve(import.meta.dirname, "..");
 const outDir = process.env.E2E_OUTPUT_DIR || path.join(appDir, "e2e", "output");
@@ -418,9 +418,15 @@ await page.waitForTimeout(400);
 
 // Import From Browser: Chrome's "Personal" profile in the made-up home (e2e/fixtures/importHome.mjs). Its bookmarks
 // arrive as one folder at the end of Pinned and its history joins ours (nested folders and non-web addresses are
-// checked in tests/chromiumImport.test.ts). The summary dialog is answered here.
+// checked in tests/chromiumImport.test.ts). Its saved logins come too, after a sheet asks (answered "Import Passwords
+// Too" here; the Keychain question is stood in for by the test secret, src/main/chromiumPasswordsImport.ts). The sheets
+// are answered here: the first button, and what they said is kept.
 await app.evaluate(({ dialog }) => {
-  dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false });
+  globalThis.importSheets = [];
+  dialog.showMessageBox = async (_window, options) => {
+    globalThis.importSheets.push({ message: options.message, detail: options.detail, buttons: options.buttons ?? [] });
+    return { response: 0, checkboxChecked: false };
+  };
 });
 // main's own module: the built file by its full path is the instance the app runs.
 const historyStorePath = path.join(appDir, "dist", "node", "main", "historyStore.js");
@@ -448,6 +454,30 @@ check(
   `${importedFolder?.title} › ${barFolder?.title} › ${barTabs.map((item) => item.title).join(",")}`,
 );
 check("Import From Browser brings Chrome's history over", chromeHistory === IMPORT_HOME_COUNTS.chromeDefault.history, `${chromeHistory} sites`);
+const importSheets = await app.evaluate(() => globalThis.importSheets);
+const passwordsSheet = importSheets.find((sheet) => sheet.message === "Import passwords too?");
+check(
+  "Import From Browser asks first whether to bring the passwords, naming the browser and the macOS question",
+  passwordsSheet?.detail === "macOS will ask to let Bow read Google Chrome's saved passwords." && passwordsSheet.buttons.join() === "Import Passwords Too,Skip Passwords",
+  JSON.stringify(passwordsSheet),
+);
+const vaultModulePath = path.join(appDir, "dist", "node", "main", "passwordVault.js");
+const chromeProfileId = state.spaces.find((space) => space.id === state.activeSpaceId).profileId;
+const readVault = (profileId) =>
+  app.evaluate(
+    async (_electron, { modulePath, wantedProfileId }) => {
+      const access = await process.mainModule.require(modulePath).openVault(wantedProfileId);
+      return { logins: access.vault.logins.map((login) => `${login.origin} ${login.username} ${login.password}`), neverSave: access.vault.neverSaveOrigins };
+    },
+    { modulePath: vaultModulePath, wantedProfileId: profileId },
+  );
+const chromeVault = await readVault(chromeProfileId);
+check(
+  "Import From Browser brings Chrome's saved passwords into the active Space's profile, with its never-save site",
+  IMPORT_HOME_LOGINS.chromeDefault.filter((entry) => !entry.isNeverSave).every((entry) => chromeVault.logins.includes(`${entry.origin} ${entry.username} ${entry.password}`)) &&
+    chromeVault.neverSave.includes("https://chrome-never.example.net"),
+  JSON.stringify({ count: chromeVault.logins.length, neverSave: chromeVault.neverSave }),
+);
 
 // Notes, like Arc's: a note sits in Today like a tab, its editor fills the page card, its first line names it, and
 // its text is kept (in its own file) when you switch away and back. Pasted text arrives plain.

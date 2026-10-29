@@ -1,10 +1,11 @@
 /**
  * WHY this file exists:
  *   Chrome, Dia, Brave, Edge, Vivaldi, Opera and Chromium share one on-disk format. One importer covers all of them: it
- *   finds their profiles, turns the `Bookmarks` file into a bookmark tree and reads the `History` database.
+ *   finds their profiles, turns the `Bookmarks` file into a bookmark tree and reads the `History` database. Their saved
+ *   passwords are read by chromiumPasswords.ts; this file knows where each browser keeps the key (its Keychain item).
  *
  * Data source:
- *   ~/Library/Application Support/<browser folder>/<profile folder>/{Bookmarks, History} and the browser's
+ *   ~/Library/Application Support/<browser folder>/<profile folder>/{Bookmarks, History, Login Data} and the browser's
  *   `Local State` file (profile display names); Opera keeps its one profile in its data folder itself. The home
  *   folder is a parameter so tests can use a temporary one.
  *
@@ -19,27 +20,37 @@ import * as path from "node:path";
 import type { HistoryEntry } from "./history";
 import { readProfileHistory } from "./arcHistoryImport";
 import type { ImportedBookmarkNode } from "./bookmarkImport";
+import { LOGIN_DATA_FILE_NAMES } from "./chromiumPasswords";
 
 export interface ChromiumBrowser {
   id: string;
   name: string;
   /** The browser's data folder, relative to ~/Library/Application Support. */
   dataFolder: string;
+  /**
+   * The Keychain item (its "service") that holds the secret the browser encrypts its saved passwords with. Chromium
+   * names it "<application name> Safe Storage" (components/os_crypt/sync/os_crypt_mac.mm: the browser's own
+   * `GetKeychainServiceName`); the names below are the ones its apps use.
+   */
+  keychainService: string;
 }
+
+/** Arc's Keychain item, the same naming (Arc keeps its profiles in "User Data" like the browsers below). */
+export const ARC_KEYCHAIN_SERVICE = "Arc Safe Storage";
 
 /** The Chromium-family browsers we know on macOS. Folder names are the browsers' own standard locations. */
 export const CHROMIUM_BROWSERS: ChromiumBrowser[] = [
-  { id: "chrome", name: "Google Chrome", dataFolder: "Google/Chrome" },
+  { id: "chrome", name: "Google Chrome", dataFolder: "Google/Chrome", keychainService: "Chrome Safe Storage" },
   // Dia (The Browser Company), like Arc: its binary names "Application Support/Dia", and its profiles sit in "User
   // Data" (Finicky issue #456, trycua/cua pull request #5723; checked 2026-10-29).
-  { id: "dia", name: "Dia", dataFolder: "Dia/User Data" },
-  { id: "brave", name: "Brave", dataFolder: "BraveSoftware/Brave-Browser" },
-  { id: "edge", name: "Microsoft Edge", dataFolder: "Microsoft Edge" },
-  { id: "vivaldi", name: "Vivaldi", dataFolder: "Vivaldi" },
+  { id: "dia", name: "Dia", dataFolder: "Dia/User Data", keychainService: "Dia Safe Storage" },
+  { id: "brave", name: "Brave", dataFolder: "BraveSoftware/Brave-Browser", keychainService: "Brave Safe Storage" },
+  { id: "edge", name: "Microsoft Edge", dataFolder: "Microsoft Edge", keychainService: "Microsoft Edge Safe Storage" },
+  { id: "vivaldi", name: "Vivaldi", dataFolder: "Vivaldi", keychainService: "Vivaldi Safe Storage" },
   // Opera keeps its profile in this folder itself, without a Default folder (HackBrowserData's browser_darwin.go,
   // Opera's forums; checked 2026-10-29). listProfilesOfBrowser() reads either layout.
-  { id: "opera", name: "Opera", dataFolder: "com.operasoftware.Opera" },
-  { id: "chromium", name: "Chromium", dataFolder: "Chromium" },
+  { id: "opera", name: "Opera", dataFolder: "com.operasoftware.Opera", keychainService: "Opera Safe Storage" },
+  { id: "chromium", name: "Chromium", dataFolder: "Chromium", keychainService: "Chromium Safe Storage" },
 ];
 
 export interface ChromiumProfile {
@@ -53,6 +64,10 @@ export interface ChromiumProfile {
   displayName: string;
   hasBookmarks: boolean;
   hasHistory: boolean;
+  /** The browser's Keychain item that holds the key to its saved passwords (see ChromiumBrowser). */
+  keychainService: string;
+  /** The profile has saved logins (a `Login Data` file); their count needs no secret, reading them does. */
+  hasLogins: boolean;
 }
 
 const APPLICATION_SUPPORT_PATH = path.join("Library", "Application Support");
@@ -61,7 +76,7 @@ const HISTORY_FILE_NAME = "History";
 const LOCAL_STATE_FILE_NAME = "Local State";
 
 /** Chromium's profile folders: "Default" and "Profile 1", "Profile 2", … Other folders (Crashpad, …) are not profiles. */
-const PROFILE_FOLDER_PATTERN = /^(Default|Profile \d+)$/;
+export const PROFILE_FOLDER_PATTERN = /^(Default|Profile \d+)$/;
 const DEFAULT_PROFILE_FOLDER_NAME = "Default";
 
 /** Only these addresses can be opened by our tabs. */
@@ -100,10 +115,34 @@ function readProfileDisplayName(localState: unknown, folderName: string): string
 }
 
 /**
- * True when a folder holds a profile's files (bookmarks or history).
+ * True when a folder has saved logins (either `Login Data` file).
+ */
+export function hasLoginData(folder: string): boolean {
+  return LOGIN_DATA_FILE_NAMES.some((fileName) => fs.existsSync(path.join(folder, fileName)));
+}
+
+/**
+ * True when a folder holds a profile's files (bookmarks, history or saved logins).
  */
 function hasProfileFiles(folder: string): boolean {
-  return fs.existsSync(path.join(folder, BOOKMARKS_FILE_NAME)) || fs.existsSync(path.join(folder, HISTORY_FILE_NAME));
+  const hasBookmarksOrHistory = fs.existsSync(path.join(folder, BOOKMARKS_FILE_NAME)) || fs.existsSync(path.join(folder, HISTORY_FILE_NAME));
+  return hasBookmarksOrHistory || hasLoginData(folder);
+}
+
+/**
+ * The profile folders ("Default", "Profile 1", …) inside a browser's "User Data" folder that hold saved logins, with
+ * their folder names. Arc's passwords are read from these. Empty when the folder cannot be read.
+ */
+export function findLoginProfileFolders(userDataFolder: string): { folderName: string; profileFolder: string }[] {
+  let folderNames: string[] = [];
+  try {
+    folderNames = fs.readdirSync(userDataFolder);
+  } catch {
+    return [];
+  }
+  const profileFolderNames = folderNames.filter((name) => PROFILE_FOLDER_PATTERN.test(name));
+  const folders = profileFolderNames.map((folderName) => ({ folderName: folderName, profileFolder: path.join(userDataFolder, folderName) }));
+  return folders.filter((folder) => hasLoginData(folder.profileFolder));
 }
 
 /**
@@ -131,23 +170,26 @@ function listProfilesOfBrowser(homeFolder: string, browser: ChromiumBrowser): Ch
   for (const { folderName, profileFolder } of listProfileFolders(browserFolder)) {
     const hasBookmarks = fs.existsSync(path.join(profileFolder, BOOKMARKS_FILE_NAME));
     const hasHistory = fs.existsSync(path.join(profileFolder, HISTORY_FILE_NAME));
-    if (!hasBookmarks && !hasHistory) {
+    const hasLogins = hasLoginData(profileFolder);
+    if (!hasBookmarks && !hasHistory && !hasLogins) {
       continue;
     }
     profiles.push({
       browserId: browser.id,
       browserName: browser.name,
+      keychainService: browser.keychainService,
       profileFolder: profileFolder,
       folderName: folderName,
       displayName: readProfileDisplayName(localState, folderName) ?? folderName,
       hasBookmarks: hasBookmarks,
       hasHistory: hasHistory,
+      hasLogins: hasLogins,
     });
   }
   return profiles;
 }
 
-/** Finds every profile with bookmarks or history, browser by browser. Empty when none is installed. */
+/** Finds every profile with bookmarks, history or saved logins, browser by browser. Empty when none is installed. */
 export function findChromiumProfiles(homeFolder: string): ChromiumProfile[] {
   const profiles: ChromiumProfile[] = [];
   for (const browser of CHROMIUM_BROWSERS) {

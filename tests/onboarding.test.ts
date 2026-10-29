@@ -10,6 +10,8 @@ import {
   IMPORT_PART_LABELS,
   IMPORT_PART_ORDER,
   ONBOARDING_SCENES,
+  PART_NOT_IMPORTED_TEXT,
+  PASSWORDS_PERMISSION_NOTE,
   SUPPORTED_BROWSERS,
   describeFound,
   describeImportProfilesButton,
@@ -61,7 +63,28 @@ const ARC_FOUND: ImportFound = {
   tabs: 25,
 };
 
+const ARC_FOUND_WITH_PASSWORDS: ImportFound = {
+  parts: ["spaces", "favorites", "archive", "extensions", "passwords", "history"],
+  counts: { spaces: 3, favorites: 4, archive: 265, extensions: 15, passwords: 34, history: 1370 },
+  tabs: 21,
+};
+
 describe("what a source holds, in one sentence", () => {
+  it("names the passwords before the history, which stays last", () => {
+    expect(sentenceText(ARC_FOUND_WITH_PASSWORDS)).toBe(
+      "Found 3 Spaces with 21 tabs, 4 Favorites, 265 archived tabs, 15 extensions, 34 passwords and 1,370 sites from your history.",
+    );
+    const boldParts = describeFound(ARC_FOUND_WITH_PASSWORDS)
+      .filter((part) => part.isBold)
+      .map((part) => part.text);
+    expect(boldParts).toContain("34 passwords");
+  });
+
+  it("says a browser's passwords with its bookmarks, and one password in the singular", () => {
+    const found: ImportFound = { parts: ["bookmarks", "passwords", "history"], counts: { bookmarks: 5, passwords: 1, history: 12 }, tabs: 0 };
+    expect(sentenceText(found)).toBe("Found 5 bookmarks, 1 password and 12 sites from your history.");
+  });
+
   it("lists everything an Arc import found, the last part joined with 'and'", () => {
     expect(sentenceText(ARC_FOUND)).toBe("Found 3 Spaces with 25 tabs, 6 Favorites, 40 archived tabs, 4 extensions and 4,812 sites from your history.");
   });
@@ -94,7 +117,12 @@ describe("what a source holds, in one sentence", () => {
   });
 
   it("never uses a dash", () => {
-    const texts = [sentenceText(ARC_FOUND), ...IMPORT_PART_ORDER.map((part) => IMPORT_PART_LABELS[part].title), ...IMPORT_PART_ORDER.map((part) => describePartCount(part, ARC_FOUND))];
+    const texts = [
+      sentenceText(ARC_FOUND),
+      sentenceText(ARC_FOUND_WITH_PASSWORDS),
+      ...IMPORT_PART_ORDER.map((part) => IMPORT_PART_LABELS[part].title),
+      ...IMPORT_PART_ORDER.map((part) => describePartCount(part, ARC_FOUND_WITH_PASSWORDS)),
+    ];
     for (const text of texts) {
       expect(text).not.toMatch(/[-\u2013\u2014]/);
     }
@@ -117,13 +145,23 @@ describe("a browser with several profiles", () => {
   it("counts each profile in one line, and says when it is done", () => {
     expect(describeProfileCounts({ parts: ["bookmarks", "history"], counts: { bookmarks: 120, history: 1240 }, tabs: 0 })).toBe("120 bookmarks, 1,240 sites");
     expect(describeProfileCounts({ parts: ["bookmarks"], counts: { bookmarks: 1, history: 0 }, tabs: 0 })).toBe("1 bookmark");
+    expect(describeProfileCounts({ parts: ["bookmarks", "passwords", "history"], counts: { bookmarks: 2, passwords: 3, history: 8 }, tabs: 0 })).toBe("2 bookmarks, 3 passwords, 8 sites");
+    expect(describeProfileCounts({ parts: ["passwords"], counts: { passwords: 1 }, tabs: 0 })).toBe("1 password");
     expect(describeProfileCounts({ parts: [], counts: {}, tabs: 0 })).toBe("Nothing new");
     expect(describeProfilesDone(4, "dia", "Dia")).toBe("Done. Your 4 spaces from Dia are in Bow.");
     expect(describeProfilesDone(1, "dia", "Dia")).toBe("Done. Your 1 space from Dia is in Bow.");
+    expect(describeProfilesDone(4, "dia", "Dia", true)).toBe("Done. Your 4 spaces from Dia are in Bow. macOS did not let Bow read your passwords.");
   });
 
   it("never uses a dash", () => {
-    const texts = [describeProfilesFound(2, "brave", "Brave"), describeImportProfilesButton(2, 3, "edge"), describeProfilesDone(3, "vivaldi", "Vivaldi")];
+    const texts = [
+      describeProfilesFound(2, "brave", "Brave"),
+      describeImportProfilesButton(2, 3, "edge"),
+      describeProfilesDone(3, "vivaldi", "Vivaldi"),
+      describeProfilesDone(3, "vivaldi", "Vivaldi", true),
+      PASSWORDS_PERMISSION_NOTE,
+      PART_NOT_IMPORTED_TEXT,
+    ];
     for (const text of texts) {
       expect(text).not.toMatch(/[-\u2013\u2014]/);
     }
@@ -136,6 +174,8 @@ describe("the checklist", () => {
     expect(describePartCount("favorites", ARC_FOUND)).toBe("6 sites");
     expect(describePartCount("history", ARC_FOUND)).toBe("4,812 sites");
     expect(describePartCount("extensions", ARC_FOUND)).toBe("4 extensions");
+    expect(describePartCount("passwords", ARC_FOUND_WITH_PASSWORDS)).toBe("34 passwords");
+    expect(IMPORT_PART_LABELS.passwords.title).toBe("Passwords");
   });
 });
 

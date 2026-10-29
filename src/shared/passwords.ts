@@ -96,6 +96,11 @@ export function isImportedFileTrashable(outcome: PasswordImportOutcome): boolean
 /** Browsers that share Chrome's export (Settings, Passwords, Export passwords). */
 const CHROMIUM_FAMILY_IDS = ["chrome", "arc", "dia", "brave", "edge", "vivaldi", "opera", "chromium"];
 
+/** True for the browsers whose saved passwords Bow reads directly (Chromium family); Safari and Firefox need a file. */
+export function readsPasswordsDirectly(browserId: string): boolean {
+  return CHROMIUM_FAMILY_IDS.includes(browserId);
+}
+
 /**
  * Where a browser keeps its passwords export, for the onboarding's "Your passwords" block.
  */
@@ -106,6 +111,11 @@ export function describePasswordExport(browserId: string): string {
   }
   if (browserId === "firefox") {
     return "In Firefox, open Passwords, click the three dots and choose Export Passwords. Then choose the file it saved.";
+  }
+  // Arc and Chrome have a page for it; type the address in the address bar (Chromium's own pages cannot be linked).
+  if (browserId === "arc" || browserId === "chrome") {
+    const passwordPageAddress = `${browserId}://password-manager/settings`;
+    return `In ${browserName}, type ${passwordPageAddress} in the address bar and choose Export passwords. Then choose the file it saved.`;
   }
   if (CHROMIUM_FAMILY_IDS.includes(browserId)) {
     return `In ${browserName}, open Settings, find Passwords and choose Export passwords. Then choose the file it saved.`;

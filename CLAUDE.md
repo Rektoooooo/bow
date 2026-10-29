@@ -113,6 +113,11 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   the pick). Form memory: `formMemoryRecorder.ts`. Library › Passwords: `passwordsLibrary.ts` / `passwordsView.ts`;
   Show, Copy password and Edit go through `passwordAuth.ts` (macOS's Touch ID or password prompt, unlocked 5 minutes,
   fails closed). Import: `passwordImport.ts` (CSV from the Library, File › Import From Browser, the onboarding).
+  Importing from Arc and the other Chromium browsers reads their saved passwords directly (`chromiumPasswords.ts`
+  reads each profile's `Login Data`, `chromiumPasswordCrypto.ts` decrypts it, `chromiumPasswordsImport.ts` asks macOS
+  once for the browser's "<Name> Safe Storage" Keychain secret and merges into the right profile's vault; it is one more
+  part of the import, "Passwords"); under the mock keychain e2e uses `BOW_E2E_IMPORT_KEYCHAIN_SECRET` (e2e/background.mjs)
+  instead of the Keychain, and Safari and Firefox keep the CSV way.
   Backups and Sync leave passwords out (another Mac can't decrypt them). e2e runs set `BOW_E2E_MOCK_KEYCHAIN`
   (e2e/background.mjs), so tests use Chromium's mock keychain and never touch the real Keychain; under it the Library
   skips Touch ID (no real vault can be opened with the test key).

@@ -17,7 +17,8 @@
  *   a browser with several profiles → profilesImport.ts (every profile at once, each as a Space)
  */
 import type { ImportFound, ImportPart, WelcomeBrowser, WelcomeData, WelcomeImport } from "../shared/onboarding";
-import { IMPORT_PART_LABELS, describeFound, describePartCount } from "../shared/onboarding.js";
+import { IMPORT_PART_LABELS, PART_NOT_IMPORTED_TEXT, PASSWORDS_PERMISSION_NOTE, describeFound, describePartCount } from "../shared/onboarding.js";
+import { readsPasswordsDirectly } from "../shared/passwords.js";
 import { createElement, createTextButton } from "../renderer/dom.js";
 import { createIcon } from "../renderer/icons.js";
 import type { IconName } from "../renderer/icons.js";
@@ -33,6 +34,7 @@ const PART_ICONS: Record<ImportPart, IconName> = {
   archive: "archiveOutline",
   bookmarks: "book",
   extensions: "puzzle",
+  passwords: "key",
   history: "clock",
 };
 
@@ -319,11 +321,14 @@ export function createImportScene(data: WelcomeData, goNext: () => void): SceneV
     let turn = 0;
     for (const row of rows) {
       const isTaken = isImporting ? welcomeImport.parts.includes(row.part) : chosen.has(row.part);
-      const isDone = welcomeImport.doneParts.includes(row.part) || (welcomeImport.phase === "done" && isTaken);
+      const isFailed = isImporting && isTaken && (welcomeImport.failedParts ?? []).includes(row.part);
+      const isDone = !isFailed && (welcomeImport.doneParts.includes(row.part) || (welcomeImport.phase === "done" && isTaken));
+      row.count.textContent = isFailed ? PART_NOT_IMPORTED_TEXT : describePartCount(row.part, found);
       row.button.setAttribute("aria-checked", String(isTaken));
       row.button.disabled = isImporting;
       row.button.classList.toggle("is-left-out", isImporting && !isTaken);
-      row.button.classList.toggle("is-working", isImporting && isTaken && !isDone);
+      row.button.classList.toggle("is-working", isImporting && isTaken && !isDone && !isFailed);
+      row.button.classList.toggle("is-failed", isFailed);
       if (isImporting && isTaken) {
         turn += 1;
         const tickDelay = Math.max(0, startedAt + turn * PART_TICK_MS - Date.now());
@@ -373,6 +378,26 @@ export function createImportScene(data: WelcomeData, goNext: () => void): SceneV
     drawSourceActions(browser, phase, found, isEmpty, isWorking, isDoneShown);
   };
 
+  // While the passwords are among the parts to come over, the note says macOS will ask once.
+  const describeWaitingNote = (found: ImportFound | null): string => {
+    const sourceId = view.sourceId;
+    const welcomeImport = findImport();
+    if (sourceId === null || found === null || welcomeImport === undefined || !found.parts.includes("passwords")) {
+      return "Everything stays on this Mac.";
+    }
+    const isImportingNow = welcomeImport.phase === "importing" || welcomeImport.phase === "done";
+    const isChosen = isImportingNow ? welcomeImport.parts.includes("passwords") : chosenFor(sourceId, found).has("passwords");
+    return isChosen ? `Everything stays on this Mac. ${PASSWORDS_PERMISSION_NOTE}` : "Everything stays on this Mac.";
+  };
+
+  // The CSV steps show once the import is done, when the passwords did not come over by themselves: macOS refused
+  // them, or the browser (Safari, Firefox) keeps them behind its own lock.
+  const needsPasswordsFile = (browser: WelcomeBrowser, found: ImportFound | null): boolean => {
+    const wasRefused = (findImport()?.failedParts ?? []).includes("passwords");
+    const isFileOnly = !readsPasswordsDirectly(browser.id) && !(found?.parts.includes("passwords") ?? false);
+    return wasRefused || isFileOnly;
+  };
+
   const drawSourceActions = (browser: WelcomeBrowser, phase: WelcomeImport["phase"], found: ImportFound | null, isEmpty: boolean, isWorking: boolean, isDoneShown: boolean): void => {
     const primary = sourceActions.primary;
     const secondary = sourceActions.secondary;
@@ -380,8 +405,11 @@ export function createImportScene(data: WelcomeData, goNext: () => void): SceneV
     primary.disabled = isWorking;
     secondary.hidden = isWorking;
     sourceNote.classList.toggle("is-positive", isDoneShown);
-    sourceNote.textContent = isDoneShown ? `Done. Your things from ${browser.name} are in Bow.` : "Everything stays on this Mac.";
-    passwordsBlock.update(isDoneShown ? browser.id : null);
+    sourceNote.textContent = isDoneShown ? `Done. Your things from ${browser.name} are in Bow.` : describeWaitingNote(found);
+    const showsPasswordsFile = isDoneShown && needsPasswordsFile(browser, found);
+    passwordsBlock.update(showsPasswordsFile ? browser.id : null);
+    // In the smallest window the CSS then makes room for the block (only the row that says "Not imported" stays).
+    sourcePane.dataset.passwordsFile = String(showsPasswordsFile);
     if (phase === "needsAccess") {
       primary.textContent = "Open System Settings";
       secondary.textContent = "Try again";

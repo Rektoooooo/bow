@@ -5,8 +5,12 @@
 //   to watch a check.
 //   BOW_E2E_MOCK_KEYCHAIN=1 is set always (also in foreground runs): the saved-passwords vault then uses a test key
 //   instead of the real Keychain, so a run never shows a Keychain dialog or creates a Keychain item.
+//   BOW_E2E_IMPORT_KEYCHAIN_SECRET is the stand-in for a browser's Keychain secret that imports use to read saved passwords
+//   (src/main/chromiumPasswordsImport.ts, only under the mock keychain); it matches the secret e2e/fixtures/importHome.mjs
+//   encrypts its logins with. A check may set it to "deny" (the user refusing macOS's question) before the import.
 // Data flow: process.env.BOW_E2E_BACKGROUND, BOW_E2E_MOCK_KEYCHAIN → Playwright passes the environment to the app it starts.
 if (process.env.BOW_E2E_FOREGROUND !== "1") {
   process.env.BOW_E2E_BACKGROUND = "1";
 }
 process.env.BOW_E2E_MOCK_KEYCHAIN = "1";
+process.env.BOW_E2E_IMPORT_KEYCHAIN_SECRET ??= "bow-test-safe-storage";

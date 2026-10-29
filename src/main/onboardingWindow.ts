@@ -384,8 +384,8 @@ async function bringWelcomeSourceOver(sourceId: string, chosenParts: ImportPart[
     return;
   }
   const doneParts: ImportPart[] = [];
-  const showProgress = (phase: WelcomeImport["phase"]): void => {
-    setWelcomeImport(sourceId, { phase: phase, found: welcomeImport.found, parts: parts, doneParts: [...doneParts] });
+  const showProgress = (phase: WelcomeImport["phase"], failedParts: ImportPart[] = []): void => {
+    setWelcomeImport(sourceId, { phase: phase, found: welcomeImport.found, parts: parts, doneParts: [...doneParts], failedParts: failedParts });
   };
   const markDone = (part: ImportPart): void => {
     doneParts.push(part);
@@ -393,13 +393,11 @@ async function bringWelcomeSourceOver(sourceId: string, chosenParts: ImportPart[
   };
   showProgress("importing");
   try {
-    if ("arc" in prepared) {
-      await applyArcImport(prepared.arc, parts, markDone);
-    } else {
-      applyBrowserImport(prepared.browser, parts, markDone);
-    }
+    // The passwords part fails when macOS does not let Bow read them; every other part still lands.
+    const passwordsOutcome = "arc" in prepared ? (await applyArcImport(prepared.arc, parts, markDone)).passwords : (await applyBrowserImport(prepared.browser, parts, markDone)).passwords;
     preparedSources.delete(sourceId);
-    showProgress("done");
+    const isPasswordsRefused = passwordsOutcome !== null && passwordsOutcome.kind !== "imported";
+    showProgress("done", isPasswordsRefused ? ["passwords"] : []);
   } catch (error) {
     console.error("The onboarding's import failed:", error);
     showProgress("failed");
@@ -431,19 +429,20 @@ async function bringProfilesOver(browserId: string, sourceIds: string[]): Promis
   if (profiles.length === 0) {
     return;
   }
-  const showPhase = (phase: WelcomeImport["phase"]): void => {
+  const showPhase = (phase: WelcomeImport["phase"], failedParts: ImportPart[] = []): void => {
     for (const [sourceId, welcomeImport] of takenImports) {
       const parts = welcomeImport.found?.parts ?? [];
-      const doneParts = phase === "done" ? parts : [];
-      welcomeImports.set(sourceId, { phase: phase, found: welcomeImport.found, parts: parts, doneParts: doneParts });
+      const doneParts = phase === "done" ? parts.filter((part) => !failedParts.includes(part)) : [];
+      welcomeImports.set(sourceId, { phase: phase, found: welcomeImport.found, parts: parts, doneParts: doneParts, failedParts: failedParts });
     }
     refreshOnboarding();
   };
   showPhase("importing");
   try {
-    applyProfileImports(profiles);
+    const result = await applyProfileImports(profiles, true);
     takenImports.forEach((_welcomeImport, sourceId) => preparedSources.delete(sourceId));
-    showPhase("done");
+    const isPasswordsRefused = result.passwords !== null && result.passwords.kind !== "imported";
+    showPhase("done", isPasswordsRefused ? ["passwords"] : []);
   } catch (error) {
     console.error("The onboarding's import of every profile failed:", error);
     showPhase("failed");

@@ -67,7 +67,9 @@ describe("isImportedFileTrashable", () => {
 
 describe("describePasswordExport", () => {
   it("names the browser for the Chromium family", () => {
-    expect(describePasswordExport("chrome")).toBe("In Chrome, open Settings, find Passwords and choose Export passwords. Then choose the file it saved.");
+    expect(describePasswordExport("chrome")).toBe("In Chrome, type chrome://password-manager/settings in the address bar and choose Export passwords. Then choose the file it saved.");
+    expect(describePasswordExport("arc")).toBe("In Arc, type arc://password-manager/settings in the address bar and choose Export passwords. Then choose the file it saved.");
+    expect(describePasswordExport("brave")).toBe("In Brave, open Settings, find Passwords and choose Export passwords. Then choose the file it saved.");
     expect(describePasswordExport("dia")).toContain("In Dia,");
     expect(describePasswordExport("edge")).toContain("In Edge,");
   });
@@ -79,8 +81,10 @@ describe("describePasswordExport", () => {
 
   it("has steps for every browser the onboarding lists, without a dash", () => {
     for (const browser of SUPPORTED_BROWSERS) {
+      // The browsers' own addresses (arc://password-manager/settings) have a dash we cannot write another way.
+      const stepsWithoutAddresses = describePasswordExport(browser.id).replace(/\S+:\/\/\S+/g, "");
       const steps = describePasswordExport(browser.id);
-      expect(steps).not.toMatch(DASH_PATTERN);
+      expect(stepsWithoutAddresses).not.toMatch(DASH_PATTERN);
       expect(steps.length).toBeGreaterThan(20);
     }
   });

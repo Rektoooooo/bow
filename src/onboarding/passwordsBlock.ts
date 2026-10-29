@@ -1,7 +1,8 @@
 /**
  * WHY this file exists:
- *   Once a browser's things are in Bow, its saved passwords are the one thing left behind: browsers keep them
- *   behind their own lock, so Bow cannot read them. The user exports them to a CSV file; this block, under the "Done"
+ *   Arc and the other Chromium browsers hand over their passwords directly (macOS asks once). When that did not
+ *   happen (macOS said no) or the browser keeps them behind its own lock (Safari, Firefox), the user exports them to
+ *   a CSV file; this block, under the "Done"
  *   note of "Bring your things." (importScene.ts and profilesImport.ts both show it), says where that export is in
  *   that browser, lets the user choose the file, tells how the import went, and offers to move the file (which holds
  *   every password in plain text) to the Trash.

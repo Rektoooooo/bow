@@ -1,7 +1,8 @@
 /**
  * WHY this file exists:
  *   File › Import From Browser and the onboarding bring bookmarks and history from Chrome, Dia, Brave, Edge, Vivaldi,
- *   Opera, Chromium, Firefox or Safari, like Arc's own importer. The readers (chromiumImport.ts, firefoxImport.ts,
+ *   Opera, Chromium, Firefox or Safari, like Arc's own importer; from the Chromium browsers also their saved
+ *   passwords (macOS asks once to let Bow read them). The readers (chromiumImport.ts, firefoxImport.ts,
  *   safariImport.ts) and the state change (bookmarkImport.ts) are separate; this file finds what can be imported and
  *   runs one import in two steps: prepare (read the files once and count, changing nothing) and apply (bring the
  *   chosen parts over). The onboarding shows the counts first; the menu brings both and shows a summary.
@@ -14,7 +15,7 @@
  *   menu / Library → listImportSources() → importFromBrowser(sourceId) → prepareBrowserImport() → applyBrowserImport()
  *   → summary dialog
  *   onboardingWindow.ts → prepareBrowserImport() → counts on its card → applyBrowserImport(chosen parts)
- *   applyBrowserImport: addImportedBookmarks() → applyChange() → importHistoryEntries()
+ *   applyBrowserImport: addImportedBookmarks() → applyChange() → importChromiumPasswords() → importHistoryEntries()
  */
 import { dialog, shell } from "electron";
 import type { BrowserWindow } from "electron";
@@ -24,6 +25,9 @@ import { applyChange, getState, getWindow } from "./browserCore";
 import { addImportedBookmarks, addProfilesAsSpaces, countBookmarks } from "./bookmarkImport";
 import type { ImportedBookmarkNode, ProfileSpacesResult } from "./bookmarkImport";
 import { findChromiumProfiles, readChromiumBookmarks, readChromiumHistory } from "./chromiumImport";
+import { countChromiumLogins } from "./chromiumPasswords";
+import { importChromiumPasswords } from "./chromiumPasswordsImport";
+import type { ChromiumPasswordsOutcome, PasswordImportTarget } from "./chromiumPasswordsImport";
 import { findFirefoxProfiles, readFirefoxProfile } from "./firefoxImport";
 import type { HistoryEntry } from "./history";
 import { countNewHistoryUrls, importHistoryEntries } from "./historyStore";
@@ -33,7 +37,7 @@ import { THEME_PRESETS } from "./themePresets";
 import { getActiveSpace } from "./tree";
 import { IMPORT_PART_ORDER, formatCount, profileNounFor } from "../shared/onboarding";
 import type { ImportFound, ImportPart } from "../shared/onboarding";
-import type { SpaceTheme } from "../shared/types";
+import type { ProfileId, SpaceId, SpaceTheme } from "../shared/types";
 
 /** Something the user can import from, as the menus and the onboarding list it. */
 export interface ImportSource {
@@ -54,6 +58,8 @@ export interface PreparedBrowserImport {
   browserName: string;
   bookmarks: ImportedBookmarkNode[];
   history: HistoryEntry[];
+  /** Where the saved logins are and which Keychain item opens them; null when there are none to read. Never a secret. */
+  loginSource: { profileFolder: string; keychainService: string } | null;
   found: ImportFound;
 }
 
@@ -64,6 +70,8 @@ export type BrowserPreparation = { prepared: PreparedBrowserImport } | { needsFu
 export interface BrowserImportResult {
   bookmarks: number;
   historyPages: number;
+  /** How bringing the passwords went; null when they were not chosen or there are none. */
+  passwords: ChromiumPasswordsOutcome | null;
 }
 
 /** One profile of a browser, read, to bring over as a Space of its own. */
@@ -78,6 +86,8 @@ export interface ProfileImportsResult {
   /** Profiles that came over as folders: no room for more Spaces. */
   foldersInstead: string[];
   historyPages: number;
+  /** How bringing the passwords went; null when they were not chosen or there are none. */
+  passwords: ChromiumPasswordsOutcome | null;
 }
 
 const SAFARI_SOURCE_ID = "safari";
@@ -122,19 +132,27 @@ export function listImportSources(): ImportSource[] {
 }
 
 /**
- * The counts of a browser import: its bookmarks and the sites not in our history yet.
+ * The counts of a browser import: its bookmarks, its saved logins and the sites not in our history yet.
  */
-function countBrowserImport(bookmarks: ImportedBookmarkNode[], history: HistoryEntry[]): ImportFound {
-  const counts: Partial<Record<ImportPart, number>> = { bookmarks: countBookmarks(bookmarks), history: countNewHistoryUrls(history) };
+function countBrowserImport(bookmarks: ImportedBookmarkNode[], history: HistoryEntry[], passwordCount: number): ImportFound {
+  const counts: Partial<Record<ImportPart, number>> = { bookmarks: countBookmarks(bookmarks), passwords: passwordCount, history: countNewHistoryUrls(history) };
   const parts = IMPORT_PART_ORDER.filter((part) => (counts[part] ?? 0) > 0);
   return { parts: parts, counts: counts, tabs: 0 };
 }
 
 /**
- * A prepared import of what was read.
+ * A prepared import of what was read. Safari and Firefox keep their passwords behind their own lock (the user brings
+ * them as a file), so only a Chromium profile passes `loginSource` and the count of its logins.
  */
-function toPreparation(browserName: string, bookmarks: ImportedBookmarkNode[], history: HistoryEntry[]): BrowserPreparation {
-  return { prepared: { browserName: browserName, bookmarks: bookmarks, history: history, found: countBrowserImport(bookmarks, history) } };
+function toPreparation(
+  browserName: string,
+  bookmarks: ImportedBookmarkNode[],
+  history: HistoryEntry[],
+  loginSource: PreparedBrowserImport["loginSource"] = null,
+  passwordCount = 0,
+): BrowserPreparation {
+  const found = countBrowserImport(bookmarks, history, passwordCount);
+  return { prepared: { browserName: browserName, bookmarks: bookmarks, history: history, loginSource: loginSource, found: found } };
 }
 
 /**
@@ -177,21 +195,41 @@ export async function prepareBrowserImport(sourceId: string): Promise<BrowserPre
   if (profile === undefined) {
     return { isMissing: true };
   }
-  return toPreparation(profile.browserName, readChromiumBookmarks(profile), await readChromiumHistory(profile));
+  const passwordCount = profile.hasLogins ? await countChromiumLogins(profile.profileFolder) : 0;
+  const loginSource = passwordCount > 0 ? { profileFolder: profile.profileFolder, keychainService: profile.keychainService } : null;
+  return toPreparation(profile.browserName, readChromiumBookmarks(profile), await readChromiumHistory(profile), loginSource, passwordCount);
 }
 
 /**
- * Brings the chosen parts of a prepared import over: the bookmarks as one folder in the active Space, then the
- * history. `onPartDone` hears as each lands (the onboarding ticks its checklist).
+ * The Bow profile of a Space, and the profile of the active Space when the Space is gone.
  */
-export function applyBrowserImport(prepared: PreparedBrowserImport, parts: ImportPart[], onPartDone: (part: ImportPart) => void): BrowserImportResult {
-  const result: BrowserImportResult = { bookmarks: 0, historyPages: 0 };
+function findProfileOfSpace(spaceId: SpaceId): ProfileId {
+  const state = getState();
+  const space = state.spaces.find((candidate) => candidate.id === spaceId);
+  return space?.profileId ?? getActiveSpace(state).profileId;
+}
+
+/**
+ * Brings the chosen parts of a prepared import over: the bookmarks as one folder in the active Space, the saved
+ * passwords into the active Space's profile (macOS asks to let Bow read them), then the history. `onPartDone` hears as
+ * each lands (the onboarding ticks its checklist); the passwords are not reported when macOS did not allow them: the
+ * result says so.
+ */
+export async function applyBrowserImport(prepared: PreparedBrowserImport, parts: ImportPart[], onPartDone: (part: ImportPart) => void): Promise<BrowserImportResult> {
+  const result: BrowserImportResult = { bookmarks: 0, historyPages: 0, passwords: null };
   const bookmarkCount = countBookmarks(prepared.bookmarks);
   if (parts.includes("bookmarks") && bookmarkCount > 0) {
     const folderTitle = `${prepared.browserName} Bookmarks`;
     applyChange((state) => addImportedBookmarks(state, getActiveSpace(state).id, folderTitle, prepared.bookmarks, Date.now()));
     result.bookmarks = bookmarkCount;
     onPartDone("bookmarks");
+  }
+  if (parts.includes("passwords") && prepared.loginSource !== null) {
+    const target: PasswordImportTarget = { profileFolder: prepared.loginSource.profileFolder, bowProfileId: getActiveSpace(getState()).profileId };
+    result.passwords = await importChromiumPasswords([target], prepared.loginSource.keychainService, Date.now());
+    if (result.passwords.kind === "imported") {
+      onPartDone("passwords");
+    }
   }
   if (parts.includes("history")) {
     result.historyPages = importHistoryEntries(prepared.history);
@@ -226,23 +264,72 @@ export async function openFullDiskAccessSettings(): Promise<void> {
   await shell.openExternal(FULL_DISK_ACCESS_SETTINGS_URL);
 }
 
+/** The two buttons of the question before a menu import that has passwords. The first is the default. */
+const PASSWORDS_QUESTION_BUTTONS = ["Import Passwords Too", "Skip Passwords"];
+const IMPORT_PASSWORDS_INDEX = 0;
+const SKIP_PASSWORDS_INDEX = 1;
+
+/**
+ * Asks, in a sheet on the window, whether to bring the saved passwords too (the menu imports everything else without
+ * asking; macOS will show its own question about the Keychain next). True: bring them. `browserName`: whose
+ * passwords they are.
+ */
+export async function askToImportPasswords(window: BrowserWindow, browserName: string): Promise<boolean> {
+  const answer = await dialog.showMessageBox(window, {
+    type: "question",
+    message: "Import passwords too?",
+    detail: `macOS will ask to let Bow read ${browserName}'s saved passwords.`,
+    buttons: PASSWORDS_QUESTION_BUTTONS,
+    defaultId: IMPORT_PASSWORDS_INDEX,
+    cancelId: SKIP_PASSWORDS_INDEX,
+  });
+  return answer.response === IMPORT_PASSWORDS_INDEX;
+}
+
+/**
+ * The summary line about passwords after a menu import; null when they were not part of it.
+ */
+export function describePasswordsResult(outcome: ChromiumPasswordsOutcome | null): string | null {
+  if (outcome === null) {
+    return null;
+  }
+  if (outcome.kind === "denied") {
+    return "Passwords: not imported, macOS did not let Bow read them.";
+  }
+  if (outcome.kind === "missing") {
+    return "Passwords: not imported, the browser's key was not found in the Keychain.";
+  }
+  if (outcome.kind === "vaultUnavailable") {
+    return "Passwords: not imported, Bow's password vault could not be opened.";
+  }
+  const alreadyCount = outcome.alreadySavedCount + outcome.keptDifferentCount;
+  const alreadyNote = alreadyCount > 0 ? `, already in Bow: ${alreadyCount}` : "";
+  return `Passwords: ${outcome.addedCount}${alreadyNote}.`;
+}
+
 /**
  * Tells the user what arrived.
  */
 async function showSummary(window: BrowserWindow, browserName: string, result: BrowserImportResult): Promise<void> {
   const spaceName = getActiveSpace(getState()).name;
-  const nothingNew = result.bookmarks === 0 && result.historyPages === 0;
+  const addedPasswords = result.passwords?.kind === "imported" ? result.passwords.addedCount : 0;
+  const nothingNew = result.bookmarks === 0 && result.historyPages === 0 && addedPasswords === 0;
+  const lines = [`Bookmarks: ${result.bookmarks}, in the folder "${browserName} Bookmarks" in ${spaceName}.`];
+  const passwordsLine = describePasswordsResult(result.passwords);
+  if (passwordsLine !== null) {
+    lines.push(passwordsLine);
+  }
+  lines.push(`History: ${result.historyPages} pages.`);
   await dialog.showMessageBox(window, {
     type: "info",
     message: nothingNew ? `Nothing to import from ${browserName}` : `Imported from ${browserName}`,
-    detail: nothingNew
-      ? "No bookmarks, and no pages that are not in your history already."
-      : `Bookmarks: ${result.bookmarks}, in the folder "${browserName} Bookmarks" in ${spaceName}.\nHistory: ${result.historyPages} pages.`,
+    detail: nothingNew ? "No bookmarks, no passwords, and no pages that are not in your history already." : lines.join("\n"),
   });
 }
 
 /**
- * File › Import From Browser: brings one source's bookmarks and history over and says what arrived.
+ * File › Import From Browser: brings one source's bookmarks, history and (after asking) passwords over and says what
+ * arrived.
  */
 export async function importFromBrowser(sourceId: string): Promise<void> {
   const window = getWindow();
@@ -257,8 +344,12 @@ export async function importFromBrowser(sourceId: string): Promise<void> {
   if ("isMissing" in preparation) {
     return;
   }
-  const result = applyBrowserImport(preparation.prepared, IMPORT_PART_ORDER, () => undefined);
-  await showSummary(window, preparation.prepared.browserName, result);
+  const prepared = preparation.prepared;
+  const hasPasswords = (prepared.found.counts.passwords ?? 0) > 0;
+  const bringsPasswords = hasPasswords && (await askToImportPasswords(window, prepared.browserName));
+  const parts = IMPORT_PART_ORDER.filter((part) => part !== "passwords" || bringsPasswords);
+  const result = await applyBrowserImport(prepared, parts, () => undefined);
+  await showSummary(window, prepared.browserName, result);
 }
 
 /**
@@ -271,10 +362,47 @@ function listProfileSpaceThemes(): SpaceTheme[] {
 }
 
 /**
- * Brings several profiles of one browser over at once (Dia's spaces): each becomes a Space of its own with its own Bow
- * profile and its bookmarks pinned (bookmarkImport.ts addProfilesAsSpaces), and all their history comes in.
+ * The Bow profile each imported profile's logins go to: the profile of the Space it became. A profile that found no
+ * room for a Space came over as a folder in the last new Space (or the active one), so its logins follow it there.
  */
-export function applyProfileImports(profiles: PreparedProfile[]): ProfileImportsResult {
+function findProfileIdsOfImportedProfiles(profileCount: number, spaceIds: SpaceId[]): ProfileId[] {
+  const lastSpaceId = spaceIds.at(-1);
+  const profileIds: ProfileId[] = [];
+  for (let index = 0; index < profileCount; index++) {
+    const spaceId = spaceIds[index] ?? lastSpaceId;
+    profileIds.push(spaceId === undefined ? getActiveSpace(getState()).profileId : findProfileOfSpace(spaceId));
+  }
+  return profileIds;
+}
+
+/**
+ * Brings the saved passwords of several imported profiles in, with one request to macOS, each into the Bow profile its
+ * Space got.
+ */
+async function importProfilePasswords(profiles: PreparedProfile[], spaceIds: SpaceId[]): Promise<ChromiumPasswordsOutcome | null> {
+  const profileIds = findProfileIdsOfImportedProfiles(profiles.length, spaceIds);
+  const targets: PasswordImportTarget[] = [];
+  let keychainService: string | null = null;
+  for (const [index, profile] of profiles.entries()) {
+    const loginSource = profile.prepared.loginSource;
+    const bowProfileId = profileIds[index];
+    if (loginSource !== null && bowProfileId !== undefined) {
+      keychainService = loginSource.keychainService;
+      targets.push({ profileFolder: loginSource.profileFolder, bowProfileId: bowProfileId });
+    }
+  }
+  if (keychainService === null) {
+    return null;
+  }
+  return importChromiumPasswords(targets, keychainService, Date.now());
+}
+
+/**
+ * Brings several profiles of one browser over at once (Dia's spaces): each becomes a Space of its own with its own Bow
+ * profile and its bookmarks pinned (bookmarkImport.ts addProfilesAsSpaces), all their history comes in, and (when
+ * `withPasswords`) their saved passwords, each into its Space's profile.
+ */
+export async function applyProfileImports(profiles: PreparedProfile[], withPasswords: boolean): Promise<ProfileImportsResult> {
   let historyPages = 0;
   for (const profile of profiles) {
     historyPages = historyPages + importHistoryEntries(profile.prepared.history);
@@ -288,12 +416,13 @@ export function applyProfileImports(profiles: PreparedProfile[]): ProfileImports
     return result.state;
   });
   const result = results[0];
-  return { spaces: result?.spaceIds.length ?? 0, foldersInstead: result?.foldersInstead ?? [], historyPages: historyPages };
+  const passwords = withPasswords ? await importProfilePasswords(profiles, result?.spaceIds ?? []) : null;
+  return { spaces: result?.spaceIds.length ?? 0, foldersInstead: result?.foldersInstead ?? [], historyPages: historyPages, passwords: passwords };
 }
 
 /**
  * File › Import From Browser › "Dia, all 4 spaces…": reads every profile of a browser and brings them over at once,
- * each as its own Space, then says what arrived.
+ * each as its own Space (asking first about the passwords), then says what arrived.
  */
 export async function importAllProfiles(browserId: string): Promise<void> {
   const window = getWindow();
@@ -310,12 +439,16 @@ export async function importAllProfiles(browserId: string): Promise<void> {
   }
   const browserName = sources[0]?.browserName ?? browserId;
   const noun = profileNounFor(browserId);
-  const result = applyProfileImports(profiles);
+  const hasPasswords = profiles.some((profile) => profile.prepared.loginSource !== null);
+  const bringsPasswords = hasPasswords && (await askToImportPasswords(window, browserName));
+  const result = await applyProfileImports(profiles, bringsPasswords);
   const names = profiles.map((profile) => profile.name).join(", ");
   const folderLine = result.foldersInstead.length > 0 ? `\nNo room for more Spaces: ${result.foldersInstead.join(", ")} came over as folders.` : "";
+  const passwordsLine = describePasswordsResult(result.passwords);
+  const passwordsText = passwordsLine === null ? "" : `\n${passwordsLine}`;
   await dialog.showMessageBox(window, {
     type: "info",
     message: `Imported ${formatCount(profiles.length, noun)} from ${browserName}`,
-    detail: `Each is a Space of its own, with its own sign-ins: ${names}.${folderLine}\nHistory: ${result.historyPages} pages.`,
+    detail: `Each is a Space of its own, with its own sign-ins: ${names}.${folderLine}${passwordsText}\nHistory: ${result.historyPages} pages.`,
   });
 }

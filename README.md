@@ -235,8 +235,9 @@ source never updates itself.
   it offers your saved logins; pick one and the email and password are filled (nothing is filled before you pick).
   Bow also remembers what you type into forms (emails, names, phone numbers, addresses, never card numbers, codes or
   searches) and offers it again on any site. Library › Passwords lists everything per profile; Show, Copy and Edit
-  ask for Touch ID or your Mac's password. Import the CSV file Chrome, Arc, Dia, Brave, Edge, Vivaldi, Opera,
-  Safari's Passwords app or Firefox exports (Library › Passwords, File › Import From Browser, or the first start).
+  ask for Touch ID or your Mac's password. Importing from Arc, Chrome, Dia, Brave, Edge, Vivaldi, Opera or Chromium
+  brings their saved passwords straight over (macOS asks once to let Bow read them); Safari's Passwords app and
+  Firefox come by their exported CSV file (Library › Passwords, File › Import From Browser, or the first start).
   Passwords are encrypted with a key in your Keychain, stay on this Mac and are never in backups or sync. Private
   windows never save anything.
 - **Ad and tracker blocking** with EasyList and EasyPrivacy (off until you turn it on in Library › Settings), allowed

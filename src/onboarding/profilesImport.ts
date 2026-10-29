@@ -14,7 +14,8 @@
  *   rows fill in → the button → onboardingApi.bringOverAll(browserId, ticked ids) → each row importing → done
  */
 import type { WelcomeBrowser, WelcomeData, WelcomeImport } from "../shared/onboarding";
-import { describeImportProfilesButton, describeProfileCounts, describeProfilesDone, describeProfilesFound, profileNounFor } from "../shared/onboarding.js";
+import { PASSWORDS_PERMISSION_NOTE, describeImportProfilesButton, describeProfileCounts, describeProfilesDone, describeProfilesFound, profileNounFor } from "../shared/onboarding.js";
+import { readsPasswordsDirectly } from "../shared/passwords.js";
 import { createElement, createTextButton } from "../renderer/dom.js";
 import { createIcon } from "../renderer/icons.js";
 import { createPasswordsBlock } from "./passwordsBlock.js";
@@ -214,9 +215,13 @@ export function createProfilesPane(data: WelcomeData, goNext: () => void, showGr
     }
     element.dataset.phase = shownPhase;
     actions.element.hidden = !isAllRead;
+    const isPasswordsRefused = takenIds.some((sourceId) => (importOf(sourceId)?.failedParts ?? []).includes("passwords"));
+    const hasPasswords = takenIds.some((sourceId) => importOf(sourceId)?.found?.parts.includes("passwords") ?? false);
+    const waitingNote = `Everything stays on this Mac. Each ${profileNounFor(picked.id)} becomes a Space of its own.`;
     note.classList.toggle("is-positive", isDoneShown);
-    note.textContent = isDoneShown ? describeProfilesDone(takenIds.length, picked.id, picked.name) : `Everything stays on this Mac. Each ${profileNounFor(picked.id)} becomes a Space of its own.`;
-    passwordsBlock.update(isDoneShown ? picked.id : null);
+    note.textContent = isDoneShown ? describeProfilesDone(takenIds.length, picked.id, picked.name, isPasswordsRefused) : `${waitingNote}${hasPasswords ? ` ${PASSWORDS_PERMISSION_NOTE}` : ""}`;
+    // The CSV steps show when the passwords did not come over by themselves (macOS refused, or the browser needs a file).
+    passwordsBlock.update(isDoneShown && (isPasswordsRefused || !readsPasswordsDirectly(picked.id)) ? picked.id : null);
     actions.secondary.hidden = isImporting && !isDoneShown;
     actions.secondary.textContent = isDoneShown ? "Import from another browser" : "Choose another browser";
     actions.primary.disabled = (isImporting && !isDoneShown) || takenIds.length === 0;

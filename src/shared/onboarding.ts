@@ -22,11 +22,12 @@ export const ONBOARDING_SCENES = ["hello", "import", "look", "essentials", "defa
 export type OnboardingScene = (typeof ONBOARDING_SCENES)[number];
 
 /** The parts an import can bring: Arc's Spaces (with their tabs), Favorites, archive and extensions; any browser's
- * bookmarks and history. The onboarding lets the user leave some out. */
-export type ImportPart = "spaces" | "favorites" | "archive" | "bookmarks" | "extensions" | "history";
+ * bookmarks and history; the saved passwords of Arc and the other Chromium browsers (the others by file). The
+ * onboarding lets the user leave some out. */
+export type ImportPart = "spaces" | "favorites" | "archive" | "bookmarks" | "extensions" | "passwords" | "history";
 
 /** The order parts are listed and brought in (history last: it is the biggest). */
-export const IMPORT_PART_ORDER: ImportPart[] = ["spaces", "favorites", "archive", "bookmarks", "extensions", "history"];
+export const IMPORT_PART_ORDER: ImportPart[] = ["spaces", "favorites", "archive", "bookmarks", "extensions", "passwords", "history"];
 
 /** What a source holds, counted before anything is imported (main reads it once). */
 export interface ImportFound {
@@ -48,6 +49,8 @@ export interface WelcomeImport {
   parts: ImportPart[];
   /** Those already brought over while it imports. */
   doneParts: ImportPart[];
+  /** Chosen parts that could not come over (the passwords, when macOS did not let Bow read them); never in doneParts. */
+  failedParts?: ImportPart[];
 }
 
 /** A browser the onboarding lists: every one Bow imports from, found on this Mac or not. */
@@ -285,20 +288,31 @@ export function describeImportProfilesButton(chosenCount: number, profileCount: 
 }
 
 /**
- * The note once profiles came over: "Done. Your 4 spaces from Dia are in Bow." (one: "… is in Bow.").
+ * The note once profiles came over: "Done. Your 4 spaces from Dia are in Bow." (one: "… is in Bow."). When macOS did
+ * not let Bow read their passwords, it says so.
  */
-export function describeProfilesDone(profileCount: number, browserId: string, browserName: string): string {
+export function describeProfilesDone(profileCount: number, browserId: string, browserName: string, isPasswordsRefused = false): string {
   const verb = profileCount === 1 ? "is" : "are";
-  return `Done. Your ${formatCount(profileCount, profileNounFor(browserId))} from ${browserName} ${verb} in Bow.`;
+  const done = `Done. Your ${formatCount(profileCount, profileNounFor(browserId))} from ${browserName} ${verb} in Bow.`;
+  return isPasswordsRefused ? `${done} macOS did not let Bow read your passwords.` : done;
 }
 
+/** The note under the import buttons while the passwords are among the parts to come over. */
+export const PASSWORDS_PERMISSION_NOTE = "For your passwords, macOS asks once to let Bow read them.";
+
+/** What a part's row says when it was chosen but could not come over (the passwords, when macOS said no). */
+export const PART_NOT_IMPORTED_TEXT = "Not imported";
+
 /**
- * The line under a profile's name: "120 bookmarks, 1,240 sites"; nothing to bring: "Nothing new".
+ * The line under a profile's name: "120 bookmarks, 34 passwords, 1,240 sites"; nothing to bring: "Nothing new".
  */
 export function describeProfileCounts(found: ImportFound): string {
   const counts: string[] = [];
   if ((found.counts.bookmarks ?? 0) > 0) {
     counts.push(formatCount(found.counts.bookmarks ?? 0, "bookmark"));
+  }
+  if ((found.counts.passwords ?? 0) > 0) {
+    counts.push(formatCount(found.counts.passwords ?? 0, "password"));
   }
   if ((found.counts.history ?? 0) > 0) {
     counts.push(formatCount(found.counts.history ?? 0, "site"));
@@ -344,6 +358,9 @@ export function describeFound(found: ImportFound): SentencePart[] {
   if ((counts.extensions ?? 0) > 0) {
     phrases.push([{ text: formatCount(counts.extensions ?? 0, "extension"), isBold: true }]);
   }
+  if ((counts.passwords ?? 0) > 0) {
+    phrases.push([{ text: formatCount(counts.passwords ?? 0, "password"), isBold: true }]);
+  }
   if ((counts.history ?? 0) > 0) {
     phrases.push([{ text: formatCount(counts.history ?? 0, "site"), isBold: true }, { text: " from your history", isBold: false }]);
   }
@@ -370,6 +387,7 @@ export const IMPORT_PART_LABELS: Record<ImportPart, { title: string; noun: strin
   archive: { title: "Archived tabs", noun: "tab" },
   bookmarks: { title: "Bookmarks", noun: "bookmark" },
   extensions: { title: "Extensions", noun: "extension" },
+  passwords: { title: "Passwords", noun: "password" },
   history: { title: "History", noun: "site" },
 };
 

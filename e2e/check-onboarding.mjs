@@ -7,14 +7,19 @@
 // motion; the default-browser scene's switches turn ad blocking and the shortcut from any app on; Open Bow closes it
 // and shows the browser, for good; Help › Welcome to Bow… opens it again and Escape ends it; a restart does not show
 // it; every scene fits its smallest window; no text has a dash; no window was made visible by a fade in the e2e
-// background mode. The done view of an import holds a "Your passwords" block: the browser's export steps, a CSV chosen and imported (stand-in sheet), moved to the Trash (stand-in), and fitting 760 × 520.
+// background mode. Passwords: Chrome, Dia and Arc name them in their summary and rows and bring them straight from their
+// Login Data files (encrypted with a made-up Keychain secret, e2e/fixtures/importHome.mjs) into the right Bow profiles,
+// never-save sites included, with no "Your passwords" CSV block after; with the Keychain refused (the secret set to "deny"
+// for Chrome) the other parts still land, the Passwords row says "Not imported" and the CSV block ("Your passwords":
+// the browser's export steps, a CSV chosen and imported through a stand-in sheet, moved to the Trash by a stand-in)
+// appears; the done views fit 760 × 520.
 // usage: npm run build && node e2e/check-onboarding.mjs      (uses a throwaway --user-data-dir and home folder)
 import "./background.mjs";
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { IMPORT_HOME_COUNTS, createImportHome } from "./fixtures/importHome.mjs";
+import { IMPORT_HOME_COUNTS, IMPORT_HOME_LOGINS, createImportHome } from "./fixtures/importHome.mjs";
 
 const appDir = path.resolve(import.meta.dirname, "..");
 const outDir = process.env.E2E_OUTPUT_DIR || path.join(appDir, "e2e", "output");
@@ -83,6 +88,27 @@ async function findOnboarding() {
 }
 await findOnboarding();
 const getState = () => sidebar.evaluate(() => window.browserApi.getState());
+/** What the stand-in Keychain answers imports with: the made-up secret, or "deny" (the user refusing macOS's question). */
+const setKeychainAnswer = (answer) => app.evaluate((_electron, value) => { process.env.BOW_E2E_IMPORT_KEYCHAIN_SECRET = value; }, answer);
+/** The logins and never-save sites in one Bow profile's vault (main's own module: the built file by its full path). */
+const vaultModuleFile = path.join(appDir, "dist", "node", "main", "passwordVault.js");
+const readVaultOfProfile = (profileId) =>
+  app.evaluate(
+    async (_electron, { modulePath, wantedProfileId }) => {
+      const access = await process.mainModule.require(modulePath).openVault(wantedProfileId);
+      return { logins: access.vault.logins.map((login) => `${login.origin} ${login.username} ${login.password}`), neverSave: access.vault.neverSaveOrigins };
+    },
+    { modulePath: vaultModuleFile, wantedProfileId: profileId },
+  );
+/** A stand-in login as readVaultOfProfile writes it (the address is the site's origin: the fixture adds /login). */
+const loginLine = (entry) => `${entry.origin} ${entry.username} ${entry.password}`;
+const savedLogins = (entries) => entries.filter((entry) => !entry.isNeverSave);
+const neverSaveSites = (entries) => entries.filter((entry) => entry.isNeverSave).map((entry) => entry.origin);
+/** True when a vault holds exactly these stand-in logins (and no other from the same browser, by the prefix) and sites. */
+const vaultHolds = (vault, entries, prefix) =>
+  savedLogins(entries).every((entry) => vault.logins.includes(loginLine(entry))) &&
+  vault.logins.filter((line) => line.includes(prefix)).length === savedLogins(entries).length &&
+  neverSaveSites(entries).every((site) => vault.neverSave.includes(site));
 const activeTheme = async () => {
   const state = await getState();
   return state.spaces.find((space) => space.id === state.activeSpaceId).theme;
@@ -146,7 +172,8 @@ const openWelcomeFromHelp = () =>
 /** Text in the onboarding with a dash of any kind ("-", "–", "—"), for the no-dash rule. */
 const dashedTexts = () =>
   page.evaluate(() => {
-    const text = document.querySelector(".onboarding")?.innerText ?? "";
+    // The browsers' own addresses (chrome://password-manager/settings) have a dash we cannot write another way.
+    const text = (document.querySelector(".onboarding")?.innerText ?? "").replace(/\S+:\/\/\S+/g, "");
     return text.match(/.{0,24}[-–—].{0,24}/g) ?? [];
   });
 const dashesSeen = [];
@@ -259,8 +286,8 @@ const bookmarkUrls = ["https://docs.example.com/", "https://news.example.org/", 
 const importedBookmarks = (state) => Object.values(state.items).filter((item) => item.kind === "tab" && bookmarkUrls.includes(item.url)).length;
 check(
   "picking a browser reads it first and says what it holds, numbers in bold",
-  chromeSentence === `Found ${IMPORT_HOME_COUNTS.chromeDefault.bookmarks} bookmarks and ${IMPORT_HOME_COUNTS.chromeDefault.history} sites from your history.` &&
-    chromeView.bold.join() === "5 bookmarks,12 sites" &&
+  chromeSentence === `Found ${IMPORT_HOME_COUNTS.chromeDefault.bookmarks} bookmarks, ${IMPORT_HOME_COUNTS.chromeDefault.passwords} passwords and ${IMPORT_HOME_COUNTS.chromeDefault.history} sites from your history.` &&
+    chromeView.bold.join() === "5 bookmarks,2 passwords,12 sites" &&
     chromeView.primary === "Import everything" &&
     !chromeView.isChecklistShown,
   JSON.stringify({ chromeSentence, chromeView }),
@@ -277,9 +304,19 @@ const afterUntick = await page.evaluate(() => ({
 }));
 check(
   "Choose what to import opens the checklist, every part ticked; a part can be left out",
-  rows.join() === "bookmarks:true,history:true" && afterUntick.history === "false" && afterUntick.primary === "Import selected",
+  rows.join() === "bookmarks:true,passwords:true,history:true" && afterUntick.history === "false" && afterUntick.primary === "Import selected",
   JSON.stringify({ rows, afterUntick }),
 );
+const passwordsNote = await page.textContent(".import-source .scene-note");
+check(
+  "while the passwords are among the parts, the note says macOS asks once to let Bow read them",
+  passwordsNote === "Everything stays on this Mac. For your passwords, macOS asks once to let Bow read them.",
+  passwordsNote,
+);
+// Chrome first meets a refusal: the user says no to macOS's question about the Keychain (stood in by the secret "deny").
+await setKeychainAnswer("deny");
+const stateBeforeChrome = await getState();
+const profileOfChrome = stateBeforeChrome.spaces.find((space) => space.id === stateBeforeChrome.activeSpaceId).profileId;
 await page.click(".import-source .scene-primary");
 const chromeDone = await waitInPage(() => {
   const note = document.querySelector(".import-source .scene-note");
@@ -287,6 +324,8 @@ const chromeDone = await waitInPage(() => {
   return {
     note: note.textContent,
     bookmarks: document.querySelector(".import-row[data-part='bookmarks']").className,
+    passwords: document.querySelector(".import-row[data-part='passwords']").className,
+    passwordsCount: document.querySelector(".import-row[data-part='passwords'] .import-row-count").textContent,
     history: document.querySelector(".import-row[data-part='history']").className,
     primary: document.querySelector(".import-source .scene-primary").textContent,
   };
@@ -302,10 +341,19 @@ check(
   "its row is ticked off, the part left out stays dimmed, and the scene says it is done",
   chromeDone !== null &&
     chromeDone.bookmarks.includes("is-done") &&
+    chromeDone.passwords.includes("is-failed") &&
+    !chromeDone.passwords.includes("is-done") &&
+    chromeDone.passwordsCount === "Not imported" &&
     chromeDone.history.includes("is-left-out") &&
     chromeDone.note === "Done. Your things from Chrome are in Bow." &&
     chromeDone.primary === "Continue",
   JSON.stringify(chromeDone),
+);
+const chromeVaultAfterRefusal = await readVaultOfProfile(profileOfChrome);
+check(
+  "a refused Keychain imports no Chrome passwords (nor its never-save site), and the other parts still landed",
+  !chromeVaultAfterRefusal.logins.some((line) => line.includes("chrome-")) && !chromeVaultAfterRefusal.neverSave.includes("https://chrome-never.example.net") && importedBookmarks(stateAfterChrome) === IMPORT_HOME_COUNTS.chromeDefault.bookmarks,
+  JSON.stringify(chromeVaultAfterRefusal),
 );
 dashesSeen.push(...(await dashedTexts()));
 
@@ -398,11 +446,13 @@ async function checkDoneSceneFits(browserName, sceneSelector) {
 await checkPasswordsBlock({
   pane: ".import-source",
   browserName: "Chrome",
-  expectedSteps: "In Chrome, open Settings, find Passwords and choose Export passwords. Then choose the file it saved.",
+  expectedSteps: "In Chrome, type chrome://password-manager/settings in the address bar and choose Export passwords. Then choose the file it saved.",
   fileName: "Chrome Passwords.csv",
   origins: ["https://chrome-one.example.com", "https://chrome-two.example.com"],
 });
 await checkDoneSceneFits("Chrome", ".import-source");
+// The user allows the Keychain from here on.
+await setKeychainAnswer(process.env.BOW_E2E_IMPORT_KEYCHAIN_SECRET);
 
 // ---------- Bring your things: Dia, every space at once, each as a Space of its own ----------
 
@@ -422,7 +472,14 @@ const readDiaView = () =>
   });
 await waitInPage(() => (document.querySelector(".import-profiles .import-sentence")?.textContent ?? "").startsWith("Found"));
 const diaView = await readDiaView();
-const countsText = (space) => [space.bookmarks > 0 ? `${space.bookmarks} bookmark${space.bookmarks === 1 ? "" : "s"}` : null, space.history > 0 ? `${space.history} sites` : null].filter(Boolean).join(", ");
+const countsText = (space) =>
+  [
+    space.bookmarks > 0 ? `${space.bookmarks} bookmark${space.bookmarks === 1 ? "" : "s"}` : null,
+    space.passwords > 0 ? `${space.passwords} password${space.passwords === 1 ? "" : "s"}` : null,
+    space.history > 0 ? `${space.history} sites` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
 const expectedDiaRows = IMPORT_HOME_COUNTS.diaSpaces.map((space) => `${space.name}|${countsText(space)}|true`);
 check(
   "a browser with several profiles lists them all at once, ticked: Dia's 4 spaces",
@@ -474,13 +531,24 @@ check(
   JSON.stringify({ diaHistory, expectedDiaHistory, diaDone }),
 );
 dashesSeen.push(...(await dashedTexts()));
-await checkPasswordsBlock({
-  pane: ".import-profiles",
-  browserName: "Dia",
-  expectedSteps: "In Dia, open Settings, find Passwords and choose Export passwords. Then choose the file it saved.",
-  fileName: "Dia Passwords.csv",
-  origins: ["https://dia-one.example.com", "https://dia-two.example.com"],
+// Dia's passwords came over by themselves, each space's into its own profile (the first space's logins are not in the
+// second's), its never-save site too, and the CSV steps stay hidden.
+const diaVaults = [];
+for (const space of IMPORT_HOME_COUNTS.diaSpaces) {
+  const bowSpace = stateAfterDia.spaces.find((candidate) => candidate.name === space.name && !candidate.id.startsWith("space-personal"));
+  diaVaults.push({ folder: space.folder, vault: await readVaultOfProfile(bowSpace.profileId) });
+}
+const diaVaultsRight = IMPORT_HOME_COUNTS.diaSpaces.every((space) => {
+  const vault = diaVaults.find((entry) => entry.folder === space.folder).vault;
+  return vaultHolds(vault, IMPORT_HOME_LOGINS.dia[space.folder] ?? [], "dia-");
 });
+const diaBlockHidden = await page.evaluate(() => document.querySelector(".import-profiles .passwords-block").hidden);
+check(
+  "Dia's passwords come over by themselves, each space's into its own profile with its never-save site, and the CSV steps stay hidden",
+  diaVaultsRight && diaBlockHidden,
+  JSON.stringify({ diaVaultsRight, diaBlockHidden, counts: diaVaults.map((entry) => entry.vault.logins.length) }),
+);
+await page.screenshot({ path: path.join(outDir, "onboarding-dia-done.png") }).catch(() => undefined);
 await checkDoneSceneFits("Dia", ".import-profiles");
 
 // ---------- Bring your things: Arc, everything, filling the sidebar ----------
@@ -495,9 +563,11 @@ const arcSentence = await waitInPage(() => {
 });
 check(
   "back at the browsers Chrome shows it was imported, and Arc says what it holds",
-  chromeTileImported && arcSentence === "Found 2 Spaces with 4 tabs, 4 Favorites and 30 sites from your history.",
+  chromeTileImported && arcSentence === `Found 2 Spaces with 4 tabs, 4 Favorites, ${IMPORT_HOME_COUNTS.arc.passwords} passwords and 30 sites from your history.`,
   JSON.stringify({ chromeTileImported, arcSentence }),
 );
+await page.waitForTimeout(600);
+await page.screenshot({ path: path.join(outDir, "onboarding-arc-found.png") }).catch(() => undefined);
 await page.click(".import-source .scene-primary");
 const working = await waitInPage(
   () => {
@@ -511,7 +581,7 @@ const working = await waitInPage(
 const arcDone = await waitInPage(() => (document.querySelector(".import-source .scene-note").classList.contains("is-positive") ? Array.from(document.querySelectorAll(".import-source .import-row.is-done")).map((row) => row.dataset.part) : null));
 check(
   "Import everything shows every part working, then ticks each off",
-  working !== null && working.primary === "Importing…" && working.rows.join() === "spaces:true,favorites:true,history:true" && arcDone?.join() === "spaces,favorites,history",
+  working !== null && working.primary === "Importing…" && working.rows.join() === "spaces:true,favorites:true,passwords:true,history:true" && arcDone?.join() === "spaces,favorites,passwords,history",
   JSON.stringify({ working, arcDone }),
 );
 const stateAfterArc = await getState();
@@ -523,6 +593,20 @@ check(
   spaceNames.includes("Studio") && spaceNames.includes("Home") && activeSpace.name === "Studio" && activeSpace.favoriteIds.length === IMPORT_HOME_COUNTS.arc.favorites && arcHistory === IMPORT_HOME_COUNTS.arc.history,
   JSON.stringify({ spaceNames, active: activeSpace.name, favorites: activeSpace.favoriteIds.length, arcHistory }),
 );
+// Arc's passwords reached the Bow profile of the Arc profile they came from: "Default" is the Studio Space's, "Profile 1"
+// (where Home lives) has its own Bow profile; the never-save site came along.
+const studioSpace = stateAfterArc.spaces.find((space) => space.name === "Studio");
+const homeSpace = stateAfterArc.spaces.find((space) => space.name === "Home");
+const studioVault = await readVaultOfProfile(studioSpace.profileId);
+const homeVault = await readVaultOfProfile(homeSpace.profileId);
+const arcBlockHidden = await page.evaluate(() => document.querySelector(".import-source .passwords-block").hidden);
+check(
+  "Arc's passwords come over by themselves, each Arc profile's into its own Bow profile, with its never-save site, and the CSV steps stay hidden",
+  studioSpace.profileId !== homeSpace.profileId && vaultHolds(studioVault, IMPORT_HOME_LOGINS.arcDefault, "arc-") && vaultHolds(homeVault, IMPORT_HOME_LOGINS.arcProfile1, "arc-") && arcBlockHidden,
+  JSON.stringify({ studio: studioVault, home: homeVault, arcBlockHidden }),
+);
+await page.screenshot({ path: path.join(outDir, "onboarding-arc-done.png") }).catch(() => undefined);
+await checkDoneSceneFits("Arc", ".import-source");
 const preview = await page.evaluate(() => ({
   isShown: document.querySelector(".onboarding").classList.contains("shows-preview"),
   space: document.querySelector(".preview-space-name").textContent,

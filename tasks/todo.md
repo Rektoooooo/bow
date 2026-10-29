@@ -422,6 +422,10 @@ a Keychain key, per profile.
 - [x] 10. Docs (CLAUDE.md security rule and architecture, README, backup and sync docs, handoff) → full suite, push;
       screenshots for the user
 - [ ] 11. Live check with the user's go: the real Keychain item and Touch ID in a packaged build
+- [x] 12. Passwords straight from Arc and the other Chromium browsers (the user, testing 0.2.0: "if this imports the
+      passwords it should tell it here"; chose to read them directly): counted in the summary and a Passwords row,
+      macOS asks once for the browser's Safe Storage key, logins into the right Bow profiles; Safari and Firefox keep
+      the CSV way, which stays as the fallback when macOS says no
 
 ## Milestone 7 — Favorites per Space (user-approved 2026-10-29)
 The user: "each space needs its own favorites". Arc keeps Favorites per profile (the user's Arc: 3 Spaces on 3

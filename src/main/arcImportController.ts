@@ -1,7 +1,7 @@
 /**
  * WHY this file exists:
- *   File › Import from Arc… and the onboarding bring the user's Arc sidebar, archive, history and extensions into this
- *   browser. The pure readers (arcImport.ts, arcArchiveImport.ts) do the translating; this file does the parts around
+ *   File › Import from Arc… and the onboarding bring the user's Arc sidebar, archive, history, extensions and saved
+ *   passwords into this browser. The pure readers (arcImport.ts, arcArchiveImport.ts) do the translating; this file does the parts around
  *   them, in two steps: prepare (find or ask for the file, read everything once and count what would arrive, without
  *   changing anything) and apply (bring the chosen parts over one by one: attach Arc's cached icons, replace the empty
  *   starter Spaces, switch to the first imported Space). The onboarding shows the counts and lets the user leave parts
@@ -10,26 +10,32 @@
  * Data source:
  *   ~/Library/Application Support/Arc/StorableSidebar.json (or a file the user picks, such as a backup of that
  *   folder), and next to it StorableArchiveItems.json, StorableWindows.json (the sidebar width), the favicon cache
- *   folders, and "User Data" with the History databases and the extensions.
+ *   folders, and "User Data" with the History databases, the extensions and the `Login Data` files (the saved passwords;
+ *   Arc's key to them is its Keychain item, which macOS asks the user to allow once).
  *
  * Data flow:
  *   menu → importFromArc() → prepareArcImport() → applyArcImport(every part) → summary dialog
  *   onboardingWindow.ts → prepareArcImport(ARC_SIDEBAR_FILE) → counts on its card → applyArcImport(chosen parts,
  *   each reported as it lands)
  *   applyArcImport: importArcSidebar() → attachArcFavicons() → applyChange() → importArcArchive() → applyChange()
- *   → importArcExtensions() → importHistoryEntries()
+ *   → importArcExtensions() → importChromiumPasswords() → importHistoryEntries()
  */
 import { dialog } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { importArcArchive } from "./arcArchiveImport";
 import type { ArcArchiveImportReport } from "./arcArchiveImport";
-import { findArcExtensions } from "./arcExtensionsImport";
+import { arcProfileFolderToProfileId, findArcExtensions } from "./arcExtensionsImport";
 import { attachArcArchiveFavicons, attachArcFavicons } from "./arcFavicons";
-import { readArcHistory } from "./arcHistoryImport";
+import { USER_DATA_FOLDER_NAME, readArcHistory } from "./arcHistoryImport";
 import { importArcSidebar, readArcSidebarWidth } from "./arcImport";
 import type { ArcImportReport } from "./arcImport";
 import { applyChange, getState, getWindow } from "./browserCore";
+import { askToImportPasswords, describePasswordsResult } from "./browserImportController";
+import { ARC_KEYCHAIN_SERVICE, findLoginProfileFolders } from "./chromiumImport";
+import { countChromiumLogins } from "./chromiumPasswords";
+import { importChromiumPasswords } from "./chromiumPasswordsImport";
+import type { ChromiumPasswordsOutcome, PasswordImportTarget } from "./chromiumPasswordsImport";
 import { findExtension } from "./extensionList";
 import { importArcExtensions } from "./extensionsController";
 import type { ArcExtensionsImportReport } from "./extensionsController";
@@ -40,6 +46,7 @@ import { countNewHistoryUrls, importHistoryEntries } from "./historyStore";
 import { getImportHomeFolder } from "./importHome";
 import { STARTER_SPACE_IDS, removeEmptySpaces, switchSpace } from "./spaces";
 import { setSidebarWidth } from "./state";
+import { getActiveSpace } from "./tree";
 
 /** Where Arc keeps its sidebar on the account that uses it (docs/research/arc-data-model.md). */
 function getArcSidebarFile(): string {
@@ -62,6 +69,8 @@ export interface PreparedArcImport {
   archiveFile: unknown;
   sidebarWidth: number | null;
   history: HistoryEntry[];
+  /** Arc's profile folders that have saved logins, with their folder names ("Default", "Profile 1"). */
+  loginFolders: { folderName: string; profileFolder: string }[];
   found: ImportFound;
 }
 
@@ -70,6 +79,8 @@ export interface ArcImportResult {
   sidebarReport: ArcImportReport | null;
   archiveReport: ArcArchiveImportReport | null;
   extensionsReport: ArcExtensionsImportReport | null;
+  /** How bringing the passwords went; null when they were not chosen or there are none. */
+  passwords: ChromiumPasswordsOutcome | null;
   historyPages: number;
 }
 
@@ -119,6 +130,10 @@ function describeResult(result: ArcImportResult): string {
   }
   if (result.archiveReport !== null) {
     lines.push(`Archived tabs: ${result.archiveReport.archivedImported}`);
+  }
+  const passwordsLine = describePasswordsResult(result.passwords);
+  if (passwordsLine !== null) {
+    lines.push(passwordsLine);
   }
   lines.push(`History: ${result.historyPages} pages`);
   const extensionsReport = result.extensionsReport;
@@ -188,11 +203,17 @@ export async function prepareArcImport(sidebarFilePath: string): Promise<{ prepa
   const archiveCount = archiveFile === null ? 0 : importArcArchive(archiveFile, wholeSidebar.state, now).report.archivedImported;
   const arcFolder = path.dirname(sidebarFilePath);
   const history = await readArcHistory(arcFolder);
+  const loginFolders = findLoginProfileFolders(path.join(arcFolder, USER_DATA_FOLDER_NAME));
+  let passwordCount = 0;
+  for (const loginFolder of loginFolders) {
+    passwordCount += await countChromiumLogins(loginFolder.profileFolder);
+  }
   const counts: Partial<Record<ImportPart, number>> = {
     spaces: spacesOnly.report.spacesImported,
     favorites: wholeSidebar.report.favoritesImported,
     archive: archiveCount,
     extensions: countNewExtensions(arcFolder),
+    passwords: passwordCount,
     history: countNewHistoryUrls(history),
   };
   const parts = IMPORT_PART_ORDER.filter((part) => (counts[part] ?? 0) > 0);
@@ -202,6 +223,7 @@ export async function prepareArcImport(sidebarFilePath: string): Promise<{ prepa
     archiveFile: archiveFile,
     sidebarWidth: readArcSidebarWidth(readFileNextToSidebar(sidebarFilePath, WINDOWS_FILE_NAME)),
     history: history,
+    loginFolders: loginFolders,
     found: { parts: parts, counts: counts, tabs: spacesOnly.report.tabsImported },
   };
   return { prepared: prepared };
@@ -257,11 +279,27 @@ function applyArchive(prepared: PreparedArcImport): ArcArchiveImportReport | nul
 }
 
 /**
+ * Brings Arc's saved passwords in, with one request to macOS. Each Arc profile's logins go to the Bow profile the
+ * import made for it (arcProfileFolderToProfileId), or to the active Space's profile when there is none.
+ */
+async function applyPasswords(prepared: PreparedArcImport): Promise<ChromiumPasswordsOutcome> {
+  const state = getState();
+  const fallbackProfileId = getActiveSpace(state).profileId;
+  const targets: PasswordImportTarget[] = prepared.loginFolders.map((loginFolder) => {
+    const wantedProfileId = arcProfileFolderToProfileId(loginFolder.folderName);
+    const exists = state.profiles.some((profile) => profile.id === wantedProfileId);
+    return { profileFolder: loginFolder.profileFolder, bowProfileId: exists ? wantedProfileId : fallbackProfileId };
+  });
+  return importChromiumPasswords(targets, ARC_KEYCHAIN_SERVICE, Date.now());
+}
+
+/**
  * Brings the chosen parts of a prepared import over, in IMPORT_PART_ORDER, telling `onPartDone` as each lands (the
- * onboarding ticks its checklist). Extensions come after the Spaces, which create the profiles they belong to.
+ * onboarding ticks its checklist). Extensions and passwords come after the Spaces, which create the profiles they belong to. A refused passwords part is
+ * left out of `onPartDone`; the result says why.
  */
 export async function applyArcImport(prepared: PreparedArcImport, parts: ImportPart[], onPartDone: (part: ImportPart) => void): Promise<ArcImportResult> {
-  const result: ArcImportResult = { sidebarReport: null, archiveReport: null, extensionsReport: null, historyPages: 0 };
+  const result: ArcImportResult = { sidebarReport: null, archiveReport: null, extensionsReport: null, passwords: null, historyPages: 0 };
   const sidebarChosen = parts.filter((part) => part === "spaces" || part === "favorites");
   if (sidebarChosen.length > 0) {
     result.sidebarReport = applySidebarParts(prepared, sidebarChosen);
@@ -274,6 +312,12 @@ export async function applyArcImport(prepared: PreparedArcImport, parts: ImportP
   if (parts.includes("extensions")) {
     result.extensionsReport = importArcExtensions(prepared.arcFolder);
     onPartDone("extensions");
+  }
+  if (parts.includes("passwords") && prepared.loginFolders.length > 0) {
+    result.passwords = await applyPasswords(prepared);
+    if (result.passwords.kind === "imported") {
+      onPartDone("passwords");
+    }
   }
   if (parts.includes("history")) {
     result.historyPages = importHistoryEntries(prepared.history);
@@ -297,7 +341,10 @@ export async function importFromArc(): Promise<void> {
     dialog.showErrorBox("Import from Arc", preparation.error);
     return;
   }
-  const result = await applyArcImport(preparation.prepared, IMPORT_PART_ORDER, () => undefined);
+  const hasPasswords = (preparation.prepared.found.counts.passwords ?? 0) > 0;
+  const bringsPasswords = hasPasswords && (await askToImportPasswords(window, "Arc"));
+  const parts = IMPORT_PART_ORDER.filter((part) => part !== "passwords" || bringsPasswords);
+  const result = await applyArcImport(preparation.prepared, parts, () => undefined);
   const spacesImported = result.sidebarReport?.spacesImported ?? 0;
   await dialog.showMessageBox(window, {
     type: "info",

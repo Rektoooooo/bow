@@ -942,6 +942,13 @@ button {
   transition-delay: var(--tick-delay, 0ms);
 }
 
+/* A part that could not come over (the passwords, when macOS said no) shows no mark, only "Not imported". */
+.import-row.is-failed .import-row-circle,
+.import-row.is-failed .import-row-spinner,
+.import-row.is-failed .import-row-check {
+  opacity: 0;
+}
+
 .import-row.is-left-out .import-row-mark {
   visibility: hidden;
 }
@@ -2143,6 +2150,13 @@ body.dark .link-bubble-url {
 /* In the smallest window the finished list of spaces makes room for the passwords block under it. */
 @media (max-height: 560px) {
   .import-profiles[data-phase="done"] .import-checklist {
+    display: none;
+  }
+
+  /* One browser's done view with the block under it: what it found is told by the rows, of which only the one that did
+     not come over stays (the passwords, when macOS said no), so the block fits. */
+  .import-source[data-passwords-file="true"] .import-sentence,
+  .import-source[data-passwords-file="true"] .import-row:not(.is-failed) {
     display: none;
   }
 }
