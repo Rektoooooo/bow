@@ -391,6 +391,10 @@ yours, the essentials, a few good defaults, you're all set). Our own CSS/DOM/SVG
       all at once, each profile as its own Space with its own profile (the user's choice: separate sign-ins, like Dia);
       rows per profile in the onboarding, "Dia, all 4 spaces…" in the File menu; check-onboarding 38 with four made-up
       Dia spaces
+- [ ] 10. Google sign-in refused (the user, 2026-10-29, "Couldn't sign you in. This browser or app may not be
+      secure"): with Bow's Chrome user agent Google runs desktop Chrome's sign-in (GlifWebSignIn), which Electron fails;
+      its sign-in pages now get Electron's own user agent in headers and scripts, and Google serves WebLiteSignIn
+      (check-google-sign-in 11). Left: the user's real sign-in on a fresh profile, then release 0.1.2
 
 ## Milestone 6 — Bow Passwords (user-approved 2026-10-29: "yes lets do all 5")
 The user: Bow "isn't remembering emails I filled in or any passwords… super important for user experience". Electron

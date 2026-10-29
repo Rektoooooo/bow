@@ -196,7 +196,12 @@ const tabPreloadIds = await app.evaluate(({ webContents }) => {
   const tab = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith("https://example.com"));
   return tab.session.getPreloadScripts().map((script) => script.id);
 });
-check("a tab's profile session has exactly the forms helper", tabPreloadIds.length === 1 && tabPreloadIds[0] === "bow-forms", JSON.stringify(tabPreloadIds));
+// Bow's two page helpers: Google's sign-in user agent (does nothing elsewhere) and the forms helper of Bow Passwords.
+check(
+  "a tab's profile session has exactly Bow's helpers (Google sign-in, forms)",
+  tabPreloadIds.length === 2 && tabPreloadIds.includes("bow-google-sign-in") && tabPreloadIds.includes("bow-forms"),
+  JSON.stringify(tabPreloadIds),
+);
 
 // A private window (File › New Private Window) has a session in memory: no helper there.
 await page.evaluate(() => window.browserApi.dispatch({ type: "openCommandBar", mode: "newTab" }));
@@ -217,7 +222,12 @@ const privatePreloadIds = await (async () => {
   }
   return null;
 })();
-check("a private window's session has no preload scripts", Array.isArray(privatePreloadIds) && privatePreloadIds.length === 0, JSON.stringify(privatePreloadIds));
+// Signing in to Google works in private windows too; nothing of Bow Passwords runs there.
+check(
+  "a private window's session has only the Google sign-in helper, never the forms helper",
+  Array.isArray(privatePreloadIds) && privatePreloadIds.length === 1 && privatePreloadIds[0] === "bow-google-sign-in",
+  JSON.stringify(privatePreloadIds),
+);
 await app.evaluate(({ BrowserWindow }) => {
   BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().includes("private=1"))?.close();
 });

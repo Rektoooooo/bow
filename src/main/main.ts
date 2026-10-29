@@ -99,6 +99,7 @@ import { initializeEaselsStore, readEasel, writeEasel } from "./easelsStore";
 import { initializeNotesStore, readNote, writeNote } from "./notesStore";
 import { createNoteUrl } from "../shared/notes";
 import { applyCosmeticFilters, initializeAdBlocking, installAdBlocker } from "./adBlock";
+import { installGoogleSignIn } from "./googleSignIn";
 import { applyAppIcon, followSystemAppearance } from "./appIcon";
 import { findRootLocation, findTab, getActiveSpace } from "./tree";
 import { isSameSite } from "./urls";
@@ -355,6 +356,8 @@ async function handleAppReady(): Promise<void> {
   // Ad blocking checks requests in every profile session; the lists load now when it is on.
   initializeAdBlocking(app.getPath("userData"), getState, () => refreshOpenPanel());
   onProfileSessionCreated(installAdBlocker);
+  // Google's sign-in refuses Bow's Chrome user agent; its pages get Electron's own (googleSignIn.ts).
+  onProfileSessionCreated(installGoogleSignIn);
   // Bow Passwords: the helper that notices sign-in forms runs in every profile session's pages (not private ones).
   onProfileSessionCreated(registerFormsHelper);
   startTrackingDownloads(
