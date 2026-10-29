@@ -12,10 +12,15 @@ import {
   ONBOARDING_SCENES,
   SUPPORTED_BROWSERS,
   describeFound,
+  describeImportProfilesButton,
   describePartCount,
+  describeProfileCounts,
+  describeProfilesDone,
+  describeProfilesFound,
   formatCount,
   orderBrowsers,
   pickWashColors,
+  profileNounFor,
   stepScene,
   swatchColor,
   vividWashColor,
@@ -90,6 +95,35 @@ describe("what a source holds, in one sentence", () => {
 
   it("never uses a dash", () => {
     const texts = [sentenceText(ARC_FOUND), ...IMPORT_PART_ORDER.map((part) => IMPORT_PART_LABELS[part].title), ...IMPORT_PART_ORDER.map((part) => describePartCount(part, ARC_FOUND))];
+    for (const text of texts) {
+      expect(text).not.toMatch(/[-\u2013\u2014]/);
+    }
+  });
+});
+
+describe("a browser with several profiles", () => {
+  it("calls Dia's profiles spaces, the others' profiles", () => {
+    expect(profileNounFor("dia")).toBe("space");
+    expect(profileNounFor("chrome")).toBe("profile");
+  });
+
+  it("says how many it found and what the button brings", () => {
+    expect(describeProfilesFound(4, "dia", "Dia")).toBe("Found 4 spaces in Dia.");
+    expect(describeImportProfilesButton(4, 4, "dia")).toBe("Import all 4 spaces");
+    expect(describeImportProfilesButton(3, 4, "dia")).toBe("Import 3 spaces");
+    expect(describeImportProfilesButton(1, 2, "chrome")).toBe("Import 1 profile");
+  });
+
+  it("counts each profile in one line, and says when it is done", () => {
+    expect(describeProfileCounts({ parts: ["bookmarks", "history"], counts: { bookmarks: 120, history: 1240 }, tabs: 0 })).toBe("120 bookmarks, 1,240 sites");
+    expect(describeProfileCounts({ parts: ["bookmarks"], counts: { bookmarks: 1, history: 0 }, tabs: 0 })).toBe("1 bookmark");
+    expect(describeProfileCounts({ parts: [], counts: {}, tabs: 0 })).toBe("Nothing new");
+    expect(describeProfilesDone(4, "dia", "Dia")).toBe("Done. Your 4 spaces from Dia are in Bow.");
+    expect(describeProfilesDone(1, "dia", "Dia")).toBe("Done. Your 1 space from Dia is in Bow.");
+  });
+
+  it("never uses a dash", () => {
+    const texts = [describeProfilesFound(2, "brave", "Brave"), describeImportProfilesButton(2, 3, "edge"), describeProfilesDone(3, "vivaldi", "Vivaldi")];
     for (const text of texts) {
       expect(text).not.toMatch(/[-\u2013\u2014]/);
     }

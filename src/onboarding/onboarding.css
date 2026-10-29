@@ -652,7 +652,8 @@ button {
 /* ---------- Bring your things: the browsers ---------- */
 
 .import-pick,
-.import-source {
+.import-source,
+.import-profiles {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -793,28 +794,6 @@ button {
 .source-name {
   font-weight: 600;
   font-size: 14.5px;
-}
-
-.source-profiles {
-  display: flex;
-  gap: 4px;
-  margin-left: 4px;
-}
-
-.source-profile {
-  height: 26px;
-  padding: 0 10px;
-  border: 1px solid var(--onb-border);
-  border-radius: 13px;
-  background: none;
-  color: var(--onb-ink-soft);
-  font: 500 12px/1 var(--font-text);
-}
-
-.source-profile[aria-checked="true"] {
-  border-color: transparent;
-  background: var(--onb-accent);
-  color: var(--onb-accent-ink);
 }
 
 .import-sentence.is-reading {

@@ -21,17 +21,19 @@ import type { BrowserWindow } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { applyChange, getState, getWindow } from "./browserCore";
-import { addImportedBookmarks, countBookmarks } from "./bookmarkImport";
-import type { ImportedBookmarkNode } from "./bookmarkImport";
+import { addImportedBookmarks, addProfilesAsSpaces, countBookmarks } from "./bookmarkImport";
+import type { ImportedBookmarkNode, ProfileSpacesResult } from "./bookmarkImport";
 import { findChromiumProfiles, readChromiumBookmarks, readChromiumHistory } from "./chromiumImport";
 import { findFirefoxProfiles, readFirefoxProfile } from "./firefoxImport";
 import type { HistoryEntry } from "./history";
 import { countNewHistoryUrls, importHistoryEntries } from "./historyStore";
 import { getImportHomeFolder } from "./importHome";
 import { readSafariBookmarks, readSafariHistory } from "./safariImport";
+import { THEME_PRESETS } from "./themePresets";
 import { getActiveSpace } from "./tree";
-import { IMPORT_PART_ORDER } from "../shared/onboarding";
+import { IMPORT_PART_ORDER, formatCount, profileNounFor } from "../shared/onboarding";
 import type { ImportFound, ImportPart } from "../shared/onboarding";
+import type { SpaceTheme } from "../shared/types";
 
 /** Something the user can import from, as the menus and the onboarding list it. */
 export interface ImportSource {
@@ -41,6 +43,8 @@ export interface ImportSource {
   label: string;
   /** The browser it belongs to: "safari", "firefox", or a Chromium browser's id (chromiumImport.ts). */
   browserId: string;
+  /** The browser's own name: "Google Chrome", "Dia", "Firefox". */
+  browserName: string;
   /** The profile's name, or null for a browser without profiles to tell apart. */
   profileName: string | null;
 }
@@ -59,6 +63,20 @@ export type BrowserPreparation = { prepared: PreparedBrowserImport } | { needsFu
 /** What applying an import brought over. */
 export interface BrowserImportResult {
   bookmarks: number;
+  historyPages: number;
+}
+
+/** One profile of a browser, read, to bring over as a Space of its own. */
+export interface PreparedProfile {
+  name: string;
+  prepared: PreparedBrowserImport;
+}
+
+/** What bringing several profiles over did. */
+export interface ProfileImportsResult {
+  spaces: number;
+  /** Profiles that came over as folders: no room for more Spaces. */
+  foldersInstead: string[];
   historyPages: number;
 }
 
@@ -86,6 +104,7 @@ export function listImportSources(): ImportSource[] {
       id: `${CHROMIUM_SOURCE_PREFIX}${profile.browserId}:${profile.folderName}`,
       label: profileName === null ? profile.browserName : `${profile.browserName} (${profileName})`,
       browserId: profile.browserId,
+      browserName: profile.browserName,
       profileName: profileName,
     });
   }
@@ -94,10 +113,10 @@ export function listImportSources(): ImportSource[] {
   for (const profile of firefoxProfiles) {
     const profileName = firefoxProfiles.length === 1 ? null : profile.displayName;
     const label = profileName === null ? "Firefox" : `Firefox (${profileName})`;
-    sources.push({ id: `${FIREFOX_SOURCE_PREFIX}${profile.folderName}`, label: label, browserId: "firefox", profileName: profileName });
+    sources.push({ id: `${FIREFOX_SOURCE_PREFIX}${profile.folderName}`, label: label, browserId: "firefox", browserName: "Firefox", profileName: profileName });
   }
   if (fs.existsSync(path.join(homeFolder, SAFARI_FOLDER))) {
-    sources.push({ id: SAFARI_SOURCE_ID, label: "Safari", browserId: "safari", profileName: null });
+    sources.push({ id: SAFARI_SOURCE_ID, label: "Safari", browserId: "safari", browserName: "Safari", profileName: null });
   }
   return sources;
 }
@@ -240,4 +259,63 @@ export async function importFromBrowser(sourceId: string): Promise<void> {
   }
   const result = applyBrowserImport(preparation.prepared, IMPORT_PART_ORDER, () => undefined);
   await showSummary(window, preparation.prepared.browserName, result);
+}
+
+/**
+ * The colors the imported profiles' Spaces take in turn: the light presets (themePresets.ts), so each Space is told
+ * apart at a glance.
+ */
+function listProfileSpaceThemes(): SpaceTheme[] {
+  const lightPresets = THEME_PRESETS.filter((preset) => preset.appearance !== "dark");
+  return lightPresets.map((preset) => ({ colors: preset.colors, appearance: preset.appearance, grain: 0 }));
+}
+
+/**
+ * Brings several profiles of one browser over at once (Dia's spaces): each becomes a Space of its own with its own Bow
+ * profile and its bookmarks pinned (bookmarkImport.ts addProfilesAsSpaces), and all their history comes in.
+ */
+export function applyProfileImports(profiles: PreparedProfile[]): ProfileImportsResult {
+  let historyPages = 0;
+  for (const profile of profiles) {
+    historyPages = historyPages + importHistoryEntries(profile.prepared.history);
+  }
+  const importedProfiles = profiles.map((profile) => ({ name: profile.name, tree: profile.prepared.bookmarks }));
+  // A list, because the callback below fills it and TypeScript cannot see assignments to a plain variable there.
+  const results: ProfileSpacesResult[] = [];
+  applyChange((state) => {
+    const result = addProfilesAsSpaces(state, importedProfiles, listProfileSpaceThemes(), Date.now());
+    results.push(result);
+    return result.state;
+  });
+  const result = results[0];
+  return { spaces: result?.spaceIds.length ?? 0, foldersInstead: result?.foldersInstead ?? [], historyPages: historyPages };
+}
+
+/**
+ * File › Import From Browser › "Dia, all 4 spaces…": reads every profile of a browser and brings them over at once,
+ * each as its own Space, then says what arrived.
+ */
+export async function importAllProfiles(browserId: string): Promise<void> {
+  const window = getWindow();
+  if (window === null) {
+    return;
+  }
+  const sources = listImportSources().filter((source) => source.browserId === browserId);
+  const profiles: PreparedProfile[] = [];
+  for (const source of sources) {
+    const preparation = await prepareBrowserImport(source.id);
+    if ("prepared" in preparation) {
+      profiles.push({ name: source.profileName ?? source.browserName, prepared: preparation.prepared });
+    }
+  }
+  const browserName = sources[0]?.browserName ?? browserId;
+  const noun = profileNounFor(browserId);
+  const result = applyProfileImports(profiles);
+  const names = profiles.map((profile) => profile.name).join(", ");
+  const folderLine = result.foldersInstead.length > 0 ? `\nNo room for more Spaces: ${result.foldersInstead.join(", ")} came over as folders.` : "";
+  await dialog.showMessageBox(window, {
+    type: "info",
+    message: `Imported ${formatCount(profiles.length, noun)} from ${browserName}`,
+    detail: `Each is a Space of its own, with its own sign-ins: ${names}.${folderLine}\nHistory: ${result.historyPages} pages.`,
+  });
 }

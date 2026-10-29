@@ -14,12 +14,14 @@
  * Data flow:
  *   tile picked → onboardingApi.readSource() → "reading" → "found" (counts) → Import → onboardingApi.bringOver(parts)
  *   → "importing" (parts tick off) → "done" → Continue
+ *   a browser with several profiles → profilesImport.ts (every profile at once, each as a Space)
  */
 import type { ImportFound, ImportPart, WelcomeBrowser, WelcomeData, WelcomeImport } from "../shared/onboarding";
 import { IMPORT_PART_LABELS, describeFound, describePartCount } from "../shared/onboarding.js";
 import { createElement, createTextButton } from "../renderer/dom.js";
 import { createIcon } from "../renderer/icons.js";
 import type { IconName } from "../renderer/icons.js";
+import { createProfilesPane } from "./profilesImport.js";
 import { createSceneActions, createSceneFrame, createSceneLede, createSceneNote, createSceneTitle, markReveal, revealParts } from "./sceneParts.js";
 import type { SceneView } from "./sceneParts.js";
 
@@ -134,10 +136,7 @@ export function createImportScene(data: WelcomeData, goNext: () => void): SceneV
   backButton.append(createIcon("chevronLeft", "icon"), createElement("span", "", "All browsers"));
   const sourceIcon = createElement("span", "source-icon");
   const sourceName = createElement("span", "source-name");
-  const profiles = createElement("div", "source-profiles");
-  profiles.setAttribute("role", "radiogroup");
-  profiles.setAttribute("aria-label", "Profile");
-  sourceBar.append(backButton, sourceIcon, sourceName, profiles);
+  sourceBar.append(backButton, sourceIcon, sourceName);
   const sentence = markReveal(createElement("p", "scene-lede import-sentence"));
   sentence.setAttribute("aria-live", "polite");
   const checklist = createElement("div", "import-checklist");
@@ -146,7 +145,10 @@ export function createImportScene(data: WelcomeData, goNext: () => void): SceneV
   sourcePane.append(sourceBar, sentence, checklist, sourceActions.element, sourceNote);
   sourcePane.hidden = true;
 
-  frame.text.append(createSceneTitle("Bring your things."), pickPane, sourcePane);
+  // A browser with several profiles (Dia's spaces): all of them at once, each as a Space (profilesImport.ts).
+  const profilesPane = createProfilesPane(data, goNext, () => showGrid());
+
+  frame.text.append(createSceneTitle("Bring your things."), pickPane, sourcePane, profilesPane.element);
   let rows: ChecklistRow[] = [];
   let rowsSourceId: string | null = null;
 
@@ -186,10 +188,15 @@ export function createImportScene(data: WelcomeData, goNext: () => void): SceneV
     }
     view.browserId = browserId;
     pickPane.hidden = true;
+    if (browser.sources.length > 1) {
+      view.sourceId = null;
+      profilesPane.show(browser, (holder) => fillBrowserLogo(holder, browser.id));
+      draw();
+      return;
+    }
     sourcePane.hidden = false;
     fillBrowserLogo(sourceIcon, browser.id);
     sourceName.textContent = browser.name;
-    drawProfiles(browser);
     pickSource(firstSource.id);
     revealParts(sourcePane, 0);
   };
@@ -198,20 +205,10 @@ export function createImportScene(data: WelcomeData, goNext: () => void): SceneV
     view.browserId = null;
     view.sourceId = null;
     sourcePane.hidden = true;
+    profilesPane.hide();
     pickPane.hidden = false;
     draw();
     revealParts(pickPane, 0);
-  };
-
-  const drawProfiles = (browser: WelcomeBrowser): void => {
-    profiles.hidden = browser.sources.length < 2;
-    const chips = browser.sources.map((source) => {
-      const chip = createTextButton(source.profileName ?? "Default", "source-profile", () => pickSource(source.id));
-      chip.setAttribute("role", "radio");
-      chip.dataset.source = source.id;
-      return chip;
-    });
-    profiles.replaceChildren(...chips);
   };
 
   const buildRows = (sourceId: string, found: ImportFound): void => {
@@ -341,9 +338,6 @@ export function createImportScene(data: WelcomeData, goNext: () => void): SceneV
     if (browser === undefined || sourceId === null) {
       return;
     }
-    for (const chip of Array.from(profiles.querySelectorAll<HTMLElement>(".source-profile"))) {
-      chip.setAttribute("aria-checked", String(chip.dataset.source === sourceId));
-    }
     const phase = welcomeImport?.phase ?? "reading";
     const found = welcomeImport?.found ?? null;
     const isEmpty = found !== null && found.parts.length === 0;
@@ -422,9 +416,13 @@ export function createImportScene(data: WelcomeData, goNext: () => void): SceneV
   };
 
   const draw = (): void => {
-    frame.element.dataset.view = view.browserId === null ? "pick" : "source";
-    drawTiles();
+    let shownView = "pick";
     if (view.browserId !== null) {
+      shownView = view.sourceId === null ? "profiles" : "source";
+    }
+    frame.element.dataset.view = shownView;
+    drawTiles();
+    if (view.sourceId !== null) {
       drawSource();
     }
   };
@@ -432,6 +430,7 @@ export function createImportScene(data: WelcomeData, goNext: () => void): SceneV
   const update = (fresh: WelcomeData): void => {
     current = fresh;
     draw();
+    profilesPane.update(fresh);
   };
   update(data);
   return { element: frame.element, update: update, enter: () => revealParts(frame.text, 0), leave: () => undefined };

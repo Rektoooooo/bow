@@ -38,7 +38,7 @@ import type { ImportFound, ImportPart } from "../shared/onboarding";
 import type { HistoryEntry } from "./history";
 import { countNewHistoryUrls, importHistoryEntries } from "./historyStore";
 import { getImportHomeFolder } from "./importHome";
-import { removeEmptySpaces, switchSpace } from "./spaces";
+import { STARTER_SPACE_IDS, removeEmptySpaces, switchSpace } from "./spaces";
 import { setSidebarWidth } from "./state";
 
 /** Where Arc keeps its sidebar on the account that uses it (docs/research/arc-data-model.md). */
@@ -50,9 +50,6 @@ const ARCHIVE_FILE_NAME = "StorableArchiveItems.json";
 
 /** Arc's windows, with the sidebar width the user dragged to (docs/research/arc-data-model.md). */
 const WINDOWS_FILE_NAME = "StorableWindows.json";
-
-/** The two Spaces a fresh install starts with; an import replaces them while they are still empty. */
-const STARTER_SPACE_IDS = ["space-personal", "space-work"];
 
 /** The prefix arcImport.ts gives imported Space ids. */
 const IMPORTED_SPACE_PREFIX = "arc-space-";

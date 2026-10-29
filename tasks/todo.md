@@ -387,6 +387,10 @@ yours, the essentials, a few good defaults, you're all set). Our own CSS/DOM/SVG
       view form fix); full e2e and check-package 22 on that commit; built, signed and notarized by `npm run release` in
       the user's Terminal (notarytool's saved login is not visible to Claude's processes); published as Latest, and
       releases/latest/download/update-darwin-arm64.json now says 0.1.1
+- [x] 9. Dia showed 4 spaces but brought over 1 (the user, after 0.1.1): a browser with several profiles now comes over
+      all at once, each profile as its own Space with its own profile (the user's choice: separate sign-ins, like Dia);
+      rows per profile in the onboarding, "Dia, all 4 spaces…" in the File menu; check-onboarding 38 with four made-up
+      Dia spaces
 
 ## Review (2026-10-28, an unattended night: open source, releases, auto-update, speed, polish)
 - **Works and verified:** open-source setup and repo rename; `npm run release` up to Apple's notarization (signing,

@@ -1,7 +1,8 @@
 /**
  * WHY this file exists:
  *   Importing bookmarks must put one closed folder at the end of the chosen Space's Pinned list and leave
- *   everything else alone. These tests pin that down.
+ *   everything else alone; a browser with several profiles (Dia's spaces) comes over as one Space per profile, each
+ *   with its own Bow profile. These tests pin that down.
  *
  * Data source:
  *   Synthetic bookmark trees written by hand below (example.com, wikipedia.org). No real browser data.
@@ -10,10 +11,10 @@
  *   tree → addImportedBookmarks() with createInitialState() → checks on the returned state
  */
 import { describe, expect, it } from "vitest";
-import { addImportedBookmarks, countBookmarks } from "../src/main/bookmarkImport";
+import { addImportedBookmarks, addProfilesAsSpaces, countBookmarks } from "../src/main/bookmarkImport";
 import type { ImportedBookmarkNode } from "../src/main/bookmarkImport";
 import { createInitialState } from "../src/main/state";
-import type { FolderItem, TabItem } from "../src/shared/types";
+import type { FolderItem, SpaceTheme, TabItem } from "../src/shared/types";
 import { getPinnedIds, ONE_PM, PERSONAL_SPACE_ID, WORK_SPACE_ID } from "./builders";
 
 const SAMPLE_TREE: ImportedBookmarkNode[] = [
@@ -87,5 +88,61 @@ describe("addImportedBookmarks", () => {
 describe("countBookmarks", () => {
   it("counts bookmarks at any depth", () => {
     expect(countBookmarks(SAMPLE_TREE)).toBe(3);
+  });
+});
+
+describe("addProfilesAsSpaces", () => {
+  const THEMES: SpaceTheme[] = [
+    { colors: ["#f3d5d3"], appearance: "auto", grain: 0 },
+    { colors: ["#cfe0f4"], appearance: "auto", grain: 0 },
+  ];
+  const DIA_SPACES = ["Personal", "Work", "School", "Side project"].map((name) => ({
+    name: name,
+    tree: [{ kind: "folder" as const, title: "Bookmarks bar", children: [{ kind: "bookmark" as const, title: `${name} home`, url: `https://${name.toLowerCase().replace(" ", "")}.example.com/` }] }],
+  }));
+
+  it("makes one Space per profile, named after it, each with a profile of its own", () => {
+    const state = createInitialState(ONE_PM);
+    const result = addProfilesAsSpaces(state, DIA_SPACES, THEMES, ONE_PM);
+    const newSpaces = result.spaceIds.map((spaceId) => result.state.spaces.find((space) => space.id === spaceId));
+    expect(newSpaces.map((space) => space?.name)).toEqual(["Personal", "Work", "School", "Side project"]);
+    const profileIds = newSpaces.map((space) => space?.profileId);
+    expect(new Set(profileIds).size).toBe(4);
+    const profileNames = profileIds.map((profileId) => result.state.profiles.find((profile) => profile.id === profileId)?.name);
+    expect(profileNames).toEqual(["Personal", "Work", "School", "Side project"]);
+    expect(newSpaces.map((space) => space?.theme.colors[0])).toEqual(["#f3d5d3", "#cfe0f4", "#f3d5d3", "#cfe0f4"]);
+  });
+
+  it("opens the bookmarks bar into each Space's Pinned list", () => {
+    const result = addProfilesAsSpaces(createInitialState(ONE_PM), DIA_SPACES, THEMES, ONE_PM);
+    const workSpace = result.state.spaces.find((space) => space.name === "Work");
+    const pinnedTitles = (workSpace?.pinnedIds ?? []).map((itemId) => {
+      const item = result.state.items[itemId];
+      return item?.kind === "tab" ? item.title : item?.kind;
+    });
+    expect(pinnedTitles).toEqual(["Work home"]);
+  });
+
+  it("replaces the empty starter Spaces and opens the first new one", () => {
+    const result = addProfilesAsSpaces(createInitialState(ONE_PM), DIA_SPACES, THEMES, ONE_PM);
+    const spaceIds = result.state.spaces.map((space) => space.id);
+    expect(spaceIds).not.toContain(PERSONAL_SPACE_ID);
+    expect(spaceIds).not.toContain(WORK_SPACE_ID);
+    expect(result.state.activeSpaceId).toBe(result.spaceIds[0]);
+  });
+
+  it("brings profiles beyond the Space limit over as folders, never dropping them", () => {
+    const manyProfiles = Array.from({ length: 10 }, (_unused, index) => ({ name: `Profile ${index + 1}`, tree: SAMPLE_TREE }));
+    const result = addProfilesAsSpaces(createInitialState(ONE_PM), manyProfiles, THEMES, ONE_PM);
+    expect(result.spaceIds.length).toBe(7);
+    expect(result.foldersInstead).toEqual(["Profile 8", "Profile 9", "Profile 10"]);
+    const lastSpace = result.state.spaces.find((space) => space.id === result.spaceIds.at(-1));
+    const lastPinnedTitles = (lastSpace?.pinnedIds ?? []).map((itemId) => result.state.items[itemId]).filter((item) => item?.kind === "folder").map((item) => (item as FolderItem).title);
+    expect(lastPinnedTitles).toEqual(expect.arrayContaining(["Profile 8", "Profile 9", "Profile 10"]));
+  });
+
+  it("returns the same state when there are no profiles", () => {
+    const state = createInitialState(ONE_PM);
+    expect(addProfilesAsSpaces(state, [], THEMES, ONE_PM).state).toBe(state);
   });
 });

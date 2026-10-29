@@ -18,6 +18,9 @@ import { collectTabIdsInList, createId, findRootLocation, findSpace, getActiveSp
 /** The most Spaces we allow. Arc does not document one; nine matches ⌃1–⌃9. */
 export const SPACES_LIMIT = 9;
 
+/** The two Spaces a fresh install starts with (state.ts); an import replaces them while they are still empty. */
+export const STARTER_SPACE_IDS = ["space-personal", "space-work"];
+
 /** Emoji used when a new Space gets no icon. */
 export const DEFAULT_SPACE_ICON = "✦";
 

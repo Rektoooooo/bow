@@ -1,8 +1,9 @@
 // WHY this file exists:
 //   The onboarding imports for real: it reads a browser's files first, counts them, then brings the chosen parts
 //   over. The e2e checks need something to read that is not the user's own browsers, so this builds a stand-in home
-//   folder with made-up data where Bow looks for it: Google Chrome with two profiles (bookmarks and history), and Arc
-//   (a sidebar with two Spaces, Favorites and Pinned tabs, and a history). The app is started with
+//   folder with made-up data where Bow looks for it: Google Chrome with one profile (bookmarks and history), Dia with
+//   four spaces (each a profile, as Dia keeps them), and Arc (a sidebar with two Spaces, Favorites and Pinned tabs,
+//   and a history). The app is started with
 //   --import-home=<this folder> (src/main/importHome.ts).
 //
 // Data source:
@@ -24,7 +25,13 @@ const CHROMIUM_EPOCH_OFFSET_MICROSECONDS = 11644473600000000;
 export const IMPORT_HOME_COUNTS = {
   arc: { spaces: 2, tabs: 4, favorites: 4, history: 30 },
   chromeDefault: { bookmarks: 5, history: 12 },
-  chromeWork: { bookmarks: 2, history: 0 },
+  // Dia's spaces, in Dia's profile order (Default, Profile 1, …): name, bookmarks, history.
+  diaSpaces: [
+    { folder: "Default", name: "Personal", bookmarks: 3, history: 8 },
+    { folder: "Profile 1", name: "Work", bookmarks: 2, history: 5 },
+    { folder: "Profile 2", name: "School", bookmarks: 1, history: 0 },
+    { folder: "Profile 3", name: "Side project", bookmarks: 2, history: 3 },
+  ],
 };
 
 /**
@@ -140,12 +147,19 @@ export function createImportHome(folder) {
     { name: "Wiki", url: "https://wiki.example.org/" },
   ]);
   writeHistoryDatabase(path.join(chromeFolder, "Default", "History"), "chrome.example.com", IMPORT_HOME_COUNTS.chromeDefault.history);
-  writeBookmarks(path.join(chromeFolder, "Profile 1", "Bookmarks"), [
-    { name: "Tickets", url: "https://tickets.example.com/" },
-    { name: "Board", url: "https://board.example.com/" },
-  ]);
-  const localState = { profile: { info_cache: { Default: { name: "Personal" }, "Profile 1": { name: "Work" } } } };
+  const localState = { profile: { info_cache: { Default: { name: "Personal" } } } };
   fs.writeFileSync(path.join(chromeFolder, "Local State"), JSON.stringify(localState));
+  // Dia: each space is a Chromium profile in "Dia/User Data", named in its Local State.
+  const diaFolder = path.join(applicationSupport, "Dia", "User Data");
+  const diaInfoCache = {};
+  for (const space of IMPORT_HOME_COUNTS.diaSpaces) {
+    const site = space.name.toLowerCase().replace(" ", "");
+    const bookmarks = Array.from({ length: space.bookmarks }, (_unused, index) => ({ name: `${space.name} ${index + 1}`, url: `https://${site}.example.org/page-${index + 1}` }));
+    writeBookmarks(path.join(diaFolder, space.folder, "Bookmarks"), bookmarks);
+    writeHistoryDatabase(path.join(diaFolder, space.folder, "History"), `dia-${site}.example.net`, space.history);
+    diaInfoCache[space.folder] = { name: space.name };
+  }
+  fs.writeFileSync(path.join(diaFolder, "Local State"), JSON.stringify({ profile: { info_cache: diaInfoCache } }));
   const arcFolderPath = path.join(applicationSupport, "Arc");
   writeArcSidebar(path.join(arcFolderPath, "StorableSidebar.json"));
   writeHistoryDatabase(path.join(arcFolderPath, "User Data", "Default", "History"), "arc.example.org", IMPORT_HOME_COUNTS.arc.history);

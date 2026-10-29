@@ -257,6 +257,55 @@ export const SUPPORTED_BROWSERS: { id: string; name: string }[] = [
 ];
 
 /**
+ * What a browser calls its profiles, where it is not "profile": Dia's spaces are profiles (one per space).
+ */
+const PROFILE_NOUNS: Record<string, string> = { dia: "space" };
+
+/**
+ * A browser's word for its profiles: "space" for Dia, "profile" for the others.
+ */
+export function profileNounFor(browserId: string): string {
+  return PROFILE_NOUNS[browserId] ?? "profile";
+}
+
+/**
+ * The sentence over a browser's profiles: "Found 4 spaces in Dia."
+ */
+export function describeProfilesFound(profileCount: number, browserId: string, browserName: string): string {
+  return `Found ${formatCount(profileCount, profileNounFor(browserId))} in ${browserName}.`;
+}
+
+/**
+ * The button that brings profiles over: "Import all 4 spaces", or "Import 2 spaces" when some are left out.
+ */
+export function describeImportProfilesButton(chosenCount: number, profileCount: number, browserId: string): string {
+  const counted = formatCount(chosenCount, profileNounFor(browserId));
+  return chosenCount === profileCount ? `Import all ${counted}` : `Import ${counted}`;
+}
+
+/**
+ * The note once profiles came over: "Done. Your 4 spaces from Dia are in Bow." (one: "… is in Bow.").
+ */
+export function describeProfilesDone(profileCount: number, browserId: string, browserName: string): string {
+  const verb = profileCount === 1 ? "is" : "are";
+  return `Done. Your ${formatCount(profileCount, profileNounFor(browserId))} from ${browserName} ${verb} in Bow.`;
+}
+
+/**
+ * The line under a profile's name: "120 bookmarks, 1,240 sites"; nothing to bring: "Nothing new".
+ */
+export function describeProfileCounts(found: ImportFound): string {
+  const counts: string[] = [];
+  if ((found.counts.bookmarks ?? 0) > 0) {
+    counts.push(formatCount(found.counts.bookmarks ?? 0, "bookmark"));
+  }
+  if ((found.counts.history ?? 0) > 0) {
+    counts.push(formatCount(found.counts.history ?? 0, "site"));
+  }
+  return counts.length === 0 ? "Nothing new" : counts.join(", ");
+}
+
+/**
  * The browsers as the onboarding lists them: those with something to import first, each group in
  * SUPPORTED_BROWSERS' order.
  */
@@ -356,6 +405,8 @@ export interface OnboardingApi {
   bringOver(sourceId: string, parts: ImportPart[]): Promise<void>;
   /** Opens System Settings at Full Disk Access (Safari's files need it). */
   openFullDiskAccess(): Promise<void>;
+  /** Brings several profiles of one browser that were read over, each as its own Space with its own profile. */
+  bringOverAll(browserId: string, sourceIds: string[]): Promise<void>;
 }
 
 /** Channel names between the onboarding's page and main (onboardingWindow.ts checks every sender is that page). */
@@ -367,4 +418,5 @@ export const ONBOARDING_CHANNELS = {
   readSource: "onboarding:read-source",
   bringOver: "onboarding:bring-over",
   openFullDiskAccess: "onboarding:open-full-disk-access",
+  bringOverAll: "onboarding:bring-over-all",
 } as const;

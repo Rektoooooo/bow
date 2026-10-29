@@ -92,7 +92,9 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   a window of its own too (`onboardingWindow.ts`, page in `src/onboarding`, preload `onboardingPreload.ts`): at the
   first start the browser window stays hidden until it ends; Help › Welcome to Bow… opens it again. Its imports read
   first and count (`prepareArcImport` / `prepareBrowserImport`), then bring only the chosen parts
-  (`applyArcImport` / `applyBrowserImport`); the File menu runs the same two steps with every part. The browsers'
+  (`applyArcImport` / `applyBrowserImport`); the File menu runs the same two steps with every part. A browser with
+  several profiles (Dia keeps each space as one) comes over all at once, each profile as its own Space with its own
+  Bow profile (`bookmarkImport.ts addProfilesAsSpaces`, `applyProfileImports`, the onboarding's `profilesImport.ts`). The browsers'
   logos ship in `src/onboarding/browser-logos/` (sources in its `SOURCES.md`). At the first start a see-through
   intro window (`onboardingIntro.ts`, page `src/onboarding/intro.*`) grows a glow into the onboarding window's place;
   the page's entrance waits for `onboarding:shown`. Window fades go through `windowFade.ts`, which does nothing in

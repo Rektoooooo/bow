@@ -28,8 +28,8 @@ import type { BrowserState, SidebarItem, TabItem } from "../shared/types";
 import { applyArcImport, findArcSidebarFile, prepareArcImport } from "./arcImportController";
 import type { PreparedArcImport } from "./arcImportController";
 import { applyChange, getState, getWindow } from "./browserCore";
-import { applyBrowserImport, listImportSources, openFullDiskAccessSettings, prepareBrowserImport } from "./browserImportController";
-import type { PreparedBrowserImport } from "./browserImportController";
+import { applyBrowserImport, applyProfileImports, listImportSources, openFullDiskAccessSettings, prepareBrowserImport } from "./browserImportController";
+import type { PreparedBrowserImport, PreparedProfile } from "./browserImportController";
 import { isDefaultBrowser } from "./defaultBrowser";
 import { getGlobalShortcutStatus } from "./globalShortcutController";
 import { showMainWindows } from "./mainWindows";
@@ -406,6 +406,61 @@ async function bringWelcomeSourceOver(sourceId: string, chosenParts: ImportPart[
 }
 
 /**
+ * Brings several profiles of one browser that were read over at once (Dia's spaces), each as a Space of its own with
+ * its own profile. Each profile's card shows it importing, then done. Only profiles of that browser that were read
+ * and found something count.
+ */
+async function bringProfilesOver(browserId: string, sourceIds: string[]): Promise<void> {
+  const browser = welcomeBrowsers.find((candidate) => candidate.id === browserId);
+  if (browser === undefined) {
+    return;
+  }
+  const profiles: PreparedProfile[] = [];
+  const takenImports = new Map<string, WelcomeImport>();
+  for (const sourceId of sourceIds) {
+    const source = browser.sources.find((candidate) => candidate.id === sourceId);
+    const prepared = preparedSources.get(sourceId);
+    const welcomeImport = welcomeImports.get(sourceId);
+    if (source === undefined || prepared === undefined || !("browser" in prepared) || welcomeImport === undefined || welcomeImport.phase !== "found") {
+      continue;
+    }
+    profiles.push({ name: source.profileName ?? browser.name, prepared: prepared.browser });
+    takenImports.set(sourceId, welcomeImport);
+  }
+  if (profiles.length === 0) {
+    return;
+  }
+  const showPhase = (phase: WelcomeImport["phase"]): void => {
+    for (const [sourceId, welcomeImport] of takenImports) {
+      const parts = welcomeImport.found?.parts ?? [];
+      const doneParts = phase === "done" ? parts : [];
+      welcomeImports.set(sourceId, { phase: phase, found: welcomeImport.found, parts: parts, doneParts: doneParts });
+    }
+    refreshOnboarding();
+  };
+  showPhase("importing");
+  try {
+    applyProfileImports(profiles);
+    takenImports.forEach((_welcomeImport, sourceId) => preparedSources.delete(sourceId));
+    showPhase("done");
+  } catch (error) {
+    console.error("The onboarding's import of every profile failed:", error);
+    showPhase("failed");
+  }
+}
+
+/**
+ * The source ids a page sent, when the message is a list of strings.
+ */
+function readSourceIdList(value: unknown): string[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const sourceIds = value.filter((sourceId): sourceId is string => typeof sourceId === "string");
+  return sourceIds.length === value.length ? sourceIds : null;
+}
+
+/**
  * The parts a page asked for, when the message holds only known part names.
  */
 function readPartList(value: unknown): ImportPart[] | null {
@@ -442,6 +497,12 @@ export function registerOnboardingIpc(): void {
     const partList = readPartList(parts);
     if (isFromOnboarding(event) && isListedSource(sourceId) && partList !== null) {
       await bringWelcomeSourceOver(sourceId, partList);
+    }
+  });
+  ipcMain.handle(ONBOARDING_CHANNELS.bringOverAll, async (event, browserId: unknown, sourceIds: unknown) => {
+    const sourceIdList = readSourceIdList(sourceIds);
+    if (isFromOnboarding(event) && typeof browserId === "string" && sourceIdList !== null) {
+      await bringProfilesOver(browserId, sourceIdList);
     }
   });
   ipcMain.handle(ONBOARDING_CHANNELS.openFullDiskAccess, async (event) => {

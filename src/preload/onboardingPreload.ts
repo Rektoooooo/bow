@@ -30,6 +30,7 @@ const CHANNELS: typeof ONBOARDING_CHANNELS = {
   readSource: "onboarding:read-source",
   bringOver: "onboarding:bring-over",
   openFullDiskAccess: "onboarding:open-full-disk-access",
+  bringOverAll: "onboarding:bring-over-all",
 };
 
 const DISPATCH_CHANNEL: (typeof IPC_CHANNELS)["dispatch"] = "browser:dispatch";
@@ -52,6 +53,7 @@ function createOnboardingApi(): OnboardingApi {
     readSource: (sourceId) => ipcRenderer.invoke(CHANNELS.readSource, sourceId),
     bringOver: (sourceId, parts) => ipcRenderer.invoke(CHANNELS.bringOver, sourceId, parts),
     openFullDiskAccess: () => ipcRenderer.invoke(CHANNELS.openFullDiskAccess),
+    bringOverAll: (browserId, sourceIds) => ipcRenderer.invoke(CHANNELS.bringOverAll, browserId, sourceIds),
   };
 }
 

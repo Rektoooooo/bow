@@ -19,7 +19,8 @@ import { getSelectedTabId, listVisibleTabIds } from "./state";
 import { applyPreset, GRAIN_CHOICES, THEME_PRESETS } from "./themePresets";
 import { findLocation, findRootLocation, findSpace, findSplitOfTab, findTab } from "./tree";
 import { buildSearchUrl, findSearchEngine, findSpaceSearchEngine, SEARCH_ENGINE_IDS, SEARCH_ENGINES } from "../shared/searchEngines";
-import { listImportSources } from "./browserImportController";
+import { importAllProfiles, listImportSources } from "./browserImportController";
+import { formatCount, profileNounFor } from "../shared/onboarding";
 import { addMenuIcons } from "./menuIcons";
 import { describeSpaceIconAsText } from "../shared/spaceIcons";
 import { getSiteKey } from "../shared/siteKey";
@@ -534,13 +535,22 @@ function buildSpaceMenu(host: MenuHost, space: Space): MenuItemConstructorOption
 }
 
 /**
- * The Library's "Import…" button: Arc, then every browser profile on this Mac with bookmarks or history.
+ * The Library's "Import…" button: Arc, then every browser profile on this Mac with bookmarks or history, and for a
+ * browser with several profiles one entry that brings them all over, each as its own Space ("Dia, all 4 spaces…").
  */
 export function buildImportMenu(host: MenuHost): MenuItemConstructorOptions[] {
-  const browserItems: MenuItemConstructorOptions[] = listImportSources().map((source) => ({
-    label: `${source.label}…`,
-    click: () => host.runAction({ type: "importFromBrowser", sourceId: source.id }),
-  }));
+  const sources = listImportSources();
+  const browserItems: MenuItemConstructorOptions[] = [];
+  sources.forEach((source, index) => {
+    browserItems.push({ label: `${source.label}…`, click: () => host.runAction({ type: "importFromBrowser", sourceId: source.id }) });
+    const sameBrowser = sources.filter((candidate) => candidate.browserId === source.browserId);
+    const isLastOfBrowser = sources.findLastIndex((candidate) => candidate.browserId === source.browserId) === index;
+    if (sameBrowser.length < 2 || !isLastOfBrowser) {
+      return;
+    }
+    const allLabel = `${source.browserName}, all ${formatCount(sameBrowser.length, profileNounFor(source.browserId))}…`;
+    browserItems.push({ label: allLabel, click: () => importAllProfiles(source.browserId).catch((error) => console.error("Import of every profile failed:", error)) });
+  });
   if (browserItems.length === 0) {
     browserItems.push({ label: "No other browsers found", enabled: false });
   }

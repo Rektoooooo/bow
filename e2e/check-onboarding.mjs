@@ -232,13 +232,13 @@ const tiles = await waitInPage(() => {
 const tileIds = (tiles ?? []).map((tile) => tile.id);
 check(
   "every browser Bow imports from is listed, those with something here first",
-  tileIds.join() === "arc,chrome,dia,safari,firefox,brave,edge,vivaldi,opera,chromium" && tiles[0].isMissing === false && tiles[1].isMissing === false,
+  tileIds.join() === "arc,dia,chrome,safari,firefox,brave,edge,vivaldi,opera,chromium" && tiles.slice(0, 3).every((tile) => tile.isMissing === false),
   tileIds.join(),
 );
 check(
   "every browser shows its own logo; one with nothing to import here is dimmed, with no extra text under it",
-  tiles !== null && tiles.every((tile) => tile.hasLogo) && tiles.slice(2).every((tile) => tile.isMissing && tile.title === "Not on this Mac" && !tile.text.includes("Not on this Mac")),
-  JSON.stringify(tiles?.slice(1, 4)),
+  tiles !== null && tiles.every((tile) => tile.hasLogo) && tiles.slice(3).every((tile) => tile.isMissing && tile.title === "Not on this Mac" && !tile.text.includes("Not on this Mac")),
+  JSON.stringify(tiles?.slice(2, 5)),
 );
 
 // ---------- Bring your things: Chrome, read first, then only the bookmarks ----------
@@ -251,7 +251,6 @@ const chromeSentence = await waitInPage(() => {
 });
 const chromeView = await page.evaluate(() => ({
   bold: Array.from(document.querySelectorAll(".import-sentence strong")).map((element) => element.textContent),
-  profiles: Array.from(document.querySelectorAll(".source-profile")).map((chip) => `${chip.textContent}:${chip.getAttribute("aria-checked")}`),
   primary: document.querySelector(".import-source .scene-primary").textContent,
   isChecklistShown: !document.querySelector(".import-checklist").hidden,
 }));
@@ -259,10 +258,9 @@ const stateAfterRead = await getState();
 const bookmarkUrls = ["https://docs.example.com/", "https://news.example.org/", "https://shop.example.net/", "https://maps.example.com/", "https://wiki.example.org/"];
 const importedBookmarks = (state) => Object.values(state.items).filter((item) => item.kind === "tab" && bookmarkUrls.includes(item.url)).length;
 check(
-  "picking a browser reads it first and says what it holds, numbers in bold, with its profiles to pick from",
+  "picking a browser reads it first and says what it holds, numbers in bold",
   chromeSentence === `Found ${IMPORT_HOME_COUNTS.chromeDefault.bookmarks} bookmarks and ${IMPORT_HOME_COUNTS.chromeDefault.history} sites from your history.` &&
     chromeView.bold.join() === "5 bookmarks,12 sites" &&
-    chromeView.profiles.join() === "Personal:true,Work:false" &&
     chromeView.primary === "Import everything" &&
     !chromeView.isChecklistShown,
   JSON.stringify({ chromeSentence, chromeView }),
@@ -270,7 +268,7 @@ check(
 check("reading imports nothing", importedBookmarks(stateAfterRead) === 0 && (await historyUrls()).length === historyBefore);
 await page.click(".import-source .scene-secondary");
 await page.waitForTimeout(500);
-const rows = await page.$$eval(".import-row", (elements) => elements.map((row) => `${row.dataset.part}:${row.getAttribute("aria-checked")}`));
+const rows = await page.$$eval(".import-source .import-row", (elements) => elements.map((row) => `${row.dataset.part}:${row.getAttribute("aria-checked")}`));
 await page.click(".import-row[data-part='history']");
 await page.waitForTimeout(200);
 const afterUntick = await page.evaluate(() => ({
@@ -309,17 +307,82 @@ check(
     chromeDone.primary === "Continue",
   JSON.stringify(chromeDone),
 );
-await page.click(".source-profile:nth-child(2)");
-const workSentence = await waitInPage(() => {
-  const text = document.querySelector(".import-sentence")?.textContent ?? "";
-  return text.startsWith("Found 2") ? text : null;
+dashesSeen.push(...(await dashedTexts()));
+
+// ---------- Bring your things: Dia, every space at once, each as a Space of its own ----------
+
+await page.click(".import-source .source-back");
+await page.waitForTimeout(600);
+await page.click(".browser-tile[data-browser='dia']");
+const readDiaView = () =>
+  page.evaluate(() => {
+    const pane = document.querySelector(".import-profiles");
+    return {
+      sentence: pane.querySelector(".import-sentence").textContent,
+      rows: Array.from(pane.querySelectorAll(".import-row")).map((row) => `${row.querySelector(".import-row-title").textContent}|${row.querySelector(".import-row-count").textContent}|${row.getAttribute("aria-checked")}`),
+      primary: pane.querySelector(".scene-primary").textContent,
+      note: pane.querySelector(".scene-note").textContent,
+      hasChips: document.querySelector(".source-profile") !== null,
+    };
+  });
+await waitInPage(() => (document.querySelector(".import-profiles .import-sentence")?.textContent ?? "").startsWith("Found"));
+const diaView = await readDiaView();
+const countsText = (space) => [space.bookmarks > 0 ? `${space.bookmarks} bookmark${space.bookmarks === 1 ? "" : "s"}` : null, space.history > 0 ? `${space.history} sites` : null].filter(Boolean).join(", ");
+const expectedDiaRows = IMPORT_HOME_COUNTS.diaSpaces.map((space) => `${space.name}|${countsText(space)}|true`);
+check(
+  "a browser with several profiles lists them all at once, ticked: Dia's 4 spaces",
+  diaView.sentence === "Found 4 spaces in Dia." && diaView.rows.join() === expectedDiaRows.join() && diaView.primary === "Import all 4 spaces" && !diaView.hasChips,
+  JSON.stringify(diaView),
+);
+const schoolRow = ".import-profiles .import-row[data-source='chromium:dia:Profile 2']";
+await page.click(schoolRow);
+await page.waitForTimeout(200);
+const afterUntickSchool = await readDiaView();
+await page.click(schoolRow);
+await page.waitForTimeout(200);
+const afterTickSchool = await readDiaView();
+check(
+  "a space can be left out, and taken back",
+  afterUntickSchool.primary === "Import 3 spaces" && afterUntickSchool.rows[2].endsWith("|false") && afterTickSchool.primary === "Import all 4 spaces",
+  JSON.stringify({ untick: afterUntickSchool.primary, tick: afterTickSchool.primary }),
+);
+const profilesBefore = (await getState()).profiles.map((profile) => profile.id);
+await page.click(".import-profiles .scene-primary");
+const diaDone = await waitInPage(() => {
+  const pane = document.querySelector(".import-profiles");
+  const note = pane.querySelector(".scene-note");
+  if (!note.classList.contains("is-positive")) return null;
+  return { note: note.textContent, done: pane.querySelectorAll(".import-row.is-done").length, primary: pane.querySelector(".scene-primary").textContent };
+}, undefined, 8000);
+const stateAfterDia = await getState();
+const diaSpaces = IMPORT_HOME_COUNTS.diaSpaces.map((expected) => {
+  const space = stateAfterDia.spaces.find((candidate) => candidate.name === expected.name && !candidate.id.startsWith("space-personal"));
+  const profile = stateAfterDia.profiles.find((candidate) => candidate.id === space?.profileId);
+  return {
+    name: expected.name,
+    hasOwnProfile: profile !== undefined && !profilesBefore.includes(profile.id) && profile.name === expected.name,
+    pinned: space?.pinnedIds.length ?? -1,
+    expectedPinned: expected.bookmarks,
+  };
 });
-check("another profile of the same browser is read on its own", workSentence === "Found 2 bookmarks.", String(workSentence));
+const ownProfileIds = new Set(diaSpaces.map((space) => stateAfterDia.spaces.find((candidate) => candidate.name === space.name)?.profileId));
+const diaHistory = (await historyUrls()).filter((url) => url.includes("dia-")).length;
+const expectedDiaHistory = IMPORT_HOME_COUNTS.diaSpaces.reduce((sum, space) => sum + space.history, 0);
+check(
+  "Import all brings each space over as a Space of its own, with its own sign-ins and its bookmarks pinned",
+  diaSpaces.every((space) => space.hasOwnProfile && space.pinned === space.expectedPinned) && ownProfileIds.size === 4,
+  JSON.stringify(diaSpaces),
+);
+check(
+  "their history comes in, every row ticks off, and the scene says it is done",
+  diaHistory === expectedDiaHistory && diaDone !== null && diaDone.done === 4 && diaDone.note === "Done. Your 4 spaces from Dia are in Bow." && diaDone.primary === "Continue",
+  JSON.stringify({ diaHistory, expectedDiaHistory, diaDone }),
+);
 dashesSeen.push(...(await dashedTexts()));
 
 // ---------- Bring your things: Arc, everything, filling the sidebar ----------
 
-await page.click(".source-back");
+await page.click(".import-profiles .source-back");
 await page.waitForTimeout(600);
 const chromeTileImported = await page.$eval(".browser-tile[data-browser='chrome']", (tile) => tile.classList.contains("is-imported"));
 await page.click(".browser-tile[data-browser='arc']");
@@ -335,14 +398,14 @@ check(
 await page.click(".import-source .scene-primary");
 const working = await waitInPage(
   () => {
-    const rowsWorking = Array.from(document.querySelectorAll(".import-row")).map((row) => `${row.dataset.part}:${row.classList.contains("is-working") || row.classList.contains("is-done")}`);
+    const rowsWorking = Array.from(document.querySelectorAll(".import-source .import-row")).map((row) => `${row.dataset.part}:${row.classList.contains("is-working") || row.classList.contains("is-done")}`);
     const primary = document.querySelector(".import-source .scene-primary");
     return primary.disabled ? { rows: rowsWorking, primary: primary.textContent } : null;
   },
   undefined,
   3000,
 );
-const arcDone = await waitInPage(() => (document.querySelector(".import-source .scene-note").classList.contains("is-positive") ? Array.from(document.querySelectorAll(".import-row.is-done")).map((row) => row.dataset.part) : null));
+const arcDone = await waitInPage(() => (document.querySelector(".import-source .scene-note").classList.contains("is-positive") ? Array.from(document.querySelectorAll(".import-source .import-row.is-done")).map((row) => row.dataset.part) : null));
 check(
   "Import everything shows every part working, then ticks each off",
   working !== null && working.primary === "Importing…" && working.rows.join() === "spaces:true,favorites:true,history:true" && arcDone?.join() === "spaces,favorites,history",
@@ -549,6 +612,11 @@ for (let index = 0; index < 6; index++) {
     await page.click(".import-source .scene-secondary");
     await page.waitForTimeout(800);
     fitResults.push({ ...(await fitsScene()), scene: "import (checklist)" });
+    await page.click(".import-source .source-back");
+    await page.waitForTimeout(600);
+    await page.click(".browser-tile[data-browser='dia']");
+    await page.waitForTimeout(1400);
+    fitResults.push({ ...(await fitsScene()), scene: "import (Dia's spaces)" });
   }
   if (index < 5) {
     await page.keyboard.press("ArrowRight");

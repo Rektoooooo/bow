@@ -1,8 +1,10 @@
 /**
  * WHY this file exists:
- *   Bookmarks from other browsers (Chrome, Brave, Edge, Vivaldi, Safari) arrive as a tree of folders and
+ *   Bookmarks from other browsers (Chrome, Dia, Brave, Edge, Vivaldi, Opera, Safari) arrive as a tree of folders and
  *   bookmarks. This turns such a tree into one closed folder in a Space's Pinned section, so nothing the user
- *   imports ends up scattered between their own pinned tabs.
+ *   imports ends up scattered between their own pinned tabs. A browser with several profiles (Dia's spaces are
+ *   profiles) comes over as one new Space per profile instead, each with its own Bow profile, its bookmarks as the
+ *   Space's Pinned items.
  *
  * Data source:
  *   An ImportedBookmarkNode tree made by chromiumImport.ts or safariImport.ts, and the BrowserState to add to.
@@ -10,12 +12,14 @@
  *
  * Data flow:
  *   chromiumImport / safariImport parse a file → tree → addImportedBookmarks() → new state → main saves it
+ *   several profiles → addProfilesAsSpaces() → new Spaces and profiles → main saves it
  *
  * Rules: never change the state that was passed in; return the same object when nothing would change (empty
  * tree, unknown Space). Folders without any bookmark inside are left out.
  */
-import type { BrowserState, FolderItem, ItemId, SidebarItem, TabItem } from "../shared/types";
-import { createId } from "./tree";
+import type { BrowserState, FolderItem, ItemId, SidebarItem, SpaceId, SpaceTheme, TabItem } from "../shared/types";
+import { SPACES_LIMIT, STARTER_SPACE_IDS, createProfile, createSpace, removeEmptySpaces, setSpaceProfile, switchSpace } from "./spaces";
+import { createId, getActiveSpace } from "./tree";
 
 /** One bookmark from another browser. The address is always http(s): the parsers drop everything else. */
 export interface ImportedBookmark {
@@ -120,4 +124,74 @@ export function addImportedBookmarks(
     space.id === spaceId ? { ...space, pinnedIds: [...space.pinnedIds, wrapperFolder.id] } : space,
   );
   return { ...state, items: items, spaces: spaces };
+}
+
+/** One profile of another browser to bring over as a Space: its name and its bookmark tree. */
+export interface ImportedProfile {
+  name: string;
+  tree: ImportedBookmarkNode[];
+}
+
+/** What addProfilesAsSpaces() did. */
+export interface ProfileSpacesResult {
+  state: BrowserState;
+  /** The new Spaces, in the profiles' order. */
+  spaceIds: SpaceId[];
+  /** Profiles that found no room for a Space of their own (SPACES_LIMIT): their bookmarks went into a folder. */
+  foldersInstead: string[];
+}
+
+/**
+ * Appends the nodes to a Space's Pinned list. The first top folder opens out into the list (a browser's bookmarks
+ * bar is its first folder: its links and folders become the Space's own); the other top folders stay folders.
+ */
+function addToPinned(state: BrowserState, spaceId: SpaceId, tree: ImportedBookmarkNode[], now: number): BrowserState {
+  const firstNode = tree[0];
+  const openedTree = firstNode !== undefined && firstNode.kind === "folder" ? [...firstNode.children, ...tree.slice(1)] : tree;
+  const items: Record<ItemId, SidebarItem> = { ...state.items };
+  const newIds = addNodes(items, openedTree, now);
+  if (newIds.length === 0) {
+    return state;
+  }
+  const spaces = state.spaces.map((space) => (space.id === spaceId ? { ...space, pinnedIds: [...space.pinnedIds, ...newIds] } : space));
+  return { ...state, items: items, spaces: spaces };
+}
+
+/**
+ * Brings each profile over as a new Space named after it, with a Bow profile of its own (its own cookies and
+ * sign-ins, as the other browser kept them apart) and its bookmarks as the Space's Pinned items. Spaces take the
+ * `themes` in turn. A profile that finds no room (SPACES_LIMIT) comes over as a folder named after it, in the last
+ * new Space (or the active one). The empty starter Spaces go, and the first new Space opens. No profiles: the same
+ * state.
+ * Example: four Dia spaces → four new Spaces "Personal", "Work", "School", "Side project", four new profiles
+ */
+export function addProfilesAsSpaces(state: BrowserState, profiles: ImportedProfile[], themes: SpaceTheme[], now: number): ProfileSpacesResult {
+  if (profiles.length === 0) {
+    return { state: state, spaceIds: [], foldersInstead: [] };
+  }
+  let current = state;
+  const spaceIds: SpaceId[] = [];
+  const foldersInstead: string[] = [];
+  profiles.forEach((profile, index) => {
+    if (current.spaces.length >= SPACES_LIMIT) {
+      const lastNewSpaceId = spaceIds.at(-1) ?? getActiveSpace(current).id;
+      current = addImportedBookmarks(current, lastNewSpaceId, profile.name, profile.tree, now);
+      foldersInstead.push(profile.name);
+      return;
+    }
+    const withProfile = createProfile(current, profile.name, now);
+    const theme = themes[index % Math.max(themes.length, 1)] ?? getActiveSpace(current).theme;
+    // createSpace() opens the new Space, so the active Space is the new one.
+    const withSpace = createSpace(withProfile.state, { name: profile.name, icon: "", theme: theme }, now);
+    const newSpaceId = getActiveSpace(withSpace).id;
+    const withOwnProfile = setSpaceProfile(withSpace, newSpaceId, withProfile.profileId);
+    current = addToPinned(withOwnProfile, newSpaceId, profile.tree, now);
+    spaceIds.push(newSpaceId);
+  });
+  const firstSpaceId = spaceIds[0];
+  if (firstSpaceId === undefined) {
+    return { state: current, spaceIds: spaceIds, foldersInstead: foldersInstead };
+  }
+  const withoutStarters = removeEmptySpaces(current, STARTER_SPACE_IDS);
+  return { state: switchSpace(withoutStarters, firstSpaceId, now), spaceIds: spaceIds, foldersInstead: foldersInstead };
 }
