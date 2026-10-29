@@ -32,9 +32,10 @@ Space has its own colours and tabs, and tabs you stop using move to the archive 
 Electron and TypeScript, so every page runs on Chromium, and Chrome extensions work.
 
 Before Arc goes, we studied how it behaves (from its app bundle and the files it writes; see
-[docs/research](docs/research)) and rebuilt that behavior in our own code. No Arc code, icons or assets are used.
-Bow is not affiliated with or endorsed by The Browser Company; Arc is their product and trademark. (A bow is another
-word for an arc.)
+[docs/research](docs/research)) and rebuilt that behavior in our own code. No Arc code or assets are used; the one
+exception is the importer, which shows each browser's own logo (Arc's included) only to name the browser an import
+comes from ([sources](src/onboarding/browser-logos/SOURCES.md)). Bow is not affiliated with or endorsed by The Browser
+Company; Arc and Dia are their products and trademarks. (A bow is another word for an arc.)
 
 <table>
   <tr>
