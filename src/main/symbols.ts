@@ -14,13 +14,14 @@
  *   page starts → getSymbols() over IPC ("browser:get-symbols") → getSymbolImages() → the cache file if it matches,
  *   else render and write the cache → { name: { url, width, height } } → icons.ts installSymbols() in the page
  */
-import { app, ipcMain, nativeImage } from "electron";
+import { app, ipcMain, nativeImage, session } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
 import { SPACE_ICON_CHOICES } from "../shared/spaceIcons";
 import { SYMBOL_NAMES } from "../shared/symbols";
 import type { SymbolImage } from "../shared/symbols";
+import type { WebContents } from "electron";
 
 /** macOS renders symbols at 2× (a 13 pt symbol arrives as roughly 26 pixels tall). */
 const SYMBOL_SCALE_FACTOR = 2;
@@ -93,15 +94,18 @@ export function getSymbolImages(): Record<string, SymbolImage> {
 }
 
 /**
- * True for our own pages (they load from files in the app); web pages have no preload and cannot ask anyway.
+ * True for our own pages. Two proofs, because web pages in a profile with extensions or the forms helper now have a
+ * preload with ipcRenderer too: our pages all use the default session (web pages never do: they run in a profile's
+ * or a private window's own session), and they load from files in the app.
  */
-function isOwnPage(url: string | undefined): boolean {
-  return url !== undefined && url.startsWith("file://");
+function isOwnPage(contents: WebContents, url: string | undefined): boolean {
+  const isDefaultSession = contents.session === session.defaultSession;
+  return isDefaultSession && url !== undefined && url.startsWith("file://");
 }
 
 /**
  * Answers the pages' getSymbols() calls. Runs once at startup.
  */
 export function registerSymbolIpc(): void {
-  ipcMain.handle(IPC_CHANNELS.getSymbols, (event) => (isOwnPage(event.senderFrame?.url) ? getSymbolImages() : {}));
+  ipcMain.handle(IPC_CHANNELS.getSymbols, (event) => (isOwnPage(event.sender, event.senderFrame?.url) ? getSymbolImages() : {}));
 }

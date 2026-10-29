@@ -401,7 +401,7 @@ page of a profile (isolated world, never in private windows), passwords encrypte
       field kinds, card numbers / codes never), `passwordCsv.ts` (Chrome/Arc/Dia, Safari, Firefox headers, merge)
 - [x] 2. Vault store (`passwordVault.ts`: safeStorage, one file per profile, never overwrites a vault it can't open),
       the mock keychain for tests (`--use-mock-keychain`, verified first), two settings switches
-- [ ] 3. The page helper (`formsPreload.ts`, registered per profile session) and the bridge (`formsBridge.ts`: origin
+- [x] 3. The page helper (`formsPreload.ts`, registered per profile session) and the bridge (`formsBridge.ts`: origin
       from the sender frame, main frame only, limits); permission-check and check-extensions adapted; `symbols.ts`
       sender check by identity
 - [ ] 4. "Save password for example.com?" (overlay panel like the permission prompt): Save, Not now, Never for this

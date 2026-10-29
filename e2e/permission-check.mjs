@@ -10,6 +10,7 @@ import "./background.mjs";
 import { _electron } from "playwright-core";
 import { createRequire } from "node:module";
 import * as fs from "node:fs";
+import * as http from "node:http";
 import * as path from "node:path";
 
 const appDir = path.resolve(import.meta.dirname, "..");
@@ -26,7 +27,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const app = await _electron.launch({
   executablePath: createRequire(import.meta.url)("electron"),
-  args: [`--user-data-dir=${userDataDir}`, "--skip-welcome", appDir],
+  args: [`--user-data-dir=${userDataDir}`, "--skip-welcome", "--host-resolver-rules=MAP other.example 127.0.0.1", appDir],
   timeout: 30000,
 });
 // Pick our pages by URL: a restored tab's page can open first.
@@ -182,6 +183,131 @@ const siteShare = await app.evaluate(({ webContents }, code) => {
   return tab.executeJavaScript(code, true);
 }, shareScript);
 check("a site sharing the screen gets macOS's sharing picker, nothing shared yet", siteShare === "waiting for the picker", siteShare);
+
+// ---------- Bow's forms helper: invisible to pages, absent in private windows, reports only real input ----------
+const pageGlobals = await inTab(`(() => {
+  const names = ["require", "process", "module", "exports", "Buffer", "ipcRenderer", "electron"];
+  const types = Object.fromEntries(names.map((name) => [name, typeof globalThis[name]]));
+  const leaked = Object.getOwnPropertyNames(window).filter((key) => /^(bow|forms)/i.test(key));
+  return { types, leaked };
+})()`);
+check("the page's own world sees nothing new from the forms helper", Object.values(pageGlobals.types).every((type) => type === "undefined") && pageGlobals.leaked.length === 0, JSON.stringify(pageGlobals));
+const tabPreloadIds = await app.evaluate(({ webContents }) => {
+  const tab = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith("https://example.com"));
+  return tab.session.getPreloadScripts().map((script) => script.id);
+});
+check("a tab's profile session has exactly the forms helper", tabPreloadIds.length === 1 && tabPreloadIds[0] === "bow-forms", JSON.stringify(tabPreloadIds));
+
+// A private window (File › New Private Window) has a session in memory: no helper there.
+await page.evaluate(() => window.browserApi.dispatch({ type: "openCommandBar", mode: "newTab" }));
+await overlay.waitForSelector(".command-input", { timeout: 5000 });
+await overlay.fill(".command-input", "new private window");
+await overlay.waitForFunction(() => document.querySelector(".command-line.is-highlighted .command-line-title")?.textContent === "New Private Window", undefined, { timeout: 5000 }).catch(() => undefined);
+await overlay.press(".command-input", "Enter");
+const privatePreloadIds = await (async () => {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const found = await app.evaluate(({ BrowserWindow }) => {
+      const littleWindow = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().includes("private=1"));
+      if (littleWindow === undefined) return null;
+      const pageView = littleWindow.contentView.children.find((child) => child.webContents !== undefined && child.webContents !== littleWindow.webContents);
+      return pageView === undefined ? null : pageView.webContents.session.getPreloadScripts().map((script) => script.id);
+    });
+    if (found !== null) return found;
+    await sleep(200);
+  }
+  return null;
+})();
+check("a private window's session has no preload scripts", Array.isArray(privatePreloadIds) && privatePreloadIds.length === 0, JSON.stringify(privatePreloadIds));
+await app.evaluate(({ BrowserWindow }) => {
+  BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().includes("private=1"))?.close();
+});
+await sleep(500);
+
+// A local sign-in page with a cross-origin iframe that has its own sign-in form.
+const formsServer = http.createServer((request, response) => {
+  response.setHeader("content-type", "text/html");
+  if (request.url.startsWith("/login")) {
+    const port = formsServer.address().port;
+    response.end(`<!doctype html><title>Login</title><body style="margin:0">
+      <form action="/welcome" method="post">
+        <input type="email" name="email" autocomplete="username" style="width:300px;height:30px">
+        <input type="password" name="password" autocomplete="current-password" style="width:300px;height:30px">
+        <button>Sign in</button>
+      </form>
+      <iframe src="http://other.example:${port}/frame" style="width:400px;height:150px"></iframe></body>`);
+    return;
+  }
+  if (request.url.startsWith("/frame")) {
+    response.end(`<!doctype html><body><form action="/welcome" method="post"><input type="text" name="user" autocomplete="username" style="width:200px;height:30px"><input type="password" name="password" autocomplete="current-password" style="width:200px;height:30px"></form></body>`);
+    return;
+  }
+  response.end("<!doctype html><title>Welcome</title>welcome");
+});
+await new Promise((resolve) => formsServer.listen(0, "127.0.0.1", resolve));
+const formsPort = formsServer.address().port;
+const formsOrigin = `http://127.0.0.1:${formsPort}`;
+const formsBridgePath = path.join(appDir, "dist", "node", "main", "formsBridge.js");
+const formsCounts = () => app.evaluate((_electron, modulePath) => process.mainModule.require(modulePath).getFormsMessageCounts(), formsBridgePath);
+
+await page.evaluate((address) => window.browserApi.dispatch({ type: "openTab", typedText: address }), `${formsOrigin}/login`);
+let formsPage = null;
+for (let attempt = 0; attempt < 50 && formsPage === null; attempt++) {
+  formsPage = app.windows().find((candidate) => candidate.url().startsWith(formsOrigin)) ?? null;
+  if (formsPage === null) await sleep(200);
+}
+check("the local sign-in page opens in a tab", formsPage !== null);
+await formsPage.waitForSelector("input[type=email]");
+await sleep(500);
+
+const beforeClick = await formsCounts();
+await formsPage.click("input[type=email]");
+await sleep(500);
+const afterClick = await formsCounts();
+check("a real click into the email field is reported as a username field of that site", afterClick.fieldFocused === beforeClick.fieldFocused + 1 && afterClick.lastRole === "username" && afterClick.lastOrigin === formsOrigin, JSON.stringify(afterClick));
+
+await formsPage.click("html", { position: { x: 600, y: 400 } });
+await sleep(300);
+const beforeScriptFocus = await formsCounts();
+await formsPage.evaluate(() => document.querySelector("input[type=email]").focus());
+await sleep(500);
+const afterScriptFocus = await formsCounts();
+check("a page script moving focus into a field reports nothing", afterScriptFocus.fieldFocused === beforeScriptFocus.fieldFocused, JSON.stringify(afterScriptFocus));
+
+await formsPage.click("html", { position: { x: 600, y: 400 } });
+await sleep(300);
+const beforeFrameClick = await formsCounts();
+await formsPage.frameLocator("iframe").locator("input[type=password]").click();
+await sleep(500);
+const afterFrameClick = await formsCounts();
+check("a click into a sign-in form inside an iframe reports nothing", afterFrameClick.fieldFocused === beforeFrameClick.fieldFocused, JSON.stringify(afterFrameClick));
+
+await formsPage.click("input[type=email]");
+await formsPage.keyboard.type("ann@example.com");
+await formsPage.click("input[type=password]");
+await formsPage.keyboard.type("correct horse battery");
+const beforeSubmit = await formsCounts();
+await formsPage.keyboard.press("Enter");
+await sleep(800);
+const afterSubmit = await formsCounts();
+check("typing a login and pressing Enter reports one submitted form", afterSubmit.submitted === beforeSubmit.submitted + 1, JSON.stringify(afterSubmit));
+
+// A script that fills a form and sends it is still a submit (the helper marks the password as not typed).
+await app.evaluate(({ webContents }, address) => {
+  const tab = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith(address));
+  return tab.loadURL(address + "/login");
+}, formsOrigin);
+await formsPage.waitForSelector("input[type=email]");
+await sleep(500);
+const beforeScriptSubmit = await formsCounts();
+await formsPage.evaluate(() => {
+  document.querySelector("input[type=email]").value = "script@example.com";
+  document.querySelector("input[type=password]").value = "scripted";
+  document.querySelector("form").requestSubmit();
+});
+await sleep(800);
+const afterScriptSubmit = await formsCounts();
+check("a script submitting a filled form is still reported as a submit", afterScriptSubmit.submitted === beforeScriptSubmit.submitted + 1, JSON.stringify(afterScriptSubmit));
+formsServer.close();
 
 // Quitting while a prompt waits must not stop on an error (the closing page settles the prompt as the window goes).
 await askForNotifications();

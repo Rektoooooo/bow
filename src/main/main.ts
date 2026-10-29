@@ -52,6 +52,7 @@ import { createCommandActionRegistry } from "./commandBarActions";
 import { startTrackingDownloads } from "./downloads";
 import { getExtensionMenuItems, initializeExtensionHost, prepareExtensions } from "./extensionHost";
 import { initializePermissionPrompts } from "./permissionPrompts";
+import { registerFormsHelper, registerFormsIpc } from "./formsBridge";
 import { registerSymbolIpc } from "./symbols";
 import { getPictureInPictureTabId, registerPictureInPictureIpc } from "./pictureInPicture";
 import { loadToolbarColors } from "./toolbarTint";
@@ -352,6 +353,8 @@ async function handleAppReady(): Promise<void> {
   // Ad blocking checks requests in every profile session; the lists load now when it is on.
   initializeAdBlocking(app.getPath("userData"), getState, () => refreshOpenPanel());
   onProfileSessionCreated(installAdBlocker);
+  // Bow Passwords: the helper that notices sign-in forms runs in every profile session's pages (not private ones).
+  onProfileSessionCreated(registerFormsHelper);
   startTrackingDownloads(
     () => {
       scheduleRuntimePush();
@@ -394,6 +397,7 @@ async function handleAppReady(): Promise<void> {
   registerOnboardingIpc();
   registerLittleWindowIpc();
   registerSymbolIpc();
+  registerFormsIpc();
   registerPictureInPictureIpc();
   setCommandActionRegistry(createCommandActionRegistry({ commands: appMenuCommands, runAction: runAction, getState: getState }));
   // The menu bar, with your own keys (Library › Shortcuts), built again when they change.
