@@ -75,8 +75,6 @@ import {
   showTabTooltip,
 } from "./overlayController";
 import { setDeveloperMode } from "../shared/developerMode";
-import { ARC_IMPORT_SOURCE_ID } from "../shared/onboarding";
-import { runWelcomeImport } from "./onboardingWindow";
 import { openDeveloperTool, translatePage } from "./pageCommands";
 import { setAsDefaultBrowser } from "./defaultBrowser";
 import { setTabSleepAfter } from "./tabSleep";
@@ -467,9 +465,6 @@ export function runAction(action: BrowserAction): void {
       loadUnpackedExtension().catch((error) => console.error("Load Unpacked failed:", error));
       return;
     case "importFromArc":
-      if (action.fromWelcome === true) {
-        return runWelcomeImport(ARC_IMPORT_SOURCE_ID, () => importFromArc(false));
-      }
       importFromArc().catch((error) => console.error("Import from Arc failed:", error));
       return;
     case "exportBackup":
@@ -647,9 +642,6 @@ export function runAction(action: BrowserAction): void {
       applyAppIcon(action.variantId).catch((error) => console.error("Changing the app icon failed:", error));
       return;
     case "importFromBrowser":
-      if (action.fromWelcome === true) {
-        return runWelcomeImport(action.sourceId, () => importFromBrowser(action.sourceId, false));
-      }
       importFromBrowser(action.sourceId).catch((error) => console.error("Import from browser failed:", error));
       return;
     case "createGitHubLiveFolder":

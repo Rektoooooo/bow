@@ -2,7 +2,8 @@
  * WHY this file exists:
  *   The onboarding's pictures, drawn by us: a small Bow window (its frame in a Space's colors, the sidebar, the page
  *   card) and five short looping demos built on it for the essentials tour (Command Bar, Spaces, Split View, Peek,
- *   Today tidying itself into the Archive). Plain elements moved with the Web Animations API, so they stay sharp at
+ *   Today tidying itself into the Archive), and a message whose link opens in a Little Window (the default-browser
+ *   scene). Plain elements moved with the Web Animations API, so they stay sharp at
  *   any size, follow the chosen look and need no video, Lottie or image files (Arc's onboarding clips are not ours).
  *
  * Data source:
@@ -156,7 +157,7 @@ function loop(element: Element, frames: TimedFrames): Animation {
  * The part every demo shares: its animations start together, stop together, and hold a still moment with reduced
  * motion.
  */
-function createDemo(miniWindow: MiniWindow, extraPaint: (theme: SpaceTheme, isSystemDark: boolean) => void, startLoops: () => Animation[], stillMoment: number): TourDemo {
+function createDemo(miniWindow: Pick<MiniWindow, "element" | "paint">, extraPaint: (theme: SpaceTheme, isSystemDark: boolean) => void, startLoops: () => Animation[], stillMoment: number): TourDemo {
   let running: Animation[] = [];
   const stop = (): void => {
     for (const animation of running) {
@@ -395,9 +396,61 @@ export interface TourItem {
 export function createTourItems(): TourItem[] {
   return [
     { title: "Command Bar", keys: "⌘T", text: "Search, open a site or jump to any tab from one place.", icon: "search", demo: createCommandBarDemo() },
-    { title: "Spaces", keys: "⌃1 – ⌃9", text: "A sidebar for each part of your life. Swipe between them.", icon: "spaces", demo: createSpacesDemo() },
+    { title: "Spaces", keys: "⌃1 to ⌃9", text: "A sidebar for each part of your life. Swipe between them.", icon: "spaces", demo: createSpacesDemo() },
     { title: "Split View", keys: "⌃⇧=", text: "Two pages side by side, in one tab.", icon: "split", demo: createSplitDemo() },
     { title: "Peek", keys: "⇧ Click", text: "A link opens over the page, so you never lose your place.", icon: "expand", demo: createPeekDemo() },
     { title: "Today tidies itself", keys: "⌘⇧L", text: "Tabs you leave alone for 12 hours move to the Archive. Pin what you keep.", icon: "archive", demo: createArchiveDemo() },
   ];
+}
+
+/** The message in the default-browser scene: made-up words and a link on example.com (reserved for examples). */
+const LINK_MESSAGE_TEXT = "Here are the notes from today:";
+const LINK_MESSAGE_URL = "notes.example.com/today";
+
+/**
+ * A link from another app: a message bubble appears, its link lights up, and a Little Window (a small frame with
+ * its page) grows out of the link, stays a while, and goes back.
+ */
+export function createLinkDemo(): TourDemo {
+  const element = createElement("div", "link-demo");
+  element.setAttribute("aria-hidden", "true");
+  const bubble = createElement("div", "link-bubble");
+  const url = createElement("span", "link-bubble-url", LINK_MESSAGE_URL);
+  bubble.append(createElement("span", "link-bubble-text", LINK_MESSAGE_TEXT), url);
+  const littleWindow = createElement("div", "link-window");
+  const bar = createElement("div", "link-window-bar");
+  const lights = createElement("span", "mini-lights");
+  lights.append(createElement("span", "mini-light"), createElement("span", "mini-light"), createElement("span", "mini-light"));
+  bar.append(lights, createElement("span", "link-window-address", LINK_MESSAGE_URL));
+  const card = createElement("div", "link-window-card");
+  card.append(createMiniPage());
+  littleWindow.append(createElement("span", "mini-grain"), bar, card);
+  element.append(bubble, littleWindow);
+  const startLoops = (): Animation[] => [
+    loop(bubble, [
+      { opacity: 0, transform: "translateY(10px) scale(0.96)", offset: 0, easing: DEMO_EASING },
+      { opacity: 1, transform: "translateY(0) scale(1)", offset: 0.1 },
+      { opacity: 1, transform: "translateY(0) scale(1)", offset: 0.9, easing: DEMO_EASING },
+      { opacity: 0, transform: "translateY(-6px) scale(0.98)", offset: 0.98 },
+      { opacity: 0, transform: "translateY(10px) scale(0.96)", offset: 1 },
+    ]),
+    loop(url, [
+      { backgroundColor: "transparent", offset: 0 },
+      { backgroundColor: "transparent", offset: 0.18, easing: DEMO_EASING },
+      { backgroundColor: "var(--link-highlight)", offset: 0.23 },
+      { backgroundColor: "var(--link-highlight)", offset: 0.3, easing: DEMO_EASING },
+      { backgroundColor: "transparent", offset: 0.38 },
+      { backgroundColor: "transparent", offset: 1 },
+    ]),
+    loop(littleWindow, [
+      { opacity: 0, transform: "translate(-18%, -26%) scale(0.2)", offset: 0 },
+      { opacity: 0, transform: "translate(-18%, -26%) scale(0.2)", offset: 0.26, easing: "cubic-bezier(0.33, 1, 0.68, 1)" },
+      { opacity: 1, transform: "translate(0, 0) scale(1)", offset: 0.4 },
+      { opacity: 1, transform: "translate(0, 0) scale(1)", offset: 0.8, easing: "cubic-bezier(0.32, 0, 0.67, 0)" },
+      { opacity: 0, transform: "translate(-18%, -26%) scale(0.2)", offset: 0.9 },
+      { opacity: 0, transform: "translate(-18%, -26%) scale(0.2)", offset: 1 },
+    ]),
+  ];
+  const paint = (theme: SpaceTheme, isSystemDark: boolean): void => paintFrame(littleWindow, theme, isSystemDark);
+  return createDemo({ element: element, paint: paint }, () => undefined, startLoops, 0.6);
 }

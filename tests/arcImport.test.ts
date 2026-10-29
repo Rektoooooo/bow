@@ -376,6 +376,33 @@ describe("importing Favorites", () => {
   });
 });
 
+describe("choosing the parts", () => {
+  it("brings only the Favorites when the Spaces are left out", () => {
+    const { state: imported, report } = importArcSidebar(buildTwoSpaceFile(), createInitialState(), ONE_PM, { spaces: false, favorites: true });
+
+    expect(report.spacesImported).toBe(0);
+    expect(imported.spaces.map((space) => space.id)).toEqual(["space-personal", "space-work"]);
+    expect(report.favoritesImported).toBe(2);
+    expect(imported.profiles[0].favoriteIds).toEqual(["arc-fav-one"]);
+  });
+
+  it("brings only the Spaces when the Favorites are left out", () => {
+    const { state: imported, report } = importArcSidebar(buildTwoSpaceFile(), createInitialState(), ONE_PM, { spaces: true, favorites: false });
+
+    expect(report.spacesImported).toBe(2);
+    expect(report.favoritesImported).toBe(0);
+    expect(imported.profiles.every((profile) => profile.favoriteIds.every((id) => !id.startsWith("arc-fav")))).toBe(true);
+  });
+
+  it("changes nothing when both are left out", () => {
+    const state = createInitialState();
+    const { state: imported, report } = importArcSidebar(buildTwoSpaceFile(), state, ONE_PM, { spaces: false, favorites: false });
+
+    expect(report.spacesImported + report.favoritesImported + report.tabsImported).toBe(0);
+    expect(imported.spaces).toEqual(state.spaces);
+  });
+});
+
 describe("running the import twice", () => {
   it("changes nothing the second time except the report", () => {
     const arcFile = buildTwoSpaceFile();

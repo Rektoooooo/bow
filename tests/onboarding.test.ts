@@ -1,10 +1,25 @@
 /**
  * WHY this file exists:
- *   The onboarding's rules without a screen: keys must never step past its first or last scene, an import's card must
- *   say in one line only what arrived, and the wash must always get three colors (Bow's own until a look is picked).
+ *   The onboarding's rules without a screen: keys must never step past its first or last scene, a source's sentence
+ *   must say only what it holds (numbers bold, no dashes), the browsers it lists must come in a steady order, and the
+ *   wash must always get three colors (Bow's own until a look is picked).
  */
 import { describe, expect, it } from "vitest";
-import { BOW_WASH_COLORS, ONBOARDING_SCENES, describeImportSummary, formatCount, pickWashColors, stepScene, vividWashColor } from "../src/shared/onboarding";
+import {
+  BOW_WASH_COLORS,
+  IMPORT_PART_LABELS,
+  IMPORT_PART_ORDER,
+  ONBOARDING_SCENES,
+  SUPPORTED_BROWSERS,
+  describeFound,
+  describePartCount,
+  formatCount,
+  orderBrowsers,
+  pickWashColors,
+  stepScene,
+  vividWashColor,
+} from "../src/shared/onboarding";
+import type { ImportFound, WelcomeBrowser } from "../src/shared/onboarding";
 
 describe("onboarding scenes", () => {
   it("has six scenes, from hello to ready", () => {
@@ -19,24 +34,86 @@ describe("onboarding scenes", () => {
   });
 });
 
-describe("import summary", () => {
+describe("counts", () => {
   it("counts with the right noun and groups thousands", () => {
     expect(formatCount(1, "tab")).toBe("1 tab");
     expect(formatCount(0, "tab")).toBe("0 tabs");
     expect(formatCount(2341, "page")).toBe("2,341 pages");
   });
+});
 
-  it("says only what an Arc import brought", () => {
-    expect(describeImportSummary({ spaces: 4, tabs: 120, bookmarks: 0, historyPages: 2341 })).toBe("4 Spaces · 120 tabs · 2,341 pages of history");
-    expect(describeImportSummary({ spaces: 1, tabs: 1, bookmarks: 0, historyPages: 1 })).toBe("1 Space · 1 tab · 1 page of history");
+/** The sentence as the page shows it (the bold parts are only drawn differently). */
+function sentenceText(found: ImportFound): string {
+  return describeFound(found)
+    .map((part) => part.text)
+    .join("");
+}
+
+const ARC_FOUND: ImportFound = {
+  parts: ["spaces", "favorites", "archive", "extensions", "history"],
+  counts: { spaces: 3, favorites: 6, archive: 40, extensions: 4, history: 4812 },
+  tabs: 25,
+};
+
+describe("what a source holds, in one sentence", () => {
+  it("lists everything an Arc import found, the last part joined with 'and'", () => {
+    expect(sentenceText(ARC_FOUND)).toBe("Found 3 Spaces with 25 tabs, 6 Favorites, 40 archived tabs, 4 extensions and 4,812 sites from your history.");
   });
 
-  it("says what a browser import brought", () => {
-    expect(describeImportSummary({ spaces: 0, tabs: 0, bookmarks: 312, historyPages: 0 })).toBe("312 bookmarks");
+  it("says what a browser holds", () => {
+    const found: ImportFound = { parts: ["bookmarks", "history"], counts: { bookmarks: 214, history: 1 }, tabs: 0 };
+    expect(sentenceText(found)).toBe("Found 214 bookmarks and 1 site from your history.");
   });
 
-  it("says when nothing new arrived", () => {
-    expect(describeImportSummary({ spaces: 0, tabs: 0, bookmarks: 0, historyPages: 0 })).toBe("Nothing new to bring over");
+  it("says a single part without a list", () => {
+    const found: ImportFound = { parts: ["history"], counts: { history: 12 }, tabs: 0 };
+    expect(sentenceText(found)).toBe("Found 12 sites from your history.");
+  });
+
+  it("uses one noun for one", () => {
+    const found: ImportFound = { parts: ["spaces"], counts: { spaces: 1 }, tabs: 1 };
+    expect(sentenceText(found)).toBe("Found 1 Space with 1 tab.");
+  });
+
+  it("says when there is nothing new", () => {
+    const found: ImportFound = { parts: [], counts: { bookmarks: 0, history: 0 }, tabs: 0 };
+    expect(sentenceText(found)).toBe("Nothing new to bring over.");
+  });
+
+  it("makes the numbers and their nouns bold, the joining words plain", () => {
+    const boldParts = describeFound(ARC_FOUND)
+      .filter((part) => part.isBold)
+      .map((part) => part.text);
+    expect(boldParts).toEqual(["3 Spaces", "25 tabs", "6 Favorites", "40 archived tabs", "4 extensions", "4,812 sites"]);
+  });
+
+  it("never uses a dash", () => {
+    const texts = [sentenceText(ARC_FOUND), ...IMPORT_PART_ORDER.map((part) => IMPORT_PART_LABELS[part].title), ...IMPORT_PART_ORDER.map((part) => describePartCount(part, ARC_FOUND))];
+    for (const text of texts) {
+      expect(text).not.toMatch(/[-\u2013\u2014]/);
+    }
+  });
+});
+
+describe("the checklist", () => {
+  it("counts each part under its name", () => {
+    expect(describePartCount("spaces", ARC_FOUND)).toBe("3 Spaces, 25 tabs");
+    expect(describePartCount("favorites", ARC_FOUND)).toBe("6 sites");
+    expect(describePartCount("history", ARC_FOUND)).toBe("4,812 sites");
+    expect(describePartCount("extensions", ARC_FOUND)).toBe("4 extensions");
+  });
+});
+
+describe("the browsers", () => {
+  it("lists every browser Bow imports from", () => {
+    expect(SUPPORTED_BROWSERS.map((browser) => browser.id)).toEqual(["arc", "chrome", "safari", "firefox", "brave", "edge", "vivaldi", "chromium"]);
+  });
+
+  it("puts the browsers with something to import first, each group in the usual order", () => {
+    const browsers: WelcomeBrowser[] = SUPPORTED_BROWSERS.map((browser) => ({ ...browser, iconUrl: null, sources: [] }));
+    const withSafari = browsers.map((browser) => (browser.id === "safari" || browser.id === "brave" ? { ...browser, sources: [{ id: browser.id, profileName: null }] } : browser));
+    const ordered = orderBrowsers(withSafari).map((browser) => browser.id);
+    expect(ordered).toEqual(["safari", "brave", "arc", "chrome", "firefox", "edge", "vivaldi", "chromium"]);
   });
 });
 

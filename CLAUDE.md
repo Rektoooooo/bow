@@ -30,8 +30,9 @@ npm run e2e          # build + drive the real app: check-app, check-overlay, che
                      # Sleep Tab, Keep Awake, Sleep Other Tabs, Task Manager),
                      # check-backup (export, restore by replacing or adding, unsafe files refused),
                      # check-sync (two copies of Bow sync through one folder: join, both ways, stop),
-                     # check-onboarding (the first-start onboarding: scenes, keys, a look, the tour, the defaults,
-                     # replay from Help, fits a 640 × 400 window)
+                     # check-onboarding (the first-start onboarding in its own window: scenes, keys, real imports
+                     # from a made-up home folder via --import-home (e2e/fixtures/importHome.mjs), a color, the
+                     # tour, the defaults, replay from Help, fits a 760 × 520 window, no dashes in its text)
 node e2e/window-shot.mjs --open  # after npm run package: Bow on the sample profile, for the README's hand-taken
                                  # screenshots (docs/screenshot-*.png); without --open: the views → e2e/output/readme-shots
 node e2e/arc-compare.mjs   # side-by-side crops with the user's Arc screenshots (reference/, local only) → e2e/output
@@ -89,7 +90,10 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   `src/overlay`): Command Bar, Library, site controls, Find, the Peek frame. Peek's page is its own view above it
   (`peek.ts`). Little Windows are separate windows (`littleWindow.ts`, bar page in `src/little`). The onboarding is
   a window of its own too (`onboardingWindow.ts`, page in `src/onboarding`, preload `onboardingPreload.ts`): at the
-  first start the browser window stays hidden until it ends; Help › Welcome to Bow… opens it again.
+  first start the browser window stays hidden until it ends; Help › Welcome to Bow… opens it again. Its imports read
+  first and count (`prepareArcImport` / `prepareBrowserImport`), then bring only the chosen parts
+  (`applyArcImport` / `applyBrowserImport`); the File menu runs the same two steps with every part. Browser logos are
+  the installed apps' own icons, drawn by macOS at runtime (`browserIcons.ts`); none are in the repo.
 - **Render from state.** `src/renderer/sidebar.ts` redraws the sidebar and toolbar on every state; redraws wait while
   a drag is in progress.
 - **Constants** live in `src/shared/settings.ts` with a comment on where each value comes from (measured from Arc,

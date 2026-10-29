@@ -106,6 +106,16 @@ export function getHistory(): HistoryEntry[] {
 }
 
 /**
+ * How many of these addresses are not in the history yet: what importHistoryEntries() would add (the onboarding
+ * says it before importing).
+ */
+export function countNewHistoryUrls(imported: HistoryEntry[]): number {
+  const knownUrls = new Set(entries.map((entry) => entry.url));
+  const newUrls = new Set(imported.map((entry) => entry.url).filter((url) => !knownUrls.has(url)));
+  return newUrls.size;
+}
+
+/**
  * Adds history from another browser. Returns how many addresses were not in the history before.
  */
 export function importHistoryEntries(imported: HistoryEntry[]): number {
@@ -113,11 +123,10 @@ export function importHistoryEntries(imported: HistoryEntry[]): number {
   if (mergedEntries === entries) {
     return 0;
   }
-  const knownUrls = new Set(entries.map((entry) => entry.url));
-  const newUrls = new Set(imported.map((entry) => entry.url).filter((url) => !knownUrls.has(url)));
+  const newUrlCount = countNewHistoryUrls(imported);
   entries = mergedEntries;
   saveHistoryNow();
-  return newUrls.size;
+  return newUrlCount;
 }
 
 /**

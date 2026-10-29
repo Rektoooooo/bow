@@ -1,8 +1,8 @@
 /**
  * WHY this file exists:
- *   The first-start onboarding's rules that need no screen: which scenes it has and how keys move between them, what
- *   an import brought over in one line, and the three colors of its background wash; and the messages between its
- *   window's page and main. Kept pure, so they are tested on their own; the page (onboarding/onboarding.ts) and main
+ *   The first-start onboarding's rules that need no screen: which scenes it has and how keys move between them, the
+ *   browsers it imports from and how it says what one holds, and the three colors of its background wash; and the
+ *   messages between its window's page and main. Kept pure, so they are tested on their own; the page (onboarding/onboarding.ts) and main
  *   (onboardingWindow.ts) share them.
  *
  * Data source:
@@ -20,25 +20,51 @@ export const ONBOARDING_SCENES = ["hello", "import", "look", "essentials", "defa
 
 export type OnboardingScene = (typeof ONBOARDING_SCENES)[number];
 
-/** What one import brought over (main/arcImportController.ts, main/browserImportController.ts). */
-export interface ImportSummary {
-  spaces: number;
+/** The parts an import can bring: Arc's Spaces (with their tabs), Favorites, archive and extensions; any browser's
+ * bookmarks and history. The onboarding lets the user leave some out. */
+export type ImportPart = "spaces" | "favorites" | "archive" | "bookmarks" | "extensions" | "history";
+
+/** The order parts are listed and brought in (history last: it is the biggest). */
+export const IMPORT_PART_ORDER: ImportPart[] = ["spaces", "favorites", "archive", "bookmarks", "extensions", "history"];
+
+/** What a source holds, counted before anything is imported (main reads it once). */
+export interface ImportFound {
+  /** The parts it has something for, in IMPORT_PART_ORDER. */
+  parts: ImportPart[];
+  /** How many of each: Spaces count Spaces (their tabs are `tabs`), history counts sites. */
+  counts: Partial<Record<ImportPart, number>>;
   tabs: number;
-  bookmarks: number;
-  historyPages: number;
 }
 
-/** An import started from the onboarding: running, finished with what it brought, or failed. */
-export interface WelcomeImportState {
-  phase: "running" | "done" | "failed";
-  summary: ImportSummary | null;
+/**
+ * One source's import in the onboarding: being read, read (what it holds), waiting for Full Disk Access (Safari),
+ * bringing the chosen parts over (those done so far), done, or failed.
+ */
+export interface WelcomeImport {
+  phase: "reading" | "found" | "needsAccess" | "importing" | "done" | "failed";
+  found: ImportFound | null;
+  /** The parts chosen to come over (all it found, until the user leaves some out). */
+  parts: ImportPart[];
+  /** Those already brought over while it imports. */
+  doneParts: ImportPart[];
 }
 
-/** One browser (or Arc) the onboarding can import from. */
-export interface WelcomeImportSource {
-  /** "arc" or an id from browserImportController.ts listImportSources(). */
+/** A browser the onboarding lists: every one Bow imports from, found on this Mac or not. */
+export interface WelcomeBrowser {
+  /** One of SUPPORTED_BROWSERS' ids. */
   id: string;
-  label: string;
+  name: string;
+  /** The installed app's own icon (a data: URL drawn by macOS), or null (not installed, or not drawn). */
+  iconUrl: string | null;
+  /** Its profiles that have something to import (several for a browser with profiles); none: not on this Mac. */
+  sources: { id: string; profileName: string | null }[];
+}
+
+/** The sidebar preview beside the import: what the active Space and its profile hold now. */
+export interface WelcomeSidebar {
+  spaceName: string;
+  favorites: { title: string; iconUrl: string | null }[];
+  pinned: { title: string; iconUrl: string | null; isFolder: boolean }[];
 }
 
 /** A theme preset as the onboarding offers it (main/themePresets.ts). */
@@ -54,9 +80,11 @@ export interface WelcomeData {
   spaceId: string;
   theme: SpaceTheme;
   isSystemDark: boolean;
-  importSources: WelcomeImportSource[];
-  /** Imports started from the onboarding, by source id. */
-  imports: Record<string, WelcomeImportState>;
+  /** Every browser Bow imports from, those on this Mac first. */
+  browsers: WelcomeBrowser[];
+  /** Imports read or started from the onboarding, by source id. */
+  imports: Record<string, WelcomeImport>;
+  sidebar: WelcomeSidebar;
   presets: WelcomePreset[];
   /** A build from source cannot register as the default browser (macOS needs the packaged app). */
   isPackaged: boolean;
@@ -90,30 +118,6 @@ export function stepScene(currentIndex: number, delta: number, sceneCount: numbe
 export function formatCount(count: number, noun: string): string {
   const grouped = count.toLocaleString("en-US");
   return count === 1 ? `${grouped} ${noun}` : `${grouped} ${noun}s`;
-}
-
-/**
- * What an import brought over, in one line for its card: only the parts it brought.
- * Example: { spaces: 4, tabs: 120, bookmarks: 0, historyPages: 2341 } → "4 Spaces · 120 tabs · 2,341 pages of history"
- */
-export function describeImportSummary(summary: ImportSummary): string {
-  const parts: string[] = [];
-  if (summary.spaces > 0) {
-    parts.push(formatCount(summary.spaces, "Space"));
-  }
-  if (summary.tabs > 0) {
-    parts.push(formatCount(summary.tabs, "tab"));
-  }
-  if (summary.bookmarks > 0) {
-    parts.push(formatCount(summary.bookmarks, "bookmark"));
-  }
-  if (summary.historyPages > 0) {
-    parts.push(`${formatCount(summary.historyPages, "page")} of history`);
-  }
-  if (parts.length === 0) {
-    return "Nothing new to bring over";
-  }
-  return parts.join(" · ");
 }
 
 /**
@@ -207,6 +211,97 @@ export function vividWashColor(color: string, isDark: boolean): string {
   return hslToHex(hue, keptSaturation, keptLightness);
 }
 
+/** Every browser Bow imports from, in the order the onboarding lists them (those on this Mac come first). */
+export const SUPPORTED_BROWSERS: { id: string; name: string }[] = [
+  { id: "arc", name: "Arc" },
+  { id: "chrome", name: "Chrome" },
+  { id: "safari", name: "Safari" },
+  { id: "firefox", name: "Firefox" },
+  { id: "brave", name: "Brave" },
+  { id: "edge", name: "Edge" },
+  { id: "vivaldi", name: "Vivaldi" },
+  { id: "chromium", name: "Chromium" },
+];
+
+/**
+ * The browsers as the onboarding lists them: those with something to import first, each group in
+ * SUPPORTED_BROWSERS' order.
+ */
+export function orderBrowsers(browsers: WelcomeBrowser[]): WelcomeBrowser[] {
+  const found = browsers.filter((browser) => browser.sources.length > 0);
+  const missing = browsers.filter((browser) => browser.sources.length === 0);
+  return [...found, ...missing];
+}
+
+/** A piece of a sentence, drawn bold (a number and its noun) or plain. */
+export interface SentencePart {
+  text: string;
+  isBold: boolean;
+}
+
+/**
+ * What a source holds, as one sentence with the numbers in bold: "Found 3 Spaces with 25 tabs, 6 Favorites and 4,812
+ * sites from your history." Nothing: "Nothing new to bring over."
+ */
+export function describeFound(found: ImportFound): SentencePart[] {
+  const counts = found.counts;
+  const phrases: SentencePart[][] = [];
+  if ((counts.spaces ?? 0) > 0) {
+    phrases.push([{ text: formatCount(counts.spaces ?? 0, "Space"), isBold: true }, { text: " with ", isBold: false }, { text: formatCount(found.tabs, "tab"), isBold: true }]);
+  }
+  if ((counts.favorites ?? 0) > 0) {
+    phrases.push([{ text: formatCount(counts.favorites ?? 0, "Favorite"), isBold: true }]);
+  }
+  if ((counts.archive ?? 0) > 0) {
+    phrases.push([{ text: formatCount(counts.archive ?? 0, "archived tab"), isBold: true }]);
+  }
+  if ((counts.bookmarks ?? 0) > 0) {
+    phrases.push([{ text: formatCount(counts.bookmarks ?? 0, "bookmark"), isBold: true }]);
+  }
+  if ((counts.extensions ?? 0) > 0) {
+    phrases.push([{ text: formatCount(counts.extensions ?? 0, "extension"), isBold: true }]);
+  }
+  if ((counts.history ?? 0) > 0) {
+    phrases.push([{ text: formatCount(counts.history ?? 0, "site"), isBold: true }, { text: " from your history", isBold: false }]);
+  }
+  if (phrases.length === 0) {
+    return [{ text: "Nothing new to bring over.", isBold: false }];
+  }
+  const sentence: SentencePart[] = [{ text: "Found ", isBold: false }];
+  phrases.forEach((phrase, index) => {
+    const isLast = index === phrases.length - 1;
+    const separator = isLast ? " and " : ", ";
+    if (index > 0) {
+      sentence.push({ text: separator, isBold: false });
+    }
+    sentence.push(...phrase);
+  });
+  sentence.push({ text: ".", isBold: false });
+  return sentence;
+}
+
+/** Each part's row in "Choose what comes over": its name and how its count reads. */
+export const IMPORT_PART_LABELS: Record<ImportPart, { title: string; noun: string }> = {
+  spaces: { title: "Spaces and pinned tabs", noun: "Space" },
+  favorites: { title: "Favorites", noun: "site" },
+  archive: { title: "Archived tabs", noun: "tab" },
+  bookmarks: { title: "Bookmarks", noun: "bookmark" },
+  extensions: { title: "Extensions", noun: "extension" },
+  history: { title: "History", noun: "site" },
+};
+
+/**
+ * The line under a part's name in the checklist: "3 Spaces, 25 tabs", "6 sites", "214 bookmarks".
+ */
+export function describePartCount(part: ImportPart, found: ImportFound): string {
+  const count = found.counts[part] ?? 0;
+  const counted = formatCount(count, IMPORT_PART_LABELS[part].noun);
+  if (part === "spaces") {
+    return `${counted}, ${formatCount(found.tabs, "tab")}`;
+  }
+  return counted;
+}
+
 /** The functions the onboarding's page may call (preload/onboardingPreload.ts provides them as window.onboardingApi). */
 export interface OnboardingApi {
   /** What the onboarding shows now; later changes come through onData. */
@@ -217,6 +312,12 @@ export interface OnboardingApi {
   close(): Promise<void>;
   /** The SF Symbols the icons use, rendered by macOS (the same as every page of ours). */
   getSymbols(): Promise<Record<string, SymbolImage>>;
+  /** Reads what a source (a browser profile, or Arc) holds and counts it; nothing is imported yet. */
+  readSource(sourceId: string): Promise<void>;
+  /** Brings the chosen parts of a source that was read over. */
+  bringOver(sourceId: string, parts: ImportPart[]): Promise<void>;
+  /** Opens System Settings at Full Disk Access (Safari's files need it). */
+  openFullDiskAccess(): Promise<void>;
 }
 
 /** Channel names between the onboarding's page and main (onboardingWindow.ts checks every sender is that page). */
@@ -224,4 +325,7 @@ export const ONBOARDING_CHANNELS = {
   getData: "onboarding:get-data",
   data: "onboarding:data",
   close: "onboarding:close",
+  readSource: "onboarding:read-source",
+  bringOver: "onboarding:bring-over",
+  openFullDiskAccess: "onboarding:open-full-disk-access",
 } as const;

@@ -94,6 +94,9 @@ export const SYMBOL_NAMES = {
   // Tab sleeping: Keep Awake in the Control Center, and Library › Task Manager.
   sleep: "moon.zzz",
   taskManager: "cpu",
+  // The onboarding's import checklist: Favorites and bookmarks.
+  star: "star",
+  book: "book",
 } as const;
 
 /** An icon drawn from an SF Symbol. */

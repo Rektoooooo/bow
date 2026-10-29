@@ -653,12 +653,21 @@ export function readArcSidebarWidth(windowsFile: unknown): number | null {
   return Math.round(arcWidth - CARD_GAP_PX);
 }
 
+/** Which parts of Arc's sidebar an import brings: the Spaces (with their Pinned and Today tabs and themes), the Favorites. */
+export interface ArcSidebarParts {
+  spaces: boolean;
+  favorites: boolean;
+}
+
+const ALL_SIDEBAR_PARTS: ArcSidebarParts = { spaces: true, favorites: true };
+
 /**
- * Adds the Spaces, Favorites, Pinned and Today items and themes found in Arc's sidebar file to the state.
- * Safe to run twice: Spaces and items that exist from an earlier import are skipped.
+ * Adds the Spaces, Favorites, Pinned and Today items and themes found in Arc's sidebar file to the state (the parts
+ * asked for: the onboarding can leave the Spaces or the Favorites out). Safe to run twice: Spaces and items that exist
+ * from an earlier import are skipped.
  * Example: importArcSidebar(parsedJson, state, Date.now()).report.spacesImported → 2
  */
-export function importArcSidebar(arcFile: unknown, state: BrowserState, now: number): { state: BrowserState; report: ArcImportReport } {
+export function importArcSidebar(arcFile: unknown, state: BrowserState, now: number, parts: ArcSidebarParts = ALL_SIDEBAR_PARTS): { state: BrowserState; report: ArcImportReport } {
   const report = createEmptyReport();
   const liveContainer = findLiveContainer(arcFile);
   if (liveContainer === null) {
@@ -678,10 +687,14 @@ export function importArcSidebar(arcFile: unknown, state: BrowserState, now: num
       now: now,
     };
 
-    for (const pair of readPairs(liveContainer["spaces"])) {
-      importSpace(context, pair.key, pair.value);
+    if (parts.spaces) {
+      for (const pair of readPairs(liveContainer["spaces"])) {
+        importSpace(context, pair.key, pair.value);
+      }
     }
-    importFavorites(context, liveContainer["topAppsContainerIDs"]);
+    if (parts.favorites) {
+      importFavorites(context, liveContainer["topAppsContainerIDs"]);
+    }
 
     const importedState: BrowserState = {
       ...state,

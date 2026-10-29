@@ -366,11 +366,12 @@ yours, the essentials, a few good defaults, you're all set). Our own CSS/DOM/SVG
 ### 5.2 Onboarding v2 (the user's review, 2026-10-29: Arc's first launch and the D'arce onboarding as references)
 - [x] 1. Its own window (70 % of the screen, the browser hidden until it ends) with its own preload and channels;
       replay from Help; the overlay welcome removed; check-app and check-onboarding adapted
-- [ ] 2. Imports read first, then bring the chosen parts (counts before importing, "Choose what comes over", progress
+- [x] 2. Imports read first, then bring the chosen parts (counts before importing, "Choose what comes over", progress
       per part); every supported browser with its real icon (drawn by macOS from the installed app); the sidebar
       preview that fills in
-- [ ] 3. The cleaner look: bold sans titles, left column with a live preview, the whole window takes the picked colour,
-      "Make Bow your browser?" with a message bubble, "You're all set."; no dashes in any text
+- [x] 3. The cleaner look: bold sans titles, left column with a live preview, the whole window takes the picked colour,
+      "Make Bow your browser?" with a message bubble, "You're all set."; no dashes in any text (done with 2: the
+      import scene needed the new layout; check-onboarding 33 checks with real imports from a made-up home folder)
 - [ ] 4. The startup: a glow on the desktop that grows into the onboarding window, Bow's mark drawing itself; the
       onboarding fading into the browser window
 - [ ] 5. Screenshots and a recording for the user; polish

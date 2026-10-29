@@ -102,7 +102,7 @@ async function simulateDrag(page, sourceSelector, targetSelector, verticalFracti
 // ---------- first run ----------
 let { app, page, mainLog, consoleErrors } = await launch(userDataDir);
 await page.waitForSelector(".space-title", { timeout: 15000 });
-// The first start shows the onboarding (overlay/onboarding.ts; e2e/check-onboarding.mjs checks it in full); Skip ends
+// The first start shows the onboarding (onboarding/onboarding.ts; e2e/check-onboarding.mjs checks it in full); Skip ends
 // it for good.
 const welcomeOverlay = await (async () => {
   for (let attempt = 0; attempt < 80; attempt++) {
@@ -114,8 +114,8 @@ const welcomeOverlay = await (async () => {
 })();
 const isBrowserVisible = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"))?.isVisible() ?? false);
 const wasBrowserHidden = !(await isBrowserVisible());
-const welcomeTitle = welcomeOverlay === null ? null : await welcomeOverlay.waitForSelector(".onboarding .onboarding-title-hero", { timeout: 8000 }).then((title) => title.getAttribute("aria-label")).catch(() => null);
-check("the first start shows the onboarding in its own window, the browser window hidden", welcomeTitle === "Welcome to Bow" && wasBrowserHidden, `${welcomeTitle} hidden=${wasBrowserHidden}`);
+const welcomeTitle = welcomeOverlay === null ? null : await welcomeOverlay.waitForSelector(".onboarding .scene-hello .scene-title", { timeout: 8000 }).then((title) => title.textContent()).catch(() => null);
+check("the first start shows the onboarding in its own window, the browser window hidden", welcomeTitle === "Welcome to Bow." && wasBrowserHidden, `${welcomeTitle} hidden=${wasBrowserHidden}`);
 await welcomeOverlay?.click(".onboarding-skip").catch(() => undefined);
 // Skip plays the outro (the scene lifts away, the wash fades) before the onboarding window closes.
 await page.waitForTimeout(1500);

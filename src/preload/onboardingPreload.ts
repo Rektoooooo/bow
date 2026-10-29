@@ -2,7 +2,7 @@
  * WHY this file exists:
  *   The onboarding's window (main/onboardingWindow.ts) is sandboxed like every page of ours. This is its only bridge:
  *   window.onboardingApi for its own messages, and window.browserApi.dispatch so its buttons run the same actions as
- *   the sidebar (a theme, a switch, an import).
+ *   the sidebar (a theme, a switch).
  *
  * Data source:
  *   Electron's contextBridge and ipcRenderer.
@@ -10,6 +10,7 @@
  * Data flow:
  *   onboarding.ts → window.onboardingApi.getData() → "onboarding:get-data" → onboardingWindow.ts
  *   onboardingWindow.ts → "onboarding:data" → onData listener → onboarding.ts updates in place
+ *   onboarding.ts → readSource / bringOver → onboardingWindow.ts (the import is read, then brought over)
  */
 import { contextBridge, ipcRenderer } from "electron";
 import type { IpcRendererEvent } from "electron";
@@ -25,6 +26,9 @@ const CHANNELS: typeof ONBOARDING_CHANNELS = {
   getData: "onboarding:get-data",
   data: "onboarding:data",
   close: "onboarding:close",
+  readSource: "onboarding:read-source",
+  bringOver: "onboarding:bring-over",
+  openFullDiskAccess: "onboarding:open-full-disk-access",
 };
 
 const DISPATCH_CHANNEL: (typeof IPC_CHANNELS)["dispatch"] = "browser:dispatch";
@@ -41,6 +45,9 @@ function createOnboardingApi(): OnboardingApi {
     },
     close: () => ipcRenderer.invoke(CHANNELS.close),
     getSymbols: () => ipcRenderer.invoke(SYMBOLS_CHANNEL),
+    readSource: (sourceId) => ipcRenderer.invoke(CHANNELS.readSource, sourceId),
+    bringOver: (sourceId, parts) => ipcRenderer.invoke(CHANNELS.bringOver, sourceId, parts),
+    openFullDiskAccess: () => ipcRenderer.invoke(CHANNELS.openFullDiskAccess),
   };
 }
 
