@@ -69,6 +69,7 @@ export const SYMBOL_NAMES = {
   microphone: "mic",
   video: "video",
   clipboard: "doc.on.clipboard",
+  key: "key.fill",
   pictureInPicture: "pip",
   // The picture-in-picture window's "back to tab", like macOS's own picture-in-picture.
   pictureInPictureExit: "pip.exit",

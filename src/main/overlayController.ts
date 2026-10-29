@@ -115,6 +115,10 @@ const PERMISSION_PROMPT_WIDTH_PX = 360;
 const PERMISSION_PROMPT_HEIGHT_PX = 116;
 const PERMISSION_PROMPT_MARGIN_PX = 10;
 
+/** Size of the "Save password?" card, in the same place. Must fit overlay.css's .password-prompt. Our choice. */
+const SAVE_PASSWORD_PROMPT_WIDTH_PX = 360;
+const SAVE_PASSWORD_PROMPT_HEIGHT_PX = 132;
+
 /** Why a panel went away: closed (Escape, a click outside, an answer) or replaced by another panel. */
 export type PanelEndReason = "closed" | "replaced";
 
@@ -223,6 +227,10 @@ function computeOverlayBounds(panel: OverlayPanel): Bounds | null {
     const x = Math.max(0, Math.min(panel.frame.x, contentWidth - width));
     const y = Math.max(0, Math.min(panel.frame.y, contentHeight - height));
     return { x: x, y: y, width: width, height: height };
+  }
+  if (panel.kind === "savePassword") {
+    const pageCard = computeCardBounds(contentWidth, contentHeight, getLayoutOptions());
+    return { x: pageCard.x + PERMISSION_PROMPT_MARGIN_PX, y: pageCard.y + PERMISSION_PROMPT_MARGIN_PX, width: SAVE_PASSWORD_PROMPT_WIDTH_PX, height: SAVE_PASSWORD_PROMPT_HEIGHT_PX };
   }
   if (panel.kind === "permission") {
     // Under the toolbar at the page's top left, like Chromium's permission bubble; the page stays usable around it.
@@ -513,6 +521,22 @@ export function openPermissionPrompt(requestId: string, host: string, kinds: Sit
  */
 export function closePermissionPrompt(requestId: string): void {
   if (shownPanel?.kind === "permission" && shownPanel.requestId === requestId) {
+    closeOverlay();
+  }
+}
+
+/**
+ * Shows "Save password for <host>?" (passwordOffers.ts decides when). The password itself never goes to the overlay.
+ */
+export function openPasswordOffer(offerId: string, host: string, username: string, isUpdate: boolean): void {
+  openPanel({ kind: "savePassword", offerId: offerId, host: host, username: username, isUpdate: isUpdate });
+}
+
+/**
+ * Closes the overlay when it shows the given password offer.
+ */
+export function closePasswordOffer(offerId: string): void {
+  if (shownPanel?.kind === "savePassword" && shownPanel.offerId === offerId) {
     closeOverlay();
   }
 }

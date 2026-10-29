@@ -2776,6 +2776,29 @@ body.is-closing .peek-buttons {
   color: var(--chip-active-ink);
 }
 
+/* The "Save password?" card is a permission prompt with a quiet "Never for this site" on the left. */
+.password-prompt .password-never-button {
+  min-width: 0;
+  margin-right: auto;
+  padding-left: 6px;
+  padding-right: 6px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.password-prompt .password-never-button:hover {
+  color: var(--ink);
+}
+
+.password-muted {
+  flex: none;
+  color: var(--muted);
+}
+
+.password-prompt .permission-wish.password-muted {
+  flex: 0 1 auto;
+}
+
 /* ---------- Library › Settings: groups of rows, each with a name, a short note and its control ---------- */
 
 .setting-group {

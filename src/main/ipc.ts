@@ -343,6 +343,13 @@ function isExtensionId(value: unknown): boolean {
 /** The permission kinds a site can be allowed or refused (types.ts SitePermissionKind). */
 const SITE_PERMISSION_KINDS = ["camera", "microphone", "notifications", "location", "clipboard"];
 
+/** The three answers to "Save password?" (actions.ts answerPasswordOffer). */
+const PASSWORD_OFFER_ANSWERS = ["save", "never", "notNow"];
+
+function isPasswordOfferAnswer(value: unknown): boolean {
+  return typeof value === "string" && PASSWORD_OFFER_ANSWERS.includes(value);
+}
+
 function isSitePermissionKind(value: unknown): boolean {
   return typeof value === "string" && SITE_PERMISSION_KINDS.includes(value);
 }
@@ -426,6 +433,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   restoreBackup: {},
   showExtensionsMenu: { anchor: isAnchor },
   answerPermissionPrompt: { requestId: isText, isAllowed: isBoolean },
+  answerPasswordOffer: { offerId: isText, answer: isPasswordOfferAnswer },
   removeSitePermission: { profileId: isText, origin: isText, kind: isSitePermissionKind },
   installWebStoreExtension: { extensionId: isExtensionId },
   checkExtensionUpdates: {},

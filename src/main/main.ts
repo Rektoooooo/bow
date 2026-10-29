@@ -51,6 +51,7 @@ import { restoreMainWindows } from "./mainWindows";
 import { createCommandActionRegistry } from "./commandBarActions";
 import { startTrackingDownloads } from "./downloads";
 import { getExtensionMenuItems, initializeExtensionHost, prepareExtensions } from "./extensionHost";
+import { initializePasswordOffers } from "./passwordOffers";
 import { initializePermissionPrompts } from "./permissionPrompts";
 import { registerFormsHelper, registerFormsIpc } from "./formsBridge";
 import { registerSymbolIpc } from "./symbols";
@@ -350,6 +351,7 @@ async function handleAppReady(): Promise<void> {
   restrictWebPermissions(session.defaultSession);
   // Sites ask before using the camera, microphone, location, notifications or the clipboard.
   initializePermissionPrompts();
+  initializePasswordOffers();
   // Ad blocking checks requests in every profile session; the lists load now when it is on.
   initializeAdBlocking(app.getPath("userData"), getState, () => refreshOpenPanel());
   onProfileSessionCreated(installAdBlocker);

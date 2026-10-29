@@ -19,6 +19,7 @@ import { renderFindBar } from "./findBar.js";
 import { renderLibrary } from "./library.js";
 import { renderBoostEditor } from "./boostEditor.js";
 import { playPeekClose, renderPeekFrame } from "./peekFrame.js";
+import { renderPasswordPrompt } from "./passwordPrompt.js";
 import { renderPermissionPrompt } from "./permissionPrompt.js";
 import { renderThemeEditor } from "./themeEditor.js";
 import { renderSpaceIconPicker } from "./spaceIconPicker.js";
@@ -471,7 +472,7 @@ function showPanel(message: OverlayShowMessage): void {
   document.body.dataset.panel = message.panel.kind;
   // The Find bar's and a permission prompt's overlay is only as big as the card, so it needs no backdrop; Capture
   // draws its own dimming.
-  const hasOwnBackground = ["find", "permission", "capture", "tabTooltip", "library", "folderList"].includes(message.panel.kind);
+  const hasOwnBackground = ["find", "permission", "savePassword", "capture", "tabTooltip", "library", "folderList"].includes(message.panel.kind);
   backdrop.hidden = hasOwnBackground;
 
   if (message.panel.kind === "commandBar") {
@@ -503,6 +504,9 @@ function showPanel(message: OverlayShowMessage): void {
   }
   if (message.panel.kind === "permission") {
     renderPermissionPrompt(host, message.panel);
+  }
+  if (message.panel.kind === "savePassword") {
+    renderPasswordPrompt(host, message.panel);
   }
   if (message.panel.kind === "capture") {
     renderCapture(host, message.panel);

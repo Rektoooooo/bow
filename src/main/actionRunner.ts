@@ -54,6 +54,7 @@ import { applyAppIcon } from "./appIcon";
 import { showExtensionsMenu } from "./extensionHost";
 import { setExtensionEnabled } from "./extensionList";
 import { checkForExtensionUpdatesNow, installFromWebStore, loadUnpackedExtension, removeExtensionAndCopy } from "./extensionsController";
+import { answerPasswordOffer } from "./passwordOffers";
 import { answerPermissionPrompt } from "./permissionPrompts";
 import { removePermissionAnswer } from "./sitePermissions";
 import { showMenuRequest } from "./menus";
@@ -477,6 +478,8 @@ export function runAction(action: BrowserAction): void {
       return;
     case "showExtensionsMenu":
       return showExtensionsMenu(action.anchor);
+    case "answerPasswordOffer":
+      return answerPasswordOffer(action.offerId, action.answer);
     case "answerPermissionPrompt":
       return answerPermissionPrompt(action.requestId, action.isAllowed);
     case "removeSitePermission":

@@ -59,6 +59,7 @@ export type OverlayPanel =
    * `pageColor`, the page view's color before it paints), and the page shows once it has grown.
    */
   | { kind: "peek"; frame: OverlayRect; card: OverlayRect; url: string; chromeColor: string; pageColor: string; canGoBack: boolean; canGoForward: boolean; growFrom: OverlayRect | null; peekNumber: number }
+  | { kind: "savePassword"; offerId: string; host: string; username: string; isUpdate: boolean }
   | { kind: "permission"; requestId: string; host: string; kinds: SitePermissionKind[]; appName: string | null }
   | { kind: "capture"; frame: { x: number; y: number; width: number; height: number } }
   | { kind: "switcher"; tabs: SwitcherTab[]; index: number }

@@ -146,6 +146,7 @@ export type BrowserAction =
   | { type: "restoreBackup" }
   | { type: "showExtensionsMenu"; anchor: { x: number; y: number; width: number; height: number } }
   | { type: "answerPermissionPrompt"; requestId: string; isAllowed: boolean }
+  | { type: "answerPasswordOffer"; offerId: string; answer: "save" | "never" | "notNow" }
   | { type: "removeSitePermission"; profileId: string; origin: string; kind: SitePermissionKind }
   | { type: "installWebStoreExtension"; extensionId: string }
   | { type: "checkExtensionUpdates" }
@@ -314,6 +315,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "restoreBackup",
   "showExtensionsMenu",
   "answerPermissionPrompt",
+  "answerPasswordOffer",
   "removeSitePermission",
   "installWebStoreExtension",
   "checkExtensionUpdates",
