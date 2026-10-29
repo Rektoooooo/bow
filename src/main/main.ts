@@ -58,6 +58,7 @@ import { loadToolbarColors } from "./toolbarTint";
 import { initializeFaviconAccents, refreshFaviconAccents } from "./faviconAccents";
 import { updateExtensionsFromWebStore } from "./extensionsController";
 import { isRecordableUrl } from "./history";
+import { saveAllVaultsNow, useMockKeychainInTests } from "./passwordVault";
 import { addVisit, loadHistory, saveHistoryNow, setVisitTitle } from "./historyStore";
 import { registerIpcHandlers } from "./ipc";
 import { archiveIdleLittleWindows, handleExternalUrl, registerLittleWindowIpc } from "./littleWindow";
@@ -503,6 +504,8 @@ function keepDataFolder(): void {
 function startApp(): void {
   // e2e runs only: windows stay invisible and never take the focus (backgroundTesting.ts).
   keepTestRunInBackground();
+  // e2e runs only: safeStorage uses a test key instead of the real Keychain (passwordVault.ts).
+  useMockKeychainInTests();
   // Before anything reads the data folder (the single-instance lock lives in it).
   keepDataFolder();
   useChromeUserAgent();
@@ -546,6 +549,7 @@ function startApp(): void {
   app.whenReady().then(handleAppReady);
   app.on("before-quit", () => {
     saveHistoryNow();
+    saveAllVaultsNow();
     savePrivacyReportNow();
     // Before the windows close their pages, which takes the lists with them.
     saveTabHistoriesNow();

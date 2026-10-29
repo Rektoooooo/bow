@@ -90,6 +90,8 @@ import {
   getSelectedTabId,
   removeSearchKeyword,
   setAskWhereToSave,
+  setOffersToSavePasswords,
+  setRemembersFormEntries,
   setDownloadFolder,
   setSpaceArchiveAfter,
   setSpaceNewTabUrl,
@@ -582,6 +584,10 @@ export function runAction(action: BrowserAction): void {
       return;
     case "setAskWhereToSave":
       return applyChange((state) => setAskWhereToSave(state, action.isOn));
+    case "setOffersToSavePasswords":
+      return applyChange((state) => setOffersToSavePasswords(state, action.isOn));
+    case "setRemembersFormEntries":
+      return applyChange((state) => setRemembersFormEntries(state, action.isOn));
     case "setTabNeverArchived":
       return applyChange((state) => setTabNeverArchived(state, action.tabId, action.isNeverArchived));
     case "setSpaceArchiveAfter":

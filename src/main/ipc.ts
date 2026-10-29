@@ -462,6 +462,8 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   runCommandChain: { chainId: isText },
   chooseDownloadFolder: {},
   setAskWhereToSave: { isOn: isBoolean },
+  setOffersToSavePasswords: { isOn: isBoolean },
+  setRemembersFormEntries: { isOn: isBoolean },
   setTabNeverArchived: { tabId: isText, isNeverArchived: isBoolean },
   setSpaceArchiveAfter: { spaceId: isText, archiveAfterMs: isSpaceArchiveAfter },
   setSpaceSearchEngine: { spaceId: isText, engineId: isSpaceSearchEngine },

@@ -319,6 +319,10 @@ export interface BrowserSettings {
   downloadFolder?: string;
   /** Each download asks where to save it (main/downloads.ts). Optional: missing means off. */
   asksWhereToSave?: boolean;
+  /** Bow offers to save a login after a page submits one (main/passwordVault.ts). Optional: missing means on. */
+  offersToSavePasswords?: boolean;
+  /** Bow remembers what is typed into forms (names, addresses) to suggest it again. Optional: missing means on. */
+  remembersFormEntries?: boolean;
   /** The first-start tour was finished or skipped (overlay/welcome.ts). Optional: missing means not yet. */
   hasSeenWelcome?: boolean;
   /**

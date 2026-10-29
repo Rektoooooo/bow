@@ -821,6 +821,26 @@ export function setAskWhereToSave(state: BrowserState, isOn: boolean): BrowserSt
 }
 
 /**
+ * "Offer to save passwords". Missing means on.
+ */
+export function setOffersToSavePasswords(state: BrowserState, isOn: boolean): BrowserState {
+  if ((state.settings.offersToSavePasswords !== false) === isOn) {
+    return state;
+  }
+  return { ...state, settings: { ...state.settings, offersToSavePasswords: isOn } };
+}
+
+/**
+ * "Remember what I type into forms". Missing means on.
+ */
+export function setRemembersFormEntries(state: BrowserState, isOn: boolean): BrowserState {
+  if ((state.settings.remembersFormEntries !== false) === isOn) {
+    return state;
+  }
+  return { ...state, settings: { ...state.settings, remembersFormEntries: isOn } };
+}
+
+/**
  * Marks a tab Never Archive (or not): neither the sweep nor Clear takes it; closing or deleting it still does.
  */
 export function setTabNeverArchived(state: BrowserState, tabId: ItemId, isNeverArchived: boolean): BrowserState {

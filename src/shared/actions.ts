@@ -175,6 +175,8 @@ export type BrowserAction =
   | { type: "runCommandChain"; chainId: string }
   | { type: "chooseDownloadFolder" }
   | { type: "setAskWhereToSave"; isOn: boolean }
+  | { type: "setOffersToSavePasswords"; isOn: boolean }
+  | { type: "setRemembersFormEntries"; isOn: boolean }
   | { type: "setTabNeverArchived"; tabId: ItemId; isNeverArchived: boolean }
   | { type: "setSpaceArchiveAfter"; spaceId: SpaceId; archiveAfterMs: number | null | "default" }
   /** A Space's own search engine, or the one in Settings ("default"). */
@@ -340,6 +342,8 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "runCommandChain",
   "chooseDownloadFolder",
   "setAskWhereToSave",
+  "setOffersToSavePasswords",
+  "setRemembersFormEntries",
   "setTabNeverArchived",
   "setSpaceArchiveAfter",
   "setSpaceSearchEngine",

@@ -583,7 +583,7 @@ function checkSettings(raw: unknown): BrowserSettings {
   if (typeof source.searchEngine === "string" && (SEARCH_ENGINE_IDS as readonly string[]).includes(source.searchEngine)) {
     settings.searchEngine = source.searchEngine as BrowserSettings["searchEngine"];
   }
-  const flags = ["isAdBlockOn", "isHttpsOnly", "areTitlesTidy", "showsFullUrls", "hasSeenWelcome", "areSnapshotsOn", "areFavoritesKeptAwake", "asksWhereToSave"] as const;
+  const flags = ["isAdBlockOn", "isHttpsOnly", "areTitlesTidy", "showsFullUrls", "hasSeenWelcome", "areSnapshotsOn", "areFavoritesKeptAwake", "asksWhereToSave", "offersToSavePasswords", "remembersFormEntries"] as const;
   for (const flag of flags) {
     if (typeof source[flag] === "boolean") {
       settings[flag] = source[flag] as boolean;

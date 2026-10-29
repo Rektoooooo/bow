@@ -104,11 +104,13 @@ describe("backups", () => {
 
   it("never take a download folder from a file, and keep this Mac's on replacing", () => {
     const crafted = craftedBackupText((backup) => {
-      backup.state.settings = { ...backup.state.settings, downloadFolder: "/Users/someone/Library/LaunchAgents", asksWhereToSave: true };
+      backup.state.settings = { ...backup.state.settings, downloadFolder: "/Users/someone/Library/LaunchAgents", asksWhereToSave: true, offersToSavePasswords: false, remembersFormEntries: false };
     });
     const restored = parseOrFail(crafted).state;
     expect(restored.settings.downloadFolder).toBeUndefined();
     expect(restored.settings.asksWhereToSave).toBe(true);
+    expect(restored.settings.offersToSavePasswords).toBe(false);
+    expect(restored.settings.remembersFormEntries).toBe(false);
     const current = setDownloadFolder(createInitialState(), "/Users/someone/Desktop");
     expect(replaceFromBackup(current, restored).settings.downloadFolder).toBe("/Users/someone/Desktop");
   });

@@ -30,6 +30,8 @@ import {
   restoreLastArchivedTab,
   setTabNeverArchived,
   setAskWhereToSave,
+  setOffersToSavePasswords,
+  setRemembersFormEntries,
   setDownloadFolder,
   selectTab,
   setSidebarWidth,
@@ -560,6 +562,22 @@ describe("download settings", () => {
     const asking = setAskWhereToSave(initialState, true);
     expect(asking.settings.asksWhereToSave).toBe(true);
     expect(setAskWhereToSave(initialState, false)).toBe(initialState);
+  });
+
+  it("offering to save passwords is on until turned off", () => {
+    expect(setOffersToSavePasswords(initialState, true)).toBe(initialState);
+    const notOffering = setOffersToSavePasswords(initialState, false);
+    expect(notOffering.settings.offersToSavePasswords).toBe(false);
+    expect(setOffersToSavePasswords(notOffering, false)).toBe(notOffering);
+    expect(setOffersToSavePasswords(notOffering, true).settings.offersToSavePasswords).toBe(true);
+  });
+
+  it("remembering form entries is on until turned off", () => {
+    expect(setRemembersFormEntries(initialState, true)).toBe(initialState);
+    const notRemembering = setRemembersFormEntries(initialState, false);
+    expect(notRemembering.settings.remembersFormEntries).toBe(false);
+    expect(setRemembersFormEntries(notRemembering, false)).toBe(notRemembering);
+    expect(setRemembersFormEntries(notRemembering, true).settings.remembersFormEntries).toBe(true);
   });
 });
 
