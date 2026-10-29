@@ -219,12 +219,14 @@ export function vividWashColor(color: string, isDark: boolean): string {
 /** Every browser Bow imports from, in the order the onboarding lists them (those on this Mac come first). */
 export const SUPPORTED_BROWSERS: { id: string; name: string }[] = [
   { id: "arc", name: "Arc" },
+  { id: "dia", name: "Dia" },
   { id: "chrome", name: "Chrome" },
   { id: "safari", name: "Safari" },
   { id: "firefox", name: "Firefox" },
   { id: "brave", name: "Brave" },
   { id: "edge", name: "Edge" },
   { id: "vivaldi", name: "Vivaldi" },
+  { id: "opera", name: "Opera" },
   { id: "chromium", name: "Chromium" },
 ];
 

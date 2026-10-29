@@ -1,7 +1,7 @@
 /**
  * WHY this file exists:
- *   File › Import From Browser and the onboarding bring bookmarks and history from Chrome, Brave, Edge, Vivaldi,
- *   Chromium, Firefox or Safari, like Arc's own importer. The readers (chromiumImport.ts, firefoxImport.ts,
+ *   File › Import From Browser and the onboarding bring bookmarks and history from Chrome, Dia, Brave, Edge, Vivaldi,
+ *   Opera, Chromium, Firefox or Safari, like Arc's own importer. The readers (chromiumImport.ts, firefoxImport.ts,
  *   safariImport.ts) and the state change (bookmarkImport.ts) are separate; this file finds what can be imported and
  *   runs one import in two steps: prepare (read the files once and count, changing nothing) and apply (bring the
  *   chosen parts over). The onboarding shows the counts first; the menu brings both and shows a summary.

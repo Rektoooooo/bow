@@ -659,9 +659,10 @@ button {
   width: 100%;
 }
 
+/* Ten browsers, two even rows of five. */
 .browser-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 92px));
+  grid-template-columns: repeat(5, minmax(0, 88px));
   gap: 6px;
   margin-top: clamp(14px, 2.8vh, 24px);
 }
@@ -2001,8 +2002,8 @@ body.dark .link-bubble-url {
   }
 
   .browser-grid {
-    grid-template-columns: repeat(4, minmax(0, 84px));
-    gap: 4px;
+    grid-template-columns: repeat(5, minmax(0, 74px));
+    gap: 2px;
   }
 }
 

@@ -232,7 +232,7 @@ const tiles = await waitInPage(() => {
 const tileIds = (tiles ?? []).map((tile) => tile.id);
 check(
   "every browser Bow imports from is listed, those with something here first",
-  tileIds.join() === "arc,chrome,safari,firefox,brave,edge,vivaldi,chromium" && tiles[0].isMissing === false && tiles[1].isMissing === false,
+  tileIds.join() === "arc,chrome,dia,safari,firefox,brave,edge,vivaldi,opera,chromium" && tiles[0].isMissing === false && tiles[1].isMissing === false,
   tileIds.join(),
 );
 check(

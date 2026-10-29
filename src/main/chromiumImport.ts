@@ -1,11 +1,12 @@
 /**
  * WHY this file exists:
- *   Chrome, Brave, Edge, Vivaldi and Chromium share one on-disk format. One importer covers all of them: it finds
- *   their profiles, turns the `Bookmarks` file into a bookmark tree and reads the `History` database.
+ *   Chrome, Dia, Brave, Edge, Vivaldi, Opera and Chromium share one on-disk format. One importer covers all of them: it
+ *   finds their profiles, turns the `Bookmarks` file into a bookmark tree and reads the `History` database.
  *
  * Data source:
  *   ~/Library/Application Support/<browser folder>/<profile folder>/{Bookmarks, History} and the browser's
- *   `Local State` file (profile display names). The home folder is a parameter so tests can use a temporary one.
+ *   `Local State` file (profile display names); Opera keeps its one profile in its data folder itself. The home
+ *   folder is a parameter so tests can use a temporary one.
  *
  * Data flow:
  *   findChromiumProfiles(home) → user picks one → readChromiumBookmarks(profile) → parseChromiumBookmarks()
@@ -29,9 +30,15 @@ export interface ChromiumBrowser {
 /** The Chromium-family browsers we know on macOS. Folder names are the browsers' own standard locations. */
 export const CHROMIUM_BROWSERS: ChromiumBrowser[] = [
   { id: "chrome", name: "Google Chrome", dataFolder: "Google/Chrome" },
+  // Dia (The Browser Company), like Arc: its binary names "Application Support/Dia", and its profiles sit in "User
+  // Data" (Finicky issue #456, trycua/cua pull request #5723; checked 2026-10-29).
+  { id: "dia", name: "Dia", dataFolder: "Dia/User Data" },
   { id: "brave", name: "Brave", dataFolder: "BraveSoftware/Brave-Browser" },
   { id: "edge", name: "Microsoft Edge", dataFolder: "Microsoft Edge" },
   { id: "vivaldi", name: "Vivaldi", dataFolder: "Vivaldi" },
+  // Opera keeps its profile in this folder itself, without a Default folder (HackBrowserData's browser_darwin.go,
+  // Opera's forums; checked 2026-10-29). listProfilesOfBrowser() reads either layout.
+  { id: "opera", name: "Opera", dataFolder: "com.operasoftware.Opera" },
   { id: "chromium", name: "Chromium", dataFolder: "Chromium" },
 ];
 
@@ -55,6 +62,7 @@ const LOCAL_STATE_FILE_NAME = "Local State";
 
 /** Chromium's profile folders: "Default" and "Profile 1", "Profile 2", … Other folders (Crashpad, …) are not profiles. */
 const PROFILE_FOLDER_PATTERN = /^(Default|Profile \d+)$/;
+const DEFAULT_PROFILE_FOLDER_NAME = "Default";
 
 /** Only these addresses can be opened by our tabs. */
 const WEB_URL_PATTERN = /^https?:\/\//i;
@@ -91,18 +99,36 @@ function readProfileDisplayName(localState: unknown, folderName: string): string
   return typeof name === "string" && name.trim().length > 0 ? name : null;
 }
 
-function listProfilesOfBrowser(homeFolder: string, browser: ChromiumBrowser): ChromiumProfile[] {
-  const browserFolder = path.join(homeFolder, APPLICATION_SUPPORT_PATH, browser.dataFolder);
+/**
+ * True when a folder holds a profile's files (bookmarks or history).
+ */
+function hasProfileFiles(folder: string): boolean {
+  return fs.existsSync(path.join(folder, BOOKMARKS_FILE_NAME)) || fs.existsSync(path.join(folder, HISTORY_FILE_NAME));
+}
+
+/**
+ * A browser's profile folders by name: "Default", "Profile 1", … inside its data folder; or, when the data folder
+ * holds the profile's files itself (Opera), that folder alone, named "Default".
+ */
+function listProfileFolders(browserFolder: string): { folderName: string; profileFolder: string }[] {
+  if (hasProfileFiles(browserFolder)) {
+    return [{ folderName: DEFAULT_PROFILE_FOLDER_NAME, profileFolder: browserFolder }];
+  }
   let folderNames: string[] = [];
   try {
     folderNames = fs.readdirSync(browserFolder);
   } catch (error) {
     return [];
   }
+  const profileFolderNames = folderNames.filter((name) => PROFILE_FOLDER_PATTERN.test(name));
+  return profileFolderNames.map((folderName) => ({ folderName: folderName, profileFolder: path.join(browserFolder, folderName) }));
+}
+
+function listProfilesOfBrowser(homeFolder: string, browser: ChromiumBrowser): ChromiumProfile[] {
+  const browserFolder = path.join(homeFolder, APPLICATION_SUPPORT_PATH, browser.dataFolder);
   const localState = readJsonFile(path.join(browserFolder, LOCAL_STATE_FILE_NAME));
   const profiles: ChromiumProfile[] = [];
-  for (const folderName of folderNames.filter((name) => PROFILE_FOLDER_PATTERN.test(name))) {
-    const profileFolder = path.join(browserFolder, folderName);
+  for (const { folderName, profileFolder } of listProfileFolders(browserFolder)) {
     const hasBookmarks = fs.existsSync(path.join(profileFolder, BOOKMARKS_FILE_NAME));
     const hasHistory = fs.existsSync(path.join(profileFolder, HISTORY_FILE_NAME));
     if (!hasBookmarks && !hasHistory) {

@@ -106,14 +106,18 @@ describe("the checklist", () => {
 
 describe("the browsers", () => {
   it("lists every browser Bow imports from", () => {
-    expect(SUPPORTED_BROWSERS.map((browser) => browser.id)).toEqual(["arc", "chrome", "safari", "firefox", "brave", "edge", "vivaldi", "chromium"]);
+    expect(SUPPORTED_BROWSERS.map((browser) => browser.id)).toEqual(["arc", "dia", "chrome", "safari", "firefox", "brave", "edge", "vivaldi", "opera", "chromium"]);
+  });
+
+  it("lists an even number, for two even rows of tiles", () => {
+    expect(SUPPORTED_BROWSERS.length % 2).toBe(0);
   });
 
   it("puts the browsers with something to import first, each group in the usual order", () => {
     const browsers: WelcomeBrowser[] = SUPPORTED_BROWSERS.map((browser) => ({ ...browser, sources: [] }));
     const withSafari = browsers.map((browser) => (browser.id === "safari" || browser.id === "brave" ? { ...browser, sources: [{ id: browser.id, profileName: null }] } : browser));
     const ordered = orderBrowsers(withSafari).map((browser) => browser.id);
-    expect(ordered).toEqual(["safari", "brave", "arc", "chrome", "firefox", "edge", "vivaldi", "chromium"]);
+    expect(ordered).toEqual(["safari", "brave", "arc", "dia", "chrome", "firefox", "edge", "vivaldi", "opera", "chromium"]);
   });
 });
 

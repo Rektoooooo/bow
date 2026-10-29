@@ -102,6 +102,23 @@ describe("findChromiumProfiles", () => {
     ]);
   });
 
+  it("finds Dia's profiles in its User Data folder, like Arc's", () => {
+    writeFile("Library/Application Support/Dia/User Data/Default/History", "");
+    writeFile("Library/Application Support/Dia/User Data/Profile 1/Bookmarks", JSON.stringify(BOOKMARKS_JSON));
+    const profiles = findChromiumProfiles(homeFolder).map((profile) => `${profile.browserId}:${profile.folderName}`);
+    expect(profiles).toEqual(["dia:Default", "dia:Profile 1"]);
+  });
+
+  it("takes Opera's data folder itself as its one profile (it has no Default folder)", () => {
+    const operaFolder = "Library/Application Support/com.operasoftware.Opera";
+    writeFile(`${operaFolder}/Bookmarks`, JSON.stringify(BOOKMARKS_JSON));
+    writeFile(`${operaFolder}/History`, "");
+    const profiles = findChromiumProfiles(homeFolder);
+    expect(profiles.map((profile) => `${profile.browserId}:${profile.folderName}`)).toEqual(["opera:Default"]);
+    expect(profiles[0]?.profileFolder).toBe(path.join(homeFolder, operaFolder));
+    expect(readChromiumBookmarks(profiles[0]!).length).toBeGreaterThan(0);
+  });
+
   it("returns nothing when no browser is installed", () => {
     expect(findChromiumProfiles(homeFolder)).toEqual([]);
   });
