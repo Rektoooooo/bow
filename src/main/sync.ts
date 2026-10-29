@@ -3,7 +3,7 @@
  *   Sync between the user's own Macs without an account or a server: Bow keeps one file per Mac in a folder the user
  *   picks (iCloud Drive, Dropbox, a NAS) and reads the other Macs' files. This file is the pure part. The sidebar is
  *   cut into small units (a tab, a folder, a split view, a Space's name and look, a Space's Pinned order, the Space
- *   order, a profile's Favorites, a Boost, the Air Traffic Control rules, the command chains, the Space templates, a
+ *   order, a Space's Favorites, a Boost, the Air Traffic Control rules, the command chains, the Space templates, a
  *   Note, an Easel), each with a fingerprint and the time it last changed on the Mac that changed it. Merging goes
  *   unit by unit: the newer change wins, a deletion wins over older edits and ties, and a unit changed on both Macs
  *   too close in time to tell which came first (clocks differ) is counted as a conflict and decided the same way on
@@ -75,7 +75,7 @@ export interface SyncPayload {
   deviceId: string;
   deviceName: string;
   writtenAt: number;
-  /** The synced parts of the state: Spaces (without Today), their Pinned trees, Favorites, Boosts and rules. */
+  /** The synced parts of the state: Spaces (without Today), their Favorites and Pinned trees, Boosts and rules. */
   state: BrowserState;
   stamps: Record<string, UnitStamp>;
   tombstones: Record<string, number>;
@@ -159,7 +159,7 @@ function toSyncedItem(item: SidebarItem): unknown {
 }
 
 /**
- * The ids of every synced item: everything reachable from the Spaces' Pinned lists and the Favorites, except the
+ * The ids of every synced item: everything reachable from the Spaces' Favorites and Pinned lists, except the
  * children of live folders.
  */
 export function collectSyncedItemIds(state: BrowserState): Set<ItemId> {
@@ -178,10 +178,8 @@ export function collectSyncedItemIds(state: BrowserState): Set<ItemId> {
     }
   };
   for (const space of state.spaces) {
+    visit(space.favoriteIds);
     visit(space.pinnedIds);
-  }
-  for (const profile of state.profiles) {
-    visit(profile.favoriteIds);
   }
   return synced;
 }
@@ -214,11 +212,11 @@ export function collectUnits(state: BrowserState, notes: Record<string, string>,
   for (const space of state.spaces) {
     addUnit(units, `space:${space.id}`, { name: space.name, icon: space.icon, theme: space.theme, profileId: space.profileId });
     addUnit(units, `pinned:${space.id}`, space.pinnedIds);
+    addUnit(units, `favorites:${space.id}`, space.favoriteIds);
   }
   addUnit(units, "order", state.spaces.map((space) => space.id));
   for (const profile of state.profiles) {
     addUnit(units, `profile:${profile.id}`, { name: profile.name });
-    addUnit(units, `favorites:${profile.id}`, profile.favoriteIds);
   }
   for (const boost of state.boosts ?? []) {
     addUnit(units, `boost:${boost.site}`, boost);
@@ -371,30 +369,45 @@ function readFiles(raw: unknown, isId: (value: unknown) => boolean, maxLength: n
   return files;
 }
 
+/** The first saved-state version whose Favorites sync per Space; a peer on an earlier one is not merged. */
+const FIRST_PER_SPACE_FAVORITES_VERSION = 5;
+
+/** A peer's file this Bow read: the payload, or why there is none (damaged or from a newer Bow / from an older Bow). */
+export type SyncParseResult = { payload: SyncPayload; problem: null } | { payload: null; problem: "unreadable" | "older" };
+
+const UNREADABLE_FILE: SyncParseResult = { payload: null, problem: "unreadable" };
+
 /**
- * Reads a peer's sync file. Null when it is not one, is from a newer Bow, or its sidebar can't be read. Its state is
- * checked like a restored backup (only safe addresses, real references, JavaScript Boosts off).
+ * Reads a peer's sync file. No payload when it is not one, is from a newer Bow, or its sidebar can't be read, and no
+ * payload ("older") when the Mac that wrote it still keeps Favorites per profile: its Favorites cannot be placed in
+ * a Space, so nothing of that file is merged until that Mac updates. The payload's state is checked like a restored
+ * backup (only safe addresses, real references, JavaScript Boosts off).
  */
-export function parseSyncPayload(text: string): SyncPayload | null {
+export function parseSyncPayload(text: string, now: number): SyncParseResult {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {
-    return null;
+    return UNREADABLE_FILE;
   }
   if (!isRecord(parsed)) {
-    return null;
+    return UNREADABLE_FILE;
   }
   const isPayload = parsed.format === SYNC_FORMAT && typeof parsed.formatVersion === "number" && parsed.formatVersion <= SYNC_FORMAT_VERSION;
   if (!isPayload || typeof parsed.deviceId !== "string" || !DEVICE_ID_PATTERN.test(parsed.deviceId) || typeof parsed.writtenAt !== "number") {
-    return null;
+    return UNREADABLE_FILE;
   }
-  const upgraded = upgradeToCurrentVersion(parsed.state);
+  // The raw version, read before the upgrade below makes every file look current.
+  const rawVersion = isRecord(parsed.state) ? parsed.state.version : null;
+  if (typeof rawVersion === "number" && rawVersion < FIRST_PER_SPACE_FAVORITES_VERSION) {
+    return { payload: null, problem: "older" };
+  }
+  const upgraded = upgradeToCurrentVersion(parsed.state, now);
   const state = upgraded === null ? null : checkBackupState(upgraded, { leftOut: 0, scriptsTurnedOff: 0 });
   if (state === null) {
-    return null;
+    return UNREADABLE_FILE;
   }
-  return {
+  const payload: SyncPayload = {
     format: SYNC_FORMAT,
     formatVersion: parsed.formatVersion as number,
     deviceId: parsed.deviceId,
@@ -406,6 +419,7 @@ export function parseSyncPayload(text: string): SyncPayload | null {
     notes: readFiles(parsed.notes, isNoteId, MAX_NOTE_LENGTH),
     easels: readFiles(parsed.easels, isEaselId, MAX_EASEL_LENGTH),
   };
+  return { payload: payload, problem: null };
 }
 
 // ---------- Merging a peer ----------
@@ -509,7 +523,7 @@ function landSpace(remote: Space, local: Space | undefined): Space {
   if (local !== undefined) {
     return { ...local, ...fields };
   }
-  return { id: remote.id, ...fields, pinnedIds: [], todayIds: [], isPinnedOpen: true };
+  return { id: remote.id, ...fields, favoriteIds: [], pinnedIds: [], todayIds: [], isPinnedOpen: true };
 }
 
 /**
@@ -544,10 +558,11 @@ function tidyLists(state: BrowserState): BrowserState {
     }
     return kept;
   };
-  const profiles = state.profiles.map((profile) => ({ ...profile, favoriteIds: keep(profile.favoriteIds) }));
-  const spaces = state.spaces.map((space) => ({ ...space, pinnedIds: keep(space.pinnedIds), todayIds: keep(space.todayIds) }));
+  // Favorites of every Space first, so an item listed as a Favorite and elsewhere stays a Favorite.
+  const spacesWithFavorites = state.spaces.map((space) => ({ ...space, favoriteIds: keep(space.favoriteIds) }));
+  const spaces = spacesWithFavorites.map((space) => ({ ...space, pinnedIds: keep(space.pinnedIds), todayIds: keep(space.todayIds) }));
   const unreached = Object.keys(items).filter((itemId) => !seen.has(itemId));
-  return deleteItems({ ...state, items: items, profiles: profiles, spaces: spaces }, unreached);
+  return deleteItems({ ...state, items: items, spaces: spaces }, unreached);
 }
 
 /**
@@ -578,7 +593,7 @@ function applyAdoptedUnits(state: BrowserState, payload: SyncPayload, keys: stri
     }
   }
   let spaces = [...state.spaces];
-  let profiles = state.profiles.map((profile) => ({ ...profile }));
+  let profiles = state.profiles;
   for (const key of keys) {
     const separatorIndex = key.indexOf(":");
     const kind = key.slice(0, separatorIndex);
@@ -592,9 +607,12 @@ function applyAdoptedUnits(state: BrowserState, payload: SyncPayload, keys: stri
     if (kind === "pinned" && remoteSpace !== undefined) {
       spaces = spaces.map((space) => (space.id === id ? { ...space, pinnedIds: remoteSpace.pinnedIds } : space));
     }
+    if (kind === "favorites" && remoteSpace !== undefined) {
+      spaces = spaces.map((space) => (space.id === id ? { ...space, favoriteIds: remoteSpace.favoriteIds } : space));
+    }
     const remoteProfile = payload.state.profiles.find((profile) => profile.id === id);
-    if ((kind === "profile" || kind === "favorites") && remoteProfile !== undefined) {
-      profiles = landProfile(profiles, remoteProfile, kind === "favorites");
+    if (kind === "profile" && remoteProfile !== undefined) {
+      profiles = landProfile(profiles, remoteProfile);
     }
   }
   if (keys.includes("order")) {
@@ -608,14 +626,14 @@ function applyAdoptedUnits(state: BrowserState, payload: SyncPayload, keys: stri
 }
 
 /**
- * A profile from the peer: its name, or its Favorites list. A profile this Mac lacks is added.
+ * A profile from the peer: its name. A profile this Mac lacks is added.
  */
-function landProfile(profiles: Profile[], remote: Profile, isFavorites: boolean): Profile[] {
+function landProfile(profiles: Profile[], remote: Profile): Profile[] {
   const local = profiles.find((profile) => profile.id === remote.id);
   if (local === undefined) {
-    return [...profiles, { id: remote.id, name: remote.name, favoriteIds: isFavorites ? remote.favoriteIds : [] }];
+    return [...profiles, { id: remote.id, name: remote.name }];
   }
-  const landed = isFavorites ? { ...local, favoriteIds: remote.favoriteIds } : { ...local, name: remote.name };
+  const landed = { ...local, name: remote.name };
   return profiles.map((profile) => (profile.id === remote.id ? landed : profile));
 }
 

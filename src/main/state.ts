@@ -28,7 +28,6 @@ import {
   createId,
   deleteItems,
   findLocation,
-  findProfileIdOfItem,
   findRootLocation,
   findSpace,
   findSpaceIdOfItem,
@@ -53,6 +52,7 @@ export function createInitialState(): BrowserState {
     icon: "🏠",
     theme: { colors: ["#e9d8d4"], appearance: "auto", grain: 0 },
     profileId: DEFAULT_PROFILE_ID,
+    favoriteIds: [],
     pinnedIds: [],
     todayIds: [],
     isPinnedOpen: true,
@@ -63,15 +63,16 @@ export function createInitialState(): BrowserState {
     icon: "💼",
     theme: { colors: ["#d4dfe9"], appearance: "auto", grain: 0 },
     profileId: DEFAULT_PROFILE_ID,
+    favoriteIds: [],
     pinnedIds: [],
     todayIds: [],
     isPinnedOpen: true,
   };
 
   return {
-    version: 4,
+    version: 5,
     items: {},
-    profiles: [{ id: DEFAULT_PROFILE_ID, name: "Default", favoriteIds: [] }],
+    profiles: [{ id: DEFAULT_PROFILE_ID, name: "Default" }],
     spaces: [personalSpace, workSpace],
     activeSpaceId: personalSpace.id,
     selectedTabIdBySpace: {
@@ -182,28 +183,6 @@ export function setNoteTitle(state: BrowserState, noteUrl: string, title: string
 }
 
 /**
- * Finds which Space should show a tab. A tab in a Space's lists belongs to that Space. A Favorite belongs to a
- * profile, so it shows in the active Space when that Space uses the same profile, otherwise in the first Space that does.
- */
-function findSpaceToShowTab(state: BrowserState, tabId: ItemId): SpaceId | null {
-  const ownSpaceId = findSpaceIdOfItem(state, tabId);
-  if (ownSpaceId !== null) {
-    return ownSpaceId;
-  }
-
-  const profileId = findProfileIdOfItem(state, tabId);
-  if (profileId === null) {
-    return null;
-  }
-  const activeSpace = getActiveSpace(state);
-  if (activeSpace.profileId === profileId) {
-    return activeSpace.id;
-  }
-  const spaceWithProfile = state.spaces.find((space) => space.profileId === profileId);
-  return spaceWithProfile === undefined ? null : spaceWithProfile.id;
-}
-
-/**
  * Selects a tab and makes its Space active. Both the tab you leave and the tab you open get lastActiveAt = now,
  * because leaving a tab is the last moment it was in use.
  */
@@ -212,7 +191,8 @@ export function selectTab(state: BrowserState, tabId: ItemId, now: number): Brow
   if (tab === undefined) {
     return state;
   }
-  const spaceId = findSpaceToShowTab(state, tabId);
+  // A tab shows in the Space whose Favorites, Pinned or Today list holds it.
+  const spaceId = findSpaceIdOfItem(state, tabId);
   if (spaceId === null) {
     return state;
   }
@@ -268,7 +248,7 @@ export function updateTabFavicon(state: BrowserState, tabId: ItemId, faviconUrl:
 
 /**
  * Pins a tab: it moves to the bottom of its Space's Pinned list and remembers its current URL as its home.
- * A Favorite goes to the active Space's Pinned list. A pinned tab is left alone.
+ * A Favorite goes to the Pinned list of the Space it is a Favorite of. A pinned tab is left alone.
  * Example: pin a tab on "https://mail.example.com/inbox" → homeUrl is "https://mail.example.com/inbox"
  */
 export function pinTab(state: BrowserState, tabId: ItemId): BrowserState {
@@ -278,9 +258,9 @@ export function pinTab(state: BrowserState, tabId: ItemId): BrowserState {
     return state;
   }
 
-  const spaceId = rootLocation.kind === "today" ? rootLocation.spaceId : state.activeSpaceId;
-  const space = findSpace(state, spaceId);
-  if (space === undefined) {
+  const spaceId = findSpaceIdOfItem(state, tabId);
+  const space = spaceId === null ? undefined : findSpace(state, spaceId);
+  if (spaceId === null || space === undefined) {
     return state;
   }
 
@@ -303,7 +283,10 @@ export function unpinTab(state: BrowserState, tabId: ItemId, now: number): Brows
     return state;
   }
 
-  const spaceId = rootLocation.kind === "pinned" ? rootLocation.spaceId : state.activeSpaceId;
+  const spaceId = findSpaceIdOfItem(state, tabId);
+  if (spaceId === null) {
+    return state;
+  }
   const stateWithoutTab = removeFromLocation(state, tabId);
   const todayLocation: ItemLocation = { kind: "today", spaceId: spaceId };
   const stateWithTab = insertIntoLocation(stateWithoutTab, todayLocation, tabId, 0);
@@ -311,18 +294,18 @@ export function unpinTab(state: BrowserState, tabId: ItemId, now: number): Brows
 }
 
 /**
- * Makes a tab a Favorite of its profile (the tiles at the top). Returns the same state when that profile already
+ * Makes a tab a Favorite of the Space it is in (the tiles at the top). Returns the same state when that Space already
  * has FAVORITES_LIMIT Favorites, or the tab is one already.
  */
 export function addToFavorites(state: BrowserState, tabId: ItemId): BrowserState {
   const tab = findTab(state, tabId);
   const location = findLocation(state, tabId);
-  const profileId = findProfileIdOfItem(state, tabId);
-  if (tab === undefined || location === null || location.kind === "favorites" || profileId === null) {
+  const spaceId = findSpaceIdOfItem(state, tabId);
+  if (tab === undefined || location === null || location.kind === "favorites" || spaceId === null) {
     return state;
   }
 
-  const favoritesLocation: ItemLocation = { kind: "favorites", profileId: profileId };
+  const favoritesLocation: ItemLocation = { kind: "favorites", spaceId: spaceId };
   const favoriteIds = getIdsAt(state, favoritesLocation);
   if (favoriteIds.length >= FAVORITES_LIMIT) {
     return state;
@@ -379,9 +362,10 @@ export function moveItem(state: BrowserState, itemId: ItemId, target: ItemLocati
     return state;
   }
   const currentLocation = findLocation(state, itemId);
-  const isAlreadyFavorite = currentLocation !== null && currentLocation.kind === "favorites";
+  // Reordering inside a full row is fine; a Favorite of another Space (or any other tab) needs a free slot.
+  const isAlreadyInTarget = currentLocation !== null && isSameLocation(currentLocation, target);
   const favoritesAreFull = target.kind === "favorites" && getIdsAt(state, target).length >= FAVORITES_LIMIT;
-  if (favoritesAreFull && !isAlreadyFavorite) {
+  if (favoritesAreFull && !isAlreadyInTarget) {
     return state;
   }
 
@@ -536,14 +520,12 @@ export function setTabMuted(state: BrowserState, tabId: ItemId, isMuted: boolean
 }
 
 /**
- * Returns every tab id a Space can show: its Pinned and Today tabs plus its profile's Favorites.
+ * Returns every tab id a Space can show: its Favorites, Pinned and Today tabs.
  */
 function collectSpaceTabIds(state: BrowserState, space: Space): ItemId[] {
-  const profile = state.profiles.find((candidate) => candidate.id === space.profileId);
-  const favoriteIds = profile === undefined ? [] : profile.favoriteIds;
   const pinnedTabIds = collectTabIdsInList(state, space.pinnedIds);
   const todayTabIds = collectTabIdsInList(state, space.todayIds);
-  return [...favoriteIds, ...pinnedTabIds, ...todayTabIds];
+  return [...space.favoriteIds, ...pinnedTabIds, ...todayTabIds];
 }
 
 /**
@@ -967,7 +949,9 @@ export function duplicateTab(state: BrowserState, tabId: ItemId, now: number): B
     const index = getIdsAt(state, location).indexOf(tabId) + 1;
     stateWithCopy = insertIntoLocation(stateWithItem, location, copy.id, index);
   } else {
-    stateWithCopy = insertIntoLocation(stateWithItem, { kind: "today", spaceId: state.activeSpaceId }, copy.id, 0);
+    // A Pinned tab or Favorite copies into the Today of the Space it belongs to.
+    const copySpaceId = findSpaceIdOfItem(state, tabId) ?? state.activeSpaceId;
+    stateWithCopy = insertIntoLocation(stateWithItem, { kind: "today", spaceId: copySpaceId }, copy.id, 0);
   }
   return selectTab(stateWithCopy, copy.id, now);
 }
@@ -1208,11 +1192,9 @@ export function setCompactMode(state: BrowserState, isOn: boolean): BrowserState
  */
 export function listVisibleTabIds(state: BrowserState): ItemId[] {
   const space = getActiveSpace(state);
-  const profile = state.profiles.find((candidate) => candidate.id === space.profileId);
-  const favoriteIds = profile === undefined ? [] : profile.favoriteIds;
   const pinnedTabIds = space.isPinnedOpen ? collectOpenTabIds(state, space.pinnedIds) : [];
   const todayTabIds = collectTabIdsInList(state, space.todayIds);
-  return [...favoriteIds, ...pinnedTabIds, ...todayTabIds];
+  return [...space.favoriteIds, ...pinnedTabIds, ...todayTabIds];
 }
 
 /**

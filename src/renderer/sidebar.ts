@@ -175,25 +175,23 @@ function renderHeader(state: BrowserState): void {
 }
 
 /**
- * Draws the Favorites tiles of the active Space's profile, and a drop zone for adding more.
+ * Draws the Favorites tiles of the active Space, and a drop zone for adding more.
  */
 function renderFavorites(state: BrowserState, space: Space, context: RowContext, motion: MorphOptions): void {
   const container = document.getElementById("favorites");
   if (container === null) {
     return;
   }
-  const profile = state.profiles.find((candidate) => candidate.id === space.profileId);
-  const favoriteIds = profile === undefined ? [] : profile.favoriteIds;
-  const location: ItemLocation = { kind: "favorites", profileId: space.profileId };
+  const location: ItemLocation = { kind: "favorites", spaceId: space.id };
 
   const tiles: HTMLElement[] = [];
-  favoriteIds.forEach((tabId, index) => {
+  space.favoriteIds.forEach((tabId, index) => {
     const tab = state.items[tabId];
     if (tab !== undefined && tab.kind === "tab") {
       tiles.push(renderFavoriteTile(tab, location, index, context));
     }
   });
-  // The end zone's drop location follows the active Space's profile on every redraw.
+  // The end zone's drop location follows the active Space on every redraw.
   const endZone = createElement("div", "favorites-end-zone");
   endZone.dataset.key = "favorites-end";
   endZone.title = "Drop a tab here to make it a Favorite";
@@ -342,9 +340,10 @@ function renderSpaceContent(state: BrowserState, space: Space, context: RowConte
 }
 
 /**
- * Plays a short slide when the active Space changes, in the direction of the new Space, like Arc's swipe.
+ * Plays a short slide when the active Space changes, in the direction of the new Space, like Arc's swipe. The
+ * Favorites row slides along with the Space's tabs, because the row belongs to the Space too.
  */
-function slideIfSpaceChanged(state: BrowserState, content: HTMLElement): void {
+function slideIfSpaceChanged(state: BrowserState, slidingElements: HTMLElement[]): void {
   const previousSpaceId = lastRenderedSpaceId;
   lastRenderedSpaceId = state.activeSpaceId;
   if (previousSpaceId === null || previousSpaceId === state.activeSpaceId) {
@@ -353,10 +352,12 @@ function slideIfSpaceChanged(state: BrowserState, content: HTMLElement): void {
   const previousIndex = state.spaces.findIndex((space) => space.id === previousSpaceId);
   const newIndex = state.spaces.findIndex((space) => space.id === state.activeSpaceId);
   const slideClass = newIndex > previousIndex ? "slide-from-right" : "slide-from-left";
-  content.classList.remove("slide-from-right", "slide-from-left");
-  // Reading offsetWidth restarts the CSS animation when the same class is added again.
-  void content.offsetWidth;
-  content.classList.add(slideClass);
+  for (const element of slidingElements) {
+    element.classList.remove("slide-from-right", "slide-from-left");
+    // Reading offsetWidth restarts the CSS animation when the same class is added again.
+    void element.offsetWidth;
+    element.classList.add(slideClass);
+  }
 }
 
 /**
@@ -596,8 +597,9 @@ function renderAll(): void {
   renderSpaceContent(state, space, context, motion);
   keepOnly(listTabRowOrder());
   const content = document.getElementById("space-content");
-  if (content !== null) {
-    slideIfSpaceChanged(state, content);
+  const favoritesRow = document.getElementById("favorites");
+  if (content !== null && favoritesRow !== null) {
+    slideIfSpaceChanged(state, [favoritesRow, content]);
   }
   hasRenderedOnce = true;
   renderMediaPlayer(state);

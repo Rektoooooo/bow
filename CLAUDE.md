@@ -62,8 +62,8 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   `history.ts`, `layout.ts`, `migrate.ts`, `backup.ts`, `sync.ts` and the Arc importers take data in and return a
   changed copy. No Electron, no
   `Date.now()` inside; `now` is a parameter. Return the *same object* when nothing changed.
-- **Data model** (`src/shared/types.ts`, version 4) follows Arc's: every sidebar object is an item; order lives only
-  in ordered id lists (profile Favorites, Space Pinned / Today, folder and split children). No parent pointers.
+- **Data model** (`src/shared/types.ts`, version 5) follows Arc's: every sidebar object is an item; order lives only
+  in ordered id lists (Space Favorites, Pinned and Today, folder and split children). No parent pointers.
   A saved-shape change needs a version bump and an upgrade step in `migrate.ts`.
 - **One way to change state.** Only `applyChange()` in `src/main/browserCore.ts` replaces the state; it saves, calls
   `syncTabViews()`, keeps floating layers (overlay, Peek) on top and pushes state to the sidebar. Runtime facts that

@@ -206,7 +206,7 @@ export function readBackupFile(filePath: string): { backup: CheckedBackup } | { 
     if (size > MAX_BACKUP_FILE_BYTES) {
       return { error: "This file is too large to be a Bow backup." };
     }
-    const result = parseBackup(fs.readFileSync(filePath, "utf8"));
+    const result = parseBackup(fs.readFileSync(filePath, "utf8"), Date.now());
     return result.isValid ? { backup: result.backup } : { error: result.error };
   } catch {
     return { error: "This file could not be read." };

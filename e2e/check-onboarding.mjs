@@ -517,12 +517,11 @@ check(
 const stateAfterArc = await getState();
 const spaceNames = stateAfterArc.spaces.map((space) => space.name);
 const activeSpace = stateAfterArc.spaces.find((space) => space.id === stateAfterArc.activeSpaceId);
-const defaultProfile = stateAfterArc.profiles.find((profile) => profile.id === activeSpace.profileId);
 const arcHistory = (await historyUrls()).filter((url) => url.includes("arc.example.org")).length;
 check(
-  "Arc's Spaces, Favorites and history arrive, and its first Space opens",
-  spaceNames.includes("Studio") && spaceNames.includes("Home") && activeSpace.name === "Studio" && defaultProfile.favoriteIds.length === IMPORT_HOME_COUNTS.arc.favorites && arcHistory === IMPORT_HOME_COUNTS.arc.history,
-  JSON.stringify({ spaceNames, active: activeSpace.name, favorites: defaultProfile.favoriteIds.length, arcHistory }),
+  "Arc's Spaces, Favorites (in the first Space, which opens) and history arrive",
+  spaceNames.includes("Studio") && spaceNames.includes("Home") && activeSpace.name === "Studio" && activeSpace.favoriteIds.length === IMPORT_HOME_COUNTS.arc.favorites && arcHistory === IMPORT_HOME_COUNTS.arc.history,
+  JSON.stringify({ spaceNames, active: activeSpace.name, favorites: activeSpace.favoriteIds.length, arcHistory }),
 );
 const preview = await page.evaluate(() => ({
   isShown: document.querySelector(".onboarding").classList.contains("shows-preview"),

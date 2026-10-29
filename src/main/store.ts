@@ -42,6 +42,21 @@ function keepBrokenFile(filePath: string, now: number): void {
 }
 
 /**
+ * Keeps the file as it was before an upgrade, as browser-state.version-<n>-<time>.json next to it: an older Bow can
+ * open that copy again (it cannot read the upgraded file), and nothing is lost if an upgrade ever misreads a file.
+ * A copy that cannot be written does not stop the start: the upgrade itself keeps every item.
+ */
+function keepPreUpgradeCopy(filePath: string, fileText: string, fileVersion: unknown, now: number): void {
+  const folder = path.dirname(filePath);
+  const copyPath = path.join(folder, `browser-state.version-${String(fileVersion)}-${now}.json`);
+  try {
+    fs.writeFileSync(copyPath, fileText, "utf8");
+  } catch (error) {
+    console.warn("Could not keep a copy of the state before upgrading it:", error);
+  }
+}
+
+/**
  * Reads the saved state, upgrading older versions. Returns a fresh initial state when the file does not exist yet.
  * When the file is unreadable, not valid JSON, or from an unknown version, keeps a copy and starts fresh.
  */
@@ -53,8 +68,12 @@ export function loadState(filePath: string, now: number): BrowserState {
   try {
     const fileText = fs.readFileSync(filePath, "utf8");
     const parsedValue: unknown = JSON.parse(fileText);
-    const upgradedState = upgradeToCurrentVersion(parsedValue);
+    const upgradedState = upgradeToCurrentVersion(parsedValue, now);
     if (upgradedState !== null) {
+      const fileVersion = (parsedValue as { version?: unknown }).version;
+      if (fileVersion !== upgradedState.version) {
+        keepPreUpgradeCopy(filePath, fileText, fileVersion, now);
+      }
       return upgradedState;
     }
   } catch (error) {

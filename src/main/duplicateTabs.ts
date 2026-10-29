@@ -26,8 +26,8 @@ interface PlacedTab {
 }
 
 /**
- * The tabs of a profile, in the order a match is preferred: the given Space's Pinned and Today tabs, the profile's
- * Favorites, then its other Spaces.
+ * The tabs of a profile, in the order a match is preferred: the given Space's Pinned, Today and Favorites, then those
+ * of the profile's other Spaces.
  */
 function listProfileTabs(state: BrowserState, profileId: string, preferredSpaceId: SpaceId | null): PlacedTab[] {
   const placed: PlacedTab[] = [];
@@ -45,10 +45,9 @@ function listProfileTabs(state: BrowserState, profileId: string, preferredSpaceI
   const addSpace = (space: Space): void => {
     addList(space.pinnedIds, false);
     addList(space.todayIds, true);
+    addList(space.favoriteIds, false);
   };
   preferred.forEach(addSpace);
-  const profile = state.profiles.find((candidate) => candidate.id === profileId);
-  addList(profile?.favoriteIds ?? [], false);
   others.forEach(addSpace);
   return placed;
 }

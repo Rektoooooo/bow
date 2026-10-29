@@ -25,6 +25,7 @@ import type {
   ProfileId,
   SidebarItem,
   Space,
+  SpaceId,
   SpaceTheme,
   SplitItem,
   SplitOrientation,
@@ -93,7 +94,7 @@ export interface ArcImportReport {
   foldersImported: number;
   splitViewsImported: number;
   favoritesImported: number;
-  /** Favorites skipped because a profile already had the most Favorites allowed. */
+  /** Favorites skipped because their Space already had the most Favorites allowed. */
   favoritesDropped: number;
   /** Folders (counted in foldersImported too) that Arc fills from GitHub. They become our GitHub live folders. */
   liveFolders: number;
@@ -112,6 +113,10 @@ interface ImportContext {
   items: Record<ItemId, SidebarItem>;
   profiles: Profile[];
   spaces: Space[];
+  /** The Spaces this run created from Arc's, in Arc's order: the first one with a profile gets that profile's Favorites. */
+  importedSpaceIds: SpaceId[];
+  /** The Space that was active before the import: it takes Favorites no imported Space can. */
+  activeSpaceId: SpaceId;
   selectedTabIdBySpace: Record<string, ItemId | null>;
   /** Arc item ids already looked at, so a loop in Arc's data cannot make us run forever. */
   visitedArcItemIds: Set<string>;
@@ -351,7 +356,7 @@ function resolveProfileId(context: ImportContext, arcProfileKey: unknown): Profi
   const profileId = arcProfileFolderToProfileId(directoryBasename);
   const profileExists = context.profiles.some((profile) => profile.id === profileId);
   if (!profileExists) {
-    context.profiles.push({ id: profileId, name: directoryBasename, favoriteIds: [] });
+    context.profiles.push({ id: profileId, name: directoryBasename });
   }
   return profileId;
 }
@@ -558,16 +563,29 @@ function importSpace(context: ImportContext, arcSpaceKey: unknown, arcSpace: unk
     icon: readArcIcon(customInfo),
     theme: readArcTheme(customInfo),
     profileId: profileId,
+    favoriteIds: [],
     pinnedIds: pinnedIds,
     todayIds: todayIds,
     isPinnedOpen: true,
   });
+  context.importedSpaceIds.push(newSpaceId);
   context.selectedTabIdBySpace[newSpaceId] = null;
   context.report.spacesImported += 1;
 }
 
-/** Adds one Favorites container's tabs to a profile, up to FAVORITES_LIMIT in total. */
-function importFavoritesContainer(context: ImportContext, profile: Profile, containerChildIds: unknown[]): void {
+/**
+ * The Space that takes an Arc profile's Favorites (Arc keeps them per profile, we per Space): the first Space this run
+ * imported with that profile, else the Space that was active before the import (an import without Spaces, or a
+ * profile none of the imported Spaces uses).
+ */
+function findFavoritesSpace(context: ImportContext, profileId: ProfileId): Space | undefined {
+  const importedSpaces = context.spaces.filter((space) => context.importedSpaceIds.includes(space.id));
+  const spaceWithProfile = importedSpaces.find((space) => space.profileId === profileId);
+  return spaceWithProfile ?? context.spaces.find((space) => space.id === context.activeSpaceId);
+}
+
+/** Adds one Favorites container's tabs to a Space, up to FAVORITES_LIMIT in total. */
+function importFavoritesContainer(context: ImportContext, space: Space, containerChildIds: unknown[]): void {
   for (const childArcId of containerChildIds) {
     const childItem = lookupArcItem(context, childArcId);
     if (childItem === null || typeof childArcId !== "string" || !claimArcItem(context, childArcId)) {
@@ -582,12 +600,12 @@ function importFavoritesContainer(context: ImportContext, profile: Profile, cont
     if (tab === null) {
       continue;
     }
-    if (profile.favoriteIds.length >= FAVORITES_LIMIT) {
+    if (space.favoriteIds.length >= FAVORITES_LIMIT) {
       context.report.favoritesDropped += 1;
       continue;
     }
     context.items[tab.id] = tab;
-    profile.favoriteIds.push(tab.id);
+    space.favoriteIds.push(tab.id);
     context.report.favoritesImported += 1;
   }
 }
@@ -595,13 +613,13 @@ function importFavoritesContainer(context: ImportContext, profile: Profile, cont
 function importFavorites(context: ImportContext, topAppsContainerIds: unknown): void {
   for (const pair of readPairs(topAppsContainerIds)) {
     const profileId = resolveProfileId(context, pair.key);
-    const profile = context.profiles.find((candidate) => candidate.id === profileId);
+    const space = profileId === null ? undefined : findFavoritesSpace(context, profileId);
     const container = lookupArcItem(context, pair.value);
-    if (profile === undefined || container === null) {
+    if (space === undefined || container === null) {
       countSkipped(context.report, "favoritesWithoutProfile");
       continue;
     }
-    importFavoritesContainer(context, profile, readArray(container, "childrenIds") ?? []);
+    importFavoritesContainer(context, space, readArray(container, "childrenIds") ?? []);
   }
 }
 
@@ -679,8 +697,11 @@ export function importArcSidebar(arcFile: unknown, state: BrowserState, now: num
     const context: ImportContext = {
       arcItems: createArcItemMap(liveContainer["items"]),
       items: { ...state.items },
-      profiles: state.profiles.map((profile) => ({ ...profile, favoriteIds: [...profile.favoriteIds] })),
-      spaces: [...state.spaces],
+      profiles: [...state.profiles],
+      // Copies, because a Space's Favorites list grows while the import runs.
+      spaces: state.spaces.map((space) => ({ ...space, favoriteIds: [...space.favoriteIds] })),
+      importedSpaceIds: [],
+      activeSpaceId: state.activeSpaceId,
       selectedTabIdBySpace: { ...state.selectedTabIdBySpace },
       visitedArcItemIds: new Set<string>(),
       report: report,

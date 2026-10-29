@@ -120,8 +120,8 @@ async function loadAccent(address: string): Promise<void> {
  * Starts loading the colour of every Favorite's icon not seen yet.
  */
 export function refreshFaviconAccents(state: BrowserState): void {
-  for (const profile of state.profiles) {
-    for (const favoriteId of profile.favoriteIds) {
+  for (const space of state.spaces) {
+    for (const favoriteId of space.favoriteIds) {
       const tab = findTab(state, favoriteId);
       const address = tab === undefined ? null : getFaviconAddress(tab.faviconUrl, tab.url);
       if (address === null || accents.has(address) || loading.has(address)) {

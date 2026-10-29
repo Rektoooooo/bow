@@ -77,6 +77,10 @@ const items = {
   "fav-github": tab("fav-github", "https://github.com/", "GitHub", "https://github.com/"),
   "fav-youtube": tab("fav-youtube", "https://www.youtube.com/", "YouTube", "https://www.youtube.com/"),
   "fav-duckduckgo": tab("fav-duckduckgo", "https://duckduckgo.com/", "DuckDuckGo", "https://duckduckgo.com/"),
+  // Work has its own Favorites row (Favorites belong to the Space).
+  "work-fav-apple": tab("work-fav-apple", "https://developer.apple.com/", "Apple Developer", "https://developer.apple.com/"),
+  "work-fav-notion": tab("work-fav-notion", "https://www.notion.so/", "Notion", "https://www.notion.so/"),
+  "work-fav-figma": tab("work-fav-figma", "https://www.figma.com/", "Figma", "https://www.figma.com/"),
   "folder-reading": { kind: "folder", id: "folder-reading", title: "Reading List", childIds: Object.keys(readingChildren), isOpen: false },
   // Like the user's second folder: a closed GitHub live folder (Arc draws GitHub's mark on it).
   "folder-projects": { kind: "folder", id: "folder-projects", title: "Pull Requests", childIds: [], isOpen: false, live: { source: { kind: "github", list: "pullRequests" }, hiddenUrls: [] } },
@@ -86,16 +90,18 @@ const items = {
   "today-wikipedia": tab("today-wikipedia", "https://en.wikipedia.org/wiki/Web_browser", "Web browser - Wikipedia"),
 };
 const sampleState = {
-  version: 2,
+  version: 5,
   items,
-  profiles: [{ id: "profile-default", name: "Default", favoriteIds: ["fav-wikipedia", "fav-github", "fav-youtube", "fav-duckduckgo"] }],
+  profiles: [{ id: "profile-default", name: "Default" }],
   spaces: [
-    { id: "space-main", name: "Main", icon: "✦", theme: { colors: ["#000000"], appearance: "dark", grain: 0, intensity: 1 }, profileId: "profile-default", pinnedIds: ["folder-reading", "folder-projects"], todayIds: ["today-search"], isPinnedOpen: true },
-    { id: "space-work", name: "Work", icon: "💼", theme: { colors: ["#000000"], appearance: "auto", grain: 0 }, profileId: "profile-default", pinnedIds: [], todayIds: ["today-mdn"], isPinnedOpen: true },
-    { id: "space-side", name: "Side", icon: "🚀", theme: { colors: ["#000000"], appearance: "auto", grain: 0 }, profileId: "profile-default", pinnedIds: [], todayIds: ["today-wikipedia"], isPinnedOpen: true },
+    { id: "space-main", name: "Main", icon: "✦", theme: { colors: ["#000000"], appearance: "dark", grain: 0, intensity: 1 }, profileId: "profile-default", favoriteIds: ["fav-wikipedia", "fav-github", "fav-youtube", "fav-duckduckgo"], pinnedIds: ["folder-reading", "folder-projects"], todayIds: ["today-search"], isPinnedOpen: true },
+    { id: "space-work", name: "Work", icon: "💼", theme: { colors: ["#000000"], appearance: "auto", grain: 0 }, profileId: "profile-default", favoriteIds: ["work-fav-apple", "work-fav-notion", "work-fav-figma"], pinnedIds: [], todayIds: ["today-mdn"], isPinnedOpen: true },
+    { id: "space-side", name: "Side", icon: "🚀", theme: { colors: ["#000000"], appearance: "auto", grain: 0 }, profileId: "profile-default", favoriteIds: [], pinnedIds: [], todayIds: ["today-wikipedia"], isPinnedOpen: true },
   ],
   activeSpaceId: "space-main",
   selectedTabIdBySpace: { "space-main": "today-search", "space-work": "today-mdn", "space-side": "today-wikipedia" },
+  focusedWindowId: "window-1",
+  otherWindows: [],
   archive: [],
   settings: { archiveAfterMs: 43200000, isSidebarVisible: true },
 };

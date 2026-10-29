@@ -1,6 +1,6 @@
 /**
  * WHY this file exists:
- *   Sidebar items live in ordered lists: a profile's Favorites, a Space's Pinned and Today lists, and the child
+ *   Sidebar items live in ordered lists: a Space's Favorites, a Space's Pinned and Today lists, and the child
  *   lists of folders and split views. Moving, closing and archiving all come down to "find the list that holds
  *   this id, take it out, put it somewhere else". Those few steps live here once, so every action uses the same rules.
  *
@@ -61,8 +61,8 @@ export function getActiveSpace(state: BrowserState): Space {
  */
 export function getIdsAt(state: BrowserState, location: ItemLocation): ItemId[] {
   if (location.kind === "favorites") {
-    const profile = state.profiles.find((candidate) => candidate.id === location.profileId);
-    return profile === undefined ? [] : profile.favoriteIds;
+    const space = findSpace(state, location.spaceId);
+    return space === undefined ? [] : space.favoriteIds;
   }
   if (location.kind === "pinned" || location.kind === "today") {
     const space = findSpace(state, location.spaceId);
@@ -85,8 +85,8 @@ export function getIdsAt(state: BrowserState, location: ItemLocation): ItemId[] 
  */
 export function setIdsAt(state: BrowserState, location: ItemLocation, ids: ItemId[]): BrowserState {
   if (location.kind === "favorites") {
-    const profiles = state.profiles.map((profile) => (profile.id === location.profileId ? { ...profile, favoriteIds: ids } : profile));
-    return { ...state, profiles: profiles };
+    const spaces = state.spaces.map((space) => (space.id === location.spaceId ? { ...space, favoriteIds: ids } : space));
+    return { ...state, spaces: spaces };
   }
   if (location.kind === "pinned") {
     const spaces = state.spaces.map((space) => (space.id === location.spaceId ? { ...space, pinnedIds: ids } : space));
@@ -111,9 +111,9 @@ export function setIdsAt(state: BrowserState, location: ItemLocation, ids: ItemI
  * The sidebar has at most a few hundred items, so a scan is fast enough and keeps one source of truth.
  */
 export function findLocation(state: BrowserState, itemId: ItemId): ItemLocation | null {
-  for (const profile of state.profiles) {
-    if (profile.favoriteIds.includes(itemId)) {
-      return { kind: "favorites", profileId: profile.id };
+  for (const space of state.spaces) {
+    if (space.favoriteIds.includes(itemId)) {
+      return { kind: "favorites", spaceId: space.id };
     }
   }
   for (const space of state.spaces) {
@@ -162,31 +162,28 @@ export function findRootLocation(state: BrowserState, itemId: ItemId): ItemLocat
 }
 
 /**
- * Returns the Space an item belongs to, or null for Favorites (they belong to a profile) and orphans.
+ * Returns the Space an item belongs to (Favorites included), or null for orphans.
  */
 export function findSpaceIdOfItem(state: BrowserState, itemId: ItemId): SpaceId | null {
   const rootLocation = findRootLocation(state, itemId);
-  if (rootLocation === null || rootLocation.kind === "favorites") {
+  if (rootLocation === null) {
     return null;
   }
-  if (rootLocation.kind === "pinned" || rootLocation.kind === "today") {
+  if (rootLocation.kind === "favorites" || rootLocation.kind === "pinned" || rootLocation.kind === "today") {
     return rootLocation.spaceId;
   }
   return null;
 }
 
 /**
- * Returns the profile whose cookies an item's page uses: the Favorites' profile, or its Space's profile.
+ * Returns the profile whose cookies an item's page uses: the profile of the Space that holds it.
  */
 export function findProfileIdOfItem(state: BrowserState, itemId: ItemId): ProfileId | null {
   const rootLocation = findRootLocation(state, itemId);
   if (rootLocation === null) {
     return null;
   }
-  if (rootLocation.kind === "favorites") {
-    return rootLocation.profileId;
-  }
-  if (rootLocation.kind === "pinned" || rootLocation.kind === "today") {
+  if (rootLocation.kind === "favorites" || rootLocation.kind === "pinned" || rootLocation.kind === "today") {
     const space = findSpace(state, rootLocation.spaceId);
     return space === undefined ? null : space.profileId;
   }

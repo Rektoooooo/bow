@@ -11,7 +11,7 @@ copies (the one it keeps before a restore, and the automatic hourly snapshots) u
   "formatVersion": 1,
   "createdAt": "2026-10-28T11:35:32.000Z",
   "appVersion": "0.1.0",
-  "state": { "version": 4, "items": { … }, "profiles": [ … ], "spaces": [ … ], … },
+  "state": { "version": 5, "items": { … }, "profiles": [ … ], "spaces": [ … ], … },
   "notes": { "<note id>": "<the note's HTML>" },
   "easels": { "<easel id>": "<the board as JSON text>" }
 }
@@ -27,8 +27,9 @@ upgrade older versions. The parts that matter for reading it by hand:
   folder also has `live.source` (GitHub list or feed address). A **split view** has `childIds` (its panes) and an
   `orientation`.
 - `spaces`: in switcher order. Each has `name`, `icon`, `theme` (colors, light/dark/auto, grain), `profileId`,
-  `pinnedIds` and `todayIds` (ids into `items`, in sidebar order).
-- `profiles`: each with `favoriteIds` (the Favorites tiles, ids into `items`).
+  `favoriteIds` (the Favorites tiles), `pinnedIds` and `todayIds` (ids into `items`, in sidebar order).
+- `profiles`: each with an `id` and a `name`. Backups of version 4 kept the Favorites here; they are moved to one Space
+  of that profile when the backup is read.
 - `archive`: archived tabs, newest first, with when and why they were archived.
 - `settings`, `boosts` (per-site styles and scripts), `routingRules` (Air Traffic Control), `sitePermissions`,
   `developerModeSites`, `adBlockOffSites`.
@@ -55,5 +56,5 @@ Restoring treats the file as untrusted, whoever made it:
 
 **Replace My Setup** puts the backup in place of your Spaces and tabs; Bow first keeps a copy of the current setup in
 its Backups folder. Your open windows, the sidebar new windows start with and your installed extensions stay.
-**Add Its Spaces** puts the backup's Spaces next to yours under new ids (Notes and Easels too); its Favorites join
-their profile up to the limit of 12, without repeating an address; Boosts join for sites without one.
+**Add Its Spaces** puts the backup's Spaces next to yours under new ids (Notes and Easels too); each Space
+brings its own Favorites, up to the limit of 12, without repeating an address; Boosts join for sites without one.

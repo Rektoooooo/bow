@@ -395,14 +395,14 @@ function checkProfiles(raw: unknown): Profile[] {
       continue;
     }
     seenIds.add(entry.id);
-    const profile: Profile = { id: entry.id.slice(0, MAX_TEXT_LENGTH), name: readText(entry.name, "Profile"), favoriteIds: readIdList(entry.favoriteIds) };
+    const profile: Profile = { id: entry.id.slice(0, MAX_TEXT_LENGTH), name: readText(entry.name, "Profile") };
     if (entry.forgetsSiteDataOnQuit === true) {
       profile.forgetsSiteDataOnQuit = true;
     }
     profiles.push(profile);
   }
   if (profiles.length === 0) {
-    profiles.push({ id: DEFAULT_PROFILE_ID, name: "Default", favoriteIds: [] });
+    profiles.push({ id: DEFAULT_PROFILE_ID, name: "Default" });
   }
   return profiles;
 }
@@ -425,6 +425,7 @@ function checkSpaces(raw: unknown, profileIds: Set<ProfileId>, fallbackProfileId
       icon: readText(entry.icon, "✦").slice(0, 64),
       theme: checkTheme(entry.theme),
       profileId: profileId,
+      favoriteIds: readIdList(entry.favoriteIds),
       pinnedIds: readIdList(entry.pinnedIds),
       todayIds: readIdList(entry.todayIds),
       isPinnedOpen: entry.isPinnedOpen !== false,
@@ -633,9 +634,10 @@ export function checkBackupState(raw: BrowserState, counter: CheckCounter): Brow
   }
 
   const walk: SidebarWalk = { items: candidateItems, visited: new Set() };
-  const walkedProfiles = profiles.map((profile) => ({ ...profile, favoriteIds: keepList(walk, profile.favoriteIds, false, true) }));
+  // Each Space's Favorites are walked before its Pinned and Today lists, so a tab named in two of them stays a Favorite.
   const walkedSpaces = spaces.map((space) => ({
     ...space,
+    favoriteIds: keepList(walk, space.favoriteIds, false, true),
     pinnedIds: keepList(walk, space.pinnedIds, true, false),
     todayIds: keepList(walk, space.todayIds, false, false),
   }));
@@ -661,7 +663,7 @@ export function checkBackupState(raw: BrowserState, counter: CheckCounter): Brow
   const checked: BrowserState = {
     version: raw.version,
     items: items,
-    profiles: walkedProfiles,
+    profiles: profiles,
     spaces: walkedSpaces,
     activeSpaceId: activeSpaceId,
     selectedTabIdBySpace: selectedTabIdBySpace,
@@ -754,7 +756,7 @@ function countState(state: BrowserState): { pinnedTabs: number; todayTabs: numbe
       folders += 1;
     }
   }
-  const favorites = state.profiles.reduce((total, profile) => total + profile.favoriteIds.length, 0);
+  const favorites = state.spaces.reduce((total, space) => total + space.favoriteIds.length, 0);
   let pinnedTabs = 0;
   let todayTabs = 0;
   const countTabs = (itemIds: ItemId[]): number => {
@@ -794,7 +796,7 @@ function keepUsedFiles(raw: unknown, usedIds: string[], isId: (value: unknown) =
  * Reads a backup file's text. It must be a Bow backup of a format this Bow knows, holding a state file of any version
  * Bow can upgrade; everything in it is checked (checkBackupState).
  */
-export function parseBackup(text: string): BackupParseResult {
+export function parseBackup(text: string, now: number): BackupParseResult {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -807,7 +809,7 @@ export function parseBackup(text: string): BackupParseResult {
   if (parsed.formatVersion > BACKUP_FORMAT_VERSION) {
     return { isValid: false, error: "This backup was made by a newer Bow. Update Bow, then restore it." };
   }
-  const upgraded = upgradeToCurrentVersion(parsed.state);
+  const upgraded = upgradeToCurrentVersion(parsed.state, now);
   if (upgraded === null) {
     return { isValid: false, error: "This backup's sidebar could not be read." };
   }
@@ -909,18 +911,39 @@ function renameFileUrl(url: string, now: number, files: { noteIds: Record<string
 }
 
 /**
+ * Copies a restored Space's Favorites under new ids, up to FAVORITES_LIMIT; a second Favorite with the same address is
+ * left out, like the same page added twice.
+ */
+function copyFavorites(restored: BrowserState, favoriteIds: ItemId[], now: number, target: Record<ItemId, SidebarItem>, files: { noteIds: Record<string, string>; easelIds: Record<string, string> }): ItemId[] {
+  const copiedIds: ItemId[] = [];
+  const presentAddresses = new Set<string>();
+  for (const favoriteId of favoriteIds) {
+    const address = readAddress(restored.items[favoriteId]);
+    if (copiedIds.length >= FAVORITES_LIMIT || address === null || presentAddresses.has(address)) {
+      continue;
+    }
+    const copyId = copyItemTree(restored, favoriteId, now, target, files);
+    if (copyId !== null) {
+      copiedIds.push(copyId);
+      presentAddresses.add(address);
+    }
+  }
+  return copiedIds;
+}
+
+/**
  * Adds a backup's Spaces next to the current ones, with all their tabs, folders and split views under new ids. A
- * profile the backup's Spaces use is added when this Mac has none of that id. The backup's Favorites join their
- * profile up to its limit (the same address is not added twice), its Boosts join for sites without one, and its
+ * profile the backup's Spaces use is added when this Mac has none of that id. Each Space brings its own Favorites (up to
+ * the limit, the same address not twice), the backup's Boosts join for sites without one, and its
  * Air Traffic Control rules join pointing at the new Spaces. The archive and settings stay as they are.
  */
 export function addSpacesFromBackup(current: BrowserState, restored: BrowserState, now: number): AddedFromBackup {
   const files = { noteIds: {} as Record<string, string>, easelIds: {} as Record<string, string> };
   const items: Record<ItemId, SidebarItem> = { ...current.items };
-  const profiles = current.profiles.map((profile) => ({ ...profile, favoriteIds: [...profile.favoriteIds] }));
+  const profiles = [...current.profiles];
   for (const restoredProfile of restored.profiles) {
     if (!profiles.some((profile) => profile.id === restoredProfile.id)) {
-      profiles.push({ id: restoredProfile.id, name: restoredProfile.name, favoriteIds: [] });
+      profiles.push({ id: restoredProfile.id, name: restoredProfile.name });
     }
   }
 
@@ -928,29 +951,11 @@ export function addSpacesFromBackup(current: BrowserState, restored: BrowserStat
   const addedSpaces: Space[] = restored.spaces.map((space) => {
     const newSpaceId = createId("space", now);
     spaceIdMap.set(space.id, newSpaceId);
+    const favoriteIds = copyFavorites(restored, space.favoriteIds, now, items, files);
     const pinnedIds = space.pinnedIds.map((itemId) => copyItemTree(restored, itemId, now, items, files)).filter((itemId): itemId is ItemId => itemId !== null);
     const todayIds = space.todayIds.map((itemId) => copyItemTree(restored, itemId, now, items, files)).filter((itemId): itemId is ItemId => itemId !== null);
-    return { ...space, id: newSpaceId, pinnedIds: pinnedIds, todayIds: todayIds };
+    return { ...space, id: newSpaceId, favoriteIds: favoriteIds, pinnedIds: pinnedIds, todayIds: todayIds };
   });
-
-  for (const restoredProfile of restored.profiles) {
-    const profile = profiles.find((candidate) => candidate.id === restoredProfile.id);
-    if (profile === undefined) {
-      continue;
-    }
-    const presentAddresses = new Set(profile.favoriteIds.map((favoriteId) => readAddress(items[favoriteId])));
-    for (const favoriteId of restoredProfile.favoriteIds) {
-      const address = readAddress(restored.items[favoriteId]);
-      if (profile.favoriteIds.length >= FAVORITES_LIMIT || address === null || presentAddresses.has(address)) {
-        continue;
-      }
-      const copyId = copyItemTree(restored, favoriteId, now, items, files);
-      if (copyId !== null) {
-        profile.favoriteIds.push(copyId);
-        presentAddresses.add(address);
-      }
-    }
-  }
 
   const presentBoostSites = new Set((current.boosts ?? []).map((boost) => boost.site));
   const addedBoosts = (restored.boosts ?? []).filter((boost) => !presentBoostSites.has(boost.site));

@@ -164,7 +164,7 @@ export const ARCHIVE_LIMIT = 250;
 /** A Little Window left alone this long is archived and closed. Same as Arc's Little Arc default (6 h, measured). */
 export const LITTLE_WINDOW_ARCHIVE_AFTER_MS = 6 * HOUR_MS;
 
-/** Most Favorites a profile can have. Same as Arc (help center: raised from 8 to 12 in 2023). */
+/** Most Favorites a Space can have. Arc allows 12 per profile (help center: raised from 8 to 12 in 2023); we count per Space. */
 export const FAVORITES_LIMIT = 12;
 
 /** Most panes in one split view. Same as Arc (help center shortcuts page: up to 4). */

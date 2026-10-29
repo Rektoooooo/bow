@@ -28,7 +28,7 @@ function makeExtension(id: string, changes: Partial<InstalledExtension> = {}): I
 /** The initial state plus a second profile. */
 function stateWithTwoProfiles(): BrowserState {
   const state = createInitialState();
-  return { ...state, profiles: [...state.profiles, { id: WORK_PROFILE_ID, name: "Work", favoriteIds: [] }] };
+  return { ...state, profiles: [...state.profiles, { id: WORK_PROFILE_ID, name: "Work" }] };
 }
 
 describe("extension list", () => {

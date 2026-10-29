@@ -699,11 +699,13 @@ button:disabled {
   padding-bottom: 12px;
 }
 
-.space-content.slide-from-right {
+.space-content.slide-from-right,
+.favorites.slide-from-right {
   animation: slide-from-right var(--motion-slow) var(--motion-ease);
 }
 
-.space-content.slide-from-left {
+.space-content.slide-from-left,
+.favorites.slide-from-left {
   animation: slide-from-left var(--motion-slow) var(--motion-ease);
 }
 
@@ -1917,6 +1919,8 @@ body.peek-open .main-column {
 
   .space-content.slide-from-right,
   .space-content.slide-from-left,
+  .favorites.slide-from-right,
+  .favorites.slide-from-left,
   body.sidebar-hidden.sidebar-peeking .sidebar,
   body.toolbar-hidden.toolbar-peeking .toolbar,
   .toolbar.is-loading::after {

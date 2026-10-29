@@ -108,7 +108,7 @@ function describeResult(result: ArcImportResult): string {
     lines.push(`Tabs: ${report.tabsImported}, folders: ${report.foldersImported}, split views: ${report.splitViewsImported}`);
     lines.push(`Favorites: ${report.favoritesImported}`);
     if (report.favoritesDropped > 0) {
-      lines.push(`${report.favoritesDropped} Favorite(s) left out: a profile can have 12.`);
+      lines.push(`${report.favoritesDropped} Favorite(s) left out: a Space can have 12.`);
     }
     if (report.spacesDropped > 0) {
       lines.push(`${report.spacesDropped} Space(s) left out: the browser holds 9.`);

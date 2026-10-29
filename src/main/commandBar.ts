@@ -94,6 +94,8 @@ const DATED_HISTORY_LIMIT = 6;
 
 const OPEN_TAB_BOOST = 15;
 const FAVORITE_BOOST = 10;
+/** Tab search names the place of a tab no Space holds (cannot happen in a healthy file). */
+const NO_SPACE_LABEL = "No Space";
 const RECENT_TAB_MAX_BOOST = 10;
 const VISIT_COUNT_MAX_BOOST = 10;
 const RECENT_VISIT_BOOST_DAY = 10;
@@ -197,7 +199,7 @@ function getHost(url: string): string {
  * Lists every tab in the state with whether it is a Favorite.
  */
 function listAllTabs(state: BrowserState): { tab: TabItem; isFavorite: boolean }[] {
-  const favoriteIds = new Set(state.profiles.flatMap((profile) => profile.favoriteIds));
+  const favoriteIds = new Set(state.spaces.flatMap((space) => space.favoriteIds));
   const tabs: { tab: TabItem; isFavorite: boolean }[] = [];
   for (const item of Object.values(state.items)) {
     if (item.kind === "tab") {
@@ -231,12 +233,15 @@ export interface TabSearchInput {
 }
 
 /**
- * Where a tab lives, for tab search: its Space ("🏠 Home"), or Favorites, and whether another window shows it.
+ * Where a tab lives, for tab search: its Space ("🏠 Home"; "🏠 Home · Favorites" for one of its Favorites), and
+ * whether another window shows it.
  */
 function describeTabPlace(input: TabSearchInput, tabId: ItemId): string {
   const spaceId = findSpaceIdOfItem(input.state, tabId);
   const space = input.state.spaces.find((candidate) => candidate.id === spaceId);
-  const place = space === undefined ? "Favorites" : `${describeSpaceIconAsText(space.icon)} ${space.name}`;
+  const spaceName = space === undefined ? NO_SPACE_LABEL : `${describeSpaceIconAsText(space.icon)} ${space.name}`;
+  const isFavorite = space !== undefined && space.favoriteIds.includes(tabId);
+  const place = isFavorite ? `${spaceName} · Favorites` : spaceName;
   return input.tabIdsInOtherWindows.includes(tabId) ? `${place} · open in another window` : place;
 }
 

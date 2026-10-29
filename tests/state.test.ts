@@ -101,15 +101,15 @@ describe("selectTab", () => {
     expect(state.activeSpaceId).toBe(PERSONAL_SPACE_ID);
   });
 
-  it("shows a Favorite in the active Space, because Favorites belong to the profile", () => {
+  it("switches to the Space whose Favorites hold the tab, even when Work shares its profile", () => {
     const { state: withTab, tabIds } = openTabs(["https://mail.example"]);
     const favoriteState = addToFavorites(withTab, tabIds[0] as ItemId);
     const inWork: BrowserState = { ...favoriteState, activeSpaceId: WORK_SPACE_ID };
 
     const state = selectTab(inWork, tabIds[0] as ItemId, TWO_PM);
 
-    expect(state.activeSpaceId).toBe(WORK_SPACE_ID);
-    expect(state.selectedTabIdBySpace[WORK_SPACE_ID]).toBe(tabIds[0]);
+    expect(state.activeSpaceId).toBe(PERSONAL_SPACE_ID);
+    expect(state.selectedTabIdBySpace[PERSONAL_SPACE_ID]).toBe(tabIds[0]);
   });
 });
 
@@ -151,12 +151,13 @@ describe("pinTab / unpinTab", () => {
 });
 
 describe("addToFavorites", () => {
-  it("moves the tab into its profile's Favorites with a home URL", () => {
+  it("moves the tab into its Space's Favorites with a home URL, and leaves the other Space's row alone", () => {
     const { state: withTab, tabIds } = openTabs(["https://music.example"]);
 
     const state = addToFavorites(withTab, tabIds[0] as ItemId);
 
-    expect(state.profiles[0]?.favoriteIds).toEqual([tabIds[0]]);
+    expect(state.spaces[0]?.favoriteIds).toEqual([tabIds[0]]);
+    expect(state.spaces[1]?.favoriteIds).toEqual([]);
     expect(getTodayIds(state)).toEqual([]);
     expect(getTab(state, tabIds[0] as ItemId).homeUrl).toBe("https://music.example");
   });
@@ -169,8 +170,37 @@ describe("addToFavorites", () => {
       state = addToFavorites(state, tabId);
     }
 
-    expect(state.profiles[0]?.favoriteIds).toHaveLength(FAVORITES_LIMIT);
+    expect(state.spaces[0]?.favoriteIds).toHaveLength(FAVORITES_LIMIT);
     expect(findLocation(state, tabIds[FAVORITES_LIMIT] as ItemId)?.kind).toBe("today");
+  });
+
+  it(`gives every Space its own ${FAVORITES_LIMIT} slots`, () => {
+    const urls = Array.from({ length: FAVORITES_LIMIT + 1 }, (_value, index) => `https://site${index}.example`);
+    const { state: withTabs, tabIds } = openTabs(urls);
+    let state = withTabs;
+    for (const tabId of tabIds.slice(0, FAVORITES_LIMIT)) {
+      state = addToFavorites(state, tabId);
+    }
+    const lastTabId = tabIds[FAVORITES_LIMIT] as ItemId;
+    const moved = moveItem(state, lastTabId, { kind: "today", spaceId: WORK_SPACE_ID }, 0, FIVE_PM);
+
+    const withWorkFavorite = addToFavorites(moved, lastTabId);
+
+    expect(withWorkFavorite.spaces[0]?.favoriteIds).toHaveLength(FAVORITES_LIMIT);
+    expect(withWorkFavorite.spaces[1]?.favoriteIds).toEqual([lastTabId]);
+  });
+
+  it("pins and unpins a Favorite in its own Space", () => {
+    const { state: withTab, tabIds } = openTabs(["https://mail.example"]);
+    const tabId = tabIds[0] as ItemId;
+    const inWork: BrowserState = { ...addToFavorites(withTab, tabId), activeSpaceId: WORK_SPACE_ID };
+
+    const pinned = pinTab(inWork, tabId);
+    const backToFavorites = addToFavorites(pinned, tabId);
+    const unpinned = unpinTab(backToFavorites, tabId, FIVE_PM);
+
+    expect(findLocation(pinned, tabId)).toEqual({ kind: "pinned", spaceId: PERSONAL_SPACE_ID });
+    expect(findLocation(unpinned, tabId)).toEqual({ kind: "today", spaceId: PERSONAL_SPACE_ID });
   });
 });
 

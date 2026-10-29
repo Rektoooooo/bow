@@ -15,10 +15,10 @@ function lastUsedAt(state: BrowserState, tabId: ItemId, time: number): BrowserSt
   return { ...state, items: { ...state.items, [tabId]: { ...tab, lastActiveAt: time } } };
 }
 
-/** Makes a tab a Favorite of the default profile. */
+/** Makes a tab a Favorite of the first Space. */
 function makeFavorite(state: BrowserState, tabId: ItemId): BrowserState {
-  const profiles = state.profiles.map((profile, index) => (index === 0 ? { ...profile, favoriteIds: [...profile.favoriteIds, tabId] } : profile));
-  return { ...state, profiles: profiles };
+  const spaces = state.spaces.map((space, index) => (index === 0 ? { ...space, favoriteIds: [...space.favoriteIds, tabId] } : space));
+  return { ...state, spaces: spaces };
 }
 
 describe("findTabsToSleep", () => {

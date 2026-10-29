@@ -28,6 +28,10 @@ const items = {
   "fav-github": tab("fav-github", "https://github.com/", "GitHub", "https://github.com/"),
   "fav-youtube": tab("fav-youtube", "https://www.youtube.com/", "YouTube", "https://www.youtube.com/"),
   "fav-duckduckgo": tab("fav-duckduckgo", "https://duckduckgo.com/", "DuckDuckGo", "https://duckduckgo.com/"),
+  // Work has its own Favorites row (Favorites belong to the Space).
+  "work-fav-apple": tab("work-fav-apple", "https://developer.apple.com/", "Apple Developer", "https://developer.apple.com/"),
+  "work-fav-notion": tab("work-fav-notion", "https://www.notion.so/", "Notion", "https://www.notion.so/"),
+  "work-fav-figma": tab("work-fav-figma", "https://www.figma.com/", "Figma", "https://www.figma.com/"),
   "folder-reading": { kind: "folder", id: "folder-reading", title: "Reading", childIds: ["pin-mdn", "pin-hn", "pin-ars"], isOpen: true },
   "pin-mdn": tab("pin-mdn", "https://developer.mozilla.org/", "MDN Web Docs", "https://developer.mozilla.org/"),
   "pin-hn": tab("pin-hn", "https://news.ycombinator.com/", "Hacker News", "https://news.ycombinator.com/"),
@@ -46,16 +50,18 @@ const items = {
   "side-ts": tab("side-ts", "https://www.typescriptlang.org/", "TypeScript", "https://www.typescriptlang.org/"),
 };
 const sampleState = {
-  version: 2,
+  version: 5,
   items: items,
-  profiles: [{ id: "profile-default", name: "Default", favoriteIds: ["fav-wikipedia", "fav-github", "fav-youtube", "fav-duckduckgo"] }],
+  profiles: [{ id: "profile-default", name: "Default" }],
   spaces: [
-    { id: "space-personal", name: "Personal", icon: "🏠", theme: { colors: ["#1f2b47", "#2e2147"], appearance: "dark", grain: 0.35 }, profileId: "profile-default", pinnedIds: ["folder-reading", "pin-electron"], todayIds: ["today-browser", "today-hypertext", "today-example", "split-docs"], isPinnedOpen: true },
-    { id: "space-work", name: "Work", icon: "💼", theme: { colors: ["#cfe0f4"], appearance: "light", grain: 0 }, profileId: "profile-default", pinnedIds: ["work-apple", "work-w3c"], todayIds: ["work-article"], isPinnedOpen: true },
-    { id: "space-side", name: "Side project", icon: "🚀", theme: { colors: ["#cdeadb", "#c2e3e8"], appearance: "light", grain: 0 }, profileId: "profile-default", pinnedIds: ["side-node", "side-ts"], todayIds: [], isPinnedOpen: true },
+    { id: "space-personal", name: "Personal", icon: "🏠", theme: { colors: ["#1f2b47", "#2e2147"], appearance: "dark", grain: 0.35 }, profileId: "profile-default", favoriteIds: ["fav-wikipedia", "fav-github", "fav-youtube", "fav-duckduckgo"], pinnedIds: ["folder-reading", "pin-electron"], todayIds: ["today-browser", "today-hypertext", "today-example", "split-docs"], isPinnedOpen: true },
+    { id: "space-work", name: "Work", icon: "💼", theme: { colors: ["#cfe0f4"], appearance: "light", grain: 0 }, profileId: "profile-default", favoriteIds: ["work-fav-apple", "work-fav-notion", "work-fav-figma"], pinnedIds: ["work-apple", "work-w3c"], todayIds: ["work-article"], isPinnedOpen: true },
+    { id: "space-side", name: "Side project", icon: "🚀", theme: { colors: ["#cdeadb", "#c2e3e8"], appearance: "light", grain: 0 }, profileId: "profile-default", favoriteIds: [], pinnedIds: ["side-node", "side-ts"], todayIds: [], isPinnedOpen: true },
   ],
   activeSpaceId: "space-personal",
   selectedTabIdBySpace: { "space-personal": "today-browser", "space-work": "work-article", "space-side": null },
+  focusedWindowId: "window-1",
+  otherWindows: [],
   archive: [],
   settings: { archiveAfterMs: 43200000, isSidebarVisible: true },
 };

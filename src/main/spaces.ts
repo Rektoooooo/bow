@@ -1,6 +1,6 @@
 /**
  * WHY this file exists:
- *   Spaces are Arc's workspaces: each has a name, an emoji, a theme, a profile and its own Pinned and Today tabs.
+ *   Spaces are Arc's workspaces: each has a name, an emoji, a theme, a profile and its own Favorites, Pinned and Today tabs.
  *   Switching, creating, editing, reordering and deleting them, and moving items between them, live here.
  *
  * Data source:
@@ -11,7 +11,8 @@
  *
  * Rules: never change the state that was passed in; return a changed copy, or the same object when nothing changed.
  */
-import type { BrowserState, ItemId, ItemLocation, Space, SpaceId, SpaceTheme } from "../shared/types";
+import { FAVORITES_LIMIT } from "../shared/settings";
+import type { BrowserState, ItemId, ItemLocation, SidebarItem, Space, SpaceId, SpaceTheme } from "../shared/types";
 import { getSelectedTabId, moveTabsToArchive, repairSelections, updateTab } from "./state";
 import { collectTabIdsInList, createId, findRootLocation, findSpace, getActiveSpace, getIdsAt, insertIntoLocation, removeFromLocation } from "./tree";
 
@@ -101,6 +102,7 @@ export function createSpace(state: BrowserState, details: NewSpaceDetails, now: 
     icon: details.icon.trim() === "" ? DEFAULT_SPACE_ICON : details.icon.trim(),
     theme: details.theme,
     profileId: activeSpace.profileId,
+    favoriteIds: [],
     pinnedIds: [],
     todayIds: [],
     isPinnedOpen: true,
@@ -159,7 +161,7 @@ export function deleteSpace(state: BrowserState, spaceId: SpaceId, now: number):
     return state;
   }
 
-  const allItemIds = [...space.pinnedIds, ...space.todayIds];
+  const allItemIds = [...space.favoriteIds, ...space.pinnedIds, ...space.todayIds];
   const tabIds = collectTabIdsInList(state, allItemIds);
   const archivedState = moveTabsToArchive(state, tabIds, now, "manual");
 
@@ -198,20 +200,20 @@ function deleteSubtree(items: BrowserState["items"], itemId: ItemId): void {
 }
 
 /**
- * Adds a profile (its own cookies, logins and Favorites) and returns the new state and the profile's id.
+ * Adds a profile (its own cookies and logins) and returns the new state and the profile's id.
  * The name is trimmed; an empty name becomes "Profile N".
  */
 export function createProfile(state: BrowserState, name: string, now: number): { state: BrowserState; profileId: string } {
   const profileId = createId("profile", now);
   const trimmedName = name.trim();
   const profileName = trimmedName === "" ? `Profile ${state.profiles.length + 1}` : trimmedName;
-  const profiles = [...state.profiles, { id: profileId, name: profileName, favoriteIds: [] }];
+  const profiles = [...state.profiles, { id: profileId, name: profileName}];
   return { state: { ...state, profiles: profiles }, profileId: profileId };
 }
 
 /**
- * Makes a Space use another profile. Its tabs then load with that profile's cookies, and it shows that profile's
- * Favorites. Returns the same state for an unknown profile or Space.
+ * Makes a Space use another profile. Its tabs, Favorites included, then load with that profile's cookies. Returns the
+ * same state for an unknown profile or Space.
  */
 export function setSpaceProfile(state: BrowserState, spaceId: SpaceId, profileId: string): BrowserState {
   const space = findSpace(state, spaceId);
@@ -220,8 +222,7 @@ export function setSpaceProfile(state: BrowserState, spaceId: SpaceId, profileId
     return state;
   }
   const changedState = updateSpace(state, spaceId, { profileId: profileId });
-  // The selected tab may have been a Favorite of the old profile.
-  return repairSelections(changedState);
+  return changedState;
 }
 
 /**
@@ -240,9 +241,22 @@ export function moveSpace(state: BrowserState, spaceId: SpaceId, newIndex: numbe
 }
 
 /**
+ * Picks the list "Move to Space" puts an item in: a Favorite stays a Favorite while the target's row has room, Today
+ * items stay in Today, everything else (and a Favorite that does not fit) goes to Pinned.
+ */
+function chooseMoveTarget(rootLocation: ItemLocation, item: SidebarItem | undefined, targetSpace: Space): ItemLocation {
+  if (rootLocation.kind === "favorites" && targetSpace.favoriteIds.length < FAVORITES_LIMIT) {
+    return { kind: "favorites", spaceId: targetSpace.id };
+  }
+  const goesToPinned = rootLocation.kind !== "today" || item?.kind === "folder";
+  return goesToPinned ? { kind: "pinned", spaceId: targetSpace.id } : { kind: "today", spaceId: targetSpace.id };
+}
+
+/**
  * Moves a top-level Pinned or Today item to another Space ("Move to Space"). It keeps its section: Pinned stays
- * Pinned (at the bottom), Today goes to the top of Today. Favorites and items inside folders move into the
- * target's Today or Pinned list matching their root.
+ * Pinned (at the bottom), Today goes to the top of Today. A Favorite becomes a Favorite of the target Space, or goes to
+ * its Pinned list when that row is full. Items inside folders move into the target's Today or Pinned list matching
+ * their root.
  */
 export function moveItemToSpace(state: BrowserState, itemId: ItemId, targetSpaceId: SpaceId): BrowserState {
   const targetSpace = findSpace(state, targetSpaceId);
@@ -250,16 +264,15 @@ export function moveItemToSpace(state: BrowserState, itemId: ItemId, targetSpace
   if (targetSpace === undefined || rootLocation === null) {
     return state;
   }
-  const isAlreadyThere = (rootLocation.kind === "pinned" || rootLocation.kind === "today") && rootLocation.spaceId === targetSpaceId;
+  const isAlreadyThere = rootLocation.kind !== "folder" && rootLocation.kind !== "split" && rootLocation.spaceId === targetSpaceId;
   if (isAlreadyThere) {
     return state;
   }
 
   const item = state.items[itemId];
-  const goesToPinned = rootLocation.kind !== "today" || item?.kind === "folder";
-  const targetLocation: ItemLocation = goesToPinned ? { kind: "pinned", spaceId: targetSpaceId } : { kind: "today", spaceId: targetSpaceId };
+  const targetLocation = chooseMoveTarget(rootLocation, item, targetSpace);
   const stateWithoutItem = removeFromLocation(state, itemId);
-  const insertIndex = goesToPinned ? getIdsAt(stateWithoutItem, targetLocation).length : 0;
+  const insertIndex = targetLocation.kind === "today" ? 0 : getIdsAt(stateWithoutItem, targetLocation).length;
   const movedState = insertIntoLocation(stateWithoutItem, targetLocation, itemId, insertIndex);
   return repairSelections(movedState);
 }
@@ -272,7 +285,7 @@ export function removeEmptySpaces(state: BrowserState, spaceIds: SpaceId[]): Bro
   let changedState = state;
   for (const spaceId of spaceIds) {
     const space = findSpace(changedState, spaceId);
-    const isEmpty = space !== undefined && space.pinnedIds.length === 0 && space.todayIds.length === 0;
+    const isEmpty = space !== undefined && space.favoriteIds.length === 0 && space.pinnedIds.length === 0 && space.todayIds.length === 0;
     if (!isEmpty || changedState.spaces.length <= 1) {
       continue;
     }

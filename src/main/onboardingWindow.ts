@@ -132,14 +132,13 @@ function previewPinnedItem(state: BrowserState, item: SidebarItem): WelcomeSideb
 }
 
 /**
- * The sidebar preview beside the import: the active Space's name, its profile's Favorites and its first Pinned items,
+ * The sidebar preview beside the import: the active Space's name, its Favorites and its first Pinned items,
  * as they are now (it fills in as an import lands).
  */
 function buildSidebarPreview(state: BrowserState): WelcomeSidebar {
   const space = getActiveSpace(state);
-  const profile = state.profiles.find((candidate) => candidate.id === space.profileId);
   const favoriteTabs: TabItem[] = [];
-  for (const itemId of profile?.favoriteIds ?? []) {
+  for (const itemId of space.favoriteIds) {
     const item = state.items[itemId];
     if (item !== undefined && item.kind === "tab") {
       favoriteTabs.push(item);

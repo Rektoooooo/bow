@@ -25,7 +25,7 @@ describe("rankTabSearchResults", () => {
     const results = rankTabSearchResults({ query: "", state: state, tabIdsInOtherWindows: [mailTab] });
     const subtitleOf = (tabId: ItemId) => results.find((result) => result.tabId === tabId)?.subtitle;
     expect(subtitleOf(docsTab)).toContain("Work");
-    expect(subtitleOf(newsTab)).toBe("Favorites");
+    expect(subtitleOf(newsTab)).toMatch(/Personal · Favorites$/);
     expect(subtitleOf(mailTab)).toMatch(/Personal · open in another window$/);
   });
 
