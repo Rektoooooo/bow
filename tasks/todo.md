@@ -431,7 +431,8 @@ profiles, so each looks separate); on the other macOS account Bow's Spaces share
       profile without a Space: its Favorites to the Archive; selections repaired), tree / state / spaces, imports,
       backup, sync (a peer from an older Bow is skipped with a notice), sidebar (the row slides with the Space), docs
       (worktree favorites-per-space, built while Passwords step 8 runs here)
-- [ ] 2. Merge into bow-next, full suite, push
+- [x] 2. Merge into bow-next, full suite, push (main at 84b4a22; check-windows' quit check failed once at a load
+      average of 86 and passed twice on re-runs)
 
 ## Review (2026-10-29, Google sign-in, Bow Passwords, Favorites per Space)
 - **Google sign-in**: the cause measured on accounts.google.com (Chrome user agent → GlifWebSignIn, Electron's →
