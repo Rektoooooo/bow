@@ -417,7 +417,8 @@ a Keychain key, per profile.
       sites, forget form memory, the two switches
 - [x] 8. Import from a CSV file: Library, File › Import From Browser, the onboarding's done view (export steps per
       browser), move the file to the Trash afterwards
-- [ ] 9. The rest of check-passwords; check-onboarding's Passwords block
+- [x] 9. The rest of check-passwords; check-onboarding's Passwords block (done with steps 6 to 8: check-passwords 60,
+      check-onboarding 46)
 - [ ] 10. Docs (CLAUDE.md security rule and architecture, README, backup and sync docs, handoff) → full suite, push;
       screenshots for the user
 - [ ] 11. Live check with the user's go: the real Keychain item and Touch ID in a packaged build
