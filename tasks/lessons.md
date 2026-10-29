@@ -180,3 +180,9 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   `/private/tmp/...` to build an old commit). The harness resets the shell to the main checkout and the session's
   working directory moves there. For another folder, use `npm --prefix <dir> run build` or a subshell
   `(cd <dir> && …)`, and absolute paths.
+- Every `cd` goes inside `( … )`, no exceptions, even into a subfolder of the worktree (2026-10-29: a plain
+  `cd src/onboarding/browser-logos && …` moved the session's working directory there, a third time). Better still,
+  no `cd` at all: absolute paths, `git -C`, `npm --prefix`.
+- "Real logos" means each browser's recognizable brand mark for every option, the same on every Mac, not an icon
+  macOS draws from whatever is installed (2026-10-29: macOS 26 boxes Chrome's own icon file into a grey tile, and
+  browsers that are not installed had none). Ask early where brand assets come from and whether they may ship.
