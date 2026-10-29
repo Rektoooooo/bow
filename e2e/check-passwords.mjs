@@ -60,6 +60,26 @@ const server = http.createServer((request, response) => {
       </script></body>`);
     return;
   }
+  // An ordinary form (no password): what is typed into its allowed fields is remembered; the rest never is.
+  if (request.url.startsWith("/profile")) {
+    response.end(`<!doctype html><title>Profile</title><body style="margin:0"><form method="post" action="/saved">
+      <input name="fullname" autocomplete="name" style="width:300px;height:30px">
+      <input type="email" name="contact" style="width:300px;height:30px">
+      <input type="tel" name="phone" style="width:300px;height:30px">
+      <input type="search" name="q" style="width:300px;height:30px">
+      <input name="comment" style="width:300px;height:30px">
+      <input name="cardnumber" inputmode="numeric" style="width:300px;height:30px">
+      <input name="code" autocomplete="one-time-code" style="width:300px;height:30px">
+      <input name="company" value="Planted Inc" style="width:300px;height:30px">
+      <button>Save</button></form></body>`);
+    return;
+  }
+  // Another form on another site, with an email field: a remembered email comes back here.
+  if (request.url.startsWith("/contact")) {
+    response.end(`<!doctype html><title>Contact</title><body style="margin:0"><form method="post" action="/saved">
+      <input type="email" name="reply_to" style="width:300px;height:30px"><button>Send</button></form></body>`);
+    return;
+  }
   if (request.url.startsWith("/blank")) {
     response.end("<!doctype html><title>Blank</title><body>blank</body>");
     return;
@@ -471,6 +491,99 @@ const staysInside =
   bottomList.popup.y + bottomList.popup.height <= bottomList.tab.y + bottomList.tab.height;
 check("near the page's bottom the list opens above the field, inside the page's area", isAboveField && staysInside, JSON.stringify(bottomList));
 await pressKeyLikeUser(bottomTab, "Escape");
+
+// ---------- 12. Form memory: what is typed into ordinary forms comes back ----------
+const readFormEntries = () =>
+  app.evaluate(async (_electron, modulePath) => {
+    const access = await process.mainModule.require(modulePath).openVault("profile-default");
+    return access.vault.formEntries.map((entry) => ({ kind: entry.kind, value: entry.value }));
+  }, vaultModulePath);
+async function openForm(origin, route) {
+  runCounter = runCounter + 1;
+  const address = `${origin}/${route}?run=${runCounter}`;
+  await dispatch({ type: "openTab", typedText: address });
+  let tabPage = null;
+  for (let attempt = 0; attempt < 50 && tabPage === null; attempt++) {
+    tabPage = app.windows().find((candidate) => candidate.url().includes(`run=${runCounter}`)) ?? null;
+    if (tabPage === null) await sleep(200);
+  }
+  if (tabPage === null) throw new Error(`${address} did not open`);
+  await tabPage.waitForSelector("form");
+  await sleep(400);
+  return tabPage;
+}
+async function typeInto(tabPage, selector, text) {
+  await tabPage.click(selector);
+  await tabPage.keyboard.type(text);
+}
+const isRemembered = (entries, kind, value) => entries.some((entry) => entry.kind === kind && entry.value === value);
+
+// 12a. Typed values of allowed fields are kept; search, comment, card number, one-time code and a value the page
+// filled in itself are not.
+const profileTab = await openForm(mainOrigin, "profile");
+await typeInto(profileTab, "input[name=fullname]", "Alex Example");
+await typeInto(profileTab, "input[name=contact]", "alex.form@example.com");
+await typeInto(profileTab, "input[name=phone]", "+1 415 555 0100");
+await typeInto(profileTab, "input[name=q]", "secret search");
+await typeInto(profileTab, "input[name=comment]", "a comment");
+await typeInto(profileTab, "input[name=cardnumber]", "4111 1111 1111 1111");
+await typeInto(profileTab, "input[name=code]", "123456");
+await profileTab.click("button");
+const remembered = await (async () => {
+  const deadline = Date.now() + 5000;
+  let entries = await readFormEntries();
+  while (entries.length === 0 && Date.now() < deadline) {
+    await sleep(150);
+    entries = await readFormEntries();
+  }
+  return entries;
+})();
+check(
+  "a sent form's typed name, email and phone are remembered",
+  isRemembered(remembered, "name", "Alex Example") && isRemembered(remembered, "email", "alex.form@example.com") && isRemembered(remembered, "tel", "+1 415 555 0100"),
+  JSON.stringify(remembered),
+);
+const rememberedText = JSON.stringify(remembered);
+check(
+  "a search, a comment, a card number, a one-time code and a value the page filled in are never remembered",
+  ["secret search", "a comment", "4111", "123456", "Planted Inc"].every((secret) => !rememberedText.includes(secret)),
+  rememberedText,
+);
+
+// 12b. The remembered email comes back in an email field on another site.
+const contactTab = await openForm(otherOrigin, "contact");
+await contactTab.click("input[name=reply_to]");
+const contactList = await waitForList(contactTab);
+const contactListText = contactList === null || listPage === null ? "" : await listPage.textContent("body");
+check("on another site, an email field offers the remembered email", contactList !== null && contactListText.includes("alex.form@example.com"), contactListText.trim());
+await pressKeyLikeUser(contactTab, "Down");
+await pressKeyLikeUser(contactTab, "Return");
+await sleep(400);
+const contactValue = await contactTab.evaluate(() => document.querySelector("input[name=reply_to]").value);
+check("Down and Return put it into the field", contactValue === "alex.form@example.com", contactValue);
+
+// 12c. Shift+Delete on a highlighted suggestion forgets it.
+const forgetTab = await openForm(otherOrigin, "contact");
+await forgetTab.click("input[name=reply_to]");
+await waitForList(forgetTab);
+await pressKeyLikeUser(forgetTab, "Down");
+await app.evaluate(({ webContents }, addressPart) => {
+  const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL().includes(addressPart));
+  contents.sendInputEvent({ type: "keyDown", keyCode: "Delete", modifiers: ["shift"] });
+  contents.sendInputEvent({ type: "keyUp", keyCode: "Delete", modifiers: ["shift"] });
+}, `run=${new URL(forgetTab.url()).searchParams.get("run")}`);
+await sleep(500);
+const afterForget = await readFormEntries();
+check("Shift+Delete forgets the highlighted suggestion", !isRemembered(afterForget, "email", "alex.form@example.com") && isRemembered(afterForget, "name", "Alex Example"), JSON.stringify(afterForget));
+
+// 12d. With the setting off nothing new is remembered.
+await dispatch({ type: "setRemembersFormEntries", isOn: false });
+const offProfileTab = await openForm(mainOrigin, "profile");
+await typeInto(offProfileTab, "input[name=fullname]", "Sam Off");
+await offProfileTab.click("button");
+await sleep(1500);
+check("with form memory off, a sent form is not remembered", !isRemembered(await readFormEntries(), "name", "Sam Off"));
+await dispatch({ type: "setRemembersFormEntries", isOn: true });
 
 // ---------- Done ----------
 const appPid = app.process().pid;

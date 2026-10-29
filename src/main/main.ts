@@ -53,6 +53,7 @@ import { startTrackingDownloads } from "./downloads";
 import { getExtensionMenuItems, initializeExtensionHost, prepareExtensions } from "./extensionHost";
 import { initializeAutofill } from "./autofillPopup";
 import { initializePasswordOffers } from "./passwordOffers";
+import { initializeFormMemory } from "./formMemoryRecorder";
 import { initializePermissionPrompts } from "./permissionPrompts";
 import { registerFormsHelper, registerFormsIpc } from "./formsBridge";
 import { registerSymbolIpc } from "./symbols";
@@ -356,6 +357,8 @@ async function handleAppReady(): Promise<void> {
   initializePasswordOffers();
   // The list under a sign-in or address field (saved logins, remembered values).
   initializeAutofill();
+  // Bow Passwords: what the user types into forms (emails, names, addresses) is remembered and offered again.
+  initializeFormMemory();
   // Ad blocking checks requests in every profile session; the lists load now when it is on.
   initializeAdBlocking(app.getPath("userData"), getState, () => refreshOpenPanel());
   onProfileSessionCreated(installAdBlocker);
