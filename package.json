@@ -1,7 +1,7 @@
 {
   "name": "sidebar-browser",
   "productName": "Bow",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "An open-source browser in the spirit of Arc: tabs in a vertical sidebar, Spaces, Peek, Split View and auto-archive.",
   "license": "MIT",
   "author": "Rektoooooo",
