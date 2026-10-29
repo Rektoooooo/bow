@@ -383,6 +383,10 @@ yours, the essentials, a few good defaults, you're all set). Our own CSS/DOM/SVG
       lifts, "Welcome to Bow." sweeps in from the left, then a small glass button
 - [ ] 7. Live check on the real desktop with the user's go: the see-through dim, the window's real corner radius (the
       sheet's is 16 px), the traffic lights arriving, the window above the intro while the dimming lifts
+- [x] 8. Release v0.1.1 (2026-10-29): tag at 7e926ea (onboarding v2, Dia and Opera import, the color picker, the Reader
+      view form fix); full e2e and check-package 22 on that commit; built, signed and notarized by `npm run release` in
+      the user's Terminal (notarytool's saved login is not visible to Claude's processes); published as Latest, and
+      releases/latest/download/update-darwin-arm64.json now says 0.1.1
 
 ## Review (2026-10-28, an unattended night: open source, releases, auto-update, speed, polish)
 - **Works and verified:** open-source setup and repo rename; `npm run release` up to Apple's notarization (signing,
