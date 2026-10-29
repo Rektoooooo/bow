@@ -398,9 +398,9 @@ yours, the essentials, a few good defaults, you're all set). Our own CSS/DOM/SVG
 
 ## Milestone 6 — Bow Passwords (user-approved 2026-10-29: "yes lets do all 5")
 The user: Bow "isn't remembering emails I filled in or any passwords… super important for user experience". Electron
-44 has no password manager, autofill or autocomplete history, so Bow builds its own. Plan:
-`/Users/sebastiankucera/.claude/plans/reflective-honking-quasar.md` (summary here). One small Bow helper in every
-page of a profile (isolated world, never in private windows), passwords encrypted with a Keychain key, per profile.
+44 has no password manager, autofill or autocomplete history, so Bow builds its own (the approved plan, in short).
+One small Bow helper in every page of a profile (isolated world, never in private windows), passwords encrypted with
+a Keychain key, per profile.
 - [x] 1. Pure core + unit tests: `passwords.ts` (vault, offer decisions, `www.` matching), `formMemory.ts` (allow-listed
       field kinds, card numbers / codes never), `passwordCsv.ts` (Chrome/Arc/Dia, Safari, Firefox headers, merge)
 - [x] 2. Vault store (`passwordVault.ts`: safeStorage, one file per profile, never overwrites a vault it can't open),
