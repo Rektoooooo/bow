@@ -567,6 +567,9 @@ body.dark .command-info-button {
   place-items: center;
   width: 28px;
   height: 28px;
+  /* No padding: a button's default 6 px sides left a 14 px space, so a wide icon (the eye) hung out to the right of
+     its own hover square (the user, 2026-10-29). Now every icon centres in the whole button. */
+  padding: 0;
   border: 0;
   border-radius: 7px;
   background: none;
