@@ -189,3 +189,6 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 - Never write an absolute local path into a committed file (2026-10-29: a to-do entry named the plan file under
   `/Users/<name>/.claude/plans/`, which carries the macOS user name; the personal-data check before the push caught
   it). Describe where something lives in words, or use a path inside the repo.
+- Read `sysctl -n vm.loadavg` before an e2e suite, and re-run a failed timing check alone before suspecting the change
+  (2026-10-29: at load averages of 60 to 127, "the app quits when the last window closes" (10 s), the Control Center
+  refresh and the ⌃Tab pictures each failed once and passed on re-runs; three times the change was not the cause).
