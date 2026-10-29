@@ -36,15 +36,21 @@ const SCENE_ENTER_DELAY_MS = 140;
 const SCENE_SHIFT_PX = 24;
 
 /**
- * The first scene's entrance: Bow's mark draws itself and settles, the title sharpens out of a blur, then the sentence
- * and the small round button. Our choice, timed by eye against the user's recording of Arc's first launch.
+ * The first scene's entrance, in milliseconds from the window showing: Bow's mark alone draws itself, holds, and lifts
+ * away; "Welcome to Bow." sweeps in word by word from the left; then a small glass button; Skip setup and the dots
+ * last. Our choice, timed by eye against the user's recording of Arc's first launch.
  */
-const MARK_DRAW_MS = 1150;
-const MARK_SETTLE_MS = 1500;
-const TITLE_ENTER_DELAY_MS = 850;
-const TITLE_ENTER_MS = 900;
-const LEDE_ENTER_DELAY_MS = 1150;
-const HELLO_BUTTON_DELAY_MS = 1500;
+const MARK_DRAW_AT_MS = 150;
+const MARK_DRAW_MS = 1200;
+const MARK_APPEAR_MS = 400;
+const MARK_LEAVE_AT_MS = 2350;
+const MARK_LEAVE_MS = 450;
+const TITLE_AT_MS = 2550;
+const TITLE_WORD_MS = 760;
+const TITLE_WORD_STAGGER_MS = 110;
+const GO_BUTTON_AT_MS = 3350;
+const GO_BUTTON_MS = 520;
+const CHROME_AT_MS = 3600;
 
 /** The frame's parts (Skip setup, the dots) and, without the intro, the wash fade in this long. Our choice. */
 const CHROME_ENTER_MS = 600;
@@ -53,10 +59,14 @@ const WASH_ENTER_MS = 1100;
 /** The outro: the scene lifts away; then main fades the window out (and the browser in). Our choice. */
 const OUTRO_CONTENT_MS = 320;
 
-/** Bow's mark as the app icon draws it (shared/appIconDrawing.ts): a half circle, thick and rounded, in Bow's colors. */
+/**
+ * Bow's mark drawn as a thin outline (a line drawing of the app icon's thick, rounded half circle,
+ * shared/appIconDrawing.ts: centre 512,640, radius 250, width 116): the outer arc, the right foot's rounded end, the
+ * inner arc back, the left foot's end. A thin line draws itself far more cleanly than the thick stroke.
+ */
 const MARK_VIEW_BOX = "190 318 644 394";
-const MARK_PATH = "M262 640 A250 250 0 0 1 762 640";
-const MARK_STROKE_WIDTH = 116;
+const MARK_PATH = "M204 640 A308 308 0 0 1 820 640 A58 58 0 0 1 704 640 A192 192 0 0 0 320 640 A58 58 0 0 1 204 640 Z";
+const MARK_STROKE_WIDTH = 15;
 
 /** The tour moves to its next item after one loop of the demo, until an item is picked by hand. */
 const TOUR_ADVANCE_MS = TOUR_DEMO_CYCLE_MS;
@@ -112,7 +122,7 @@ function createAppIcon(className: string): HTMLElement {
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
 /**
- * Bow's mark as a drawing whose stroke can draw itself: the half circle with a gradient in Bow's colors.
+ * Bow's mark as a drawing whose outline can draw itself, in the text's color.
  */
 function createBowMark(): { element: SVGSVGElement; stroke: SVGPathElement } {
   const element = document.createElementNS(SVG_NAMESPACE, "svg");
@@ -120,69 +130,88 @@ function createBowMark(): { element: SVGSVGElement; stroke: SVGPathElement } {
   element.setAttribute("class", "hello-mark");
   element.setAttribute("role", "img");
   element.setAttribute("aria-label", "Bow");
-  const gradient = document.createElementNS(SVG_NAMESPACE, "linearGradient");
-  gradient.id = "hello-mark-colors";
-  BOW_WASH_COLORS.forEach((color, index) => {
-    const stop = document.createElementNS(SVG_NAMESPACE, "stop");
-    stop.setAttribute("offset", String(index / (BOW_WASH_COLORS.length - 1)));
-    stop.setAttribute("stop-color", color);
-    gradient.append(stop);
-  });
-  const definitions = document.createElementNS(SVG_NAMESPACE, "defs");
-  definitions.append(gradient);
   const stroke = document.createElementNS(SVG_NAMESPACE, "path");
   stroke.setAttribute("d", MARK_PATH);
   stroke.setAttribute("fill", "none");
-  stroke.setAttribute("stroke", "url(#hello-mark-colors)");
+  stroke.setAttribute("stroke", "currentColor");
   stroke.setAttribute("stroke-width", String(MARK_STROKE_WIDTH));
   stroke.setAttribute("stroke-linecap", "round");
+  stroke.setAttribute("stroke-linejoin", "round");
   // Measured as 1, so drawing it is a dash offset from 1 to 0.
   stroke.setAttribute("pathLength", "1");
   stroke.setAttribute("stroke-dasharray", "1");
-  element.append(definitions, stroke);
+  element.append(stroke);
   return { element: element, stroke: stroke };
 }
 
 /**
- * The first scene: Bow's mark draws itself and settles in its glow, the title sharpens out of a blur, then a small
- * round button.
+ * A title whose words can arrive one by one, read as one heading: spaces only between the words, so its text stays
+ * exactly the sentence.
+ */
+function createWordTitle(text: string): { element: HTMLElement; words: HTMLElement[] } {
+  const element = createElement("h1", "scene-title scene-title-hero hello-title");
+  const words = text.split(" ").map((word) => createElement("span", "hello-word", word));
+  words.forEach((word, index) => {
+    if (index > 0) {
+      element.append(document.createTextNode(" "));
+    }
+    element.append(word);
+  });
+  return { element: element, words: words };
+}
+
+/**
+ * The first scene: Bow's mark alone draws itself and lifts away, the title sweeps in from the left in its place, then
+ * a small glass button. Played again when the scene comes back.
  */
 function createHelloScene(goNext: () => void): SceneView {
   const frame = createSceneFrame("hello", true);
-  const markHolder = createElement("div", "hello-mark-holder");
-  const glow = createElement("span", "hello-glow");
+  const stack = createElement("div", "hello-stack");
   const mark = createBowMark();
-  markHolder.append(glow, mark.element);
-  const title = createElement("h1", "scene-title scene-title-hero", "Welcome to Bow.");
-  const lede = createElement("p", "scene-lede", "A calm browser for your tabs, your Spaces and your day.");
+  const words = createElement("div", "hello-words");
+  const title = createWordTitle("Welcome to Bow.");
   const goButton = createTextButton("", "hello-go scene-primary", goNext);
   goButton.setAttribute("aria-label", "Get started");
   goButton.append(createIcon("forward", "icon"));
-  frame.text.append(markHolder, title, lede, goButton);
+  words.append(title.element, goButton);
+  stack.append(mark.element, words);
+  frame.text.append(stack);
+  const markLifeMs = MARK_LEAVE_AT_MS + MARK_LEAVE_MS - MARK_DRAW_AT_MS;
   const enter = (): void => {
+    const moving: Element[] = [mark.element, mark.stroke, goButton, ...title.words];
+    moving.forEach((part) => part.getAnimations().forEach((animation) => animation.cancel()));
+    mark.element.classList.toggle("is-hidden", prefersLessMotion());
     if (prefersLessMotion()) {
-      [markHolder, title, lede, goButton].forEach((part) => reveal(part, 0));
+      reveal(title.element, 0);
+      reveal(goButton, 0);
       return;
     }
-    mark.stroke.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: MARK_DRAW_MS, easing: "cubic-bezier(0.65, 0, 0.35, 1)", fill: "backwards" });
+    mark.stroke.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: MARK_DRAW_MS, delay: MARK_DRAW_AT_MS, easing: "cubic-bezier(0.65, 0, 0.35, 1)", fill: "backwards" });
     mark.element.animate(
       [
-        { opacity: 0, transform: "scale(0.9)" },
-        { opacity: 1, transform: "scale(0.96)", offset: 0.15 },
-        { opacity: 1, transform: "scale(1)" },
+        { opacity: 0, transform: "scale(0.92)", filter: "blur(6px)", offset: 0 },
+        { opacity: 1, transform: "scale(1)", filter: "blur(0px)", offset: MARK_APPEAR_MS / markLifeMs },
+        { opacity: 1, transform: "scale(1)", filter: "blur(0px)", offset: (MARK_LEAVE_AT_MS - MARK_DRAW_AT_MS) / markLifeMs, easing: EASE_IN },
+        { opacity: 0, transform: "translateY(-6px) scale(0.94)", filter: "blur(10px)", offset: 1 },
       ],
-      { duration: MARK_SETTLE_MS, easing: EASE_OUT, fill: "backwards" },
+      { duration: markLifeMs, delay: MARK_DRAW_AT_MS, easing: EASE_OUT, fill: "both" },
     );
-    glow.animate([{ opacity: 0, transform: "scale(0.6)" }, { opacity: 1, transform: "scale(1)" }], { duration: MARK_SETTLE_MS, delay: MARK_DRAW_MS / 2, easing: EASE_OUT, fill: "backwards" });
-    title.animate(
+    title.words.forEach((word, index) =>
+      word.animate(
+        [
+          { opacity: 0, transform: "translateX(-10px)", filter: "blur(14px)" },
+          { opacity: 1, transform: "translateX(0)", filter: "blur(0px)" },
+        ],
+        { duration: TITLE_WORD_MS, delay: TITLE_AT_MS + index * TITLE_WORD_STAGGER_MS, easing: EASE_OUT, fill: "backwards" },
+      ),
+    );
+    goButton.animate(
       [
-        { opacity: 0, filter: "blur(14px)", transform: "scale(1.03)" },
-        { opacity: 1, filter: "blur(0)", transform: "scale(1)" },
+        { opacity: 0, transform: "scale(0.9)", filter: "blur(6px)" },
+        { opacity: 1, transform: "scale(1)", filter: "blur(0px)" },
       ],
-      { duration: TITLE_ENTER_MS, delay: TITLE_ENTER_DELAY_MS, easing: EASE_OUT, fill: "backwards" },
+      { duration: GO_BUTTON_MS, delay: GO_BUTTON_AT_MS, easing: EASE_EMPHASIZED, fill: "backwards" },
     );
-    reveal(lede, LEDE_ENTER_DELAY_MS, TITLE_ENTER_MS);
-    goButton.animate([{ opacity: 0, transform: "scale(0.8)" }, { opacity: 1, transform: "scale(1)" }], { duration: 520, delay: HELLO_BUTTON_DELAY_MS, easing: EASE_EMPHASIZED, fill: "backwards" });
   };
   return { element: frame.element, update: () => undefined, enter: enter, leave: () => undefined };
 }
@@ -472,10 +501,11 @@ function createReadyScene(onOpen: () => void): SceneView {
 // ---------- Navigation, updates and the outro ----------
 
 /**
- * Paints the wash and the light or dark tokens for the current data.
+ * Paints the wash and the light or dark tokens for the current data: Bow's own saturated look (light text) until a
+ * color is picked here, then the Space's colors, light or dark as its theme says.
  */
 function paintAtmosphere(state: Onboarding): void {
-  const isDark = isThemeDark(state.data.theme, state.data.isSystemDark);
+  const isDark = !state.hasPickedLook || isThemeDark(state.data.theme, state.data.isSystemDark);
   document.body.classList.toggle("dark", isDark);
   const themeColors = pickWashColors(state.data.theme.colors).map((color) => vividWashColor(color, isDark));
   const colors = state.hasPickedLook ? themeColors : BOW_WASH_COLORS;
@@ -693,7 +723,7 @@ export function renderOnboarding(host: HTMLElement, data: WelcomeData): void {
   root.addEventListener("keydown", (event) => handleKey(state, event));
   onboarding = state;
   host.replaceChildren(root);
-  preview.update(data);
+  preview.update(data, true);
   paintAtmosphere(state);
   drawChrome(state);
   root.focus({ preventScroll: true });
@@ -714,8 +744,8 @@ export function startEntrance(isAfterIntro: boolean): void {
     if (!isAfterIntro) {
       state.root.querySelector(".onboarding-wash")?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: WASH_ENTER_MS, easing: EASE_OUT });
     }
-    state.root.querySelector(".onboarding-top")?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: CHROME_ENTER_MS, delay: HELLO_BUTTON_DELAY_MS, fill: "backwards" });
-    state.root.querySelector(".onboarding-dots")?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: CHROME_ENTER_MS, delay: HELLO_BUTTON_DELAY_MS, fill: "backwards" });
+    state.root.querySelector(".onboarding-top")?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: CHROME_ENTER_MS, delay: CHROME_AT_MS, fill: "backwards" });
+    state.root.querySelector(".onboarding-dots")?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: CHROME_ENTER_MS, delay: CHROME_AT_MS, fill: "backwards" });
   }
   state.scenes[state.sceneIndex]?.enter();
 }
@@ -729,7 +759,7 @@ export function updateOnboarding(data: WelcomeData): void {
   }
   onboarding.data = data;
   paintAtmosphere(onboarding);
-  onboarding.preview.update(data);
+  onboarding.preview.update(data, !onboarding.hasPickedLook);
   for (const scene of onboarding.scenes) {
     scene.update(data);
   }

@@ -98,8 +98,15 @@ export interface WelcomeData {
 /** The import source id the onboarding uses for Arc. */
 export const ARC_IMPORT_SOURCE_ID = "arc";
 
-/** Bow's own colors (shared/appIconDrawing.ts), the wash's colors until a look is picked. */
-export const BOW_WASH_COLORS: [string, string, string] = ["#ff8a7a", "#b56cff", "#4f7cff"];
+/**
+ * Bow's own look, which the onboarding wears from the first start's glow until a color is picked (the user's choice,
+ * 2026-10-29, after comparing with Arc's single saturated color): a saturated violet-blue base and three lights over
+ * it, a periwinkle bloom, a violet and a soft orchid glint. Our choice, from the app icon's colors
+ * (shared/appIconDrawing.ts) pulled toward one hue so the window reads as one color. The intro's sheet
+ * (onboarding/intro.css) draws the same.
+ */
+export const BOW_BRAND_BASE = "#3a2bcf";
+export const BOW_WASH_COLORS: [string, string, string] = ["#7287ff", "#a35cff", "#ee8fd0"];
 
 /**
  * The scene after a step of `delta` (+1 next, −1 back), kept inside the scenes.

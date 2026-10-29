@@ -2,7 +2,8 @@
  * WHY this file exists:
  *   Beside "Bring your things." and "Choose a color." the onboarding shows a glass sidebar at the window's right edge:
  *   empty at first ("Your sidebar fills in here."), then filling with the Favorites and Pinned tabs an import
- *   actually brought, each one arriving in turn, and tinted with the Space's colors once a color is picked. It shows
+ *   actually brought, each one arriving in turn. Until a color is picked it is tinted with Bow's own colors, like the
+ *   window around it; then with the Space's. It shows
  *   what the user is about to get, with their own things.
  *
  * Data source:
@@ -12,6 +13,7 @@
  *   onboarding.ts → createSidebarPreview() → update(data) on every "onboarding:data" → new items rise in
  */
 import type { WelcomeData, WelcomeSidebar } from "../shared/onboarding";
+import { BOW_WASH_COLORS } from "../shared/onboarding.js";
 import { computeFramePalette } from "../shared/themePalette.js";
 import { createElement } from "../renderer/dom.js";
 import { createIcon } from "../renderer/icons.js";
@@ -25,10 +27,10 @@ const FAVORITE_SLOTS = 8;
 const ARRIVAL_STAGGER_MS = 90;
 const ARRIVAL_MS = 520;
 
-/** The glass sidebar and how it shows fresh data. */
+/** The glass sidebar and how it shows fresh data (`isBrandLook`: no color picked yet, Bow's own colors). */
 export interface SidebarPreview {
   element: HTMLElement;
-  update(data: WelcomeData): void;
+  update(data: WelcomeData, isBrandLook: boolean): void;
 }
 
 /**
@@ -136,11 +138,12 @@ export function createSidebarPreview(): SidebarPreview {
     return arrivals;
   };
 
-  const update = (data: WelcomeData): void => {
+  const update = (data: WelcomeData, isBrandLook: boolean): void => {
     const palette = computeFramePalette(data.theme, data.isSystemDark, true);
-    element.style.setProperty("--preview-1", palette.colors[0]);
-    element.style.setProperty("--preview-2", palette.colors[1]);
-    element.classList.toggle("is-dark", palette.isDark);
+    const tint = isBrandLook ? BOW_WASH_COLORS : palette.colors;
+    element.style.setProperty("--preview-1", tint[0]);
+    element.style.setProperty("--preview-2", tint[1]);
+    element.classList.toggle("is-dark", isBrandLook || palette.isDark);
     spaceName.textContent = data.sidebar.spaceName;
     const isEmpty = data.sidebar.favorites.length === 0 && data.sidebar.pinned.length === 0;
     element.classList.toggle("is-empty", isEmpty);

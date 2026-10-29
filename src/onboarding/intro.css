@@ -1,12 +1,15 @@
 /*
   WHY this file exists:
-    The first start's intro (intro.html): a see-through page, a glow of three soft blobs in Bow's colors that breathe
-    and turn slowly, and the sheet it grows into. The sheet is drawn like the onboarding's own background
-    (onboarding.css: the base color, three soft lights at the same places, grain), sized by the onboarding window, so
-    the real window takes over without a jump.
+    The first start's intro (intro.html). Three layers: a scrim that dims the desktop (and, once the window has
+    landed, the same scrim with a hole where the window is, so the window is never dimmed whatever is above), and in
+    the frame where the onboarding window will be, one shape that starts as a soft blob and grows into the window.
+    The shape is blurred from outside (its parent carries the blur), so its outline stays soft while it grows and
+    sharpens at the end. Inside it, the blob's colors cross-fade into the window's own background, drawn here exactly
+    like onboarding.css draws it for Bow's look (the same base, the same three lights at the same places, the same
+    grain), so the real window takes over without a jump.
 
   Data source:
-    body.dark, and the frame's place and size (intro.ts sets them).
+    The frame's place and size (intro.ts sets them). Colors: shared/onboarding.ts BOW_BRAND_BASE / BOW_WASH_COLORS.
 */
 
 html,
@@ -17,44 +20,84 @@ body {
   background: transparent;
 }
 
+.intro-scrim {
+  position: absolute;
+  inset: 0;
+  /* How dark the desktop goes around the glow: our choice, by eye against the user's recording of Arc's start. */
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+}
+
 .intro-frame {
-  --intro-base: #f5f4f8;
-  --intro-wash-opacity: 0.55;
-  --intro-grain-opacity: 0.22;
-  /* The sheet's corners at the end: about a macOS window's. Our choice, by eye on macOS 26. */
+  /* The sheet's corners at the end: a macOS window's (checked live on macOS 26). */
   --intro-corner: 16px;
   position: absolute;
   container-type: size;
 }
 
-body.dark .intro-frame {
-  --intro-base: #0c0c11;
-  --intro-wash-opacity: 0.5;
-  --intro-grain-opacity: 0.3;
+/* The scrim again, with a hole where the window is: swapped in when the window has landed. */
+.intro-hole {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--intro-corner);
+  box-shadow: 0 0 0 200vmax rgba(0, 0, 0, 0.55);
+  opacity: 0;
 }
 
 .intro-shadow {
   position: absolute;
   inset: 0;
   border-radius: var(--intro-corner);
-  box-shadow: 0 24px 70px -10px rgba(10, 8, 30, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 26px 70px -12px rgba(8, 4, 30, 0.6);
   opacity: 0;
 }
 
-.intro-sheet {
+/* The blur sits on the parent, so the shape's own outline is soft. */
+.intro-soft {
+  position: absolute;
+  inset: 0;
+  filter: blur(30px);
+  opacity: 0;
+}
+
+.intro-shape {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background: var(--intro-base);
-  opacity: 0;
-  clip-path: inset(50% 50% 50% 50% round 50%);
+  clip-path: inset(calc(50% - 160px) calc(50% - 165px) calc(50% - 163px) calc(50% - 157px) round 160px 139px 171px 149px / 155px 168px 147px 165px);
 }
 
-/* The same lights as the onboarding's wash (onboarding.css), measured by the sheet instead of the window. */
+/* While it waits, the blob's outline flows through organic shapes. */
+.intro-shape.is-breathing {
+  animation: intro-breathe 5.4s ease-in-out infinite;
+}
+
+@keyframes intro-breathe {
+  0%,
+  100% {
+    clip-path: inset(calc(50% - 160px) calc(50% - 165px) calc(50% - 163px) calc(50% - 157px) round 160px 139px 171px 149px / 155px 168px 147px 165px);
+  }
+  33% {
+    clip-path: inset(calc(50% - 171px) calc(50% - 155px) calc(50% - 152px) calc(50% - 168px) round 139px 173px 149px 168px / 171px 144px 168px 149px);
+  }
+  66% {
+    clip-path: inset(calc(50% - 152px) calc(50% - 171px) calc(50% - 171px) calc(50% - 155px) round 171px 149px 139px 173px / 147px 165px 173px 141px);
+  }
+}
+
+.intro-window-fill {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #3a2bcf;
+  opacity: 0;
+}
+
+/* The same lights as the onboarding's wash in Bow's look (onboarding.css), measured by the frame, not the window. */
 .intro-wash {
   position: absolute;
   inset: -12%;
-  opacity: var(--intro-wash-opacity);
+  opacity: 0.9;
 }
 
 .intro-light {
@@ -67,20 +110,20 @@ body.dark .intro-frame {
 .intro-light-1 {
   left: -18cqmax;
   top: -34cqmax;
-  background: radial-gradient(circle at center, #ff8a7a 0%, transparent 62%);
+  background: radial-gradient(circle at center, #7287ff 0%, color-mix(in srgb, #7287ff 45%, transparent) 30%, transparent 62%);
 }
 
 .intro-light-2 {
   right: -26cqmax;
   top: -4cqmax;
-  background: radial-gradient(circle at center, #b56cff 0%, transparent 60%);
+  background: radial-gradient(circle at center, #a35cff 0%, color-mix(in srgb, #a35cff 45%, transparent) 30%, transparent 60%);
   transform: scale(1.08);
 }
 
 .intro-light-3 {
-  left: 4cqmax;
-  bottom: -46cqmax;
-  background: radial-gradient(circle at center, #4f7cff 0%, transparent 60%);
+  left: -22cqmax;
+  bottom: -44cqmax;
+  background: radial-gradient(circle at center, #ee8fd0 0%, color-mix(in srgb, #ee8fd0 45%, transparent) 30%, transparent 60%);
   transform: scale(0.96);
 }
 
@@ -88,82 +131,55 @@ body.dark .intro-frame {
   position: absolute;
   inset: 0;
   mix-blend-mode: overlay;
-  opacity: var(--intro-grain-opacity);
+  opacity: 0.16;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='grain'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23grain)'/></svg>");
 }
 
-/* The glow: three blobs around the middle of where the window will be, blurred into one light. */
-.intro-glow {
+/* The blob's own colors: a soft lilac core through violet to the base, which fills everything as it grows. */
+.intro-blob-fill {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle 220px at 50% 50%, #ab9cff 0%, #8869ff 34%, #5545e4 68%, #3a2bcf 100%);
+}
+
+/* A soft light that drifts inside the blob, and a coral glint at its edge. */
+.intro-highlight,
+.intro-glint {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 240px;
-  height: 240px;
-  margin: -120px 0 0 -120px;
-  filter: blur(34px);
-  opacity: 0;
-}
-
-.intro-blob {
-  position: absolute;
-  width: 62%;
-  height: 62%;
   border-radius: 50%;
-  mix-blend-mode: screen;
 }
 
-body.dark .intro-blob {
-  mix-blend-mode: normal;
+.intro-highlight {
+  width: 170px;
+  height: 170px;
+  margin: -125px 0 0 -110px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 65%);
+  animation: intro-drift 6.2s ease-in-out infinite alternate;
 }
 
-.intro-blob-1 {
-  top: 6%;
-  left: 4%;
-  background: #ff8a7a;
+.intro-glint {
+  width: 150px;
+  height: 150px;
+  margin: -10px 0 0 10px;
+  background: radial-gradient(circle, rgba(238, 143, 208, 0.5) 0%, transparent 65%);
+  animation: intro-drift 7.4s ease-in-out infinite alternate-reverse;
 }
 
-.intro-blob-2 {
-  top: 4%;
-  right: 2%;
-  background: #b56cff;
-}
-
-.intro-blob-3 {
-  bottom: 2%;
-  left: 20%;
-  background: #4f7cff;
-}
-
-/* While it waits, the glow breathes and its colors turn around each other. */
-.intro-glow.is-breathing {
-  animation: intro-breathe 2.6s ease-in-out infinite alternate;
-}
-
-.intro-glow.is-breathing .intro-blob {
-  animation: intro-turn 7s linear infinite;
-}
-
-@keyframes intro-breathe {
+@keyframes intro-drift {
   from {
-    transform: scale(0.92);
+    transform: translate(-14px, 8px);
   }
   to {
-    transform: scale(1.08);
-  }
-}
-
-@keyframes intro-turn {
-  from {
-    transform: rotate(0deg) translateX(10px) rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg) translateX(10px) rotate(-360deg);
+    transform: translate(16px, -10px);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .intro-glow.is-breathing,
-  .intro-glow.is-breathing .intro-blob {
+  .intro-shape.is-breathing,
+  .intro-highlight,
+  .intro-glint {
     animation: none;
   }
 }

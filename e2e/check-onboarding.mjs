@@ -161,7 +161,14 @@ while (!isEntered && Date.now() - shownAt < 10000) {
   isEntered = await page.evaluate(() => document.querySelector(".onboarding")?.classList.contains("has-entered") ?? false);
   await page.waitForTimeout(100);
 }
-const introGone = await app.evaluate(({ BrowserWindow }, introPage) => !BrowserWindow.getAllWindows().some((candidate) => !candidate.isDestroyed() && candidate.webContents.getURL().includes(introPage)), INTRO_PAGE);
+// After the window has taken over, the intro lifts its dimming of the desktop (about 0.7 s), then goes.
+const isIntroThere = () => app.evaluate(({ BrowserWindow }, introPage) => BrowserWindow.getAllWindows().some((candidate) => !candidate.isDestroyed() && candidate.webContents.getURL().includes(introPage)), INTRO_PAGE);
+const goneBy = Date.now() + 3000;
+let introGone = !(await isIntroThere());
+while (!introGone && Date.now() < goneBy) {
+  await page.waitForTimeout(100);
+  introGone = !(await isIntroThere());
+}
 check(
   "a first start plays the intro over the screen (never taking the keyboard), then the onboarding window takes over and the intro goes",
   introSeen !== null && introSeen.isTransparentClickThrough && introSeen.coversScreen && !introSeen.isOnboardingShown && isEntered && introGone,
@@ -181,7 +188,17 @@ check(
 );
 check("the browser window stays hidden while the onboarding is open", firstPlace.isBrowserVisible === false);
 const firstScene = await currentScene();
-check("it starts on the welcome with its dot lit", firstScene.scene === "hello" && firstScene.dot === 0, JSON.stringify(firstScene));
+const firstLook = await page.evaluate(() => ({
+  isLightText: document.body.classList.contains("dark"),
+  hasPickedLook: document.querySelector(".onboarding").classList.contains("has-picked-look"),
+  wash: document.querySelector(".onboarding").style.getPropertyValue("--wash-2"),
+  hasSentence: document.querySelector(".scene-hello .scene-lede") !== null,
+}));
+check(
+  "it starts on the welcome with its dot lit, in Bow's own look (light text on its colors, whatever the system's), one line and a button",
+  firstScene.scene === "hello" && firstScene.dot === 0 && firstLook.isLightText && !firstLook.hasPickedLook && firstLook.wash === "#a35cff" && !firstLook.hasSentence,
+  JSON.stringify({ firstScene, firstLook }),
+);
 
 // ---------- Keys and dots ----------
 

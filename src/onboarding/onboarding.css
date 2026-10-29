@@ -10,11 +10,12 @@
     --preview-1…2 on the glass sidebar (onboarding.ts, onboardingScenes.ts and sidebarPreview.ts set them).
 */
 
-/* Registered, so light and dark and the wash cross-fade instead of jumping. */
+/* Registered, so light and dark and the wash cross-fade instead of jumping. Their first values are Bow's own look
+   (the one the onboarding starts in), so nothing fades in from another color when the page first paints. */
 @property --onb-base {
   syntax: "<color>";
   inherits: true;
-  initial-value: #f5f4f8;
+  initial-value: #3a2bcf;
 }
 
 @property --onb-ink {
@@ -32,19 +33,19 @@
 @property --wash-1 {
   syntax: "<color>";
   inherits: true;
-  initial-value: #ff8a7a;
+  initial-value: #7287ff;
 }
 
 @property --wash-2 {
   syntax: "<color>";
   inherits: true;
-  initial-value: #b56cff;
+  initial-value: #a35cff;
 }
 
 @property --wash-3 {
   syntax: "<color>";
   inherits: true;
-  initial-value: #4f7cff;
+  initial-value: #ee8fd0;
 }
 
 @property --mini-1 {
@@ -130,6 +131,25 @@ body.dark .onboarding {
   --link-highlight: rgba(120, 160, 255, 0.28);
 }
 
+/* Bow's own look, until a color is picked (shared/onboarding.ts BOW_BRAND_BASE and BOW_WASH_COLORS; the first
+   start's intro draws the same sheet, intro.css): a saturated violet-blue with light text, whatever the system's
+   appearance (onboarding.ts keeps body.dark on meanwhile). */
+body.dark .onboarding:not(.has-picked-look) {
+  --onb-base: #3a2bcf;
+  --onb-surface: rgba(255, 255, 255, 0.1);
+  --onb-surface-strong: rgba(255, 255, 255, 0.17);
+  --onb-border: rgba(255, 255, 255, 0.17);
+  --onb-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 18px 40px -18px rgba(10, 4, 50, 0.6);
+  --onb-accent-ink: #241a7c;
+  --onb-wash-opacity: 0.9;
+  --onb-grain-opacity: 0.16;
+}
+
+/* The wash holds still until the window is on screen, so its first frame is the intro's last one. */
+.onboarding:not(.has-entered) .wash-light {
+  animation-play-state: paused;
+}
+
 /* Once a color is picked, the whole window takes it: the base takes some of it and the lights come forward. */
 .onboarding.has-picked-look {
   --onb-base: color-mix(in srgb, var(--wash-2) 22%, #f5f4f8);
@@ -151,7 +171,7 @@ body {
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background: #0c0c11;
+  background: #3a2bcf;
 }
 
 body {
@@ -222,21 +242,22 @@ button {
 .wash-light-1 {
   left: -18vmax;
   top: -34vmax;
-  background: radial-gradient(circle at center, var(--wash-1) 0%, transparent 62%);
+  background: radial-gradient(circle at center, var(--wash-1) 0%, color-mix(in srgb, var(--wash-1) 45%, transparent) 30%, transparent 62%);
 }
 
 .wash-light-2 {
   right: -26vmax;
   top: -4vmax;
-  background: radial-gradient(circle at center, var(--wash-2) 0%, transparent 60%);
+  background: radial-gradient(circle at center, var(--wash-2) 0%, color-mix(in srgb, var(--wash-2) 45%, transparent) 30%, transparent 60%);
   animation-name: wash-drift-2;
   animation-duration: 33s;
 }
 
+/* In the bottom-left corner, so it reads as a glow and not as a hill rising from the bottom edge. */
 .wash-light-3 {
-  left: 4vmax;
-  bottom: -46vmax;
-  background: radial-gradient(circle at center, var(--wash-3) 0%, transparent 60%);
+  left: -22vmax;
+  bottom: -44vmax;
+  background: radial-gradient(circle at center, var(--wash-3) 0%, color-mix(in srgb, var(--wash-3) 45%, transparent) 30%, transparent 60%);
   animation-name: wash-drift-3;
   animation-duration: 39s;
 }
@@ -452,7 +473,7 @@ button {
 }
 
 .scene-title-hero {
-  font-size: clamp(34px, min(5.4vw, 9vh), 64px);
+  font-size: clamp(36px, min(6.2vw, 10.5vh), 78px);
   letter-spacing: -0.03em;
 }
 
@@ -557,19 +578,65 @@ button {
 
 /* ---------- Welcome ---------- */
 
-.hello-mark-holder {
-  position: relative;
+/* The mark and the words share one spot: the mark leaves where the title arrives. */
+.hello-stack {
   display: grid;
   place-items: center;
-  width: clamp(96px, 15vh, 132px);
-  margin-bottom: clamp(18px, 3.6vh, 30px);
+}
+
+.hello-stack > * {
+  grid-area: 1 / 1;
 }
 
 .hello-mark {
-  position: relative;
-  width: 100%;
+  width: clamp(130px, 21vh, 190px);
   overflow: visible;
-  filter: drop-shadow(0 10px 22px rgba(120, 80, 220, 0.25));
+  color: var(--onb-ink);
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--onb-ink) 35%, transparent));
+}
+
+.hello-mark.is-hidden {
+  visibility: hidden;
+}
+
+/* The welcome is one line at any window size the onboarding allows. */
+.scene-hello .scene-text {
+  max-width: none;
+}
+
+.hello-title {
+  white-space: nowrap;
+}
+
+.hello-words {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(18px, 3.2vh, 28px);
+}
+
+.hello-word {
+  display: inline-block;
+}
+
+/* The small glass button under the title, in the text's color. */
+.scene-primary.hello-go {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--onb-ink) 30%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--onb-ink) 16%, transparent);
+  color: var(--onb-ink);
+  box-shadow: none;
+  backdrop-filter: blur(12px);
+  --symbol-scale: 0.8;
+}
+
+.scene-primary.hello-go:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--onb-ink) 24%, transparent);
 }
 
 .ready-icon {
@@ -581,34 +648,6 @@ button {
   filter: drop-shadow(0 14px 26px rgba(30, 20, 60, 0.28));
 }
 
-.hello-glow {
-  position: absolute;
-  inset: -60%;
-  border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--wash-2) 55%, transparent) 0%, transparent 62%);
-  animation: hello-breathe 5.5s ease-in-out infinite alternate;
-}
-
-@keyframes hello-breathe {
-  from {
-    transform: scale(0.94);
-    opacity: 0.75;
-  }
-  to {
-    transform: scale(1.06);
-    opacity: 1;
-  }
-}
-
-.hello-go {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  margin-top: clamp(20px, 4vh, 32px);
-  padding: 0;
-  border-radius: 50%;
-}
 
 /* ---------- Bring your things: the browsers ---------- */
 
@@ -2032,7 +2071,6 @@ body.dark .link-bubble-url {
 
 @media (prefers-reduced-motion: reduce) {
   .wash-light,
-  .hello-glow,
   .tour-item.is-auto .tour-item-progress {
     animation: none;
   }

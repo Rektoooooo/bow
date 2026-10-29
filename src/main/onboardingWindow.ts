@@ -21,10 +21,9 @@
 import { app, BrowserWindow, ipcMain, nativeTheme, screen } from "electron";
 import type { IpcMainInvokeEvent, Rectangle, WebContents } from "electron";
 import * as path from "node:path";
-import { ARC_IMPORT_SOURCE_ID, IMPORT_PART_ORDER, ONBOARDING_CHANNELS, SUPPORTED_BROWSERS, orderBrowsers } from "../shared/onboarding";
+import { ARC_IMPORT_SOURCE_ID, BOW_BRAND_BASE, IMPORT_PART_ORDER, ONBOARDING_CHANNELS, SUPPORTED_BROWSERS, orderBrowsers } from "../shared/onboarding";
 import type { ImportPart, WelcomeBrowser, WelcomeData, WelcomeImport, WelcomeSidebar } from "../shared/onboarding";
 import { GLOBAL_SHORTCUT_CHOICES, ONBOARDING_MIN_HEIGHT_PX, ONBOARDING_MIN_WIDTH_PX, ONBOARDING_SCREEN_SHARE } from "../shared/settings";
-import { isThemeDark } from "../shared/themePalette";
 import type { BrowserState, SidebarItem, TabItem } from "../shared/types";
 import { applyArcImport, findArcSidebarFile, prepareArcImport } from "./arcImportController";
 import type { PreparedArcImport } from "./arcImportController";
@@ -40,9 +39,6 @@ import { THEME_PRESETS } from "./themePresets";
 import { getActiveSpace } from "./tree";
 import { fadeWindow } from "./windowFade";
 
-/** The page's colour before it paints (onboarding.css --onb-base), so the window never flashes another colour. */
-const LIGHT_BASE_COLOR = "#f5f4f8";
-const DARK_BASE_COLOR = "#0c0c11";
 
 /** Where macOS draws the close/minimize/zoom buttons: as in the browser window (mainWindows.ts). */
 const TRAFFIC_LIGHT_POSITION = { x: 18, y: 18 };
@@ -51,11 +47,9 @@ const TRAFFIC_LIGHT_POSITION = { x: 18, y: 18 };
 const WELCOME_GLOBAL_SHORTCUT = GLOBAL_SHORTCUT_CHOICES[1];
 
 /**
- * The handovers: the intro stays a moment after the onboarding window shows over it (so no frame shows the desktop
- * between them); at the end the onboarding fades out while the browser fades in, or (opened again from Help) just
+ * The handovers at the end: the onboarding fades out while the browser fades in, or (opened again from Help) just
  * fades out. Our choice.
  */
-const INTRO_HANDOVER_MS = 150;
 const BROWSER_HANDOVER_MS = 420;
 const REPLAY_FADE_OUT_MS = 260;
 
@@ -231,8 +225,6 @@ export function openOnboarding(isFirstStart: boolean): void {
   welcomeImports.clear();
   preparedSources.clear();
   welcomeBrowsers = listWelcomeBrowsers();
-  const theme = getActiveSpace(getState()).theme;
-  const isDark = isThemeDark(theme, nativeTheme.shouldUseDarkColors);
   const bounds = computeOnboardingBounds();
   // __dirname is dist/node/main when running, so these paths point into the build output.
   const preloadPath = path.join(__dirname, "..", "preload", "onboardingPreload.js");
@@ -245,7 +237,8 @@ export function openOnboarding(isFirstStart: boolean): void {
     title: "Welcome to Bow",
     titleBarStyle: "hiddenInset",
     trafficLightPosition: TRAFFIC_LIGHT_POSITION,
-    backgroundColor: isDark ? DARK_BASE_COLOR : LIGHT_BASE_COLOR,
+    // The page's own base color (Bow's look until a color is picked), so the window never flashes another one.
+    backgroundColor: BOW_BRAND_BASE,
     fullscreenable: false,
     webPreferences: { preload: preloadPath, sandbox: true, contextIsolation: true, nodeIntegration: false },
   });
@@ -256,7 +249,7 @@ export function openOnboarding(isFirstStart: boolean): void {
   const isPainted = new Promise<void>((resolve) => window.once("ready-to-show", () => resolve()));
   window.on("closed", () => handleOnboardingClosed());
   if (isFirstStart) {
-    showAfterIntro(window, bounds, isDark, isPainted).catch((error) => console.error("The onboarding could not show:", error));
+    showAfterIntro(window, bounds, isPainted).catch((error) => console.error("The onboarding could not show:", error));
   } else {
     isPainted.then(() => showOnboardingWindow(window, false)).catch(() => undefined);
   }
@@ -275,12 +268,13 @@ function showOnboardingWindow(window: BrowserWindow, isAfterIntro: boolean): voi
 }
 
 /**
- * The first start: the intro's glow grows into the onboarding window's place, then the window takes over there.
+ * The first start: the intro's glow grows into the onboarding window's place, the window takes over there, and the
+ * intro lifts its dimming of the desktop while the welcome plays (then it goes).
  */
-async function showAfterIntro(window: BrowserWindow, bounds: Rectangle, isDark: boolean, isPainted: Promise<void>): Promise<void> {
-  const closeIntro = await playIntro(bounds, isDark, isPainted);
+async function showAfterIntro(window: BrowserWindow, bounds: Rectangle, isPainted: Promise<void>): Promise<void> {
+  const leaveIntro = await playIntro(bounds, isPainted);
   showOnboardingWindow(window, true);
-  setTimeout(closeIntro, INTRO_HANDOVER_MS);
+  await leaveIntro();
 }
 
 /**

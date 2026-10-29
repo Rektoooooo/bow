@@ -375,7 +375,13 @@ yours, the essentials, a few good defaults, you're all set). Our own CSS/DOM/SVG
 - [x] 4. The startup: a glow on the desktop that grows into the onboarding window, Bow's mark drawing itself; the
       onboarding fading into the browser window (and, from the user's note: every browser's real logo, shipped with
       Bow, Arc's included; no "Not on this Mac" text under the dimmed ones)
-- [ ] 5. Screenshots and a recording for the user; polish
+- [x] 5. Screenshots and a recording for the user; polish
+- [x] 6. A startup as clean as Arc's (the user, 2026-10-29: "nowhere clean like Arc"): the desktop dims, one soft blob in
+      Bow's violet-blue breathes, swells and flows into the window (blurred from outside its shape, so the edge stays
+      soft), the window wears Bow's saturated look until a color is picked, the mark draws as a thin outline, holds and
+      lifts, "Welcome to Bow." sweeps in from the left, then a small glass button
+- [ ] 7. Live check on the real desktop with the user's go: the see-through dim, the window's real corner radius (the
+      sheet's is 16 px), the traffic lights arriving, the window above the intro while the dimming lifts
 
 ## Review (2026-10-28, an unattended night: open source, releases, auto-update, speed, polish)
 - **Works and verified:** open-source setup and repo rename; `npm run release` up to Apple's notarization (signing,

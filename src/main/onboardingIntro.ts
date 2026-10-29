@@ -1,27 +1,32 @@
 /**
  * WHY this file exists:
- *   Bow's first start begins on the desktop, before any window: a soft glow in Bow's colors appears in the middle of
- *   the screen and breathes, then grows into a rounded sheet at the onboarding window's exact place and size, and the
- *   real window takes over there. The glow lives in a see-through window over the screen that ignores the mouse and
- *   never takes the keyboard. It keeps breathing until the onboarding window has painted, so a slow first start just
- *   breathes longer; then it grows (its page says when it is done) and goes.
+ *   Bow's first start begins on the desktop, before any window: the desktop dims, one soft blob in Bow's colors
+ *   appears in the middle and breathes, then it swells and flows into the onboarding window's exact place and size,
+ *   where the real window takes over; the desktop brightens again while the welcome plays. All of it lives in a
+ *   see-through window over the screen that ignores the mouse and never takes the keyboard. It breathes until the
+ *   onboarding window has painted (a slow first start just breathes longer), but never longer than a ceiling: a stuck
+ *   page must not leave the desktop dimmed.
  *
  * Data source:
- *   The onboarding window's bounds and whether it starts dark (onboardingWindow.ts).
+ *   The onboarding window's bounds (onboardingWindow.ts).
  *
  * Data flow:
- *   onboardingWindow.ts openOnboarding(true) → playIntro(bounds, isDark, onboarding painted) → intro.html breathes →
- *   window.growIntoWindow() → resolves → the onboarding window shows → the returned close() removes the intro
+ *   onboardingWindow.ts openOnboarding(true) → playIntro(bounds, onboarding painted) → intro.html dims and breathes →
+ *   window.growIntoWindow() → the onboarding window shows → the returned leave() → window.leaveIntro() → closed
  */
 import { BrowserWindow, screen } from "electron";
 import type { Rectangle } from "electron";
 import * as path from "node:path";
 
-/** The glow breathes at least this long before it grows, so it reads as a moment and not a flicker. Our choice. */
-const INTRO_MIN_BREATHE_MS = 1500;
+/** The blob breathes at least this long before it grows, so it reads as a moment and not a flicker. Our choice. */
+const INTRO_MIN_BREATHE_MS = 1600;
 
-/** If the page never says its growth ended (it lasts about 1 s), the onboarding window shows anyway. */
+/** The longest the intro waits for the onboarding window to paint; then it grows anyway. Our choice. */
+const INTRO_MAX_WAIT_MS = 10_000;
+
+/** If the page never says its growth (about 1.1 s) or its leaving (about 0.7 s) ended, main goes on after these. */
 const INTRO_GROW_TIMEOUT_MS = 3000;
+const INTRO_LEAVE_TIMEOUT_MS = 2000;
 
 /**
  * Waits a while.
@@ -31,11 +36,24 @@ function delay(milliseconds: number): Promise<void> {
 }
 
 /**
- * Plays the intro over the screen that holds `target` (the onboarding window's bounds): the glow appears and breathes
- * until `targetPainted` and the shortest breath are both done, then grows into `target`. Resolves with a function that
- * removes the intro (called once the onboarding window shows in its place).
+ * Asks the intro's page to run one of its steps (it resolves when the step is done), waiting at most `timeoutMs`.
+ * A page that is gone or fails just ends the wait.
  */
-export async function playIntro(target: Rectangle, isDark: boolean, targetPainted: Promise<void>): Promise<() => void> {
+async function runIntroStep(intro: BrowserWindow, script: string, timeoutMs: number): Promise<void> {
+  if (intro.isDestroyed()) {
+    return;
+  }
+  const step = intro.webContents.executeJavaScript(script).catch((error) => console.error("An intro step failed:", error));
+  await Promise.race([step, delay(timeoutMs)]);
+}
+
+/**
+ * Plays the intro over the screen that holds `target` (the onboarding window's bounds): the desktop dims, the blob
+ * appears and breathes until `targetPainted` (at most INTRO_MAX_WAIT_MS) and the shortest breath are both done, then
+ * grows into `target`. Resolves with leave(): it lifts the dimming and removes the intro, to call once the onboarding
+ * window shows in its place.
+ */
+export async function playIntro(target: Rectangle, targetPainted: Promise<void>): Promise<() => Promise<void>> {
   const area = screen.getDisplayMatching(target).workArea;
   const intro = new BrowserWindow({
     ...area,
@@ -52,7 +70,8 @@ export async function playIntro(target: Rectangle, isDark: boolean, targetPainte
     skipTaskbar: true,
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
   });
-  const close = (): void => {
+  const leave = async (): Promise<void> => {
+    await runIntroStep(intro, "window.leaveIntro()", INTRO_LEAVE_TIMEOUT_MS);
     if (!intro.isDestroyed()) {
       intro.destroy();
     }
@@ -74,17 +93,16 @@ export async function playIntro(target: Rectangle, isDark: boolean, targetPainte
     y: String(target.y - area.y),
     width: String(target.width),
     height: String(target.height),
-    dark: isDark ? "1" : "0",
   };
   try {
     await intro.loadFile(pagePath, { query: query });
-    await Promise.all([introShown, targetPainted, delay(INTRO_MIN_BREATHE_MS)]);
-    const grown = intro.webContents.executeJavaScript("window.growIntoWindow()");
-    await Promise.race([grown, delay(INTRO_GROW_TIMEOUT_MS)]);
+    const paintedOrGivenUp = Promise.race([targetPainted, delay(INTRO_MAX_WAIT_MS)]);
+    await Promise.all([introShown, paintedOrGivenUp, delay(INTRO_MIN_BREATHE_MS)]);
+    await runIntroStep(intro, "window.growIntoWindow()", INTRO_GROW_TIMEOUT_MS);
   } catch (error) {
-    // The intro is only a flourish: whatever went wrong, the onboarding still shows.
+    // The intro is only a flourish: whatever went wrong, the onboarding still shows (the dimming goes with leave()).
     console.error("The intro could not play:", error);
-    await targetPainted;
+    await Promise.race([targetPainted, delay(INTRO_MAX_WAIT_MS)]);
   }
-  return close;
+  return leave;
 }
