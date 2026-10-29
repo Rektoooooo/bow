@@ -392,6 +392,32 @@ yours, the essentials, a few good defaults, you're all set). Our own CSS/DOM/SVG
       rows per profile in the onboarding, "Dia, all 4 spaces…" in the File menu; check-onboarding 38 with four made-up
       Dia spaces
 
+## Milestone 6 — Bow Passwords (user-approved 2026-10-29: "yes lets do all 5")
+The user: Bow "isn't remembering emails I filled in or any passwords… super important for user experience". Electron
+44 has no password manager, autofill or autocomplete history, so Bow builds its own. Plan:
+`/Users/sebastiankucera/.claude/plans/reflective-honking-quasar.md` (summary here). One small Bow helper in every
+page of a profile (isolated world, never in private windows), passwords encrypted with a Keychain key, per profile.
+- [x] 1. Pure core + unit tests: `passwords.ts` (vault, offer decisions, `www.` matching), `formMemory.ts` (allow-listed
+      field kinds, card numbers / codes never), `passwordCsv.ts` (Chrome/Arc/Dia, Safari, Firefox headers, merge)
+- [ ] 2. Vault store (`passwordVault.ts`: safeStorage, one file per profile, never overwrites a vault it can't open),
+      the mock keychain for tests (`--use-mock-keychain`, verified first), two settings switches
+- [ ] 3. The page helper (`formsPreload.ts`, registered per profile session) and the bridge (`formsBridge.ts`: origin
+      from the sender frame, main frame only, limits); permission-check and check-extensions adapted; `symbols.ts`
+      sender check by identity
+- [ ] 4. "Save password for example.com?" (overlay panel like the permission prompt): Save, Not now, Never for this
+      site; Update when the password changed; only typed passwords
+- [ ] 5. The suggestion list under the field (its own view, never takes focus, clamped inside the page), fill on a
+      pick only, ↓ ↑ Return Escape; check-passwords (save and fill) → full suite, push
+- [ ] 6. Form memory: emails, names, phones, addresses come back as suggestions; Shift+Delete removes one
+- [ ] 7. Library › Passwords: list, search, Show / Copy / Edit behind Touch ID (fails closed), delete, never-saved
+      sites, forget form memory, the two switches
+- [ ] 8. Import from a CSV file: Library, File › Import From Browser, the onboarding's done view (export steps per
+      browser), move the file to the Trash afterwards
+- [ ] 9. The rest of check-passwords; check-onboarding's Passwords block
+- [ ] 10. Docs (CLAUDE.md security rule and architecture, README, backup and sync docs, handoff) → full suite, push;
+      screenshots for the user
+- [ ] 11. Live check with the user's go: the real Keychain item and Touch ID in a packaged build
+
 ## Review (2026-10-28, an unattended night: open source, releases, auto-update, speed, polish)
 - **Works and verified:** open-source setup and repo rename; `npm run release` up to Apple's notarization (signing,
   hardened runtime, DMG checked by hand; notarization waits for the user's credentials); auto-update (a real signed
