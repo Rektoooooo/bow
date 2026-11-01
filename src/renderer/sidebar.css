@@ -398,6 +398,17 @@ button:disabled {
   mask-size: contain;
 }
 
+/* Icon buttons have no padding: a button's default 6 px sides pushed every icon right of the middle of its hover
+   square, and the wide speaker hung out of it (the user, 2026-11-01). Now every icon centres in the whole button. */
+.header-button,
+.bottom-button,
+.row-action,
+.media-button,
+.space-button,
+.toolbar-button {
+  padding: 0;
+}
+
 /* ---------- Sidebar ---------- */
 
 .sidebar {

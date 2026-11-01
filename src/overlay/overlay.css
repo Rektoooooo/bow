@@ -2561,6 +2561,8 @@ body.dark .peek-card {
   place-items: center;
   width: 28px;
   height: 26px;
+  /* No padding, like .library-line-icon-button: the icon centres in its hover square. */
+  padding: 0;
   border: 0;
   border-radius: 7px;
   background: none;
@@ -2689,6 +2691,8 @@ body.is-closing .peek-buttons {
   place-items: center;
   width: 28px;
   height: 28px;
+  /* No padding, like .library-line-icon-button: the icon centres in its hover square. */
+  padding: 0;
   border: 0;
   border-radius: 7px;
   background: none;
