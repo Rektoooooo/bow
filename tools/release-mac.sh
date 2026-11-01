@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Builds the files of a release, all in release/:
-#   Bow-<version>-<arch>.dmg      the download: Bow.app and a link to Applications
+#   Bow-<version>-<arch>.dmg      the download: Bow.app and a link to Applications in our window (make-dmg.sh)
 #   Bow-<version>-<arch>.zip      the same app for Bow's own updater (Squirrel.Mac takes a zip)
 #   update-darwin-<arch>.json     the update feed installed apps read (src/main/appUpdates.ts)
 # The app and the disk image are signed with a Developer ID certificate and notarized by Apple, so they open on any Mac
@@ -27,7 +27,7 @@ dmg_path="release/Bow-$version-$architecture.dmg"
 zip_name="Bow-$version-$architecture.zip"
 feed_path="release/update-darwin-$architecture.json"
 work_folder="$(mktemp -d)"
-# The temporary zip and disk folder go away however the script ends.
+# The temporary zip goes away however the script ends.
 trap 'rm -rf "$work_folder"' EXIT
 
 # Sends a file to Apple's notary service, waits for the answer and stops the release when Apple refuses it (the log
@@ -97,12 +97,8 @@ FEED
 # A broken feed would stop every installed Bow from updating, so the release stops here instead.
 node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$feed_path"
 
-disk_folder="$work_folder/Bow"
-mkdir -p "$disk_folder"
-ditto "$app_path" "$disk_folder/Bow.app"
-ln -s /Applications "$disk_folder/Applications"
-rm -f "$dmg_path"
-hdiutil create -volname "Bow" -srcfolder "$disk_folder" -fs HFS+ -format UDZO "$dmg_path"
+# The download: our window with Bow and Applications (make-dmg.sh asks Finder to lay it out).
+tools/make-dmg.sh "$app_path" "$dmg_path"
 codesign --sign "$sign_identity" --timestamp "$dmg_path"
 notarize "$dmg_path"
 xcrun stapler staple "$dmg_path"

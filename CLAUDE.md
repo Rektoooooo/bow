@@ -44,9 +44,13 @@ node e2e/arc-compare.mjs   # side-by-side crops with the user's Arc screenshots 
 npm run package      # release/Bow-darwin-arm64/Bow.app (ad-hoc signed, git-ignored)
 npm run release      # release/: Bow-<version>-arm64.dmg (Developer ID, hardened runtime, notarized + stapled), the
                      # updater's Bow-<version>-arm64.zip and update-darwin-arm64.json; upload all three to the release
-                     # (needs the keychain's Developer ID certificate and the notarytool profile "bow-notary")
+                     # (needs the keychain's Developer ID certificate and the notarytool profile "bow-notary"). The
+                     # disk image's window is ours (tools/make-dmg.sh: picture, icon places, Bow's disk icon); Finder
+                     # lays it out, so the first run asks once to let the terminal control Finder
 node e2e/check-package.mjs # checks that packaged app (Info.plist, menu, links from other apps)
 tools/make-icon.sh   # redraws build/icon.icns from tools/make-icon.cjs (our own icon design)
+tools/make-dmg-background.sh  # redraws build/dmg-background.tiff, the download window's picture (layout in
+                              # tools/dmg-layout.cjs); light, because Finder draws its icon labels in black
 ```
 
 `npm run e2e` runs the real app in the background (`e2e/background.mjs` → `src/main/backgroundTesting.ts`: no Dock

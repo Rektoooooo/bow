@@ -44,6 +44,12 @@ early itself. Also: document.open() erases listeners (put back), "username webau
 keeps the step-one username. The Mac's Passwords app cannot be offered live (no API; Apple's extension is limited to
 browsers on its list); its CSV export imports.
 
+**The download's window** (2026-11-01): the disk image opens in our own window (a pale wash of the icon's colors,
+a dotted arc from Bow to Applications, Bow's icon on the disk). `tools/make-dmg.sh` builds it for `npm run release`:
+Finder lays out a writable copy once (AppleScript, so the terminal needs permission to control Finder), then it is
+compressed. Finder draws the icon labels black on a picture even in Dark Mode, so the picture is light; the volume
+icon has to be copied onto the disk after Finder's layout (before it, it was gone from the finished image).
+
 ## Watch out
 
 - **Data version 5**: once a build with it ran on the real data folder, the installed 0.1.1 can't read the state any
