@@ -446,6 +446,11 @@ profiles, so each looks separate); on the other macOS account Bow's Spaces share
 - [x] 2. Merge into bow-next, full suite, push (main at 84b4a22; check-windows' quit check failed once at a load
       average of 86 and passed twice on re-runs)
 
+## Review (2026-11-01, release 0.2.0)
+- Released v0.2.0 (Latest): Bow Passwords (with embedded frames and the direct import from Chromium browsers),
+  Favorites per Space, the Google sign-in fix, hover and scroll bar polish, and the download's own window. Full e2e
+  suite on the app's last commit (f8b0272); the release tooling commits after it change no app code.
+
 ## Review (2026-10-29, Google sign-in, Bow Passwords, Favorites per Space)
 - **Google sign-in**: the cause measured on accounts.google.com (Chrome user agent → GlifWebSignIn, Electron's →
   WebLiteSignIn); the header and navigator.userAgent change only there. A real sign-in by the user is still open.

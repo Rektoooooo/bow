@@ -66,8 +66,10 @@ icon has to be copied onto the disk after Finder's layout (before it, it was gon
 
 ## Next
 
-- The user's own test of everything (Google sign-in, passwords, Favorites per Space) on a build with a separate data
-  folder, then a release (0.1.2 or 0.2.0) only with the user's go; `npm run release` runs in the user's Terminal.
+- **0.2.0 is released** (2026-11-01, Latest, after the user's own test on a separate data folder: passwords, the
+  direct Arc import, App Store Connect's list). Built by `npm run release` in the user's Terminal panel (started there
+  with run_in_terminal; notarytool's saved login is not visible to Claude's own shell); the disk image was rebuilt
+  once, without the hidden-extension mark (see the commit "Disk image: leave the app's Finder info alone").
 - Live checks by hand: the real Keychain item and Touch ID in a packaged build; the onboarding intro on the real desktop.
 - Later for passwords: Peek and Little Windows, a password generator, export, passkeys (Electron 45 and an Apple
   entitlement). Known gap: a cross-origin frame inside a frame the parent's helper handles saves and fills, but its
