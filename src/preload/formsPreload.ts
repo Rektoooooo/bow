@@ -7,7 +7,9 @@
  *   variables or ipcRenderer, and it exposes nothing: no contextBridge, no globals, no attributes or elements added to
  *   the page. Main treats every message as untrusted and takes the site from the sending frame. An embedded frame
  *   posts a random key to its parent window when the user is in one of its fields, so the parent's helper can tell
- *   main where that frame sits (the list under a field needs the field's place in the whole tab).
+ *   main where that frame sits (the list under a field needs the field's place in the whole tab). Electron runs no
+ *   helper in a same-origin frame whose first empty window Chromium keeps for the real page (Apple Developer's
+ *   sign-in); the parent's helper reaches into such a frame and handles its fields as part of its own page.
  *
  * Data source:
  *   The page's own DOM (inputs, forms) and real user input events (isTrusted). Messages from main (fill, fillValue).
@@ -103,12 +105,18 @@ const MAX_FILL_LENGTH = 1024;
 const ALLOWED_PAGE_PROTOCOLS = ["http:", "https:"];
 
 /**
- * True while this frame shows a web page. Checked each time the helper would report, not once at start: an embedded
- * frame's first empty page (about:blank) can turn into the real page in the same window without the helper starting
- * again (Chromium keeps the window for a same-site frame; Apple Developer's sign-in frame is one).
+ * Set on a frame's window, in Bow's isolated world only (page scripts never see it), to the document that frame's own
+ * helper watches. A parent's helper leaves a same-origin frame alone while it names the frame's current document.
  */
-function isOnWebPage(): boolean {
-  return ALLOWED_PAGE_PROTOCOLS.includes(location.protocol);
+const OWN_HELPER_MARKER = "bowFormsHelper";
+
+/**
+ * True for a web page (http or https). Checked for the page of each field the helper would report: it also handles the
+ * pages of same-origin frames, and a page it watches can be an empty about:blank one.
+ */
+function isWebPage(pageDocument: Document): boolean {
+  const protocol = pageDocument.defaultView?.location.protocol ?? "";
+  return ALLOWED_PAGE_PROTOCOLS.includes(protocol);
 }
 
 /** Input types that behave like free text and can hold a username or an address part. */
@@ -300,9 +308,10 @@ function isVisible(element: Element): boolean {
   return element.getClientRects().length > 0;
 }
 
-function scopeOf(element: Element): ParentNode {
+function scopeOf(element: Element): Element {
   const enclosingForm = element.closest("form");
-  return enclosingForm ?? document.body ?? document.documentElement;
+  const ownerDocument = element.ownerDocument;
+  return enclosingForm ?? ownerDocument.body ?? ownerDocument.documentElement;
 }
 
 function inputsIn(scope: ParentNode): HTMLInputElement[] {
@@ -375,8 +384,20 @@ function chosenPasswordField(scopeInfo: ScopeInfo): HTMLInputElement | null {
   return withValue.at(-1) ?? null;
 }
 
+/**
+ * An element of this page or of a same-origin frame's page this helper handles. That page is another realm, where
+ * `instanceof HTMLInputElement` says no, so these checks look at the node itself.
+ */
+function isElement(target: EventTarget | null): target is Element {
+  return target !== null && (target as Node).nodeType === Node.ELEMENT_NODE;
+}
+
 function isInput(target: EventTarget | null): target is HTMLInputElement {
-  return target instanceof HTMLInputElement;
+  return isElement(target) && target.localName === "input";
+}
+
+function isFrameElement(target: EventTarget | null): target is HTMLIFrameElement | HTMLFrameElement {
+  return isElement(target) && (target.localName === "iframe" || target.localName === "frame");
 }
 
 function isMessageRecord(value: unknown): value is Record<string, unknown> {
@@ -422,17 +443,31 @@ function makeFrameKey(): string {
 /** Where a child frame's page starts in this page's viewport: inside the frame element's border and padding. */
 function contentBoxStart(element: HTMLIFrameElement | HTMLFrameElement): { x: number; y: number } {
   const box = element.getBoundingClientRect();
-  const style = getComputedStyle(element);
+  const pageWindow = element.ownerDocument.defaultView ?? window;
+  const style = pageWindow.getComputedStyle(element);
   const paddingLeft = Number.parseFloat(style.paddingLeft);
   const paddingTop = Number.parseFloat(style.paddingTop);
   return { x: Math.round(box.x + element.clientLeft + paddingLeft), y: Math.round(box.y + element.clientTop + paddingTop) };
 }
 
+function frameElementsIn(pageDocument: Document): Array<HTMLIFrameElement | HTMLFrameElement> {
+  return Array.from(pageDocument.querySelectorAll<HTMLIFrameElement | HTMLFrameElement>("iframe, frame"));
+}
+
 /** The iframe or frame element of this page that shows that child window, or null. */
 function findFrameElement(childWindow: MessageEventSource): HTMLIFrameElement | HTMLFrameElement | null {
-  const frameElements = Array.from(document.querySelectorAll<HTMLIFrameElement | HTMLFrameElement>("iframe, frame"));
-  const match = frameElements.find((element) => element.contentWindow === childWindow);
+  const match = frameElementsIn(document).find((element) => element.contentWindow === childWindow);
   return match ?? null;
+}
+
+/** True when this helper may handle that frame's page: reachable from here and of exactly this page's origin. */
+function isSameOriginFrame(frameWindow: Window): boolean {
+  try {
+    // Reading a cross-origin frame's location throws; document.domain cannot make another origin pass this check.
+    return frameWindow.location.origin === window.location.origin;
+  } catch {
+    return false;
+  }
 }
 
 function parseFillValueMessage(value: unknown): FillValueMessage | null {
@@ -463,9 +498,9 @@ function startFormsHelper(): void {
   // from the page (the field reports leaving) before main's fill message arrives.
   let fillTargetField: HTMLInputElement | null = null;
   let loginWatchTimer: ReturnType<typeof setInterval> | null = null;
-  // The last username the user typed in this frame: two-step sign-ins (Apple's) hide or remove it once the password
-  // shows, and a login saved without it would have no name.
-  let lastTypedUsername = "";
+  // The last username the user typed in each page this helper handles: two-step sign-ins (Apple's) hide or remove it
+  // once the password shows, and a login saved without it would have no name.
+  const lastTypedUsernameByPage = new WeakMap<Document, string>();
 
   const isTopFrame = window.top === window;
   // An embedded frame's key (shared/forms.ts), posted to the parent window once the user is in one of its fields.
@@ -492,8 +527,23 @@ function startFormsHelper(): void {
     window.parent.postMessage({ [FRAME_KEY_FIELD]: ownFrameKey }, "*");
   }
 
+  /** Where a page starts in this helper's own page: (0, 0) for its own, plus each frame's place for a handled frame. */
+  function offsetInOwnPage(pageDocument: Document): { x: number; y: number } {
+    let offsetX = 0;
+    let offsetY = 0;
+    let pageWindow = pageDocument.defaultView;
+    while (pageWindow !== null && pageWindow !== window && pageWindow.frameElement !== null) {
+      const start = contentBoxStart(pageWindow.frameElement as HTMLIFrameElement);
+      offsetX = offsetX + start.x;
+      offsetY = offsetY + start.y;
+      pageWindow = pageWindow.frameElement.ownerDocument.defaultView;
+    }
+    return { x: offsetX, y: offsetY };
+  }
+
   function reportField(input: HTMLInputElement): void {
-    if (!isOnWebPage()) {
+    const pageDocument = input.ownerDocument;
+    if (!isWebPage(pageDocument)) {
       return;
     }
     const scopeInfo = readScope(scopeOf(input));
@@ -502,15 +552,21 @@ function startFormsHelper(): void {
       return;
     }
     if (role === "username" && typedInputs.has(input)) {
-      lastTypedUsername = input.value.trim().slice(0, MAX_FILL_LENGTH);
+      lastTypedUsernameByPage.set(pageDocument, input.value.trim().slice(0, MAX_FILL_LENGTH));
     }
     const isPasswordRole = role === "password" || role === "newPassword";
     const box = input.getBoundingClientRect();
+    const pageOffset = offsetInOwnPage(pageDocument);
     const message: FieldFocusedMessage = {
       role,
       // A password is never sent while it is typed: suggestions do not narrow by password.
       typed: isPasswordRole ? "" : input.value.slice(0, MAX_TYPED),
-      rect: { x: Math.round(box.x), y: Math.round(box.y), width: Math.round(box.width), height: Math.round(box.height) },
+      rect: {
+        x: Math.round(box.x + pageOffset.x),
+        y: Math.round(box.y + pageOffset.y),
+        width: Math.round(box.width),
+        height: Math.round(box.height),
+      },
       hasPasswordField: scopeInfo.visiblePasswordFields.length > 0,
       frameKey: ownFrameKey,
     };
@@ -567,8 +623,8 @@ function startFormsHelper(): void {
     return entries;
   }
 
-  function reportSubmission(scope: ParentNode): void {
-    if (!isOnWebPage()) {
+  function reportSubmission(scope: Element): void {
+    if (!isWebPage(scope.ownerDocument)) {
       return;
     }
     const now = performance.now();
@@ -585,8 +641,9 @@ function startFormsHelper(): void {
     }
     lastSubmitTimeByScope.set(scope, now);
     const usernameInForm = scopeInfo.usernameField?.value.trim() ?? "";
+    const typedEarlier = lastTypedUsernameByPage.get(scope.ownerDocument) ?? "";
     // Two-step sign-ins: the username step may be hidden or gone by the time the password is sent.
-    const username = usernameInForm === "" ? lastTypedUsername : usernameInForm;
+    const username = usernameInForm === "" ? typedEarlier : usernameInForm;
     const message: SubmittedMessage = {
       username: password === "" ? "" : username,
       password,
@@ -600,7 +657,7 @@ function startFormsHelper(): void {
     }
   }
 
-  function scopeHasPassword(scope: ParentNode, requireValue: boolean): boolean {
+  function scopeHasPassword(scope: Element, requireValue: boolean): boolean {
     const scopeInfo = readScope(scope);
     if (!requireValue) {
       return scopeInfo.visiblePasswordFields.length > 0;
@@ -611,8 +668,10 @@ function startFormsHelper(): void {
   function setInputValue(input: HTMLInputElement, value: string): void {
     const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
     nativeSetter?.call(input, value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
+    // Events made in the field's own page, so its code sees ordinary events (a handled frame's page is another realm).
+    const PageEvent = input.ownerDocument.defaultView?.Event ?? Event;
+    input.dispatchEvent(new PageEvent("input", { bubbles: true }));
+    input.dispatchEvent(new PageEvent("change", { bubbles: true }));
     typedInputs.delete(input);
   }
 
@@ -623,12 +682,12 @@ function startFormsHelper(): void {
     const target = event.target;
     lastPointerTarget = target;
     lastPointerTime = performance.now();
-    if (!isInput(target) || document.activeElement !== target) {
+    if (!isInput(target) || target.ownerDocument.activeElement !== target) {
       return;
     }
     // Clicking a field that already has focus reopens the list; the focus settles first.
     setTimeout(() => {
-      if (document.activeElement === target) {
+      if (target.ownerDocument.activeElement === target) {
         reportField(target);
       }
     }, 0);
@@ -689,7 +748,7 @@ function startFormsHelper(): void {
 
   function handleClick(event: MouseEvent): void {
     const target = event.target;
-    if (!event.isTrusted || !(target instanceof Element)) {
+    if (!event.isTrusted || !isElement(target)) {
       return;
     }
     const button = target.closest("button, input[type=submit], input[type=button], [role=button]");
@@ -703,15 +762,15 @@ function startFormsHelper(): void {
   }
 
   function handleSubmit(event: Event): void {
-    if (event.target instanceof HTMLFormElement) {
-      reportSubmission(event.target);
+    const target = event.target;
+    if (isElement(target) && target.localName === "form") {
+      reportSubmission(target);
     }
   }
 
   function handlePageHide(): void {
     reportFieldLeft();
     fillTargetField = null;
-    lastTypedUsername = "";
     stopLoginWatch();
   }
 
@@ -727,7 +786,7 @@ function startFormsHelper(): void {
 
   /** Answers main with where a child frame's page starts in this page. No answer when the frame is not ours to find. */
   function answerLocate(request: LocateFrameMessage): void {
-    if (!isOnWebPage()) {
+    if (!isWebPage(document)) {
       return;
     }
     const childWindow = childFramesByKey.get(request.frameKey);
@@ -766,33 +825,80 @@ function startFormsHelper(): void {
     }
   }
 
-  // The document the root observer below watches; a new page in the same window brings a new document.
-  let watchedDocument: Document | null = null;
-  // document.open() erases every listener on the window and the page; Apple's sign-in frame rewrites itself that way.
-  // It also swaps the page's root element, which this observer sees (observers are not erased), and the listeners go
-  // back on. addEventListener ignores a listener that is already there, so none is ever added twice.
-  const rootObserver = new MutationObserver(installPageListeners);
-
-  function installPageListeners(): void {
-    if (watchedDocument !== document) {
-      watchedDocument = document;
-      rootObserver.observe(document, { childList: true });
+  // The pages whose root element the observer below watches.
+  const watchedDocuments = new WeakSet<Document>();
+  // document.open() erases every listener on a window and its page. It also swaps the page's root element, which this
+  // observer sees (observers are not erased), and the listeners go back on. addEventListener ignores a listener that
+  // is already there, so none is ever added twice.
+  const rootObserver = new MutationObserver((records) => {
+    for (const record of records) {
+      const pageWindow = (record.target as Document).defaultView;
+      if (pageWindow !== null) {
+        installListenersOn(pageWindow);
+      }
     }
-    window.addEventListener("pointerdown", handlePointerDown, true);
-    window.addEventListener("keydown", handleKeyDown, true);
-    window.addEventListener("focusin", handleFocusIn, true);
-    window.addEventListener("focusout", handleFocusOut, true);
-    window.addEventListener("input", handleTypedInput, true);
-    window.addEventListener("paste", handlePaste, true);
-    window.addEventListener("click", handleClick, true);
-    window.addEventListener("submit", handleSubmit, true);
-    window.addEventListener("scroll", handleViewportMoved, { capture: true, passive: true });
-    window.addEventListener("resize", handleViewportMoved);
-    window.addEventListener("pagehide", handlePageHide);
-    window.addEventListener("message", rememberChildFrame);
+  });
+
+  /**
+   * Handles a same-origin frame that has no helper of its own watching its page: Electron runs none in a frame whose
+   * first empty window Chromium keeps for the real page (Apple Developer's sign-in). Its fields then count as fields of
+   * this helper's page, at the frame's place. A frame of another origin is left alone: it has its own helper.
+   */
+  function handleFrameIfAlone(element: HTMLIFrameElement | HTMLFrameElement): void {
+    const frameWindow = element.contentWindow;
+    if (frameWindow === null || !isSameOriginFrame(frameWindow)) {
+      return;
+    }
+    if (Reflect.get(frameWindow, OWN_HELPER_MARKER) === frameWindow.document) {
+      return;
+    }
+    installListenersOn(frameWindow);
   }
 
-  installPageListeners();
+  function handleFrameLoaded(event: Event): void {
+    const target = event.target;
+    if (isFrameElement(target)) {
+      handleFrameIfAlone(target);
+    }
+  }
+
+  function installListenersOn(pageWindow: Window): void {
+    const pageDocument = pageWindow.document;
+    const isNewPage = !watchedDocuments.has(pageDocument);
+    if (isNewPage) {
+      watchedDocuments.add(pageDocument);
+      rootObserver.observe(pageDocument, { childList: true });
+    }
+    pageWindow.addEventListener("pointerdown", handlePointerDown, true);
+    pageWindow.addEventListener("keydown", handleKeyDown, true);
+    pageWindow.addEventListener("focusin", handleFocusIn, true);
+    pageWindow.addEventListener("focusout", handleFocusOut, true);
+    pageWindow.addEventListener("input", handleTypedInput, true);
+    pageWindow.addEventListener("paste", handlePaste, true);
+    pageWindow.addEventListener("click", handleClick, true);
+    pageWindow.addEventListener("submit", handleSubmit, true);
+    pageWindow.addEventListener("scroll", handleViewportMoved, { capture: true, passive: true });
+    pageWindow.addEventListener("resize", handleViewportMoved);
+    // A frame's load passes its page's document on the way down (capture). It never reaches the window: the DOM leaves
+    // the window out of every load event's path.
+    pageDocument.addEventListener("load", handleFrameLoaded, true);
+    if (pageWindow === window) {
+      Reflect.set(window, OWN_HELPER_MARKER, document);
+      window.addEventListener("pagehide", handlePageHide);
+      window.addEventListener("message", rememberChildFrame);
+      return;
+    }
+    // A frame's page taken over just now has loaded with its own frames (its load comes after theirs), so their loads
+    // went by before these listeners. Never done for this helper's own page: touching a frame before its first page
+    // has loaded makes Chromium keep the frame's empty window, and Electron then runs no helper in it.
+    if (isNewPage) {
+      for (const element of frameElementsIn(pageDocument)) {
+        handleFrameIfAlone(element);
+      }
+    }
+  }
+
+  installListenersOn(window);
 
   ipcRenderer.on(CHANNELS.locateFrame, (_event: IpcRendererEvent, rawMessage: unknown) => {
     const request = parseLocateFrameMessage(rawMessage);

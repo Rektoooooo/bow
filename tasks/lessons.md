@@ -146,6 +146,15 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   background (`backgroundTesting.ts`); a new check imports `./background.mjs` first. A check that needs real OS
   focus or real mouse events cannot work there: drive the page through Playwright (CDP) instead.
 
+- Page helpers in embedded frames (Bow Passwords, 2026-11-01): `document.open()` erases every listener on the window
+  and the page (a frame that rewrites itself loses the helper's listeners; a MutationObserver survives and sees the
+  root element swap). A `load` event never reaches `window`, not even in the capture phase: listen on the document.
+  Touching a same-origin frame's window before its first page loads (even reading `contentWindow.location`) makes
+  Chromium keep that empty window for the page, and Electron then runs no preload in it at all; Apple Developer's
+  sign-in frame is built that way by Apple's own page. Prove where a helper runs with the DevTools protocol
+  (`webContents.debugger`, which follows the tab across processes: execution contexts per frame and
+  `DOMDebugger.getEventListeners` on `window` in Electron's isolated context), not by reasoning.
+
 - A runtime import in `src/shared/` must end in `.js` (`from "./settings.js"`): the pages load shared files as ES
   modules in the browser, which cannot resolve a bare `./settings`, and the whole sidebar script fails (an empty
   window; check-app times out on `.space-title`). Main's CommonJS build accepts both, so the main typecheck passes.

@@ -427,6 +427,13 @@ a Keychain key, per profile.
       macOS asks once for the browser's Safe Storage key, logins into the right Bow profiles; Safari and Firefox keep
       the CSV way, which stays as the fallback when macOS says no
       (Checked by the user on the real Arc data, 2026-10-29: macOS's dialog once, all 34 logins in Library › Passwords.)
+- [x] 13. Sign-in forms inside embedded frames (the user, testing 0.2.0: no save offer and no list on Apple Developer;
+      Apple's sign-in is an idmsa.apple.com frame): the helper in every frame, logins of the frame's own site, the list
+      placed through the parent frames, a frame Chromium kept its first window for handled by the parent's helper,
+      document.open, "username webauthn", the two-step username. Measured live without typing: Apple Developer and
+      App Store Connect report idmsa.apple.com at the field's place. check-passwords 72, permission-check 32.
+- [ ] 14. The Mac's Passwords app cannot be offered live (no API for browsers; Apple's iCloud Passwords extension needs
+      native messaging and a browser on Apple's list since macOS 15.4). Its CSV export imports today.
 
 ## Milestone 7 — Favorites per Space (user-approved 2026-10-29)
 The user: "each space needs its own favorites". Arc keeps Favorites per profile (the user's Arc: 3 Spaces on 3

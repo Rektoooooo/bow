@@ -34,6 +34,16 @@ a profile (the user's choice after it was explained that Arc keeps them per prof
 Spaces has its own profile). The upgrade gives a shared row to the active Space, keeps the file as it was next to it
 (`browser-state.version-4-<time>.json`), and Sync skips a peer from an older Bow with a notice.
 
+**Sign-in forms in embedded frames** (Milestone 6 step 13, 2026-11-01, not pushed yet): Apple's sign-in is an
+idmsa.apple.com frame (on Apple Developer of the same origin, on App Store Connect and iCloud of another). The forms
+helper runs in every frame now (tab views set nodeIntegrationInSubFrames); a frame's logins are its own site's; main
+asks parent frames where a frame sits to place the list. Apple Developer needed two more fixes, both found with the
+DevTools protocol: Apple's page touches the frame before it loads, so Chromium keeps the frame's empty window and
+Electron runs no helper in it (the parent's helper handles such a same-origin frame), and Bow must never touch a frame
+early itself. Also: document.open() erases listeners (put back), "username webauthn" is a username, a two-step sign-in
+keeps the step-one username. The Mac's Passwords app cannot be offered live (no API; Apple's extension is limited to
+browsers on its list); its CSV export imports.
+
 ## Watch out
 
 - **Data version 5**: once a build with it ran on the real data folder, the installed 0.1.1 can't read the state any
@@ -53,5 +63,6 @@ Spaces has its own profile). The upgrade gives a shared row to the active Space,
 - The user's own test of everything (Google sign-in, passwords, Favorites per Space) on a build with a separate data
   folder, then a release (0.1.2 or 0.2.0) only with the user's go; `npm run release` runs in the user's Terminal.
 - Live checks by hand: the real Keychain item and Touch ID in a packaged build; the onboarding intro on the real desktop.
-- Later for passwords: Peek and Little Windows, sign-in forms inside iframes, a password generator, export, passkeys
-  (Electron 45 and an Apple entitlement).
+- Later for passwords: Peek and Little Windows, a password generator, export, passkeys (Electron 45 and an Apple
+  entitlement). Known gap: a cross-origin frame inside a frame the parent's helper handles saves and fills, but its
+  list has no place (main asks a frame that has no helper).

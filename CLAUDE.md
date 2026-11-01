@@ -144,12 +144,25 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
     checks ("This browser or app may not be secure", 2026-10-29), so its sign-in pages get Electron's own user agent in
     the request headers (`googleSignIn.ts`, `signInUserAgent.ts`) and in `navigator.userAgent`; every other site sees
     Chrome's.
-  - `formsPreload.ts` (Bow Passwords), in profile sessions only (never private windows), in top frames of http(s)
-    pages: it reports a field only after a real click, Tab or typing, reports sent forms with only allow-listed fields
-    the user typed into, and fills only when main sends a login or value. `formsBridge.ts` trusts none of it: only a
-    tab's own top frame in a profile session, the site taken from the sending frame (never the message), rate
-    limited, payloads parsed strictly (`formsMessages.ts`); a fill goes only to a frame still on the site the list was
-    opened for.
+  - `formsPreload.ts` (Bow Passwords), in profile sessions only (never private windows), in every http(s) frame of a
+    tab, embedded frames too (tab views set `nodeIntegrationInSubFrames`: Electron loads preloads in subframes only
+    with it, and a sandboxed frame still gets no Node.js; many sign-in forms sit in a frame, Apple's does): it reports
+    a field only after a real click, Tab or typing, reports sent forms with only allow-listed fields the user typed
+    into, and fills only when main sends a login or value. `formsBridge.ts` trusts none of it: only a frame of a tab's
+    own page in a profile session, the site taken from the sending frame (never the message), rate limited, payloads
+    parsed strictly (`formsMessages.ts`); a fill goes only to the frame that reported the field, by Chromium's frame
+    ids, while it is still on the site the list was opened for. A frame's logins are its own site's (Apple's sign-in:
+    idmsa.apple.com). To place the list under a field in a frame, main asks each parent frame in turn where its child
+    frame sits (`locateFrame` / `frameLocated`; the frame posts a random key to its parent only once the user is in
+    one of its fields, and the first post of a key wins). A lying parent can only misplace the list, and it is asked
+    on every field focus before the vault is read, so it learns nothing about saved logins. Electron runs no preload
+    in a same-origin frame whose first empty window Chromium keeps for the real page (Apple Developer's sign-in): the
+    parent's helper handles such a frame's fields as its own (exactly the same origin, by `location.origin`), and it
+    never touches a frame before the frame's first page has loaded, which is what makes Chromium keep that window.
+    The helper marks its own window, in its isolated world only, with the document it watches, so a frame that has
+    its own helper is never handled twice. It puts its listeners back after `document.open()` erases them.
+  - `googleSignInPreload.ts` acts in top frames only, embedded Google frames keep Chrome's user agent like their
+    headers do.
   - In a profile that has extensions, the extension library's preload.
   Website permissions are installed per session in `profiles.ts`: `fullscreen` and `clipboard-sanitized-write`
   are allowed, camera, microphone, location, notifications and clipboard reading go to a prompt

@@ -126,6 +126,19 @@ const server = http.createServer((request, response) => {
       </body>`);
     return;
   }
+  // Apple Developer's case: the page builds its own-site frame by script and touches the frame's window before the
+  // frame's page loads. Chromium then keeps that first empty window for the page, and Electron runs no helper in it.
+  if (request.url.startsWith("/framed-reuse")) {
+    const frameQuery = new URL(request.url, "http://local").searchParams.has("single") ? "?single=1" : "";
+    response.end(`<!doctype html><title>Framed login</title><body style="margin:0;height:3000px"><script>
+      const frame = document.createElement("iframe");
+      frame.src = "/frame-login${frameQuery}";
+      frame.style.cssText = "display:block;margin:100px 0 0 150px;border:3px solid #888;padding:5px;width:400px;height:200px";
+      document.body.append(frame);
+      frame.contentWindow.eval("1");
+    </script></body>`);
+    return;
+  }
   // A slow answer to the sign-in, so a test can switch tabs before the page finishes loading.
   const delay = request.url.startsWith("/welcome") ? 1500 : 0;
   setTimeout(() => response.end("<!doctype html><title>Welcome</title><body>Welcome</body>"), delay);
@@ -1044,6 +1057,58 @@ check(
 );
 await sameSiteTab.mouse.click(700, 600);
 await isListGone(sameSiteTab);
+
+// 14b-5. Apple Developer's case: a frame without its own helper is handled by the page's helper. A two-step sign-in
+// there is offered for the site, with the step-one username.
+const reuseTab = await openFramed("framed-reuse");
+await frameField(reuseTab, "#account").click();
+await reuseTab.keyboard.type("reuse-user@example.com");
+await reuseTab.keyboard.press("Enter");
+await frameField(reuseTab, "#password").waitFor({ state: "visible" });
+await frameField(reuseTab, "#password").click();
+await reuseTab.keyboard.type("reuse-pass-1");
+await reuseTab.keyboard.press("Enter");
+const reusePrompt = await promptText(6000);
+check(
+  "a two-step sign-in in a frame Chromium kept its first window for asks to save it, with the step-one username",
+  /Save password for 127\.0\.0\.1:\d+\?/.test(reusePrompt ?? "") && (reusePrompt ?? "").includes("reuse-user@example.com"),
+  reusePrompt ?? "no prompt",
+);
+await overlay.click(".password-prompt .permission-button.is-primary");
+const afterReuseSave = await waitForVault((vault) => vault.logins.some((login) => login.username === "reuse-user@example.com"));
+check(
+  "Save keeps that login for the site",
+  afterReuseSave.logins.some((login) => login.username === "reuse-user@example.com" && login.origin === mainOrigin && login.password === "reuse-pass-1"),
+);
+await waitForOverlayGone();
+
+// 14b-6. Its list sits under the field, found by the page's own helper (no frame to locate), and a pick fills it.
+const reuseListTab = await openFramed("framed-reuse?single=1");
+const locatedBefore = (await formsCounts()).frameLocated;
+await frameField(reuseListTab, "#account").click();
+await reuseListTab.keyboard.type("reuse");
+const reuseList = await waitForList(reuseListTab);
+const reuseCounts = await formsCounts();
+check(
+  "the page's helper reports that frame's field at its place in the tab, with no frame to locate",
+  reuseCounts.lastOrigin === mainOrigin && reuseCounts.frameLocated === locatedBefore && reuseCounts.lastRect !== null && isNear(reuseCounts.lastRect.x, fieldInTab.x) && isNear(reuseCounts.lastRect.y, fieldInTab.y),
+  JSON.stringify({ origin: reuseCounts.lastOrigin, rect: reuseCounts.lastRect, located: [locatedBefore, reuseCounts.frameLocated] }),
+);
+check(
+  "its list opens right under the field",
+  reuseList !== null && isNear(reuseList.popup.y, reuseList.tab.y + fieldInTab.y + accountHeight),
+  JSON.stringify(reuseList),
+);
+await pressKeyLikeUser(reuseListTab, "Down");
+await pressKeyLikeUser(reuseListTab, "Return");
+let filledReuse = await frameValues(reuseListTab);
+for (let attempt = 0; attempt < 20 && filledReuse.password === ""; attempt++) {
+  await sleep(100);
+  filledReuse = await frameValues(reuseListTab);
+}
+check("picking it fills that frame's fields", filledReuse.account === "reuse-user@example.com" && filledReuse.password === "reuse-pass-1", filledReuse.account);
+await reuseListTab.mouse.click(700, 600);
+await isListGone(reuseListTab);
 
 // ---------- 15. A vault that cannot be opened ----------
 await quitApp();
