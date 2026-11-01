@@ -9,10 +9,18 @@
  *   Whatever arrived over IPC (unknown). Limits come from shared/forms.ts and passwords.ts.
  *
  * Data flow:
- *   formsBridge.ts → parseFieldFocusedMessage / parseSubmittedMessage → a clean message, or null (then dropped)
+ *   formsBridge.ts → parseFieldFocusedMessage / parseSubmittedMessage / parseFrameLocatedMessage → a clean message,
+ *   or null (then dropped)
  */
-import { MAX_SUBMITTED_ENTRIES, MAX_TYPED_LENGTH } from "../shared/forms";
-import type { FieldFocusedMessage, FieldRect, FieldRole, SubmittedEntry, SubmittedMessage } from "../shared/forms";
+import { FRAME_KEY_LENGTH, MAX_SUBMITTED_ENTRIES, MAX_TYPED_LENGTH } from "../shared/forms";
+import type {
+  FieldFocusedMessage,
+  FieldRect,
+  FieldRole,
+  FrameLocatedMessage,
+  SubmittedEntry,
+  SubmittedMessage,
+} from "../shared/forms";
 import { isFormFieldKind } from "../shared/passwords";
 import { MAX_LOGIN_FIELD_LENGTH } from "./passwords";
 
@@ -23,6 +31,9 @@ import { MAX_LOGIN_FIELD_LENGTH } from "./passwords";
 export const MAX_RECT_COORDINATE = 100_000;
 
 const SIGN_IN_ROLES = ["username", "password", "newPassword"];
+
+/** A frame key as the helper makes it: lower-case hex of exactly FRAME_KEY_LENGTH digits. */
+const FRAME_KEY_PATTERN = new RegExp(`^[0-9a-f]{${FRAME_KEY_LENGTH}}$`);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -38,6 +49,11 @@ function isCoordinate(value: unknown): value is number {
 
 function isSize(value: unknown): value is number {
   return isCoordinate(value) && value >= 0;
+}
+
+/** A frame key, or "" for a tab's top frame. */
+function isFrameKeyOrEmpty(value: unknown): value is string {
+  return value === "" || (typeof value === "string" && FRAME_KEY_PATTERN.test(value));
 }
 
 function parseRect(value: unknown): FieldRect | null {
@@ -58,21 +74,38 @@ export function parseFieldFocusedMessage(value: unknown): FieldFocusedMessage | 
   if (!isRecord(value)) {
     return null;
   }
-  const { role, typed, hasPasswordField } = value;
+  const { role, typed, hasPasswordField, frameKey } = value;
   if (!isAllowedRole(role)) {
     return null;
   }
   if (typeof typed !== "string" || typed.length > MAX_TYPED_LENGTH) {
     return null;
   }
-  if (typeof hasPasswordField !== "boolean") {
+  if (typeof hasPasswordField !== "boolean" || !isFrameKeyOrEmpty(frameKey)) {
     return null;
   }
   const rect = parseRect(value.rect);
   if (rect === null) {
     return null;
   }
-  return { role: role, typed: typed, rect: rect, hasPasswordField: hasPasswordField };
+  return { role: role, typed: typed, rect: rect, hasPasswordField: hasPasswordField, frameKey: frameKey };
+}
+
+/**
+ * The clean "the child frame is here" answer, or null when anything is off.
+ */
+export function parseFrameLocatedMessage(value: unknown): FrameLocatedMessage | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const { requestId, x, y, frameKey } = value;
+  if (typeof requestId !== "number" || !Number.isSafeInteger(requestId) || requestId < 1) {
+    return null;
+  }
+  if (!isCoordinate(x) || !isCoordinate(y) || !isFrameKeyOrEmpty(frameKey)) {
+    return null;
+  }
+  return { requestId: requestId, x: x, y: y, frameKey: frameKey };
 }
 
 function parseEntry(value: unknown): SubmittedEntry | null {

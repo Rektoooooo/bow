@@ -254,7 +254,7 @@ function createImportGroup(passwords: PasswordsData): HTMLElement {
   const group = createElement("section", "password-group password-import");
   const row = createElement("div", "library-line password-import-row");
   const text = createElement("span", "library-line-text");
-  text.append(createElement("span", "library-line-title", "Import passwords"), createElement("span", "library-line-meta", "From the CSV file your browser or password manager exported."));
+  text.append(createElement("span", "library-line-title", "Import passwords"), createElement("span", "library-line-meta", "From the CSV file your browser, password manager or the Mac's Passwords app (File › Export All Passwords) exported."));
   row.append(text, createTextButton("Import passwords…", "library-chip is-active password-import-button", () => dispatch({ type: "importPasswordsFromFile", profileId: passwords.profileId })));
   group.append(row);
   return group;

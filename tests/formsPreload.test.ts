@@ -68,7 +68,7 @@ describe("autocomplete", () => {
       "new-password",
       "current-password",
       "username",
-      "webauthn",
+      "username webauthn",
       "transaction-amount",
       "bday",
       "something-unknown",
@@ -80,6 +80,8 @@ describe("autocomplete", () => {
   it("goes on to the type and name rules for 'on' and empty values", () => {
     expect(kindOf({ autocomplete: "on", type: "email" })).toBe("email");
     expect(kindOf({ autocomplete: "shipping", name: "city" })).toBe("city");
+    // "webauthn" alone names no field (the standard puts it after one), like "shipping" alone.
+    expect(kindOf({ autocomplete: "webauthn", name: "email" })).toBe("email");
   });
 
   it("never returns a kind for password or hidden fields", () => {
@@ -242,6 +244,13 @@ describe("autocompleteFieldName", () => {
     expect(autocompleteFieldName("section-a billing street-address")).toBe("street-address");
     expect(autocompleteFieldName("")).toBe("");
     expect(autocompleteFieldName("shipping")).toBe("");
+  });
+
+  it("reads past the webauthn word a passkey-ready field ends with (Apple's sign-in)", () => {
+    expect(autocompleteFieldName("username webauthn")).toBe("username");
+    expect(autocompleteFieldName("current-password webauthn")).toBe("current-password");
+    expect(autocompleteFieldName("section-login email webauthn")).toBe("email");
+    expect(kindOf({ autocomplete: "email webauthn" })).toBe("email");
   });
 });
 

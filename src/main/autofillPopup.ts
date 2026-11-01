@@ -23,7 +23,7 @@ import type { BrowserWindow, IpcMainInvokeEvent, WebContents } from "electron";
 import * as path from "node:path";
 import { AUTOFILL_CHANNELS } from "../shared/autofill";
 import type { AutofillItem, AutofillShowMessage } from "../shared/autofill";
-import type { FieldReport } from "./formsBridge";
+import type { FieldReport, FrameIds } from "./formsBridge";
 import type { FieldRect } from "../shared/forms";
 import type { FormFieldKind } from "../shared/passwords";
 import type { ItemId, ProfileId } from "../shared/types";
@@ -65,6 +65,8 @@ interface ShownList {
   tabId: ItemId;
   profileId: ProfileId;
   origin: string;
+  /** The frame the field is in (the tab's top frame or an embedded one): a pick fills that frame only. */
+  frame: FrameIds;
   window: BrowserWindow;
   fieldRect: FieldRect;
   rows: ListRow[];
@@ -211,6 +213,7 @@ async function showForField(report: FieldReport): Promise<void> {
     tabId: report.tabId,
     profileId: report.profileId,
     origin: report.origin,
+    frame: report.frame,
     window: window,
     fieldRect: report.message.rect,
     rows: rows,
@@ -481,7 +484,7 @@ async function fillRow(list: ShownList, row: ListRow): Promise<void> {
     return;
   }
   if (row.entry.kind === "value") {
-    fillValue(list.tabId, list.origin, { value: row.entry.value });
+    fillValue(list.tabId, list.frame, list.origin, { value: row.entry.value });
     return;
   }
   const loginId = row.entry.loginId;
@@ -494,7 +497,7 @@ async function fillRow(list: ShownList, row: ListRow): Promise<void> {
   if (login === undefined || !isSameLoginSite(login.origin, list.origin)) {
     return;
   }
-  const wasFilled = fillLogin(list.tabId, list.origin, { username: login.username, password: login.password });
+  const wasFilled = fillLogin(list.tabId, list.frame, list.origin, { username: login.username, password: login.password });
   if (wasFilled) {
     await changeVault(list.profileId, (vault) => markLoginUsed(vault, loginId, Date.now()));
   }

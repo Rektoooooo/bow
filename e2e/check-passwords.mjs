@@ -90,6 +90,42 @@ const server = http.createServer((request, response) => {
     response.end("<!doctype html><title>Blank</title><body>blank</body>");
     return;
   }
+  // A sign-in form inside an embedded frame, like Apple's (idmsa.apple.com): the account field says
+  // "username webauthn", and by default the sign-in has two steps (the account alone, then only the password).
+  if (request.url.startsWith("/frame-login")) {
+    const isSingleStep = new URL(request.url, "http://local").searchParams.has("single");
+    response.end(`<!doctype html><title>Frame login</title><body style="margin:0;padding:20px 30px">
+      <form id="signin">
+        <input type="text" id="account" autocomplete="username webauthn" style="display:block;width:240px;height:30px;margin:0">
+        <input type="password" id="password" autocomplete="current-password" style="display:${isSingleStep ? "block" : "none"};width:240px;height:30px;margin:0">
+        <button>Continue</button>
+      </form>
+      <script>
+        const account = document.getElementById("account");
+        const password = document.getElementById("password");
+        document.getElementById("signin").addEventListener("submit", (event) => {
+          event.preventDefault();
+          if (password.style.display === "none") {
+            account.style.display = "none";
+            password.style.display = "block";
+            return;
+          }
+          setTimeout(() => { document.body.innerHTML = "<p>Verify it is you</p>"; }, 300);
+        });
+      </script></body>`);
+    return;
+  }
+  // Pages around that frame: the frame's page starts 158 px in and 108 px down (margin + border + padding), and the
+  // page is tall enough to scroll. "framed-same" embeds a frame of its own site (Apple Developer's case).
+  if (request.url.startsWith("/framed-login") || request.url.startsWith("/framed-same")) {
+    const address = new URL(request.url, "http://local");
+    const frameOrigin = address.pathname === "/framed-same" ? `http://127.0.0.1:${server.address().port}` : `http://login.test:${server.address().port}`;
+    const frameQuery = address.searchParams.has("single") ? "?single=1" : "";
+    response.end(`<!doctype html><title>Framed login</title><body style="margin:0;height:3000px">
+      <iframe src="${frameOrigin}/frame-login${frameQuery}" style="display:block;margin:100px 0 0 150px;border:3px solid #888;padding:5px;width:400px;height:200px"></iframe>
+      </body>`);
+    return;
+  }
   // A slow answer to the sign-in, so a test can switch tabs before the page finishes loading.
   const delay = request.url.startsWith("/welcome") ? 1500 : 0;
   setTimeout(() => response.end("<!doctype html><title>Welcome</title><body>Welcome</body>"), delay);
@@ -903,6 +939,111 @@ check(
 );
 await overlay.keyboard.press("Escape");
 await waitForOverlayGone();
+
+// ---------- 14b. Sign-in forms inside embedded frames (Apple's sign-in is one) ----------
+const formsBridgePath = path.join(appDir, "dist", "node", "main", "formsBridge.js");
+const formsCounts = () => app.evaluate((_electron, modulePath) => process.mainModule.require(modulePath).getFormsMessageCounts(), formsBridgePath);
+// Where the frame's page starts in the tab (see /framed-login) and where #account sits in the frame (its padding).
+const FRAME_START = { x: 158, y: 108 };
+const ACCOUNT_IN_FRAME = { x: 30, y: 20 };
+async function openFramed(route) {
+  runCounter = runCounter + 1;
+  const separator = route.includes("?") ? "&" : "?";
+  const address = `${mainOrigin}/${route}${separator}run=${runCounter}`;
+  await dispatch({ type: "openTab", typedText: address });
+  let tabPage = null;
+  for (let attempt = 0; attempt < 50 && tabPage === null; attempt++) {
+    tabPage = app.windows().find((candidate) => candidate.url().includes(`run=${runCounter}`)) ?? null;
+    if (tabPage === null) await sleep(200);
+  }
+  if (tabPage === null) throw new Error(`${address} did not open`);
+  await tabPage.frameLocator("iframe").locator("#account").waitFor();
+  await sleep(400);
+  return tabPage;
+}
+const frameField = (tabPage, selector) => tabPage.frameLocator("iframe").locator(selector);
+// The field's own height (30 px of content plus the input's default padding and border).
+const fieldHeight = (tabPage, selector) => frameField(tabPage, selector).evaluate((element) => element.getBoundingClientRect().height);
+const isNear = (value, wanted) => Math.abs(value - wanted) <= 1;
+
+// 14b-1. A two-step sign-in in a cross-origin frame: saved for the frame's own site, with the username of step one.
+const twoStepTab = await openFramed("framed-login");
+await frameField(twoStepTab, "#account").click();
+await twoStepTab.keyboard.type("frame-user@example.com");
+await twoStepTab.keyboard.press("Enter");
+await frameField(twoStepTab, "#password").waitFor({ state: "visible" });
+await frameField(twoStepTab, "#password").click();
+await twoStepTab.keyboard.type("frame-pass-1");
+await twoStepTab.keyboard.press("Enter");
+const framePrompt = await promptText(6000);
+check(
+  "a two-step sign-in inside a cross-origin frame asks to save it for the frame's own site, with the step-one username",
+  /Save password for login\.test:\d+\?/.test(framePrompt ?? "") && (framePrompt ?? "").includes("frame-user@example.com"),
+  framePrompt ?? "no prompt",
+);
+await overlay.click(".password-prompt .permission-button.is-primary");
+const afterFrameSave = await waitForVault((vault) => vault.logins.some((login) => login.username === "frame-user@example.com"));
+const frameLogin = afterFrameSave.logins.find((login) => login.username === "frame-user@example.com");
+check(
+  "Save keeps that login under the frame's site, not the page's",
+  frameLogin !== undefined && frameLogin.origin === otherOrigin && frameLogin.password === "frame-pass-1",
+  JSON.stringify(frameLogin === undefined ? null : { origin: frameLogin.origin, username: frameLogin.username }),
+);
+await waitForOverlayGone();
+
+// 14b-2. The list under a field in a cross-origin frame: placed under the field in the whole tab, a pick fills it.
+const framedTab = await openFramed("framed-login?single=1");
+await frameField(framedTab, "#account").click();
+await framedTab.keyboard.type("frame");
+const framedList = await waitForList(framedTab);
+const framedCounts = await formsCounts();
+const fieldInTab = { x: FRAME_START.x + ACCOUNT_IN_FRAME.x, y: FRAME_START.y + ACCOUNT_IN_FRAME.y };
+const accountHeight = await fieldHeight(framedTab, "#account");
+check(
+  "a field in a cross-origin frame is reported for the frame's site, at its place in the whole tab",
+  framedCounts.lastOrigin === otherOrigin && framedCounts.lastRect !== null && isNear(framedCounts.lastRect.x, fieldInTab.x) && isNear(framedCounts.lastRect.y, fieldInTab.y),
+  JSON.stringify({ origin: framedCounts.lastOrigin, rect: framedCounts.lastRect }),
+);
+check(
+  "the list opens right under that field",
+  framedList !== null && isNear(framedList.popup.y, framedList.tab.y + fieldInTab.y + accountHeight) && framedList.popup.x <= framedList.tab.x + fieldInTab.x && framedList.popup.x + 20 >= framedList.tab.x + fieldInTab.x,
+  JSON.stringify(framedList),
+);
+await fs.promises.writeFile(path.join(outDir, "autofill-frame-window.png"), await captureWindow(app)).catch(() => undefined);
+await pressKeyLikeUser(framedTab, "Down");
+await pressKeyLikeUser(framedTab, "Return");
+const frameValues = async (tabPage) => ({
+  account: await frameField(tabPage, "#account").inputValue(),
+  password: await frameField(tabPage, "#password").inputValue(),
+});
+let filledFrame = await frameValues(framedTab);
+for (let attempt = 0; attempt < 20 && filledFrame.password === ""; attempt++) {
+  await sleep(100);
+  filledFrame = await frameValues(framedTab);
+}
+check("picking it fills the frame's own fields", filledFrame.account === "frame-user@example.com" && filledFrame.password === "frame-pass-1", filledFrame.account);
+
+// 14b-3. Scrolling the page around the frame closes the list (the field moved with the page).
+await frameField(framedTab, "#account").click();
+const reopenedList = await waitForList(framedTab);
+await framedTab.evaluate(() => window.scrollBy(0, 200));
+check("scrolling the page around the frame closes the list", reopenedList !== null && (await isListGone(framedTab)));
+
+// 14b-4. A frame of the page's own site (Apple Developer's case) lists that site's logins, placed the same way.
+const sameSiteTab = await openFramed("framed-same?single=1");
+await frameField(sameSiteTab, "#account").click();
+const sameSiteList = await waitForList(sameSiteTab);
+const sameSiteCounts = await formsCounts();
+// The app restarted in 14: the list's page is a new one.
+listPage = await findPage("/autofill/popup.html");
+const sameSiteListText = sameSiteList === null ? "" : await listPage.evaluate(() => document.body.innerText.replace(/\s+/g, " ").trim());
+check(
+  "a same-site frame's field lists that site's login, under the field",
+  sameSiteList !== null && sameSiteCounts.lastOrigin === mainOrigin && isNear(sameSiteList.popup.y, sameSiteList.tab.y + fieldInTab.y + accountHeight) && sameSiteListText.includes("alex.renamed@example.com"),
+  JSON.stringify({ origin: sameSiteCounts.lastOrigin, list: sameSiteList, text: sameSiteListText }),
+);
+await sameSiteTab.mouse.click(700, 600);
+await isListGone(sameSiteTab);
 
 // ---------- 15. A vault that cannot be opened ----------
 await quitApp();

@@ -479,9 +479,18 @@ export function refreshShownSnapshots(): void {
 export function createTabView(state: BrowserState, tab: TabItem, events: TabViewEvents): WebContentsView {
   const profileId = findProfileIdOfItem(state, tab.id) ?? DEFAULT_PROFILE_ID;
   const profileSession = getProfileSession(profileId);
-  // Web pages get no preload script: sandboxed, context-isolated, no Node.js.
+  // Web pages are sandboxed and context-isolated, with no Node.js. Only the session's own page helpers run in them
+  // (formsBridge.ts, googleSignIn.ts, the extension library), in isolated worlds. nodeIntegrationInSubFrames lets
+  // those helpers run in embedded frames too, where many sign-in forms live (Apple's): Electron loads preloads in
+  // subframes only with it, and a sandboxed frame still gets no Node.js.
   const view = new WebContentsView({
-    webPreferences: { session: profileSession, sandbox: true, contextIsolation: true, nodeIntegration: false },
+    webPreferences: {
+      session: profileSession,
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      nodeIntegrationInSubFrames: true,
+    },
   });
   watchTabView(tab.id, view, events);
   view.webContents.setAudioMuted(tab.isMuted);

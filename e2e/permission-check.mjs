@@ -233,7 +233,8 @@ await app.evaluate(({ BrowserWindow }) => {
 });
 await sleep(500);
 
-// A local sign-in page with a cross-origin iframe that has its own sign-in form.
+// A local sign-in page with a cross-origin iframe that has its own sign-in form. The page is hostile: it repeats every
+// frame key it overhears from itself and makes up one of its own, trying to point the frame's list somewhere else.
 const formsServer = http.createServer((request, response) => {
   response.setHeader("content-type", "text/html");
   if (request.url.startsWith("/login")) {
@@ -244,7 +245,14 @@ const formsServer = http.createServer((request, response) => {
         <input type="password" name="password" autocomplete="current-password" style="width:300px;height:30px">
         <button>Sign in</button>
       </form>
-      <iframe src="http://other.example:${port}/frame" style="width:400px;height:150px"></iframe></body>`);
+      <iframe src="http://other.example:${port}/frame" style="width:400px;height:150px"></iframe>
+      <script>
+        window.addEventListener("message", (event) => {
+          if (event.source === window || typeof event.data?.bowFormsFrameKey !== "string") return;
+          window.postMessage({ bowFormsFrameKey: event.data.bowFormsFrameKey }, "*");
+          window.postMessage({ bowFormsFrameKey: "0".repeat(32) }, "*");
+        });
+      </script></body>`);
     return;
   }
   if (request.url.startsWith("/frame")) {
@@ -285,11 +293,42 @@ check("a page script moving focus into a field reports nothing", afterScriptFocu
 
 await formsPage.click("html", { position: { x: 600, y: 400 } });
 await sleep(300);
+const frameOrigin = `http://other.example:${formsPort}`;
 const beforeFrameClick = await formsCounts();
 await formsPage.frameLocator("iframe").locator("input[type=password]").click();
-await sleep(500);
+await sleep(800);
 const afterFrameClick = await formsCounts();
-check("a click into a sign-in form inside an iframe reports nothing", afterFrameClick.fieldFocused === beforeFrameClick.fieldFocused, JSON.stringify(afterFrameClick));
+check(
+  "a click into a sign-in form inside a cross-origin iframe is reported for that frame's own site, never the page's",
+  afterFrameClick.fieldFocused === beforeFrameClick.fieldFocused + 1 && afterFrameClick.lastOrigin === frameOrigin && afterFrameClick.lastRole === "password",
+  JSON.stringify(afterFrameClick),
+);
+// Where the field really is in the tab: the iframe's content box plus the field's place in the frame.
+const frameFieldInTab = await (async () => {
+  const frameStart = await formsPage.evaluate(() => {
+    const frameElement = document.querySelector("iframe");
+    const box = frameElement.getBoundingClientRect();
+    return { x: box.x + frameElement.clientLeft, y: box.y + frameElement.clientTop };
+  });
+  const fieldBox = await formsPage.frameLocator("iframe").locator("input[type=password]").evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return { x: box.x, y: box.y };
+  });
+  return { x: Math.round(frameStart.x + fieldBox.x), y: Math.round(frameStart.y + fieldBox.y) };
+})();
+const reportedRect = afterFrameClick.lastRect;
+check(
+  "the page around the frame repeating its key cannot move where the field is placed",
+  reportedRect !== null && Math.abs(reportedRect.x - frameFieldInTab.x) <= 1 && Math.abs(reportedRect.y - frameFieldInTab.y) <= 1,
+  JSON.stringify({ reported: reportedRect, real: frameFieldInTab }),
+);
+const frameGlobals = await formsPage.frames()[1].evaluate(() => {
+  const names = ["require", "process", "module", "exports", "Buffer", "ipcRenderer", "electron"];
+  const types = Object.fromEntries(names.map((name) => [name, typeof globalThis[name]]));
+  const leaked = Object.getOwnPropertyNames(window).filter((key) => /^(bow|forms)/i.test(key));
+  return { types, leaked };
+});
+check("the iframe's own world sees nothing new from the forms helper either", Object.values(frameGlobals.types).every((type) => type === "undefined") && frameGlobals.leaked.length === 0, JSON.stringify(frameGlobals));
 
 await formsPage.click("input[type=email]");
 await formsPage.keyboard.type("ann@example.com");

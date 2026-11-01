@@ -35,6 +35,11 @@ function setPageUserAgent(userAgent: string): void {
  * On Google's sign-in page, gives the page Electron's own user agent, the one its requests carry.
  */
 function alignSignInUserAgent(): void {
+  // Tab pages run session helpers in embedded frames too (for Bow Passwords). The header rule covers Google's sign-in
+  // only as the tab's own page, so an embedded Google frame keeps Chrome's user agent in its scripts as well.
+  if (window.top !== window) {
+    return;
+  }
   if (location.protocol !== "https:" || location.hostname !== SIGN_IN_HOST) {
     return;
   }

@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { MAX_SUBMITTED_ENTRIES, MAX_TYPED_LENGTH } from "../src/shared/forms";
-import { MAX_RECT_COORDINATE, parseFieldFocusedMessage, parseSubmittedMessage } from "../src/main/formsMessages";
+import {
+  MAX_RECT_COORDINATE,
+  parseFieldFocusedMessage,
+  parseFrameLocatedMessage,
+  parseSubmittedMessage,
+} from "../src/main/formsMessages";
 import { MAX_LOGIN_FIELD_LENGTH } from "../src/main/passwords";
 
-const goodFocused = { role: "username", typed: "ann", rect: { x: 1, y: 2, width: 3, height: 4 }, hasPasswordField: true };
+const goodFocused = { role: "username", typed: "ann", rect: { x: 1, y: 2, width: 3, height: 4 }, hasPasswordField: true, frameKey: "" };
+const FRAME_KEY = "0123456789abcdef0123456789abcdef";
+const goodLocated = { requestId: 7, x: 120, y: -40.5, frameKey: FRAME_KEY };
 const goodSubmitted = { username: "ann", password: "pw", isNewPassword: false, wasTyped: true, entries: [{ kind: "email", value: "a@b.c" }] };
 
 describe("parseFieldFocusedMessage", () => {
@@ -34,6 +41,13 @@ describe("parseFieldFocusedMessage", () => {
     expect(parseFieldFocusedMessage({ ...goodFocused, typed: 4 })).toBeNull();
     expect(parseFieldFocusedMessage({ ...goodFocused, typed: "a".repeat(MAX_TYPED_LENGTH + 1) })).toBeNull();
     expect(parseFieldFocusedMessage({ ...goodFocused, typed: "a".repeat(MAX_TYPED_LENGTH) })).not.toBeNull();
+  });
+
+  it("accepts an embedded frame's key and refuses anything else in its place", () => {
+    expect(parseFieldFocusedMessage({ ...goodFocused, frameKey: FRAME_KEY })?.frameKey).toBe(FRAME_KEY);
+    for (const frameKey of [undefined, null, 5, "abc", FRAME_KEY.toUpperCase(), `${FRAME_KEY}0`, `${FRAME_KEY.slice(1)}g`]) {
+      expect(parseFieldFocusedMessage({ ...goodFocused, frameKey })).toBeNull();
+    }
   });
 
   it("refuses a hasPasswordField that is not a boolean", () => {
@@ -115,5 +129,27 @@ describe("parseSubmittedMessage", () => {
       const entries = [{ kind: "email", value: "ok" }, badEntry];
       expect(parseSubmittedMessage({ ...goodSubmitted, entries })).toBeNull();
     }
+  });
+});
+
+describe("parseFrameLocatedMessage", () => {
+  it("accepts a good answer and drops extra properties", () => {
+    expect(parseFrameLocatedMessage({ ...goodLocated, extra: true })).toEqual(goodLocated);
+    expect(parseFrameLocatedMessage({ ...goodLocated, frameKey: "" })).toEqual({ ...goodLocated, frameKey: "" });
+  });
+
+  it("refuses a bad request id", () => {
+    for (const requestId of [0, -1, 1.5, "7", NaN, Number.MAX_SAFE_INTEGER + 2, undefined]) {
+      expect(parseFrameLocatedMessage({ ...goodLocated, requestId })).toBeNull();
+    }
+  });
+
+  it("refuses a bad place or key", () => {
+    expect(parseFrameLocatedMessage({ ...goodLocated, x: Infinity })).toBeNull();
+    expect(parseFrameLocatedMessage({ ...goodLocated, y: MAX_RECT_COORDINATE + 1 })).toBeNull();
+    expect(parseFrameLocatedMessage({ ...goodLocated, x: "1" })).toBeNull();
+    expect(parseFrameLocatedMessage({ ...goodLocated, frameKey: "nope" })).toBeNull();
+    expect(parseFrameLocatedMessage(null)).toBeNull();
+    expect(parseFrameLocatedMessage([goodLocated])).toBeNull();
   });
 });
