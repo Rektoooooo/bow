@@ -46,8 +46,6 @@ mkdir -p "$disk_folder/.background"
 ditto "$app_path" "$disk_folder/Bow.app"
 ln -s /Applications "$disk_folder/Applications"
 cp build/dmg-background.tiff "$disk_folder/.background/background.tiff"
-# The window says "Bow", not "Bow.app".
-SetFile -a E "$disk_folder/Bow.app"
 
 writable_dmg="$work_folder/writable.dmg"
 content_megabytes="$(du -sm "$disk_folder" | cut -f 1)"
