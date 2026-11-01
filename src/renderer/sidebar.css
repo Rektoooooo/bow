@@ -680,27 +680,33 @@ button:disabled {
   scrollbar-width: none;
 }
 
-/* Left of the resize strip (.sidebar-resizer reaches 4 px into the sidebar), above the rows. */
+/* Left of the resize strip (.sidebar-resizer reaches 4 px into the sidebar), above the rows. A thin line while it only
+   shows where the list is (the user found 6 px too big, 2026-11-01); under the pointer it grows back to 6 px, growing
+   to the left, so it stays easy to grab. */
 .overlay-scroll-thumb {
   position: absolute;
   right: 5px;
-  width: 6px;
-  border-radius: 3px;
+  width: 3px;
+  border-radius: 1.5px;
   background: var(--ink);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 300ms ease-out;
+  transition:
+    opacity 300ms ease-out,
+    width 120ms ease-out;
   z-index: 2;
 }
 
 .overlay-scroll-thumb.is-visible {
-  opacity: 0.3;
+  opacity: 0.25;
   pointer-events: auto;
   transition-duration: 80ms;
 }
 
 .overlay-scroll-thumb.is-visible:hover,
 .overlay-scroll-thumb.is-dragging {
+  width: 6px;
+  border-radius: 3px;
   opacity: 0.5;
 }
 
