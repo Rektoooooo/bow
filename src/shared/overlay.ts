@@ -67,6 +67,8 @@ export type OverlayPanel =
    * main); `canSave` says whether "Save in Bow Passwords" is offered (not in private windows, not for proxies).
    */
   | { kind: "httpSignIn"; requestId: string; host: string; realm: string; isProxy: boolean; savedUsername: string | null; canSave: boolean }
+  /** The choices under the "This connection isn't private" page of a tab (certificateErrors.ts). */
+  | { kind: "certificateWarning"; requestId: string; host: string }
   | { kind: "capture"; frame: { x: number; y: number; width: number; height: number } }
   | { kind: "switcher"; tabs: SwitcherTab[]; index: number }
   /** Arc's list of a closed folder's tabs, beside the sidebar (the frame is the list itself, window coordinates). */

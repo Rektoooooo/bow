@@ -2783,6 +2783,17 @@ body.is-closing .peek-buttons {
   color: var(--chip-active-ink);
 }
 
+/* The certificate warning is a permission prompt whose two answers stand one above the other. */
+.certificate-buttons {
+  flex-direction: column;
+}
+
+.certificate-buttons .permission-button {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* The HTTP sign-in card is a permission prompt with a realm line, two fields and a checkbox. */
 .http-sign-in .permission-text {
   gap: 6px;

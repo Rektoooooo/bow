@@ -57,6 +57,7 @@ import { initializePasswordOffers } from "./passwordOffers";
 import { initializeFormMemory } from "./formMemoryRecorder";
 import { initializePermissionPrompts } from "./permissionPrompts";
 import { initializeHttpSignIn } from "./httpSignIn";
+import { initializeCertificateErrors, noticeCertificateFailure } from "./certificateErrors";
 import { registerFormsHelper, registerFormsIpc } from "./formsBridge";
 import { registerSymbolIpc } from "./symbols";
 import { getPictureInPictureTabId, registerPictureInPictureIpc } from "./pictureInPicture";
@@ -162,7 +163,13 @@ const tabViewEvents: TabViewEvents = {
   },
   onContextMenu: (tabId, contents, params) => showPageContextMenu(menuHost, contents, params, getExtensionMenuItems(contents, params), tabId),
   onLoadFinished: (tabId, contents) => probeReaderPage(tabId, contents),
-  onLoadFailed: (_tabId, contents, errorCode, validatedUrl, isMainFrame) => noticeLoadFailed(contents, errorCode, validatedUrl, isMainFrame),
+  onLoadFailed: (_tabId, contents, errorCode, validatedUrl, isMainFrame) => {
+    // Exactly one of them decides: a page Bow upgraded to https falls back to http; otherwise a refused certificate warns.
+    const isHandledByHttpsOnly = noticeLoadFailed(contents, errorCode, validatedUrl, isMainFrame);
+    if (!isHandledByHttpsOnly) {
+      noticeCertificateFailure(contents, errorCode, validatedUrl, isMainFrame);
+    }
+  },
   onDomReady: (_tabId, contents) => {
     applySiteZoom(contents);
     applyBoostToPage(contents, getState()).catch(() => undefined);
@@ -360,6 +367,8 @@ async function handleAppReady(): Promise<void> {
   initializePasswordOffers();
   // Sites that ask for a username and password (HTTP authentication).
   initializeHttpSignIn();
+  // Sites with a certificate Bow cannot trust: a warning page in the tab and a card with the choices.
+  initializeCertificateErrors();
   // The list under a sign-in or address field (saved logins, remembered values).
   initializeAutofill((profileId) => openPasswords(profileId));
   // Bow Passwords: what the user types into forms (emails, names, addresses) is remembered and offered again.

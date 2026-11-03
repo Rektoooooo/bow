@@ -360,6 +360,11 @@ function isHttpSignInRequestId(value: unknown): boolean {
   return typeof value === "string" && /^http-sign-in-\d{1,9}$/.test(value);
 }
 
+/** A certificate warning card's id, as certificateErrors.ts makes them. */
+function isCertificateWarningRequestId(value: unknown): boolean {
+  return typeof value === "string" && /^certificate-\d{1,9}$/.test(value);
+}
+
 /** A typed username or password: no longer than a saved login's field may be. */
 function isLoginField(value: unknown): boolean {
   return typeof value === "string" && value.length <= MAX_LOGIN_FIELD_LENGTH;
@@ -452,6 +457,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   showExtensionsMenu: { anchor: isAnchor },
   answerPermissionPrompt: { requestId: isText, isAllowed: isBoolean },
   answerPasswordOffer: { offerId: isText, answer: isPasswordOfferAnswer },
+  answerCertificateWarning: { requestId: isCertificateWarningRequestId, isVisitAnyway: isBoolean },
   answerHttpSignIn: { requestId: isHttpSignInRequestId, choice: isHttpSignInChoice, username: isLoginField, password: isLoginField, shouldSave: isBoolean },
   removeSitePermission: { profileId: isText, origin: isText, kind: isSitePermissionKind },
   installWebStoreExtension: { extensionId: isExtensionId },

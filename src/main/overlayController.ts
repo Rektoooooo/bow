@@ -129,6 +129,10 @@ const HTTP_SIGN_IN_BASE_HEIGHT_PX = 196;
 const HTTP_SIGN_IN_SAVED_LOGIN_ROW_PX = 38;
 const HTTP_SIGN_IN_SAVE_BOX_ROW_PX = 28;
 
+/** Size of the certificate warning card, in the same place: a title and two buttons one above the other. Must fit overlay.css's .certificate-warning. Our choice. */
+const CERTIFICATE_WARNING_WIDTH_PX = 360;
+const CERTIFICATE_WARNING_HEIGHT_PX = 128;
+
 /** Why a panel went away: closed (Escape, a click outside, an answer) or replaced by another panel. */
 export type PanelEndReason = "closed" | "replaced";
 
@@ -241,6 +245,10 @@ function computeOverlayBounds(panel: OverlayPanel): Bounds | null {
   if (panel.kind === "savePassword") {
     const pageCard = computeCardBounds(contentWidth, contentHeight, getLayoutOptions());
     return { x: pageCard.x + PERMISSION_PROMPT_MARGIN_PX, y: pageCard.y + PERMISSION_PROMPT_MARGIN_PX, width: SAVE_PASSWORD_PROMPT_WIDTH_PX, height: SAVE_PASSWORD_PROMPT_HEIGHT_PX };
+  }
+  if (panel.kind === "certificateWarning") {
+    const pageCard = computeCardBounds(contentWidth, contentHeight, getLayoutOptions());
+    return { x: pageCard.x + PERMISSION_PROMPT_MARGIN_PX, y: pageCard.y + PERMISSION_PROMPT_MARGIN_PX, width: CERTIFICATE_WARNING_WIDTH_PX, height: CERTIFICATE_WARNING_HEIGHT_PX };
   }
   if (panel.kind === "httpSignIn") {
     const pageCard = computeCardBounds(contentWidth, contentHeight, getLayoutOptions());
@@ -541,6 +549,22 @@ export function openPermissionPrompt(requestId: string, host: string, kinds: Sit
  */
 export function closePermissionPrompt(requestId: string): void {
   if (shownPanel?.kind === "permission" && shownPanel.requestId === requestId) {
+    closeOverlay();
+  }
+}
+
+/**
+ * Shows the choices under a tab's certificate warning (certificateErrors.ts decides when).
+ */
+export function openCertificateWarning(requestId: string, host: string): void {
+  openPanel({ kind: "certificateWarning", requestId: requestId, host: host });
+}
+
+/**
+ * Closes the overlay when it shows the given certificate warning card.
+ */
+export function closeCertificateWarning(requestId: string): void {
+  if (shownPanel?.kind === "certificateWarning" && shownPanel.requestId === requestId) {
     closeOverlay();
   }
 }

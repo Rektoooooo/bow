@@ -51,12 +51,12 @@ export function decideMainFrameRequest(contentsId: number, url: string): string 
 
 /**
  * A tab's page failed to load: when it was Bow's upgrade and the site has no secure version, the sidebar offers the
- * http page.
+ * http page. Returns whether this was such a failure, so that nothing else (a certificate warning) also reacts to it.
  */
-export function noticeLoadFailed(contents: WebContents, errorCode: number, validatedUrl: string, isMainFrame: boolean): void {
+export function noticeLoadFailed(contents: WebContents, errorCode: number, validatedUrl: string, isMainFrame: boolean): boolean {
   const upgrade = upgrades.get(contents.id);
   if (!isMainFrame || upgrade === undefined || validatedUrl !== upgrade.httpsUrl || !isNoHttpsFailure(errorCode)) {
-    return;
+    return false;
   }
   upgrades.delete(contents.id);
   const host = new URL(upgrade.httpUrl).host;
@@ -72,4 +72,5 @@ export function noticeLoadFailed(contents: WebContents, errorCode: number, valid
     },
     HTTPS_FALLBACK_NOTICE_MS,
   );
+  return true;
 }

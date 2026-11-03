@@ -1,0 +1,30 @@
+<!doctype html>
+<!--
+  WHY this file exists:
+    Shown in a tab whose site presented a certificate Bow cannot trust, instead of a dead page. The choices
+    ("Back to Safety", "Visit <site> Anyway") are on a card in the overlay, which only our own main process can answer.
+
+  Data source:
+    The address and the error code passed in the query string by certificateErrors.ts.
+
+  Data flow:
+    load fails with a certificate error → certificateErrors.ts loads this file → certificate.ts fills in the site and
+    the reason → the overlay card asks what to do
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'">
+    <title>Connection not private</title>
+    <link rel="stylesheet" href="./certificate.css">
+  </head>
+  <body>
+    <main class="certificate">
+      <h1>This connection isn't private</h1>
+      <p id="certificate-host" class="certificate-host"></p>
+      <p id="certificate-reason" class="certificate-reason"></p>
+      <p class="certificate-note">Someone on the network may be pretending to be this site. Choose below only if you trust it.</p>
+    </main>
+    <script type="module" src="./certificate.js"></script>
+  </body>
+</html>

@@ -1,0 +1,50 @@
+/*
+  WHY this file exists:
+    Look of the "This connection isn't private" page (same family as the crashed-tab page).
+*/
+:root {
+  color-scheme: light dark;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: grid;
+  place-items: center;
+  background: light-dark(#f5f4f7, #1f1f22);
+  color: light-dark(#1d1d1f, #f2f2f4);
+  font: 14px/1.4 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+.certificate {
+  max-width: min(560px, calc(100vw - 48px));
+  text-align: center;
+}
+
+.certificate h1 {
+  margin: 0 0 6px;
+  font-size: 20px;
+}
+
+.certificate-host {
+  margin: 0 0 12px;
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.certificate-reason {
+  margin: 0 0 8px;
+  color: light-dark(rgba(0, 0, 0, 0.7), rgba(255, 255, 255, 0.7));
+}
+
+.certificate-note {
+  margin: 0;
+  color: light-dark(rgba(0, 0, 0, 0.45), rgba(255, 255, 255, 0.45));
+  font-size: 12px;
+}
