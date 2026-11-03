@@ -2,10 +2,11 @@
  * WHY this file exists:
  *   When the user clicks, tabs or types into a sign-in or address field on a page, Bow shows a small list right under
  *   it: the saved logins of that site (username and dots, never the password), or remembered emails, names and
- *   addresses. Nothing is filled before the user picks. The list is a view of our own above the page (a web page
- *   cannot read or restyle it). Because the field's place is reported by the page, the list is only ever put inside
- *   that tab's own view (autofillPlacement.ts), and the password is read from the vault again at the moment of the
- *   pick, so it is never held here while the list is open.
+ *   addresses, or what was typed before into fields of the same name on any site (like Chrome's autocomplete).
+ *   Nothing is filled before the user picks. The list is a view of our own above the page (a web page cannot read or
+ *   restyle it). Because the field's place is reported by the page, the list is only ever put inside that tab's own
+ *   view (autofillPlacement.ts), and the password is read from the vault again at the moment of the pick, so it is
+ *   never held here while the list is open.
  *
  * Data source:
  *   Field reports from formsBridge.ts (the site, the profile, what role the field has and what was typed), the
@@ -25,7 +26,8 @@ import { AUTOFILL_CHANNELS } from "../shared/autofill";
 import type { AutofillItem, AutofillShowMessage } from "../shared/autofill";
 import type { FieldReport, FrameIds } from "./formsBridge";
 import type { FieldRect } from "../shared/forms";
-import type { FormFieldKind } from "../shared/passwords";
+import { FIELD_KEY_KIND } from "../shared/passwords";
+import type { FormEntryKey } from "../shared/passwords";
 import type { ItemId, ProfileId } from "../shared/types";
 import { addAfterSyncHook, getState, getWindow } from "./browserCore";
 import { computePopupPlacement } from "./autofillPlacement";
@@ -56,7 +58,7 @@ const MANAGE_PASSWORDS_TITLE = "Manage passwords…";
 
 /** A row of the list: what main knows about it (a login's id, never its password) and what the page draws. */
 interface ListRow {
-  entry: { kind: "login"; loginId: string } | { kind: "value"; fieldKind: FormFieldKind; value: string } | { kind: "manage" };
+  entry: { kind: "login"; loginId: string } | { kind: "value"; key: FormEntryKey; value: string } | { kind: "manage" };
   item: AutofillItem;
 }
 
@@ -135,10 +137,10 @@ function makeLoginRow(loginId: string, username: string): ListRow {
   return { entry: { kind: "login", loginId: loginId }, item: { kind: "login", title: title } };
 }
 
-function makeValueRows(vault: PasswordVault, fieldKind: FormFieldKind, typed: string): ListRow[] {
-  const values = suggestEntries(vault, fieldKind, typed);
+function makeValueRows(vault: PasswordVault, key: FormEntryKey, typed: string): ListRow[] {
+  const values = suggestEntries(vault, key, typed);
   return values.map((value) => ({
-    entry: { kind: "value", fieldKind: fieldKind, value: value },
+    entry: { kind: "value", key: key, value: value },
     item: { kind: "value", title: value },
   }));
 }
@@ -158,7 +160,7 @@ function makeLoginRows(vault: PasswordVault, report: FieldReport): ListRow[] {
 
 /** What the list holds for this field; nothing for a field Bow has nothing for. */
 function makeRows(vault: PasswordVault, report: FieldReport, remembersFormEntries: boolean): ListRow[] {
-  const { role, typed } = report.message;
+  const { role, typed, fieldKey } = report.message;
   if (role === "newPassword") {
     // No password generator yet: a new-password field gets no list.
     return [];
@@ -167,12 +169,17 @@ function makeRows(vault: PasswordVault, report: FieldReport, remembersFormEntrie
     const loginRows = makeLoginRows(vault, report);
     const showsEmailsInstead = loginRows.length === 0 && role === "username" && remembersFormEntries;
     if (showsEmailsInstead) {
-      return makeValueRows(vault, "email", typed);
+      return makeValueRows(vault, { kind: "email" }, typed);
     }
     // The footer only follows logins: a list of nothing else has no reason to open the Library.
     return loginRows.length === 0 ? [] : [...loginRows, makeManageRow()];
   }
-  return remembersFormEntries ? makeValueRows(vault, role, typed) : [];
+  if (!remembersFormEntries) {
+    return [];
+  }
+  // formsMessages.ts let the role "field" through only with a field key.
+  const key: FormEntryKey = role === FIELD_KEY_KIND ? { kind: FIELD_KEY_KIND, field: fieldKey } : { kind: role };
+  return makeValueRows(vault, key, typed);
 }
 
 /**
@@ -375,8 +382,8 @@ function forgetHighlightedValue(list: ShownList): boolean {
   if (row === undefined || row.entry.kind !== "value") {
     return false;
   }
-  const { fieldKind, value } = row.entry;
-  changeVault(list.profileId, (vault) => forgetEntry(vault, fieldKind, value)).catch(() => undefined);
+  const { key, value } = row.entry;
+  changeVault(list.profileId, (vault) => forgetEntry(vault, key, value)).catch(() => undefined);
   list.rows.splice(list.highlightedIndex, 1);
   if (list.rows.length === 0) {
     closeAutofillPopup();

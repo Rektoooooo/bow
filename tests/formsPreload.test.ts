@@ -1,26 +1,42 @@
 /**
  * WHY this file exists:
  *   The page helper decides which fields Bow may remember. These tests pin that allow-list: what the page declares in
- *   autocomplete, the input type, the name heuristics, and the deny words that must always win.
+ *   autocomplete, the input type, the name heuristics, the deny words that must always win, and the field keys that
+ *   remember any other plain text field by its own name (and must look exactly as main checks them).
  *
  * Data source:
  *   Made-up field descriptions (no DOM: only the pure functions of src/preload/formsPreload.ts run in Node).
  *
  * Data flow:
- *   field description → fieldKindFor() / roleForFacts() / pickUsernameCandidate() → asserted kind, role or index
+ *   field description → fieldKindFor() / fieldKeyFor() / roleForFacts() / pickUsernameCandidate() → asserted kind,
+ *   key, role or index
  */
 import { describe, expect, it } from "vitest";
 import {
   autocompleteFieldName,
+  fieldKeyFor,
   fieldKindFor,
   KNOWN_FIELD_KINDS,
   pickUsernameCandidate,
   roleForFacts,
 } from "../src/preload/formsPreload";
-import { FORM_FIELD_KINDS } from "../src/shared/passwords";
+import { FORM_FIELD_KINDS, isFieldKey, MAX_FIELD_KEY_LENGTH } from "../src/shared/passwords";
 
 function kindOf(parts: { autocomplete?: string; type?: string; name?: string; id?: string }) {
   return fieldKindFor({ autocomplete: "", type: "text", name: "", id: "", ...parts });
+}
+
+interface KeyParts {
+  autocomplete?: string;
+  type?: string;
+  name?: string;
+  id?: string;
+  isFormMemoryOff?: boolean;
+  isInSearchArea?: boolean;
+}
+
+function keyOf(parts: KeyParts) {
+  return fieldKeyFor({ autocomplete: "", type: "text", name: "", id: "", isFormMemoryOff: false, isInSearchArea: false, ...parts });
 }
 
 describe("the helper's repeated kind list", () => {
@@ -282,7 +298,7 @@ describe("pickUsernameCandidate", () => {
 });
 
 describe("roleForFacts", () => {
-  const baseFacts = { type: "text", autocompleteName: "", isUsernameField: false, isNewPasswordForm: false, fieldKind: null };
+  const baseFacts = { type: "text", autocompleteName: "", isUsernameField: false, isNewPasswordForm: false, fieldKind: null, fieldKey: null };
 
   it("tells password from new password", () => {
     expect(roleForFacts({ ...baseFacts, type: "password" })).toBe("password");
@@ -303,5 +319,166 @@ describe("roleForFacts", () => {
   it("falls back to the remembered kind, or null", () => {
     expect(roleForFacts({ ...baseFacts, fieldKind: "city" })).toBe("city");
     expect(roleForFacts(baseFacts)).toBeNull();
+  });
+
+  it("calls a field with only a field key a 'field', and lets kinds and sign-in roles win over a key", () => {
+    expect(roleForFacts({ ...baseFacts, fieldKey: "vat number" })).toBe("field");
+    expect(roleForFacts({ ...baseFacts, fieldKind: "city", fieldKey: "town or village" })).toBe("city");
+    expect(roleForFacts({ ...baseFacts, isUsernameField: true, fieldKey: "login" })).toBe("username");
+    expect(roleForFacts({ ...baseFacts, type: "password", fieldKey: "pin" })).toBe("password");
+  });
+});
+
+describe("fieldKeyFor", () => {
+  it("names a plain text field by its normalized name, else by its id", () => {
+    expect(keyOf({ name: "vat_number" })).toBe("vat number");
+    expect(keyOf({ name: "nickName" })).toBe("nick name");
+    expect(keyOf({ name: "Customer-Reference" })).toBe("customer reference");
+    expect(keyOf({ name: "user[profile][website]" })).toBe("user profile website");
+    expect(keyOf({ name: "", id: "nickname" })).toBe("nickname");
+    expect(keyOf({ name: "__", id: "member_no" })).toBe("member no");
+    expect(keyOf({ name: "nick", id: "other" })).toBe("nick");
+  });
+
+  it("takes text, email and tel fields (an empty type is text), nothing else", () => {
+    for (const type of ["text", "", "TEXT", "email", "tel"]) {
+      expect(keyOf({ type, name: "nickname" }), type).toBe("nickname");
+    }
+    for (const type of ["password", "hidden", "search", "number", "url", "date", "checkbox", "file", "textarea"]) {
+      expect(keyOf({ type, name: "nickname" }), type).toBeNull();
+    }
+  });
+
+  it("refuses a field whose page or form turned memory off", () => {
+    expect(keyOf({ name: "nickname", autocomplete: "off" })).toBeNull();
+    expect(keyOf({ name: "nickname", autocomplete: "OFF" })).toBeNull();
+    expect(keyOf({ name: "nickname", autocomplete: "section-a off" })).toBeNull();
+    expect(keyOf({ name: "nickname", isFormMemoryOff: true })).toBeNull();
+    expect(keyOf({ name: "nickname", autocomplete: "on" })).toBe("nickname");
+  });
+
+  it("refuses sign-in names, passwords, one-time codes and payment fields the page declares", () => {
+    for (const autocomplete of [
+      "username",
+      "username webauthn",
+      "current-password",
+      "new-password",
+      "one-time-code",
+      "cc-number",
+      "cc-name",
+      "cc-exp",
+      "billing cc-csc",
+    ]) {
+      expect(keyOf({ name: "nickname", autocomplete }), autocomplete).toBeNull();
+    }
+  });
+
+  it("keeps other declared fields by their name (the page's word is not a kind Bow knows)", () => {
+    expect(keyOf({ name: "nick", autocomplete: "nickname" })).toBe("nick");
+    expect(keyOf({ name: "job", autocomplete: "organization-title" })).toBe("job");
+  });
+
+  it("refuses search boxes: by role or search area, by the whole names q and s, and by the deny words", () => {
+    expect(keyOf({ name: "destination", isInSearchArea: true })).toBeNull();
+    for (const name of ["q", "s", "search", "searchTerm", "site_search", "query", "keywords", "keyword"]) {
+      expect(keyOf({ name }), name).toBeNull();
+    }
+    expect(keyOf({ name: "", id: "s" })).toBeNull();
+  });
+
+  it("refuses everything the deny words deny, on the name or the id", () => {
+    for (const name of [
+      "card_number",
+      "cvv",
+      "security_code",
+      "iban",
+      "account_number",
+      "ssn",
+      "tax_id",
+      "passport_number",
+      "otp",
+      "verification",
+      "2fa",
+      "token",
+      "pin",
+      "passcode",
+      "captcha",
+      "password",
+      "passwd",
+      "comment",
+      "message",
+      "subject",
+      "coupon",
+      "promo",
+      "security_question",
+      "securityAnswer",
+      "answer1",
+      "question",
+      "secret",
+      "client_secret",
+      "password_hint",
+      "hint",
+      "mnemonic",
+      "passphrase",
+      "pass_phrase",
+      "private_key",
+      "apiKey",
+    ]) {
+      expect(keyOf({ name }), name).toBeNull();
+    }
+    expect(keyOf({ name: "nickname", id: "secret-nickname" })).toBeNull();
+  });
+
+  it("refuses short secret words as whole words, digits after them included", () => {
+    for (const name of ["code", "sms_code", "inviteCode", "discount-code", "code2", "key", "license_key", "pwd", "pw", "pass", "pass2", "auth", "auth_code"]) {
+      expect(keyOf({ name }), name).toBeNull();
+    }
+    for (const [name, expected] of [
+      ["keyboard_layout", "keyboard layout"],
+      ["passenger", "passenger"],
+      ["codename", "codename"],
+      ["author", "author"],
+    ]) {
+      expect(keyOf({ name }), name).toBe(expected);
+    }
+  });
+
+  it("leaves the known kinds alone: the short words are only for fields without a kind", () => {
+    expect(kindOf({ name: "zip_code" })).toBe("postalCode");
+    expect(kindOf({ name: "postal-code" })).toBe("postalCode");
+    expect(kindOf({ name: "country_code" })).toBe("country");
+  });
+
+  it("refuses a key without a letter or longer than the limit", () => {
+    expect(keyOf({ name: "" })).toBeNull();
+    expect(keyOf({ name: "12345" })).toBeNull();
+    expect(keyOf({ name: "--" })).toBeNull();
+    expect(keyOf({ name: "a".repeat(MAX_FIELD_KEY_LENGTH) })).toBe("a".repeat(MAX_FIELD_KEY_LENGTH));
+    expect(keyOf({ name: "a".repeat(MAX_FIELD_KEY_LENGTH + 1) })).toBeNull();
+  });
+
+  it("makes only keys that main accepts (else main drops the whole sent form, a sign-in's offer with it)", () => {
+    const rawNames = [
+      "vat_number",
+      "VATNumber",
+      "nickName",
+      "  spaced   out  ",
+      "first--second__third",
+      "user[profile][0][website]",
+      "a1b2c3",
+      "Příjmení",
+      "ÄÖÜ_field",
+      "field.name",
+      "x".repeat(MAX_FIELD_KEY_LENGTH),
+      "x ".repeat(MAX_FIELD_KEY_LENGTH / 2),
+      "9lives",
+    ];
+    const keys = rawNames.map((name) => keyOf({ name }));
+    for (const key of keys) {
+      if (key !== null) {
+        expect(isFieldKey(key), key).toBe(true);
+      }
+    }
+    expect(keys.filter((key) => key !== null).length).toBeGreaterThan(10);
   });
 });

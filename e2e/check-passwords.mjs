@@ -8,6 +8,10 @@
 //   login below the field and inside the page's area, a script focus shows nothing, arrow keys + Return, Escape and a
 //   click on a row work, Return with nothing highlighted still sends the form, typing past the match closes it, the
 //   password field shows it too, a site without a saved login shows nothing, and near the page's bottom it opens above.
+// - form memory: typed values of allowed kinds come back on another site; any other plain text field is remembered
+//   by its own name (sent with Return on a page without a form, or a button click in a form without a password) and
+//   offered in a field of the same name on another site; Shift+Delete forgets one; a search box and autocomplete
+//   "off" (the field's or its form's) are never remembered.
 // - Library › Passwords: opens from an action, lists logins without any password in the page, search, Show / Hide and
 //   Copy (the mock keychain stands in for Touch ID), Edit, "Never saved for", form memory with Forget all, the trash
 //   button, passwords imported from a CSV file (Chrome's and Safari's formats, the Library's button and the File menu;
@@ -78,6 +82,48 @@ const server = http.createServer((request, response) => {
       <input name="code" autocomplete="one-time-code" style="width:300px;height:30px">
       <input name="company" value="Planted Inc" style="width:300px;height:30px">
       <button>Save</button></form></body>`);
+    return;
+  }
+  // Plain fields with no known kind are remembered by their own name. "vat-enter" has no form (Return is the send),
+  // "vat-button" has a form without a password whose button sends nothing by itself (type=button, a script saves).
+  if (request.url.startsWith("/vat-enter")) {
+    response.end(`<!doctype html><title>VAT by Return</title><body style="margin:0">
+      <input name="vat_number" style="width:300px;height:30px"><p id="state"></p>
+      <script>
+        document.querySelector("input").addEventListener("keydown", (event) => {
+          if (event.key === "Enter") document.getElementById("state").textContent = "Saved";
+        });
+      </script></body>`);
+    return;
+  }
+  if (request.url.startsWith("/vat-button")) {
+    response.end(`<!doctype html><title>VAT by button</title><body style="margin:0"><form id="details">
+      <input name="vat_number" style="width:300px;height:30px">
+      <button type="button" id="save" style="width:100px;height:30px">Save</button></form><p id="state"></p>
+      <script>
+        document.getElementById("save").addEventListener("click", () => { document.getElementById("state").textContent = "Saved"; });
+      </script></body>`);
+    return;
+  }
+  // Another site's field of the same name (camelCase this time): the remembered values come back here.
+  if (request.url.startsWith("/vat-other")) {
+    response.end(`<!doctype html><title>Invoice</title><body style="margin:0"><form method="post" action="/saved">
+      <input name="vatNumber" style="width:300px;height:30px"><button>Send</button></form></body>`);
+    return;
+  }
+  // Fields that are never remembered by their name: search boxes, a field and a whole form with autocomplete="off".
+  if (request.url.startsWith("/vat-refused")) {
+    response.end(`<!doctype html><title>Refused</title><body style="margin:0">
+      <form id="first" method="post" action="/saved">
+        <input type="search" name="q" style="width:300px;height:30px">
+        <input name="site_search" style="width:300px;height:30px">
+        <input name="vat_number" autocomplete="off" style="width:300px;height:30px">
+        <button type="button" id="first-button" style="width:100px;height:30px">Go</button>
+      </form>
+      <form id="second" autocomplete="off">
+        <input name="vat_number" style="width:300px;height:30px">
+        <button type="button" id="second-button" style="width:100px;height:30px">Go</button>
+      </form></body>`);
     return;
   }
   // Another form on another site, with an email field: a remembered email comes back here.
@@ -554,7 +600,7 @@ await pressKeyLikeUser(bottomTab, "Escape");
 const readFormEntries = () =>
   app.evaluate(async (_electron, modulePath) => {
     const access = await process.mainModule.require(modulePath).openVault("profile-default");
-    return access.vault.formEntries.map((entry) => ({ kind: entry.kind, value: entry.value }));
+    return access.vault.formEntries.map((entry) => ({ kind: entry.kind, field: entry.field, value: entry.value }));
   }, vaultModulePath);
 async function openForm(origin, route) {
   runCounter = runCounter + 1;
@@ -566,7 +612,7 @@ async function openForm(origin, route) {
     if (tabPage === null) await sleep(200);
   }
   if (tabPage === null) throw new Error(`${address} did not open`);
-  await tabPage.waitForSelector("form");
+  await tabPage.waitForSelector("input");
   await sleep(400);
   return tabPage;
 }
@@ -575,6 +621,16 @@ async function typeInto(tabPage, selector, text) {
   await tabPage.keyboard.type(text);
 }
 const isRemembered = (entries, kind, value) => entries.some((entry) => entry.kind === kind && entry.value === value);
+const isRememberedByName = (entries, field, value) => entries.some((entry) => entry.kind === "field" && entry.field === field && entry.value === value);
+const waitForFormEntries = async (isWanted, timeoutMs = 5000) => {
+  const deadline = Date.now() + timeoutMs;
+  let entries = await readFormEntries();
+  while (!isWanted(entries) && Date.now() < deadline) {
+    await sleep(150);
+    entries = await readFormEntries();
+  }
+  return entries;
+};
 
 // 12a. Typed values of allowed fields are kept; search, comment, card number, one-time code and a value the page
 // filled in itself are not.
@@ -642,6 +698,84 @@ await offProfileTab.click("button");
 await sleep(1500);
 check("with form memory off, a sent form is not remembered", !isRemembered(await readFormEntries(), "name", "Sam Off"));
 await dispatch({ type: "setRemembersFormEntries", isOn: true });
+
+// 12e. Any other plain text field is remembered by its own name: Return on a page without a form sends it.
+const enterTab = await openForm(mainOrigin, "vat-enter");
+await typeInto(enterTab, "input[name=vat_number]", "CZ11111111");
+await pressKeyLikeUser(enterTab, "Return");
+const afterEnter = await waitForFormEntries((entries) => isRememberedByName(entries, "vat number", "CZ11111111"));
+const enterState = await enterTab.evaluate(() => document.getElementById("state").textContent);
+check(
+  "a plain field on a page without a form is remembered by its name when Return sends it",
+  isRememberedByName(afterEnter, "vat number", "CZ11111111") && enterState === "Saved",
+  JSON.stringify(afterEnter.filter((entry) => entry.kind === "field")),
+);
+
+// 12f. A button click in a form without a password sends it too (the button itself submits nothing).
+const buttonTab = await openForm(mainOrigin, "vat-button");
+await typeInto(buttonTab, "input[name=vat_number]", "CZ22222222");
+await buttonTab.click("#save");
+const afterButton = await waitForFormEntries((entries) => isRememberedByName(entries, "vat number", "CZ22222222"));
+check(
+  "a plain field in a form without a password is remembered when a button is clicked",
+  isRememberedByName(afterButton, "vat number", "CZ22222222"),
+  JSON.stringify(afterButton.filter((entry) => entry.kind === "field")),
+);
+
+// 12g. Another site's field of the same name offers both; Down and Return fill one in.
+const otherVatTab = await openForm(otherOrigin, "vat-other");
+await otherVatTab.click("input[name=vatNumber]");
+const vatList = await waitForList(otherVatTab);
+const vatListText = vatList === null || listPage === null ? "" : await listPage.textContent("body");
+check(
+  "on another site, a field of the same name offers what was typed there before",
+  vatList !== null && vatListText.includes("CZ11111111") && vatListText.includes("CZ22222222"),
+  vatListText.trim(),
+);
+await pressKeyLikeUser(otherVatTab, "Down");
+await pressKeyLikeUser(otherVatTab, "Return");
+await sleep(400);
+const vatValue = await otherVatTab.evaluate(() => document.querySelector("input[name=vatNumber]").value);
+check("Down and Return put the newest one into the field", vatValue === "CZ22222222", vatValue);
+
+// 12h. Shift+Delete forgets a value remembered by a field's name.
+const forgetVatTab = await openForm(otherOrigin, "vat-other");
+await forgetVatTab.click("input[name=vatNumber]");
+await waitForList(forgetVatTab);
+await pressKeyLikeUser(forgetVatTab, "Down");
+await app.evaluate(({ webContents }, addressPart) => {
+  const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL().includes(addressPart));
+  contents.sendInputEvent({ type: "keyDown", keyCode: "Delete", modifiers: ["shift"] });
+  contents.sendInputEvent({ type: "keyUp", keyCode: "Delete", modifiers: ["shift"] });
+}, `run=${new URL(forgetVatTab.url()).searchParams.get("run")}`);
+const afterVatForget = await waitForFormEntries((entries) => !isRememberedByName(entries, "vat number", "CZ22222222"));
+check(
+  "Shift+Delete forgets the highlighted value of that field name only",
+  !isRememberedByName(afterVatForget, "vat number", "CZ22222222") && isRememberedByName(afterVatForget, "vat number", "CZ11111111"),
+  JSON.stringify(afterVatForget.filter((entry) => entry.kind === "field")),
+);
+await pressKeyLikeUser(forgetVatTab, "Escape");
+
+// 12i. Search boxes and autocomplete "off" (on the field or on its whole form) are never remembered or offered.
+const refusedTab = await openForm(mainOrigin, "vat-refused");
+await typeInto(refusedTab, "input[name=q]", "find this please");
+await typeInto(refusedTab, "input[name=site_search]", "search words here");
+const reportsBeforeOff = await app.evaluate(async (_electron, modulePath) => process.mainModule.require(modulePath).getFormsMessageCounts().fieldFocused, path.join(appDir, "dist", "node", "main", "formsBridge.js"));
+await typeInto(refusedTab, "#first input[name=vat_number]", "CZ33333333");
+await sleep(500);
+const reportsAfterOff = await app.evaluate(async (_electron, modulePath) => process.mainModule.require(modulePath).getFormsMessageCounts().fieldFocused, path.join(appDir, "dist", "node", "main", "formsBridge.js"));
+check("a field with autocomplete \"off\" is not even reported, so it offers nothing", reportsAfterOff === reportsBeforeOff && (await isListGone(refusedTab, 300)), `${reportsBeforeOff} → ${reportsAfterOff}`);
+await refusedTab.click("#first-button");
+await typeInto(refusedTab, "#second input[name=vat_number]", "CZ44444444");
+await refusedTab.click("#second-button");
+await pressKeyLikeUser(refusedTab, "Return");
+await sleep(1500);
+const afterRefused = JSON.stringify(await readFormEntries());
+check(
+  "a search box and autocomplete \"off\" (a field's or its form's) are never remembered",
+  ["find this please", "search words here", "CZ33333333", "CZ44444444"].every((secret) => !afterRefused.includes(secret)),
+  afterRefused,
+);
 
 // ---------- 13. Library › Passwords ----------
 const libraryRows = () => overlay.locator(".password-row");

@@ -7,8 +7,10 @@ import {
   parseSubmittedMessage,
 } from "../src/main/formsMessages";
 import { MAX_LOGIN_FIELD_LENGTH } from "../src/main/passwords";
+import { MAX_FIELD_KEY_LENGTH } from "../src/shared/passwords";
 
-const goodFocused = { role: "username", typed: "ann", rect: { x: 1, y: 2, width: 3, height: 4 }, hasPasswordField: true, frameKey: "" };
+const goodFocused = { role: "username", typed: "ann", rect: { x: 1, y: 2, width: 3, height: 4 }, hasPasswordField: true, frameKey: "", fieldKey: "" };
+const goodFieldFocused = { ...goodFocused, role: "field", fieldKey: "vat number", hasPasswordField: false };
 const FRAME_KEY = "0123456789abcdef0123456789abcdef";
 const goodLocated = { requestId: 7, x: 120, y: -40.5, frameKey: FRAME_KEY };
 const goodSubmitted = { username: "ann", password: "pw", isNewPassword: false, wasTyped: true, entries: [{ kind: "email", value: "a@b.c" }] };
@@ -50,6 +52,20 @@ describe("parseFieldFocusedMessage", () => {
     }
   });
 
+  it("accepts the role 'field' with its field key", () => {
+    expect(parseFieldFocusedMessage(goodFieldFocused)).toEqual(goodFieldFocused);
+  });
+
+  it("refuses the role 'field' without a good key, and a key with any other role", () => {
+    for (const fieldKey of ["", undefined, null, 5, "VAT", "vat_number", "vat  number", " vat", "123", "x".repeat(MAX_FIELD_KEY_LENGTH + 1)]) {
+      expect(parseFieldFocusedMessage({ ...goodFieldFocused, fieldKey }), String(fieldKey)).toBeNull();
+    }
+    for (const role of ["username", "password", "email", "city"]) {
+      expect(parseFieldFocusedMessage({ ...goodFocused, role, fieldKey: "vat number" }), role).toBeNull();
+      expect(parseFieldFocusedMessage({ ...goodFocused, role, fieldKey: undefined }), role).toBeNull();
+    }
+  });
+
   it("refuses a hasPasswordField that is not a boolean", () => {
     expect(parseFieldFocusedMessage({ ...goodFocused, hasPasswordField: "yes" })).toBeNull();
     expect(parseFieldFocusedMessage({ ...goodFocused, hasPasswordField: undefined })).toBeNull();
@@ -79,6 +95,18 @@ describe("parseSubmittedMessage", () => {
   it("accepts a good message and drops extra properties", () => {
     const parsed = parseSubmittedMessage({ ...goodSubmitted, extra: 1, entries: [{ kind: "email", value: "a@b.c", more: true }] });
     expect(parsed).toEqual(goodSubmitted);
+  });
+
+  it("accepts field-key entries next to kinds, with only their known properties", () => {
+    const entries = [
+      { kind: "field", field: "vat number", value: "CZ12345678", extra: 1 },
+      { kind: "email", value: "a@b.c", field: "ignored for a kind" },
+    ];
+    const parsed = parseSubmittedMessage({ ...goodSubmitted, password: "", entries });
+    expect(parsed?.entries).toEqual([
+      { kind: "field", field: "vat number", value: "CZ12345678" },
+      { kind: "email", value: "a@b.c" },
+    ]);
   });
 
   it("accepts an empty password and no entries", () => {
@@ -124,6 +152,12 @@ describe("parseSubmittedMessage", () => {
       { kind: "email", value: "" },
       { kind: "email", value: 5 },
       { kind: "email", value: "a".repeat(MAX_TYPED_LENGTH + 1) },
+      { kind: "field", value: "a" },
+      { kind: "field", field: "", value: "a" },
+      { kind: "field", field: "Vat", value: "a" },
+      { kind: "field", field: "123", value: "a" },
+      { kind: "field", field: "vat number", value: "" },
+      { kind: "field", field: "vat number", value: "a".repeat(MAX_TYPED_LENGTH + 1) },
     ];
     for (const badEntry of badEntries) {
       const entries = [{ kind: "email", value: "ok" }, badEntry];
