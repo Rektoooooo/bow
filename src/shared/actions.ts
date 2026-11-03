@@ -151,6 +151,7 @@ export type BrowserAction =
   | { type: "showExtensionsMenu"; anchor: { x: number; y: number; width: number; height: number } }
   | { type: "answerPermissionPrompt"; requestId: string; isAllowed: boolean }
   | { type: "answerPasswordOffer"; offerId: string; answer: "save" | "never" | "notNow" }
+  | { type: "answerHttpSignIn"; requestId: string; choice: "signIn" | "useSaved" | "cancel"; username: string; password: string; shouldSave: boolean }
   | { type: "removeSitePermission"; profileId: string; origin: string; kind: SitePermissionKind }
   | { type: "installWebStoreExtension"; extensionId: string }
   | { type: "checkExtensionUpdates" }
@@ -335,6 +336,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "showExtensionsMenu",
   "answerPermissionPrompt",
   "answerPasswordOffer",
+  "answerHttpSignIn",
   "removeSitePermission",
   "installWebStoreExtension",
   "checkExtensionUpdates",

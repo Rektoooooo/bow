@@ -61,6 +61,12 @@ export type OverlayPanel =
   | { kind: "peek"; frame: OverlayRect; card: OverlayRect; url: string; chromeColor: string; pageColor: string; canGoBack: boolean; canGoForward: boolean; growFrom: OverlayRect | null; peekNumber: number }
   | { kind: "savePassword"; offerId: string; host: string; username: string; isUpdate: boolean }
   | { kind: "permission"; requestId: string; host: string; kinds: SitePermissionKind[]; appName: string | null }
+  /**
+   * A site (or proxy) asking for a username and password with HTTP authentication. `realm` is the server's own text,
+   * shortened, to be shown as plain text only. `savedUsername` names a login in Bow Passwords (its password stays in
+   * main); `canSave` says whether "Save in Bow Passwords" is offered (not in private windows, not for proxies).
+   */
+  | { kind: "httpSignIn"; requestId: string; host: string; realm: string; isProxy: boolean; savedUsername: string | null; canSave: boolean }
   | { kind: "capture"; frame: { x: number; y: number; width: number; height: number } }
   | { kind: "switcher"; tabs: SwitcherTab[]; index: number }
   /** Arc's list of a closed folder's tabs, beside the sidebar (the frame is the list itself, window coordinates). */

@@ -2783,6 +2783,54 @@ body.is-closing .peek-buttons {
   color: var(--chip-active-ink);
 }
 
+/* The HTTP sign-in card is a permission prompt with a realm line, two fields and a checkbox. */
+.http-sign-in .permission-text {
+  gap: 6px;
+}
+
+.http-sign-in-realm {
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.http-sign-in-saved {
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.http-sign-in-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.http-sign-in-field {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.http-sign-in-save {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  font-size: 12.5px;
+}
+
 /* The "Save password?" card is a permission prompt with a quiet "Never for this site" on the left. */
 .password-prompt .password-never-button {
   min-width: 0;

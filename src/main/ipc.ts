@@ -23,6 +23,7 @@ import type { CaptureSource } from "../shared/easels";
 import { MAX_EASEL_LENGTH } from "./easelsStore";
 import { MAX_NOTE_LENGTH } from "./notesStore";
 import { MAX_HUE_SHIFT } from "./boosts";
+import { MAX_LOGIN_FIELD_LENGTH } from "./passwords";
 import { ipcMain } from "electron";
 import type { WebContents } from "electron";
 import type { BrowserAction } from "../shared/actions";
@@ -347,6 +348,23 @@ function isPasswordOfferAnswer(value: unknown): boolean {
   return typeof value === "string" && PASSWORD_OFFER_ANSWERS.includes(value);
 }
 
+/** The three answers to a site's HTTP sign-in card (actions.ts answerHttpSignIn). */
+const HTTP_SIGN_IN_CHOICES = ["signIn", "useSaved", "cancel"];
+
+function isHttpSignInChoice(value: unknown): boolean {
+  return typeof value === "string" && HTTP_SIGN_IN_CHOICES.includes(value);
+}
+
+/** An HTTP sign-in card's id, as httpSignIn.ts makes them. */
+function isHttpSignInRequestId(value: unknown): boolean {
+  return typeof value === "string" && /^http-sign-in-\d{1,9}$/.test(value);
+}
+
+/** A typed username or password: no longer than a saved login's field may be. */
+function isLoginField(value: unknown): boolean {
+  return typeof value === "string" && value.length <= MAX_LOGIN_FIELD_LENGTH;
+}
+
 function isSitePermissionKind(value: unknown): boolean {
   return typeof value === "string" && SITE_PERMISSION_KINDS.includes(value);
 }
@@ -434,6 +452,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   showExtensionsMenu: { anchor: isAnchor },
   answerPermissionPrompt: { requestId: isText, isAllowed: isBoolean },
   answerPasswordOffer: { offerId: isText, answer: isPasswordOfferAnswer },
+  answerHttpSignIn: { requestId: isHttpSignInRequestId, choice: isHttpSignInChoice, username: isLoginField, password: isLoginField, shouldSave: isBoolean },
   removeSitePermission: { profileId: isText, origin: isText, kind: isSitePermissionKind },
   installWebStoreExtension: { extensionId: isExtensionId },
   checkExtensionUpdates: {},

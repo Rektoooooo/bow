@@ -56,6 +56,7 @@ import { showExtensionsMenu } from "./extensionHost";
 import { setExtensionEnabled } from "./extensionList";
 import { checkForExtensionUpdatesNow, installFromWebStore, loadUnpackedExtension, removeExtensionAndCopy } from "./extensionsController";
 import { answerPasswordOffer } from "./passwordOffers";
+import { answerHttpSignIn } from "./httpSignIn";
 import { answerPermissionPrompt } from "./permissionPrompts";
 import { removePermissionAnswer } from "./sitePermissions";
 import { showMenuRequest } from "./menus";
@@ -495,6 +496,8 @@ export function runAction(action: BrowserAction): void {
       return showExtensionsMenu(action.anchor);
     case "answerPasswordOffer":
       return answerPasswordOffer(action.offerId, action.answer);
+    case "answerHttpSignIn":
+      return answerHttpSignIn(action.requestId, action.choice, action.username, action.password, action.shouldSave);
     case "answerPermissionPrompt":
       return answerPermissionPrompt(action.requestId, action.isAllowed);
     case "removeSitePermission":

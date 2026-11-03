@@ -123,6 +123,12 @@ const PERMISSION_PROMPT_MARGIN_PX = 10;
 const SAVE_PASSWORD_PROMPT_WIDTH_PX = 360;
 const SAVE_PASSWORD_PROMPT_HEIGHT_PX = 132;
 
+/** Size of the HTTP sign-in card in the same place: the base is the title, realm, two fields and buttons; a saved login and the save box add a row each. Must fit overlay.css's .http-sign-in. Our choice. */
+const HTTP_SIGN_IN_WIDTH_PX = 360;
+const HTTP_SIGN_IN_BASE_HEIGHT_PX = 196;
+const HTTP_SIGN_IN_SAVED_LOGIN_ROW_PX = 38;
+const HTTP_SIGN_IN_SAVE_BOX_ROW_PX = 28;
+
 /** Why a panel went away: closed (Escape, a click outside, an answer) or replaced by another panel. */
 export type PanelEndReason = "closed" | "replaced";
 
@@ -235,6 +241,13 @@ function computeOverlayBounds(panel: OverlayPanel): Bounds | null {
   if (panel.kind === "savePassword") {
     const pageCard = computeCardBounds(contentWidth, contentHeight, getLayoutOptions());
     return { x: pageCard.x + PERMISSION_PROMPT_MARGIN_PX, y: pageCard.y + PERMISSION_PROMPT_MARGIN_PX, width: SAVE_PASSWORD_PROMPT_WIDTH_PX, height: SAVE_PASSWORD_PROMPT_HEIGHT_PX };
+  }
+  if (panel.kind === "httpSignIn") {
+    const pageCard = computeCardBounds(contentWidth, contentHeight, getLayoutOptions());
+    const savedLoginHeight = panel.savedUsername === null ? 0 : HTTP_SIGN_IN_SAVED_LOGIN_ROW_PX;
+    const saveBoxHeight = panel.canSave ? HTTP_SIGN_IN_SAVE_BOX_ROW_PX : 0;
+    const height = HTTP_SIGN_IN_BASE_HEIGHT_PX + savedLoginHeight + saveBoxHeight;
+    return { x: pageCard.x + PERMISSION_PROMPT_MARGIN_PX, y: pageCard.y + PERMISSION_PROMPT_MARGIN_PX, width: HTTP_SIGN_IN_WIDTH_PX, height: height };
   }
   if (panel.kind === "permission") {
     // Under the toolbar at the page's top left, like Chromium's permission bubble; the page stays usable around it.
@@ -528,6 +541,22 @@ export function openPermissionPrompt(requestId: string, host: string, kinds: Sit
  */
 export function closePermissionPrompt(requestId: string): void {
   if (shownPanel?.kind === "permission" && shownPanel.requestId === requestId) {
+    closeOverlay();
+  }
+}
+
+/**
+ * Shows a site's HTTP sign-in card (httpSignIn.ts decides when). The saved password never goes to the overlay.
+ */
+export function openHttpSignIn(panel: Extract<OverlayPanel, { kind: "httpSignIn" }>): void {
+  openPanel(panel);
+}
+
+/**
+ * Closes the overlay when it shows the given HTTP sign-in card.
+ */
+export function closeHttpSignIn(requestId: string): void {
+  if (shownPanel?.kind === "httpSignIn" && shownPanel.requestId === requestId) {
     closeOverlay();
   }
 }

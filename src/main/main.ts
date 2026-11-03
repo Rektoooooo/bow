@@ -56,6 +56,7 @@ import { initializeAutofill } from "./autofillPopup";
 import { initializePasswordOffers } from "./passwordOffers";
 import { initializeFormMemory } from "./formMemoryRecorder";
 import { initializePermissionPrompts } from "./permissionPrompts";
+import { initializeHttpSignIn } from "./httpSignIn";
 import { registerFormsHelper, registerFormsIpc } from "./formsBridge";
 import { registerSymbolIpc } from "./symbols";
 import { getPictureInPictureTabId, registerPictureInPictureIpc } from "./pictureInPicture";
@@ -357,6 +358,8 @@ async function handleAppReady(): Promise<void> {
   // Sites ask before using the camera, microphone, location, notifications or the clipboard.
   initializePermissionPrompts();
   initializePasswordOffers();
+  // Sites that ask for a username and password (HTTP authentication).
+  initializeHttpSignIn();
   // The list under a sign-in or address field (saved logins, remembered values).
   initializeAutofill((profileId) => openPasswords(profileId));
   // Bow Passwords: what the user types into forms (emails, names, addresses) is remembered and offered again.
