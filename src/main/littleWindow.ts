@@ -25,7 +25,9 @@ import { findRoutedSpaceId } from "./routing";
 import { rememberSourceApp } from "./linkSourceApps";
 import type { LinkSourceApp } from "../shared/routingRules";
 import { switchSpace } from "./spaces";
-import { addPageToArchive, openTab } from "./state";
+import { addPageToArchive, getSelectedTabId, openTab } from "./state";
+import { markLinkView } from "./linkDownloads";
+import { getPageBackgroundColor } from "./pageColor";
 import { openLinkInNewTab, openOrSwitchToTab } from "./tabActions";
 import { getActiveSpace } from "./tree";
 import { normalizeTypedInput } from "./urls";
@@ -134,7 +136,7 @@ function watchPage(little: LittleWindow): void {
       contents.loadURL(url).catch(() => undefined);
       return;
     }
-    openLinkInNewTab(url, inBackground ? "background" : "foreground");
+    openLinkInNewTab(url, inBackground ? "background" : "foreground", { sourceTabId: null });
   };
   const pageMenuHost = { ...menuHost, openInNewTab: openElsewhere };
   contents.on("context-menu", (_event, params) => showPageContextMenu(pageMenuHost, contents, params));
@@ -142,6 +144,18 @@ function watchPage(little: LittleWindow): void {
     openElsewhere(details.url, details.disposition === "background-tab");
     return { action: "deny" };
   });
+}
+
+/**
+ * The link of a Little Window was a download: the window closes without an Archive entry (it showed nothing), and
+ * Bow's main window comes forward so the user sees the downloads card.
+ */
+function closeLittleWindowForDownload(little: LittleWindow): void {
+  little.isSettled = true;
+  little.window.close();
+  const mainWindow = getWindow();
+  mainWindow?.show();
+  mainWindow?.focus();
 }
 
 /**
@@ -172,12 +186,18 @@ export function openLittleWindow(url: string | null, options: LittleWindowOption
     webPreferences: { session: pageSession, sandbox: true, contextIsolation: true, nodeIntegration: false },
   });
   pageView.setBorderRadius(PAGE_RADIUS_PX);
+  // So nothing flashes black before the page paints.
+  pageView.setBackgroundColor(getPageBackgroundColor());
   window.contentView.addChildView(pageView);
 
   const little: LittleWindow = { window: window, pageView: pageView, isPrivate: isPrivate, lastActiveAt: Date.now(), isSettled: false, faviconUrl: null };
   littleWindows.add(little);
   layoutPage(little);
   watchPage(little);
+  // A window opened for an address is for a link; when the link is a file, the window has nothing to show.
+  if (url !== null) {
+    markLinkView(pageView.webContents, () => closeLittleWindowForDownload(little));
+  }
 
   window.on("resize", () => layoutPage(little));
   window.on("focus", () => {
@@ -210,8 +230,10 @@ export function handleExternalUrl(url: string, sourceApp: LinkSourceApp | null):
     return;
   }
   const now = Date.now();
+  // Remembered before the Space changes: a file link leaves this tab selected again.
+  const previousTabId = getSelectedTabId(getState());
   applyChange((state) => switchSpace(state, routedSpaceId, now));
-  openOrSwitchToTab(url);
+  openOrSwitchToTab(url, { sourceTabId: previousTabId });
   const mainWindow = getWindow();
   mainWindow?.show();
   mainWindow?.focus();

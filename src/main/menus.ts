@@ -21,6 +21,7 @@ import { findLocation, findRootLocation, findSpace, findSpaceIdOfItem, findSplit
 import { buildSearchUrl, findSearchEngine, findSpaceSearchEngine, SEARCH_ENGINE_IDS, SEARCH_ENGINES } from "../shared/searchEngines";
 import { importAllProfiles, listImportSources } from "./browserImportController";
 import { formatCount, profileNounFor } from "../shared/onboarding";
+import { downloadAddress } from "./downloads";
 import { addMenuIcons } from "./menuIcons";
 import { describeSpaceIconAsText } from "../shared/spaceIcons";
 import { getSiteKey } from "../shared/siteKey";
@@ -673,9 +674,16 @@ export function showMenuRequest(host: MenuHost, request: MenuRequest): void {
 }
 
 /**
+ * True for http and https addresses, the ones a page can download (and show the source of).
+ */
+function isDownloadableAddress(address: string): boolean {
+  return address.startsWith("https://") || address.startsWith("http://");
+}
+
+/**
  * Builds the link part of the page menu.
  */
-function buildLinkItems(host: MenuHost, params: ContextMenuParams, sourceTabId: ItemId | null): MenuItemConstructorOptions[] {
+function buildLinkItems(host: MenuHost, contents: WebContents, params: ContextMenuParams, sourceTabId: ItemId | null): MenuItemConstructorOptions[] {
   const url = params.linkURL;
   if (url === "") {
     return [];
@@ -692,6 +700,13 @@ function buildLinkItems(host: MenuHost, params: ContextMenuParams, sourceTabId: 
       { label: "Open Link in Little Window", click: () => host.openLinkElsewhere(url, "littleWindow", sourceTabId) },
     );
   }
+  // Only web addresses can be downloaded (not mailto: or javascript: links).
+  if (isDownloadableAddress(url)) {
+    items.push(
+      { label: "Download Linked File", click: () => downloadAddress(contents, url, false) },
+      { label: "Save Link As…", click: () => downloadAddress(contents, url, true) },
+    );
+  }
   items.push({ label: "Copy Link Address", click: () => clipboard.writeText(url) }, { type: "separator" });
   return items;
 }
@@ -703,12 +718,28 @@ function buildImageItems(host: MenuHost, contents: WebContents, params: ContextM
   if (params.mediaType !== "image" || params.srcURL === "") {
     return [];
   }
-  return [
+  const imageItems: MenuItemConstructorOptions[] = [
     { label: "Open Image in New Tab", click: () => host.openInNewTab(params.srcURL, false) },
     { label: "Copy Image", click: () => contents.copyImageAt(params.x, params.y) },
     { label: "Copy Image Address", click: () => clipboard.writeText(params.srcURL) },
-    { type: "separator" },
   ];
+  if (isDownloadableAddress(params.srcURL)) {
+    imageItems.push({ label: "Save Image As…", click: () => downloadAddress(contents, params.srcURL, true) });
+  }
+  imageItems.push({ type: "separator" });
+  return imageItems;
+}
+
+/**
+ * Builds "View Page Source" for web pages: a tab on Chromium's view-source: address of the page (measured: Electron
+ * loads it and draws the source).
+ */
+function buildViewSourceItems(host: MenuHost, contents: WebContents): MenuItemConstructorOptions[] {
+  const pageUrl = contents.getURL();
+  if (!isDownloadableAddress(pageUrl)) {
+    return [];
+  }
+  return [{ label: "View Page Source", click: () => host.openInNewTab(`view-source:${pageUrl}`, false) }];
 }
 
 /**
@@ -773,7 +804,7 @@ export function showPageContextMenu(host: MenuHost, contents: WebContents, param
   const history = contents.navigationHistory;
   const extensionPart: (MenuItemConstructorOptions | MenuItem)[] = extensionItems.length === 0 ? [] : [...extensionItems, { type: "separator" }];
   const template: (MenuItemConstructorOptions | MenuItem)[] = [
-    ...buildLinkItems(host, params, sourceTabId),
+    ...buildLinkItems(host, contents, params, sourceTabId),
     ...buildImageItems(host, contents, params),
     ...buildTextItems(host, contents, params),
     ...extensionPart,
@@ -781,6 +812,7 @@ export function showPageContextMenu(host: MenuHost, contents: WebContents, param
     { label: "Forward", enabled: history.canGoForward(), click: () => history.goForward() },
     { label: "Reload", click: () => contents.reload() },
     { type: "separator" },
+    ...buildViewSourceItems(host, contents),
     { label: "Inspect Element", click: () => contents.inspectElement(params.x, params.y) },
   ];
   popUp(host, template);

@@ -161,6 +161,9 @@ export const ARCHIVE_PRUNE_INTERVAL_MS = 1 * HOUR_MS;
 /** How many archived tabs are kept; older ones are deleted. Same as Arc: a real user's archive held exactly 250. */
 export const ARCHIVE_LIMIT = 250;
 
+/** The sidebar's downloads card stays this long after the last download ends (or until its ×). Our choice. */
+export const DOWNLOAD_CARD_SHOWN_MS = MINUTE_MS;
+
 /** A Little Window left alone this long is archived and closed. Same as Arc's Little Arc default (6 h, measured). */
 export const LITTLE_WINDOW_ARCHIVE_AFTER_MS = 6 * HOUR_MS;
 

@@ -74,6 +74,12 @@ function runButtonAction(button: HTMLElement): void {
       return dispatch({ type: "toggleMediaPlayback" });
     case "media-dismiss":
       return dispatch({ type: "dismissMedia" });
+    case "download-open":
+      return dispatch({ type: "openDownloadCard", downloadId: itemId });
+    case "download-show":
+      return dispatch({ type: "showDownloadInFolder", downloadId: itemId });
+    case "download-dismiss":
+      return dispatch({ type: "dismissDownloadCard" });
     case "restart-to-update":
       return dispatch({ type: "restartToUpdate" });
     case "notice-action":

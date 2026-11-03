@@ -500,12 +500,26 @@ export interface TabRuntimeInfo {
   toolbarColor: string | null;
 }
 
+/** The sidebar's downloads card: the newest running download, or the result of the last one for a minute. */
+export interface DownloadCardInfo {
+  downloadId: string;
+  fileName: string;
+  receivedBytes: number;
+  /** 0 when the server did not say how big the file is. */
+  totalBytes: number;
+  state: "progressing" | "completed" | "cancelled" | "interrupted";
+  /** How many downloads are running (the card says "2 downloads" above one). */
+  runningCount: number;
+}
+
 /** Live facts main.ts sends next to the state. Nothing here is saved. */
 export interface RuntimeState {
   /** Facts for every loaded tab, by tab id. Tabs that are not loaded are missing. */
   tabs: Record<ItemId, TabRuntimeInfo>;
   /** Downloads still in progress; the Library button shows a dot while it is above zero. */
   activeDownloadCount: number;
+  /** The downloads card above the bottom bar; null when there is nothing to show. */
+  downloadCard: DownloadCardInfo | null;
   /** True while the hidden sidebar is shown because the mouse touched the window's left edge. */
   isSidebarPeeking: boolean;
   /** The hidden toolbar is showing for a moment (pointer at the window's top edge). */

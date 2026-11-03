@@ -35,6 +35,7 @@ import { focusMainWindow } from "./mainWindows";
 import { showToast } from "./statusBubble";
 import { toggleReaderView } from "./readerController";
 import { beginShortcutRecording, cancelShortcutRecording, recordShortcutKeys, resetAllShortcuts, setShortcut } from "./shortcutEditor";
+import { dismissDownloadCard, openDownloadedFile, showDownloadInFolder } from "./downloads";
 import { dismissMedia, toggleMediaPlayback } from "./media";
 import { addRoutingRule, removeRoutingRule } from "./routing";
 import { deleteBoost, setBoostCss, setBoostEnabled, setBoostJavaScript, setBoostStyle } from "./boosts";
@@ -164,7 +165,7 @@ export const menuHost: MenuHost = {
   getWindow: () => getWindow(),
   runAction: (action) => runAction(action),
   sendSidebarCommand: (command) => sendSidebarCommand(command),
-  openInNewTab: (url, inBackground) => openLinkInNewTab(url, inBackground ? "background" : "foreground"),
+  openInNewTab: (url, inBackground) => openLinkInNewTab(url, inBackground ? "background" : "foreground", { sourceTabId: getSelectedTabId(getState()) }),
   isTabLoaded: (tabId) => getTabContents(tabId) !== null,
   canTabSleep: (tabId) => canSleepNow(tabId),
   openLinkElsewhere: (url, place, sourceTabId) => openLinkElsewhere(url, place, sourceTabId),
@@ -449,6 +450,16 @@ export function runAction(action: BrowserAction): void {
     case "dismissMedia":
       dismissMedia().then(scheduleRuntimePush);
       return;
+    case "openDownloadCard":
+      // A finished file opens in its app; a running download opens the list.
+      if (!openDownloadedFile(action.downloadId)) {
+        openLibrary("downloads");
+      }
+      return;
+    case "showDownloadInFolder":
+      return showDownloadInFolder(action.downloadId);
+    case "dismissDownloadCard":
+      return dismissDownloadCard();
     case "navigate":
       return navigateFocusedPage(action.command);
     case "openCommandBar":

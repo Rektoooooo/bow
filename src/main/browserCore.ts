@@ -23,7 +23,7 @@ import type { SidebarCommand } from "../shared/actions";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
 import { SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_WIDTH_PX, STATE_SAVE_DELAY_MS } from "../shared/settings";
 import type { BrowserState, ExtensionBeingAdded, ItemId, LiveFolderStatus, RuntimeState, WindowId } from "../shared/types";
-import { getActiveDownloadCount } from "./downloads";
+import { getActiveDownloadCount, getDownloadCard } from "./downloads";
 import { getFaviconAccents } from "./faviconAccents";
 import { findMediaInfo, handleShownTabsChanged } from "./media";
 import type { CardLayoutOptions } from "./layout";
@@ -670,6 +670,7 @@ export function collectRuntimeState(windowId: WindowId = currentState.focusedWin
   return {
     tabs: tabs,
     activeDownloadCount: getActiveDownloadCount(),
+    downloadCard: getDownloadCard(Date.now()),
     isSidebarPeeking: peekingWindowIds.has(windowId),
     isToolbarPeeking: toolbarPeekingWindowIds.has(windowId),
     isFocusMode: focusModeWindowIds.has(windowId),

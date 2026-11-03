@@ -49,7 +49,8 @@ import {
 } from "./browserCore";
 import { restoreMainWindows } from "./mainWindows";
 import { createCommandActionRegistry } from "./commandBarActions";
-import { startTrackingDownloads } from "./downloads";
+import { onDownloadStarted, startTrackingDownloads } from "./downloads";
+import { startClosingEmptyLinkViews } from "./linkDownloads";
 import { getExtensionMenuItems, initializeExtensionHost, prepareExtensions } from "./extensionHost";
 import { initializeAutofill } from "./autofillPopup";
 import { initializePasswordOffers } from "./passwordOffers";
@@ -78,7 +79,7 @@ import { getReaderArticle, noticeReaderPageChanged, probeReaderPage } from "./re
 import type { LinkSourceApp } from "../shared/routingRules";
 import { showPageContextMenu } from "./menus";
 import { applyBoostToPage, runBoostJavaScript } from "./boostPages";
-import { createStatusBubble, showLinkStatus } from "./statusBubble";
+import { createStatusBubble, showLinkStatus, showToast } from "./statusBubble";
 import { initializePeek, openPeek } from "./peek";
 import { createOverlayView, getOverlayContents } from "./overlay";
 import { openPasswords, refreshOpenPanel, registerOverlayIpc, setCommandActionRegistry } from "./overlayController";
@@ -147,7 +148,7 @@ const tabViewEvents: TabViewEvents = {
       openPeek(url, tabId);
       return;
     }
-    openLinkInNewTab(url, disposition);
+    openLinkInNewTab(url, disposition, { sourceTabId: tabId });
   },
   onOpenInPeek: (tabId, url) => openPeek(url, tabId),
   onWillNavigate: (tabId, url, isUserInitiated) => {
@@ -373,6 +374,13 @@ async function handleAppReady(): Promise<void> {
     },
     () => getState().settings,
   );
+  startClosingEmptyLinkViews();
+  // With the sidebar hidden its downloads card is not there, so a toast says that the file is coming.
+  onDownloadStarted((_contents, fileName) => {
+    if (!getState().settings.isSidebarVisible) {
+      showToast(`Downloading ${fileName}`).catch(() => undefined);
+    }
+  });
   registerIpcHandlers({
     isTrustedSender: (sender) => findMainWindowIdOf(sender) !== null || sender === getOverlayContents() || sender === getOnboardingContents(),
     // The overlay is always in the focused window, so it gets the focused window's state.

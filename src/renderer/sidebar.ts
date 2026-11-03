@@ -19,7 +19,7 @@
 import { getHexLuminance } from "../shared/faviconColor.js";
 import type { SidebarCommand } from "../shared/actions.js";
 import { LIBRARY_COLUMN_WIDTH_PX, SIDEBAR_MAX_WIDTH_PX, SIDEBAR_MIN_WIDTH_PX, SIDEBAR_WIDTH_PX } from "../shared/settings.js";
-import type { BrowserState, ItemId, ItemLocation, RuntimeState, Space, SpaceId, TabItem } from "../shared/types";
+import type { BrowserState, DownloadCardInfo, ItemId, ItemLocation, RuntimeState, Space, SpaceId, TabItem } from "../shared/types";
 import { createActionButton, createElement, createFavicon, dispatch } from "./dom.js";
 import { dropItemSentFromOtherWindow, installDragAndDrop, markListDropZone, onDragStateChanged, setItemDraggedInOtherWindow } from "./dragDrop.js";
 import { morphChildren } from "./morph.js";
@@ -54,6 +54,7 @@ let currentState: BrowserState | null = null;
 let currentRuntime: RuntimeState = {
   tabs: {},
   activeDownloadCount: 0,
+  downloadCard: null,
   isSidebarPeeking: false,
   isToolbarPeeking: false,
   isFocusMode: false,
@@ -430,6 +431,83 @@ function renderMediaPlayer(state: BrowserState): void {
   player.hidden = false;
 }
 
+/** Byte sizes for the downloads card, as the Library writes them. */
+const KILOBYTE = 1024;
+const MEGABYTE = 1024 * KILOBYTE;
+
+/**
+ * Turns a byte count into "512 KB" or "3.4 MB".
+ */
+function formatDownloadSize(bytes: number): string {
+  if (bytes < MEGABYTE) {
+    return `${Math.max(1, Math.round(bytes / KILOBYTE))} KB`;
+  }
+  return `${(bytes / MEGABYTE).toFixed(1)} MB`;
+}
+
+/**
+ * The card's second line: how far a running download is, or how it ended.
+ */
+function describeDownload(card: DownloadCardInfo): string {
+  if (card.runningCount > 1) {
+    return `${card.runningCount} downloads`;
+  }
+  if (card.state === "completed") {
+    return `Downloaded · ${formatDownloadSize(card.receivedBytes)}`;
+  }
+  if (card.state === "cancelled") {
+    return "Cancelled";
+  }
+  if (card.state === "interrupted") {
+    return "Download failed";
+  }
+  if (card.totalBytes > 0) {
+    return `${formatDownloadSize(card.receivedBytes)} of ${formatDownloadSize(card.totalBytes)}`;
+  }
+  return formatDownloadSize(card.receivedBytes);
+}
+
+/**
+ * Draws the downloads card above the bottom bar, like the media player: the file's name and how far it is (a thin
+ * bar while it runs), a click opens the file or, while it runs, Library › Downloads, then Show in Finder and ×.
+ */
+function renderDownloadCard(): void {
+  const cardElement = document.getElementById("download-card");
+  if (cardElement === null) {
+    return;
+  }
+  const card = currentRuntime.downloadCard;
+  if (card === null) {
+    cardElement.hidden = true;
+    morphChildren(cardElement, [], { animate: false });
+    return;
+  }
+  const mainButton = document.createElement("button");
+  mainButton.type = "button";
+  mainButton.className = "download-main";
+  mainButton.title = card.state === "completed" ? "Open the file" : "Show downloads";
+  mainButton.dataset.action = "download-open";
+  mainButton.dataset.itemId = card.downloadId;
+  const texts = createElement("span", "download-texts");
+  texts.append(createElement("span", "download-name", card.fileName), createElement("span", "download-status", describeDownload(card)));
+  mainButton.append(createIcon("download", "icon download-icon"), texts);
+  if (card.state === "progressing" && card.totalBytes > 0) {
+    const fraction = Math.min(card.receivedBytes / card.totalBytes, 1);
+    const fill = createElement("span", "download-bar-fill");
+    fill.style.width = `${Math.round(fraction * 100)}%`;
+    const bar = createElement("span", "download-bar");
+    bar.append(fill);
+    mainButton.append(bar);
+  }
+  const buttons: HTMLElement[] = [mainButton];
+  if (card.state === "completed") {
+    buttons.push(createActionButton("folder", "Show in Finder", "media-button", "download-show", { itemId: card.downloadId }));
+  }
+  buttons.push(createActionButton("close", "Dismiss", "media-button", "download-dismiss"));
+  morphChildren(cardElement, buttons, { animate: false });
+  cardElement.hidden = false;
+}
+
 /**
  * The tab rows of the Space on screen (Pinned, then Today, folders open), in sidebar order: what ⇧-click ranges over.
  */
@@ -603,6 +681,7 @@ function renderAll(): void {
   }
   hasRenderedOnce = true;
   renderMediaPlayer(state);
+  renderDownloadCard();
   renderUpdateNotice();
   renderNotice();
   renderBottomBar(state);

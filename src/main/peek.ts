@@ -35,6 +35,8 @@ import { computeFramePalette } from "../shared/themePalette";
 import type { ItemId } from "../shared/types";
 import { addAfterSyncHook, applyChange, getLayoutOptions, getState, getWindow, setPeekWindow } from "./browserCore";
 import { computeCardBounds } from "./layout";
+import { markLinkView } from "./linkDownloads";
+import { getPageBackgroundColor } from "./pageColor";
 import type { Bounds } from "./layout";
 import { getOverlayShowCount, hideOverlay, raiseOverlayIfShown, sendPeekClosing, showOverlay } from "./overlay";
 import { getProfileSession } from "./profiles";
@@ -57,13 +59,6 @@ const PEEK_RADIUS_PX = 10;
 
 /** Without the link's own box, the card grows from a square this big around the pointer. Our choice. */
 const PEEK_POINTER_ORIGIN_PX = 16;
-
-/**
- * The page's color before it paints, also the empty card that grows in: black in dark mode, like Arc's in the user's
- * recording; white in light mode (no light capture exists; it is what a page without a background shows).
- */
-const PEEK_PAGE_COLOR_DARK = "#000000";
-const PEEK_PAGE_COLOR_LIGHT = "#ffffff";
 
 /** The page's picture for the closing card: JPEG at this quality, at 1× (it shows for about 120 ms). Our choice. */
 const PEEK_PICTURE_JPEG_QUALITY = 80;
@@ -186,13 +181,6 @@ function computeDimmedCard(window: BrowserWindow): Bounds {
 }
 
 /**
- * The page's color before it paints (and the growing card's): it follows the system's appearance, as pages do.
- */
-function getPeekPageColor(): string {
-  return nativeTheme.shouldUseDarkColors ? PEEK_PAGE_COLOR_DARK : PEEK_PAGE_COLOR_LIGHT;
-}
-
-/**
  * Where the pointer is in a window's content (the link just clicked), or null when it is outside the window.
  */
 function findPointerInWindow(window: BrowserWindow): { x: number; y: number } | null {
@@ -299,7 +287,7 @@ function showPeekFrame(contents: WebContents, takesKeyboard: boolean = true, isF
     card: computeDimmedCard(window),
     url: contents.getURL(),
     chromeColor: palette.colors[0],
-    pageColor: getPeekPageColor(),
+    pageColor: getPageBackgroundColor(),
     canGoBack: history.canGoBack(),
     canGoForward: history.canGoForward(),
     growFrom: isFirstDraw ? peekOrigin : null,
@@ -405,7 +393,7 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
   });
   view.setBorderRadius(PEEK_RADIUS_PX);
   // The same color as the empty card that grows in, so the page taking its place does not flash.
-  view.setBackgroundColor(getPeekPageColor());
+  view.setBackgroundColor(getPageBackgroundColor());
   view.setBounds(bounds);
   peekView = view;
   peekOrigin = null;
@@ -414,6 +402,12 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
   peekSourceTabId = sourceTabId ?? getSelectedTabId(state);
 
   const contents = view.webContents;
+  // A Peek is always opened for a link; when the link is a file there is no page to show, so the Peek closes.
+  markLinkView(contents, () => {
+    if (peekView === view) {
+      closePeek();
+    }
+  });
   // Escape dismisses a Peek, like Arc; ⌘O and ⌘W come through the app menu. A held Escape repeats, and a closing
   // Peek's page keeps the keyboard for a moment: neither may close anything else.
   contents.on("before-input-event", (event, input) => {

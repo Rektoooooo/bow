@@ -130,6 +130,10 @@ export type BrowserAction =
   | { type: "openBoostEditor"; site?: string }
   | { type: "toggleMediaPlayback" }
   | { type: "dismissMedia" }
+  /** The downloads card: a click opens the finished file (or Library › Downloads), Show in Finder, ×. */
+  | { type: "openDownloadCard"; downloadId: string }
+  | { type: "showDownloadInFolder"; downloadId: string }
+  | { type: "dismissDownloadCard" }
   | { type: "navigate"; command: NavigationCommand }
   | { type: "openCommandBar"; mode: "newTab" | "editUrl" }
   | { type: "openLibrary" }
@@ -312,6 +316,9 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "openBoostEditor",
   "toggleMediaPlayback",
   "dismissMedia",
+  "openDownloadCard",
+  "showDownloadInFolder",
+  "dismissDownloadCard",
   "navigate",
   "openCommandBar",
   "openLibrary",

@@ -16,6 +16,8 @@ import type { ItemId } from "../shared/types";
 import { applyChange, getState, scheduleRuntimePush } from "./browserCore";
 import { findOpenTabForUrl } from "./duplicateTabs";
 import { focusMainWindow } from "./mainWindows";
+import type { LinkOrigin } from "./linkDownloads";
+import { markLinkTab } from "./linkDownloads";
 import { offerSidebarNotice } from "./sidebarNotice";
 import { SIDEBAR_NOTICE_SHOWN_MS } from "../shared/settings";
 import { closeTab, deleteItem, getSelectedTabId, openTab, selectTab, setTabMuted, updateTab } from "./state";
@@ -27,24 +29,37 @@ import { resetPinnedTabInEveryWindow, resetPinnedTabsInEveryWindow } from "./win
 import { splitTabs } from "./split";
 
 /**
- * Opens a link in a new Today tab. Background links (⌘-click) do not take the selection.
+ * Opens a link in a new Today tab. Background links (⌘-click) do not take the selection. With `origin` the tab is
+ * remembered as made for a link: when its page turns out to be a download it goes away again (linkDownloads.ts).
  */
-export function openLinkInNewTab(url: string, disposition: OpenDisposition): void {
+export function openLinkInNewTab(url: string, disposition: OpenDisposition, origin: LinkOrigin | null = null): void {
+  const now = Date.now();
   const options: OpenTabOptions = { select: disposition === "foreground" };
-  applyChange((state) => openTab(state, url, Date.now(), options));
+  if (origin !== null) {
+    options.id = createId("tab", now);
+    markLinkTab(options.id, origin);
+  }
+  applyChange((state) => openTab(state, url, now, options));
 }
 
 /**
  * Opens an address the user asked for (typed in the sidebar or the Command Bar, a link from another app sent to a
  * Space) in a new Today tab, unless a tab of the active Space's profile already shows it (duplicateTabs.ts): then
  * that tab is shown (in its own window when another window has it on screen), and the sidebar offers to open another
- * anyway. Links opened from pages keep opening new tabs: there the user chose where to go.
+ * anyway. Links opened from pages keep opening new tabs: there the user chose where to go. With `origin` a new tab is
+ * remembered as made for a link (see openLinkInNewTab).
  */
-export function openOrSwitchToTab(url: string): void {
+export function openOrSwitchToTab(url: string, origin: LinkOrigin | null = null): void {
   const state = getState();
   const existingTabId = findOpenTabForUrl(state, url, state.activeSpaceId);
   if (existingTabId === null) {
-    applyChange((current) => openTab(current, url, Date.now()));
+    const now = Date.now();
+    const options: OpenTabOptions = {};
+    if (origin !== null) {
+      options.id = createId("tab", now);
+      markLinkTab(options.id, origin);
+    }
+    applyChange((current) => openTab(current, url, now, options));
     return;
   }
   const windowShowingTab = findWindowShowingTab(existingTabId);

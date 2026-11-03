@@ -341,6 +341,18 @@ export function getTabContents(tabId: ItemId): WebContents | null {
 }
 
 /**
+ * The tab whose page these contents are, or null (a Peek, a Little Window, a popup).
+ */
+export function findTabIdOfContents(contents: WebContents): ItemId | null {
+  for (const [tabId, view] of tabViews) {
+    if (view.webContents === contents) {
+      return tabId;
+    }
+  }
+  return null;
+}
+
+/**
  * Turns Electron's window-open details into our two dispositions. Background tabs come from ⌘-click and middle-click.
  */
 function toDisposition(details: HandlerDetails): OpenDisposition {

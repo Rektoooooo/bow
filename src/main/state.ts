@@ -724,6 +724,26 @@ export function deleteItem(state: BrowserState, itemId: ItemId, now: number): Br
 }
 
 /**
+ * Takes a tab away without an Archive entry: a tab opened for a link whose page turned out to be a download never
+ * showed anything, so it leaves no trace. When it was the selected tab, the tab it was opened from is selected
+ * again (when that still exists); otherwise the usual repair picks the most recently used one.
+ * Example: discardTab(state, linkTabId, sourceTabId, now) → state without linkTabId, sourceTabId selected
+ */
+export function discardTab(state: BrowserState, tabId: ItemId, reselectTabId: ItemId | null, now: number): BrowserState {
+  const tab = findTab(state, tabId);
+  if (tab === undefined) {
+    return state;
+  }
+  const wasSelected = getSelectedTabId(state) === tabId;
+  const stateWithoutTab = deleteItems(removeFromLocation(state, tabId), [tabId]);
+  const repairedState = repairSelections(dissolveSmallSplits(stateWithoutTab));
+  if (!wasSelected || reselectTabId === null || findTab(repairedState, reselectTabId) === undefined) {
+    return repairedState;
+  }
+  return selectTab(repairedState, reselectTabId, now);
+}
+
+/**
  * Returns the ids of the folders and split views at or below an item.
  */
 function collectContainerIds(state: BrowserState, itemId: ItemId): ItemId[] {
