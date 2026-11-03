@@ -43,7 +43,7 @@ import { getProfileSession } from "./profiles";
 import { splitTabs } from "./split";
 import { getSelectedTabId, openTab, updateTabPage } from "./state";
 import { chooseSizedPopup, watchPopups } from "./windowOpenRule";
-import { raiseAutofillPopupIfShown } from "./autofillPopup";
+import { isAutofillPopupShownFor, raiseAutofillPopupIfShown } from "./autofillPopup";
 import { registerPageHost, unregisterPageHost } from "./pageHosts";
 import { adoptTabView, getFocusedContents, getTabViews } from "./tabViews";
 import type { TabViewEvents } from "./tabViews";
@@ -428,6 +428,10 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
     const isPlainEscape = input.type === "keyDown" && input.key === "Escape" && !input.meta && !input.control && !input.alt;
     if (isPlainEscape && (input.isAutoRepeat || peekView !== view)) {
       event.preventDefault();
+      return;
+    }
+    // With Bow Passwords' list open under a field, Escape is the list's (autofillPopup.ts closes it); the Peek stays.
+    if (isPlainEscape && isAutofillPopupShownFor(contents)) {
       return;
     }
     if (isPlainEscape) {

@@ -341,6 +341,17 @@ check(
   peekList !== null && peekList.popup.y >= peekList.area.y + peekFieldBottom - 1 && isInside(peekList.popup, peekList.area),
   JSON.stringify(peekList),
 );
+// Escape with the list open is the list's: it closes, and the Peek (which also closes on Escape) stays.
+await app.evaluate(({ webContents }) => {
+  const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL().includes("run=peek"));
+  contents.sendInputEvent({ type: "keyDown", keyCode: "Escape" });
+  contents.sendInputEvent({ type: "keyUp", keyCode: "Escape" });
+});
+const listClosedByEscape = await isListGone("run=peek");
+const peekStayedOpen = await requireMain("peek", (module) => module.isPeekOpen());
+check("in a Peek, Escape with the list open closes only the list", listClosedByEscape && peekStayedOpen === true, JSON.stringify({ listClosedByEscape, peekStayedOpen }));
+await peekPage.click("input[type=email]");
+await waitForList("run=peek");
 // The vault now holds more than one login for this site: pick Alex's row.
 await listPage.click('.autofill-row:has-text("alex@example.com")');
 await sleep(500);

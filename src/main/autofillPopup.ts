@@ -21,7 +21,7 @@
  *   field left, navigation, tab switch, another window, a window resize or an open panel → closeAutofillPopup()
  */
 import { ipcMain, nativeTheme, WebContentsView } from "electron";
-import type { BrowserWindow, IpcMainInvokeEvent } from "electron";
+import type { BrowserWindow, IpcMainInvokeEvent, WebContents } from "electron";
 import * as path from "node:path";
 import { AUTOFILL_CHANNELS } from "../shared/autofill";
 import type { AutofillItem, AutofillShowMessage } from "../shared/autofill";
@@ -279,6 +279,14 @@ function drawList(list: ShownList): void {
   view.webContents.send(AUTOFILL_CHANNELS.show, message);
   // Adding a view again moves it to the top of the window (and to this window when it was in another).
   list.window.contentView.addChildView(view);
+}
+
+/**
+ * True while the list is open under a field of this page. Escape then closes only the list: a Peek, which closes on
+ * Escape too, must stay.
+ */
+export function isAutofillPopupShownFor(contents: WebContents): boolean {
+  return shownList !== null && shownList.page.contents === contents;
 }
 
 /**
