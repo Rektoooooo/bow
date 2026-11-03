@@ -42,6 +42,7 @@ import { getOverlayShowCount, hideOverlay, raiseOverlayIfShown, sendPeekClosing,
 import { getProfileSession } from "./profiles";
 import { splitTabs } from "./split";
 import { getSelectedTabId, openTab, updateTabPage } from "./state";
+import { chooseSizedPopup, watchPopups } from "./windowOpenRule";
 import { adoptTabView, getFocusedContents, getTabViews } from "./tabViews";
 import type { TabViewEvents } from "./tabViews";
 import { createId, findProfileIdOfItem, getActiveSpace } from "./tree";
@@ -389,7 +390,8 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
   const state = getState();
   const profileId = sourceTabId === null ? DEFAULT_PROFILE_ID : findProfileIdOfItem(state, sourceTabId) ?? DEFAULT_PROFILE_ID;
   const view = new WebContentsView({
-    webPreferences: { session: getProfileSession(profileId), sandbox: true, contextIsolation: true, nodeIntegration: false },
+    // nodeIntegrationInSubFrames: so the page helpers run in embedded frames too (see tabViews.ts createTabView).
+    webPreferences: { session: getProfileSession(profileId), sandbox: true, contextIsolation: true, nodeIntegration: false, nodeIntegrationInSubFrames: true },
   });
   view.setBorderRadius(PEEK_RADIUS_PX);
   // The same color as the empty card that grows in, so the page taking its place does not flash.
@@ -425,8 +427,13 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
   contents.on("did-navigate", () => showPeekFrame(contents));
   // Back and forward follow in-page navigations too (pages that change their address without loading).
   contents.on("did-navigate-in-page", () => showPeekFrame(contents));
-  // Links inside a Peek that open new windows become ordinary tabs.
+  // A sign-in popup keeps its opener; other links inside a Peek that open new windows become ordinary tabs.
+  watchPopups(contents);
   contents.setWindowOpenHandler((details) => {
+    const sizedPopup = chooseSizedPopup(contents, details);
+    if (sizedPopup !== null) {
+      return sizedPopup;
+    }
     tabViewEvents?.onOpenInNewTab(peekSourceTabId ?? "", details.url, details.disposition === "background-tab" ? "background" : "foreground");
     return { action: "deny" };
   });

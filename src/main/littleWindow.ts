@@ -30,6 +30,7 @@ import { markLinkView } from "./linkDownloads";
 import { getPageBackgroundColor } from "./pageColor";
 import { openLinkInNewTab, openOrSwitchToTab } from "./tabActions";
 import { getActiveSpace } from "./tree";
+import { chooseSizedPopup, watchPopups } from "./windowOpenRule";
 import { normalizeTypedInput } from "./urls";
 import { findSearchEngine } from "../shared/searchEngines";
 
@@ -140,7 +141,13 @@ function watchPage(little: LittleWindow): void {
   };
   const pageMenuHost = { ...menuHost, openInNewTab: openElsewhere };
   contents.on("context-menu", (_event, params) => showPageContextMenu(pageMenuHost, contents, params));
+  // A sign-in popup keeps its opener, in a private window too (it shares the window's in-memory session).
+  watchPopups(contents);
   contents.setWindowOpenHandler((details) => {
+    const sizedPopup = chooseSizedPopup(contents, details);
+    if (sizedPopup !== null) {
+      return sizedPopup;
+    }
     openElsewhere(details.url, details.disposition === "background-tab");
     return { action: "deny" };
   });
@@ -183,7 +190,8 @@ export function openLittleWindow(url: string | null, options: LittleWindowOption
   const profileId = getActiveSpace(getState()).profileId;
   const pageSession = isPrivate ? createPrivateSession() : getProfileSession(profileId);
   const pageView = new WebContentsView({
-    webPreferences: { session: pageSession, sandbox: true, contextIsolation: true, nodeIntegration: false },
+    // nodeIntegrationInSubFrames: so the page helpers run in embedded frames too (see tabViews.ts createTabView).
+    webPreferences: { session: pageSession, sandbox: true, contextIsolation: true, nodeIntegration: false, nodeIntegrationInSubFrames: true },
   });
   pageView.setBorderRadius(PAGE_RADIUS_PX);
   // So nothing flashes black before the page paints.

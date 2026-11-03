@@ -42,6 +42,7 @@ import { captureSnapshotSoon, forgetSnapshot } from "./tabSnapshots";
 import { isNoteUrl } from "../shared/notes";
 import { isEaselUrl } from "../shared/easels";
 import { getSelectedTabId } from "./state";
+import { chooseSizedPopup, watchPopups } from "./windowOpenRule";
 import { findProfileIdOfItem, findSplitOfTab, findTab, getActiveSpace } from "./tree";
 import { forgetCornerMasks, layoutCornerMasks, raiseCornerMasks } from "./cornerMasks";
 import { isCapturing } from "./mediaCapture";
@@ -370,13 +371,9 @@ function handleWindowOpen(tabId: ItemId, contents: WebContents, details: Handler
     events.onOpenInPeek(tabId, details.url);
     return { action: "deny" as const };
   }
-  if (isNewWindow) {
-    return {
-      action: "allow" as const,
-      overrideBrowserWindowOptions: {
-        webPreferences: { session: contents.session, sandbox: true, contextIsolation: true, nodeIntegration: false },
-      },
-    };
+  const sizedPopup = chooseSizedPopup(contents, details);
+  if (sizedPopup !== null) {
+    return sizedPopup;
   }
   events.onOpenInNewTab(tabId, details.url, toDisposition(details));
   return { action: "deny" as const };
@@ -459,6 +456,7 @@ function watchTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvent
     events.onContextMenu(tabId, contents, params);
   });
   contents.setWindowOpenHandler((details) => handleWindowOpen(tabId, contents, details, events));
+  watchPopups(contents);
   // No radius: the page meets the toolbar square, and cornerMasks.ts rounds the card's bottom corners over it.
 }
 
