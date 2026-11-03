@@ -26,6 +26,7 @@
  * (tabSleep.ts decides which): sleepTabView() closes the page but keeps its back/forward list with Chromium's page
  * state, and the next createTabView() for that tab restores it, scroll position and form values included.
  */
+import { watchResponsiveness } from "./unresponsivePages";
 import { WebContentsView } from "electron";
 import * as path from "node:path";
 import type { BrowserWindow, ContextMenuParams, HandlerDetails, NavigationEntry, Rectangle, WebContents } from "electron";
@@ -407,6 +408,7 @@ function watchTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvent
     const crashedUrl = contents.getURL();
     contents.loadFile(CRASH_PAGE_PATH, { query: { url: crashedUrl, reason: details.reason } }).catch(ignoreLoadFailure);
   });
+  watchResponsiveness(tabId, contents);
   contents.on("input-event", (_event, input) => {
     if (input.type === "mouseDown" || input.type === "keyDown") {
       lastUserInputAt.set(tabId, Date.now());
