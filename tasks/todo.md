@@ -446,6 +446,27 @@ profiles, so each looks separate); on the other macOS account Bow's Spaces share
 - [x] 2. Merge into bow-next, full suite, push (main at 84b4a22; check-windows' quit check failed once at a load
       average of 86 and passed twice on re-runs)
 
+## Milestone 8 — What Chrome and Arc do that Bow didn't (user-approved 2026-11-03: "just go and do everything")
+The user, on 0.2.0: downloads gave no feedback ("it just opens a little black window"), F1 TV wouldn't play, signing
+in to Claude from another app broke in a Little Window ("JS errors"), typed form values weren't remembered. Measured
+first (probes, nothing typed), then an audit of Electron-vs-Chrome gaps.
+- [x] 1. Downloads you can see (sidebar card, quarantine mark), views a file link opened close again, Save Link /
+      Image As, Download Linked File, View Page Source, no black flash in Little Windows and Peek
+- [x] 2. Sign-in popups keep `window.opener` in Peek and Little Windows too (claude.ai's "Continue with Google" now
+      opens Google's sign-in as a popup, checked live without typing)
+- [x] 4. Form memory like Chrome's autocomplete (any text field by its name), in its own session, merged
+- [x] 3. Bow Passwords in Little Windows, Peek and sign-in popups (`pageHosts.ts`; a Peek's and Little Window's offer is
+      a native sheet)
+- [x] 5. A sign-in card for sites that ask for a username and password (tabs, Peek)
+- [x] 6. Certificate errors: warning page + Back to Safety / Visit Anyway card
+- [x] 7. A Wait / Close Page sheet for a hung tab (code-reviewed only: Chromium never fired `unresponsive` in the
+      invisible e2e mode)
+- [ ] Later, each its own step: Widevine (castLabs ECS + EVS signing with the user's own account; the user chose
+      "after the rest"), passkeys and security keys (Electron 45 + Apple entitlements), web push (no push service in
+      Electron), USB/HID/Serial/Bluetooth pickers, "always allow" for links that open apps, a per-value form memory
+      list in the Library, one shared queue for the four overlay prompt cards (permission, password offer, sign-in,
+      certificate), geolocation and media keys checked by hand in a packaged build.
+
 ## Review (2026-11-01, release 0.2.0)
 - Released v0.2.0 (Latest): Bow Passwords (with embedded frames and the direct import from Chromium browsers),
   Favorites per Space, the Google sign-in fix, hover and scroll bar polish, and the download's own window. Full e2e

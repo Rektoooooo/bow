@@ -5,8 +5,9 @@ Public repo: https://github.com/Rektoooooo/bow
 
 ## Start here
 
-1. Read the newest file in `.handoffs/` (`2026-10-29-passwords.md`: onboarding v2 and 0.1.1, Google sign-in, Bow
-   Passwords, Favorites per Space; then `2026-10-28-night.md`: open source, releases, auto-update, sleeping tabs,
+1. Read the newest file in `.handoffs/` (`2026-11-03-chrome-gaps.md`: downloads, sign-in popups, Chrome-like form
+   memory, Bow Passwords beyond tabs, HTTP sign-in, certificate warnings, Widevine still to do; then
+   `2026-10-29-passwords.md`: onboarding v2 and 0.1.1, Google sign-in, Bow Passwords, Favorites per Space; then `2026-10-28-night.md`: open source, releases, auto-update, sleeping tabs,
    speed; then `2026-10-27-arc-polish.md`, `2026-10-27-multiple-windows.md`, `2026-10-26-arc-look.md`,
    `2026-10-26-arc-parity.md` and the oldest).
    They have the history, decisions, how the look is measured, status and next steps.
@@ -37,7 +38,12 @@ npm run e2e          # build + drive the real app: check-app, check-overlay, che
                      # Library › Passwords, CSV import, a restart, a vault that can't be opened; mock keychain),
                      # check-onboarding (the first-start onboarding in its own window: scenes, keys, real imports
                      # from a made-up home folder via --import-home (e2e/fixtures/importHome.mjs), a color, the
-                     # tour, the defaults, replay from Help, fits a 760 × 520 window, no dashes in its text)
+                     # tour, the defaults, replay from Help, fits a 760 × 520 window, no dashes in its text),
+                     # check-downloads (the downloads card, quarantine mark, views a file link opened close again),
+                     # check-popups (sized window.open keeps window.opener in tabs, Peek and Little Windows),
+                     # check-http-sign-in (the card for sites that ask for a username and password),
+                     # check-certificates (a self-signed site gets the warning page and card; HTTPS-only falls back),
+                     # check-passwords-windows (Bow Passwords in Little Windows, Peek and sign-in popups)
 node e2e/window-shot.mjs --open  # after npm run package: Bow on the sample profile, for the README's hand-taken
                                  # screenshots (docs/screenshot-*.png); without --open: the views → e2e/output/readme-shots
 node e2e/arc-compare.mjs   # side-by-side crops with the user's Arc screenshots (reference/, local only) → e2e/output
@@ -122,9 +128,32 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   once for the browser's "<Name> Safe Storage" Keychain secret and merges into the right profile's vault; it is one more
   part of the import, "Passwords"); under the mock keychain e2e uses `BOW_E2E_IMPORT_KEYCHAIN_SECRET` (e2e/background.mjs)
   instead of the Keychain, and Safari and Firefox keep the CSV way.
+  It serves every page in `pageHosts.ts`: tabs, the Peek page, Little Window pages and sign-in popups opened from them
+  (registered on their opener's `did-create-window`); the list sits over the page in whichever window holds it. The
+  save offer is the overlay card for tabs (and for a popup opened from a tab, shown when the popup closes), and a
+  native sheet for Peek (the overlay draws its frame) and Little Windows. Private Little Windows get nothing.
+  Form memory remembers the 12 known kinds and, like Chrome's autocomplete, any other plain text field by its own name
+  (`fieldKeyFor` in the helper; vault entries `{ kind: "field", field: "<key>" }`, which 0.2.0 skips one by one), offered
+  on any site with the same field name. Never: passwords, sign-in names, card or code fields and values, search boxes,
+  `autocomplete="off"` fields or forms, secrets and security answers (deny words). Sending is noticed for any form.
   Backups and Sync leave passwords out (another Mac can't decrypt them). e2e runs set `BOW_E2E_MOCK_KEYCHAIN`
   (e2e/background.mjs), so tests use Chromium's mock keychain and never touch the real Keychain; under it the Library
   skips Touch ID (no real vault can be opened with the test key).
+- **Downloads** (`downloads.ts`): saved into the chosen folder with a unique name, marked with macOS's quarantine
+  attribute (Electron does not add it; without it Gatekeeper never checks a downloaded app), shown on the sidebar's
+  downloads card (`RuntimeState.downloadCard`, hides 60 s after the last one ends) and in Library › Downloads. A tab,
+  Peek, Little Window or popup Bow opened *for a link* whose first load became a download goes away again
+  (`linkDownloads.ts`; a ⌘T tab or a typed address stays).
+- **New windows** (`windowOpenRule.ts`): a sized `window.open` becomes a real popup window in the same session with
+  `window.opener` (sign-in popups post their result back), from tabs, Peek and Little Windows alike; other new windows
+  become tabs (a Shift-click from a tab: a Peek). Bow learns of each popup through its opener's `did-create-window`.
+- **Prompts for the page** (overlay cards in the focused main window, queued like the permission prompt):
+  `httpSignIn.ts` answers `app.on("login")` for tab and Peek pages (sites and proxies that ask for a username and
+  password; a saved login is filled by main and never reaches the overlay; new credentials are saved only when the
+  site did not ask again); `certificateErrors.ts` turns a tab's certificate failure into our warning page
+  (`src/certificate/`, Try Again) plus a card with Back to Safety / Visit Anyway (host + certificate fingerprint,
+  this run only; `httpsOnlyController.ts` decides first for pages it upgraded). `unresponsivePages.ts`: a native
+  Wait / Close Page sheet for a hung tab.
 - **Render from state.** `src/renderer/sidebar.ts` redraws the sidebar and toolbar on every state; redraws wait while
   a drag is in progress.
 - **Constants** live in `src/shared/settings.ts` with a comment on where each value comes from (measured from Arc,
@@ -152,8 +181,8 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
     tab, embedded frames too (tab views set `nodeIntegrationInSubFrames`: Electron loads preloads in subframes only
     with it, and a sandboxed frame still gets no Node.js; many sign-in forms sit in a frame, Apple's does): it reports
     a field only after a real click, Tab or typing, reports sent forms with only allow-listed fields the user typed
-    into, and fills only when main sends a login or value. `formsBridge.ts` trusts none of it: only a frame of a tab's
-    own page in a profile session, the site taken from the sending frame (never the message), rate limited, payloads
+    into, and fills only when main sends a login or value. `formsBridge.ts` trusts none of it: only a frame of a page
+    registered in `pageHosts.ts` (a tab, the Peek, a Little Window, a sign-in popup) in a profile session, the site taken from the sending frame (never the message), rate limited, payloads
     parsed strictly (`formsMessages.ts`); a fill goes only to the frame that reported the field, by Chromium's frame
     ids, while it is still on the site the list was opened for. A frame's logins are its own site's (Apple's sign-in:
     idmsa.apple.com). To place the list under a field in a frame, main asks each parent frame in turn where its child
@@ -167,6 +196,10 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
     its own helper is never handled twice. It puts its listeners back after `document.open()` erases them.
   - `googleSignInPreload.ts` acts in top frames only, embedded Google frames keep Chrome's user agent like their
     headers do.
+  - Sites asking for a username and password (`app.on("login")`, `httpSignIn.ts`) are answered only for tab and Peek
+    pages, through an overlay card; every other request is left to Electron's default refusal. Certificate errors
+    (`certificateErrors.ts`) are refused unless the user chose "Visit Anyway" for that host and certificate fingerprint
+    in this run (never saved). Downloads get macOS's quarantine attribute.
   - In a profile that has extensions, the extension library's preload.
   Website permissions are installed per session in `profiles.ts`: `fullscreen` and `clipboard-sanitized-write`
   are allowed, camera, microphone, location, notifications and clipboard reading go to a prompt

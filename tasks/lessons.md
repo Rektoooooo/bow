@@ -155,6 +155,11 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   (`webContents.debugger`, which follows the tab across processes: execution contexts per frame and
   `DOMDebugger.getEventListeners` on `window` in Electron's isolated context), not by reasoning.
 
+- A throwaway probe that downloads anything must seed its own download folder in the state file, like
+  `e2e/check-downloads.mjs` (2026-11-03: a probe called a `setDownloadFolder` action that does not exist, swallowed
+  the error, and saved its test file into the user's real ~/Downloads; it was moved to the Trash). Never `.catch()` a
+  setup step of a probe: let it fail loudly.
+
 - A runtime import in `src/shared/` must end in `.js` (`from "./settings.js"`): the pages load shared files as ES
   modules in the browser, which cannot resolve a bare `./settings`, and the whole sidebar script fails (an empty
   window; check-app times out on `.space-title`). Main's CommonJS build accepts both, so the main typecheck passes.
