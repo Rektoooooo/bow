@@ -48,3 +48,15 @@ body {
   color: light-dark(rgba(0, 0, 0, 0.45), rgba(255, 255, 255, 0.45));
   font-size: 12px;
 }
+
+/* Quieter than the crashed-tab page's Reload: the card's two buttons are the real choice; this only brings it back. */
+.certificate-retry {
+  display: inline-block;
+  margin-top: 18px;
+  padding: 6px 16px;
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 1px light-dark(rgba(0, 0, 0, 0.18), rgba(255, 255, 255, 0.22));
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}

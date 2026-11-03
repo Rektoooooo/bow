@@ -30,6 +30,11 @@ const hostLine = document.getElementById("certificate-host");
 if (hostLine !== null && isWebAddress) {
   hostLine.textContent = new URL(siteUrl).host;
 }
+// Only a web address goes into the link, so a crafted query string cannot point it anywhere else.
+const retryLink = document.getElementById("certificate-retry");
+if (retryLink instanceof HTMLAnchorElement && isWebAddress) {
+  retryLink.href = siteUrl;
+}
 const reasonLine = document.getElementById("certificate-reason");
 if (reasonLine !== null) {
   reasonLine.textContent = REASON_TEXTS[errorCode] ?? REASON_FALLBACK;
