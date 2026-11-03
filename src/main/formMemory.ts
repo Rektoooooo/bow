@@ -1,17 +1,21 @@
 /**
  * WHY this file exists:
- *   Bow remembers what the user types in ordinary form fields (email, name, address) and suggests it again, like
- *   Chrome's autofill. What is remembered is the risky part: a one-time code, a PIN, a card number or a password
- *   must never end up in the vault's form entries. These pure functions decide that and keep the entries.
+ *   Bow remembers what the user types in ordinary form fields (email, name, address, and any other text field by its
+ *   own name) and suggests it again, like Chrome's autocomplete. What is remembered is the risky part: a one-time
+ *   code, a PIN, a card number or a password must never end up in the vault's form entries. These pure functions
+ *   decide that and keep the entries.
  *
  * Data source:
- *   Values that a submitted form held, labelled with a FormFieldKind by the page script; the vault's formEntries.
+ *   Values that a submitted form held, filed by the page helper under a known kind or a field key (FormEntryKey);
+ *   the vault's formEntries.
  *
  * Data flow:
  *   form submit → rememberEntries() (filters with isRememberableValue) → vault saved
  *   user focuses a field → suggestEntries() → overlay list; Library → forgetEntry() / forgetAllEntries()
  */
-import type { FormFieldKind } from "../shared/passwords";
+import { FIELD_KEY_KIND, isSameFormEntryKey } from "../shared/passwords";
+import type { FormEntryKey } from "../shared/passwords";
+import type { SubmittedEntry } from "../shared/forms";
 import type { FormEntry, PasswordVault } from "./passwords";
 
 /** Most remembered values. Our choice: years of typing; bounds the vault file. Least recently used go first. */
@@ -54,8 +58,15 @@ function passesLuhnCheck(digits: string): boolean {
   return sum % LUHN_MODULUS === 0;
 }
 
-/** Whether a typed value may be stored. Secrets (passwords, card numbers, codes) never may. */
-export function isRememberableValue(kind: FormFieldKind, value: string, passwordsInForm: readonly string[]): boolean {
+/**
+ * Whether a typed value may be stored. Secrets (passwords, card numbers, codes) never may. A field key ("field") gets
+ * the same rules as any kind except a postal code, so a 4 to 8 digit number (a code, but also a year) is never kept.
+ */
+export function isRememberableValue(
+  kind: FormEntryKey["kind"],
+  value: string,
+  passwordsInForm: readonly string[],
+): boolean {
   const trimmedValue = value.trim();
   if (trimmedValue === "" || trimmedValue.length > MAX_REMEMBERED_VALUE_LENGTH) {
     return false;
@@ -77,18 +88,26 @@ export function isRememberableValue(kind: FormFieldKind, value: string, password
   return !isShortCode || kind === "postalCode";
 }
 
-/** Emails are not case-sensitive in practice; everything else (names, streets) is compared exactly. */
-function isSameEntryValue(kind: FormFieldKind, firstValue: string, secondValue: string): boolean {
-  if (kind === "email") {
+/** Emails are not case-sensitive in practice; everything else (names, streets, other fields) is compared exactly. */
+function isSameEntryValue(key: FormEntryKey, firstValue: string, secondValue: string): boolean {
+  if (key.kind === "email") {
     return firstValue.toLowerCase() === secondValue.toLowerCase();
   }
   return firstValue === secondValue;
 }
 
+/** A first-time entry with the key's own fields only (what it is made from may carry more). */
+function makeFormEntry(key: FormEntryKey, value: string, now: number): FormEntry {
+  if (key.kind === FIELD_KEY_KIND) {
+    return { kind: FIELD_KEY_KIND, field: key.field, value, timesUsed: 1, lastUsedAt: now };
+  }
+  return { kind: key.kind, value, timesUsed: 1, lastUsedAt: now };
+}
+
 /** Remembers what a submitted form held. Same vault when nothing was remembered. */
 export function rememberEntries(
   vault: PasswordVault,
-  entries: readonly { kind: FormFieldKind; value: string }[],
+  entries: readonly SubmittedEntry[],
   passwordsInForm: readonly string[],
   now: number,
 ): PasswordVault {
@@ -99,14 +118,14 @@ export function rememberEntries(
     }
     const value = entry.value.trim();
     const existing = formEntries.find(
-      (candidate) => candidate.kind === entry.kind && isSameEntryValue(entry.kind, candidate.value, value),
+      (candidate) => isSameFormEntryKey(candidate, entry) && isSameEntryValue(entry, candidate.value, value),
     );
     if (existing) {
       const used: FormEntry = { ...existing, timesUsed: existing.timesUsed + 1, lastUsedAt: now };
       formEntries = formEntries.map((candidate) => (candidate === existing ? used : candidate));
       continue;
     }
-    formEntries = [...formEntries, { kind: entry.kind, value, timesUsed: 1, lastUsedAt: now }];
+    formEntries = [...formEntries, makeFormEntry(entry, value, now)];
   }
   if (formEntries === vault.formEntries) {
     return vault;
@@ -118,12 +137,12 @@ export function rememberEntries(
   return { ...vault, formEntries };
 }
 
-/** Values of the kind that start with what the user typed so far, the most used first. */
-export function suggestEntries(vault: PasswordVault, kind: FormFieldKind, typed: string): string[] {
+/** Values filed under the key that start with what the user typed so far, the most used first. */
+export function suggestEntries(vault: PasswordVault, key: FormEntryKey, typed: string): string[] {
   const typedStart = typed.trimStart().toLowerCase();
   const matching = vault.formEntries.filter((entry) => {
     const lowerValue = entry.value.toLowerCase();
-    return entry.kind === kind && lowerValue.startsWith(typedStart) && lowerValue !== typedStart;
+    return isSameFormEntryKey(entry, key) && lowerValue.startsWith(typedStart) && lowerValue !== typedStart;
   });
   const ranked = matching.sort((first, second) => {
     const byUse = second.timesUsed - first.timesUsed;
@@ -133,10 +152,10 @@ export function suggestEntries(vault: PasswordVault, kind: FormFieldKind, typed:
 }
 
 /** Removes one remembered value (Shift+Delete in the suggestion list). */
-export function forgetEntry(vault: PasswordVault, kind: FormFieldKind, value: string): PasswordVault {
+export function forgetEntry(vault: PasswordVault, key: FormEntryKey, value: string): PasswordVault {
   const trimmedValue = value.trim();
   const formEntries = vault.formEntries.filter(
-    (entry) => !(entry.kind === kind && isSameEntryValue(kind, entry.value, trimmedValue)),
+    (entry) => !(isSameFormEntryKey(entry, key) && isSameEntryValue(key, entry.value, trimmedValue)),
   );
   return formEntries.length === vault.formEntries.length ? vault : { ...vault, formEntries };
 }

@@ -14,7 +14,7 @@
  *   A field inside an embedded frame (Apple's sign-in is one): its helper posts its frame key to the parent window,
  *   main → FORMS_CHANNELS.locateFrame → the parent's helper → FORMS_CHANNELS.frameLocated → main, up to the top frame
  */
-import type { FormFieldKind } from "./passwords";
+import type { FIELD_KEY_KIND, FormEntryKey, FormFieldKind } from "./passwords";
 
 /** Channel names. The sandboxed helper cannot import our files, so it repeats them typed as `typeof FORMS_CHANNELS`. */
 export const FORMS_CHANNELS = {
@@ -28,8 +28,11 @@ export const FORMS_CHANNELS = {
   frameLocated: "forms:frame-located",
 } as const;
 
-/** What the field the user is in is for: a sign-in field, or one of the remembered kinds. */
-export type FieldRole = "username" | "password" | "newPassword" | FormFieldKind;
+/**
+ * What the field the user is in is for: a sign-in field, one of the remembered kinds, or "field": any other text field
+ * Bow remembers by its own name (its field key, sent along).
+ */
+export type FieldRole = "username" | "password" | "newPassword" | FormFieldKind | typeof FIELD_KEY_KIND;
 
 /** A field's place in the page's viewport, in CSS pixels (getBoundingClientRect). */
 export interface FieldRect {
@@ -51,18 +54,17 @@ export interface FieldFocusedMessage {
   hasPasswordField: boolean;
   /** The sending frame's key when it is an embedded frame, "" in a tab's top frame. `rect` is then in that frame. */
   frameKey: string;
+  /** The field's own name for the role "field" (isFieldKey in shared/passwords.ts), "" for every other role. */
+  fieldKey: string;
 }
 
-/** One remembered-kind field of a submitted form, with what the user typed into it. */
-export interface SubmittedEntry {
-  kind: FormFieldKind;
-  value: string;
-}
+/** One remembered field of a submitted form (a known kind or a field key), with what the user typed into it. */
+export type SubmittedEntry = FormEntryKey & { value: string };
 
 /**
  * A form was sent (submit, Return in it, or a click on its button). `password` is empty for forms without one.
  * `wasTyped` is true only when the user typed or pasted the password themselves (not a page script, not Bow's fill).
- * `entries` holds only remembered-kind fields the user typed into.
+ * `entries` holds only remembered fields (known kinds and field keys) the user typed into.
  */
 export interface SubmittedMessage {
   username: string;

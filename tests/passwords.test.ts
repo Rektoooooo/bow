@@ -10,7 +10,7 @@
  *   hand-built vaults → functions from passwords.ts → checks (including "same object when nothing changed")
  */
 import { describe, expect, it } from "vitest";
-import { isFormFieldKind } from "../src/shared/passwords";
+import { FIELD_KEY_KIND, isFieldKey, isFormFieldKind, isSameFormEntryKey, MAX_FIELD_KEY_LENGTH } from "../src/shared/passwords";
 import {
   addNeverSave,
   createEmptyVault,
@@ -92,6 +92,63 @@ describe("parseVault", () => {
     expect(parsed?.logins).toEqual([good]);
     expect(parsed?.neverSaveOrigins).toEqual(["https://example.org"]);
     expect(parsed?.formEntries).toEqual([{ kind: "email", value: "alex@example.com", timesUsed: 2, lastUsedAt: 5 }]);
+  });
+
+  it("keeps field-key entries and drops a bad one on its own", () => {
+    const fieldEntry = { kind: "field", field: "vat number", value: "CZ12345678", timesUsed: 3, lastUsedAt: 7 };
+    const parsed = parseVault({
+      version: 1,
+      logins: [],
+      neverSaveOrigins: [],
+      formEntries: [
+        fieldEntry,
+        { ...fieldEntry, extra: "dropped" },
+        { kind: "email", value: "alex@example.com", timesUsed: 2, lastUsedAt: 5 },
+        { ...fieldEntry, field: undefined },
+        { ...fieldEntry, field: "" },
+        { ...fieldEntry, field: "VAT number" },
+        { ...fieldEntry, field: "vat  number" },
+        { ...fieldEntry, field: "12345" },
+        { ...fieldEntry, field: "x".repeat(MAX_FIELD_KEY_LENGTH + 1) },
+        { ...fieldEntry, kind: "fields" },
+        { ...fieldEntry, value: "" },
+      ],
+    });
+    expect(parsed?.formEntries).toEqual([fieldEntry, fieldEntry, { kind: "email", value: "alex@example.com", timesUsed: 2, lastUsedAt: 5 }]);
+  });
+
+  it("reads an old vault, of the known kinds only, exactly as before", () => {
+    const oldEntries = [
+      { kind: "email", value: "alex@example.com", timesUsed: 2, lastUsedAt: 5 },
+      { kind: "postalCode", value: "10115", timesUsed: 1, lastUsedAt: 6 },
+    ];
+    const parsed = parseVault({ version: 1, logins: [], neverSaveOrigins: [], formEntries: oldEntries });
+    expect(parsed?.formEntries).toEqual(oldEntries);
+  });
+
+  it("stays a vault Bow 0.2.0 opens: its kind check drops a field-key entry and keeps the rest", () => {
+    // 0.2.0's parseFormEntry kept an entry only when isFormFieldKind(kind) was true, one entry at a time.
+    expect(isFormFieldKind(FIELD_KEY_KIND)).toBe(false);
+    expect(createEmptyVault().version).toBe(1);
+  });
+});
+
+describe("field keys", () => {
+  it("accepts exactly the helper's normalized names", () => {
+    for (const key of ["vat number", "nickname", "a1", "1a", "x".repeat(MAX_FIELD_KEY_LENGTH)]) {
+      expect(isFieldKey(key), key).toBe(true);
+    }
+    for (const key of [undefined, null, 5, "", " ", "Vat", "vat ", " vat", "vat  number", "vat_number", "vat-number", "123", "x".repeat(MAX_FIELD_KEY_LENGTH + 1), "přijmeni"]) {
+      expect(isFieldKey(key), String(key)).toBe(false);
+    }
+  });
+
+  it("files values by kind, or by field key for 'field'", () => {
+    expect(isSameFormEntryKey({ kind: "email" }, { kind: "email" })).toBe(true);
+    expect(isSameFormEntryKey({ kind: "email" }, { kind: "city" })).toBe(false);
+    expect(isSameFormEntryKey({ kind: "field", field: "vat" }, { kind: "field", field: "vat" })).toBe(true);
+    expect(isSameFormEntryKey({ kind: "field", field: "vat" }, { kind: "field", field: "vat number" })).toBe(false);
+    expect(isSameFormEntryKey({ kind: "field", field: "email" }, { kind: "email" })).toBe(false);
   });
 });
 

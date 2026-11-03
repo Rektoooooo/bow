@@ -13,7 +13,7 @@
  *   page submits a login → decideOffer() → prompt → saveLogin() / updateLoginPassword() → vault is encrypted and saved
  *   Library → editLogin() / removeLogin(); autofill → findLoginsForOrigin() → markLoginUsed()
  */
-import { isFormFieldKind, type FormFieldKind } from "../shared/passwords";
+import { FIELD_KEY_KIND, isFieldKey, isFormFieldKind, type FormEntryKey } from "../shared/passwords";
 import { MAX_REMEMBERED_VALUE_LENGTH } from "./formMemory";
 
 export const PASSWORD_VAULT_VERSION = 1;
@@ -43,12 +43,16 @@ export interface SavedLogin {
   timesUsed?: number;
 }
 
-export interface FormEntry {
-  kind: FormFieldKind;
+/**
+ * A remembered value, filed under a known kind ({ kind: "email", ... }) or a field key ({ kind: "field", field:
+ * "vat number", ... }). The vault stays version 1 with field keys: Bow 0.2.0 checks every entry on its own and drops
+ * one of a kind it does not know, so it still opens a vault that has them (and leaves them out when it saves it again).
+ */
+export type FormEntry = FormEntryKey & {
   value: string;
   timesUsed: number;
   lastUsedAt: number;
-}
+};
 
 export interface PasswordVault {
   version: 1;
@@ -99,12 +103,23 @@ function parseSavedLogin(value: unknown): SavedLogin | null {
   return login;
 }
 
+function parseFormEntryKey(kind: unknown, field: unknown): FormEntryKey | null {
+  if (isFormFieldKind(kind)) {
+    return { kind };
+  }
+  if (kind === FIELD_KEY_KIND && isFieldKey(field)) {
+    return { kind: FIELD_KEY_KIND, field };
+  }
+  return null;
+}
+
 function parseFormEntry(value: unknown): FormEntry | null {
   if (!isRecord(value)) {
     return null;
   }
-  const { kind, value: text, timesUsed, lastUsedAt } = value;
-  if (!isFormFieldKind(kind)) {
+  const { kind, field, value: text, timesUsed, lastUsedAt } = value;
+  const key = parseFormEntryKey(kind, field);
+  if (key === null) {
     return null;
   }
   if (typeof text !== "string" || text === "" || text.length > MAX_REMEMBERED_VALUE_LENGTH) {
@@ -113,7 +128,7 @@ function parseFormEntry(value: unknown): FormEntry | null {
   if (!isFiniteNumber(timesUsed) || !isFiniteNumber(lastUsedAt)) {
     return null;
   }
-  return { kind, value: text, timesUsed, lastUsedAt };
+  return { ...key, value: text, timesUsed, lastUsedAt };
 }
 
 /**

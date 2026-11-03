@@ -21,7 +21,7 @@ import type {
   SubmittedEntry,
   SubmittedMessage,
 } from "../shared/forms";
-import { isFormFieldKind } from "../shared/passwords";
+import { FIELD_KEY_KIND, isFieldKey, isFormFieldKind } from "../shared/passwords";
 import { MAX_LOGIN_FIELD_LENGTH } from "./passwords";
 
 /**
@@ -40,7 +40,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isAllowedRole(value: unknown): value is FieldRole {
-  return SIGN_IN_ROLES.includes(value as string) || isFormFieldKind(value);
+  return SIGN_IN_ROLES.includes(value as string) || isFormFieldKind(value) || value === FIELD_KEY_KIND;
+}
+
+/** The role "field" comes with its field key; every other role with "" (a page cannot slip a key in elsewhere). */
+function isFieldKeyForRole(role: FieldRole, fieldKey: unknown): fieldKey is string {
+  if (role === FIELD_KEY_KIND) {
+    return isFieldKey(fieldKey);
+  }
+  return fieldKey === "";
 }
 
 function isCoordinate(value: unknown): value is number {
@@ -74,8 +82,8 @@ export function parseFieldFocusedMessage(value: unknown): FieldFocusedMessage | 
   if (!isRecord(value)) {
     return null;
   }
-  const { role, typed, hasPasswordField, frameKey } = value;
-  if (!isAllowedRole(role)) {
+  const { role, typed, hasPasswordField, frameKey, fieldKey } = value;
+  if (!isAllowedRole(role) || !isFieldKeyForRole(role, fieldKey)) {
     return null;
   }
   if (typeof typed !== "string" || typed.length > MAX_TYPED_LENGTH) {
@@ -88,7 +96,14 @@ export function parseFieldFocusedMessage(value: unknown): FieldFocusedMessage | 
   if (rect === null) {
     return null;
   }
-  return { role: role, typed: typed, rect: rect, hasPasswordField: hasPasswordField, frameKey: frameKey };
+  return {
+    role: role,
+    typed: typed,
+    rect: rect,
+    hasPasswordField: hasPasswordField,
+    frameKey: frameKey,
+    fieldKey: fieldKey,
+  };
 }
 
 /**
@@ -112,14 +127,17 @@ function parseEntry(value: unknown): SubmittedEntry | null {
   if (!isRecord(value)) {
     return null;
   }
-  const { kind, value: entryValue } = value;
-  if (!isFormFieldKind(kind)) {
-    return null;
-  }
+  const { kind, field, value: entryValue } = value;
   if (typeof entryValue !== "string" || entryValue === "" || entryValue.length > MAX_TYPED_LENGTH) {
     return null;
   }
-  return { kind: kind, value: entryValue };
+  if (isFormFieldKind(kind)) {
+    return { kind: kind, value: entryValue };
+  }
+  if (kind === FIELD_KEY_KIND && isFieldKey(field)) {
+    return { kind: FIELD_KEY_KIND, field: field, value: entryValue };
+  }
+  return null;
 }
 
 function parseEntries(value: unknown): SubmittedEntry[] | null {

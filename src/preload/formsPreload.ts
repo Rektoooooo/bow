@@ -2,14 +2,15 @@
  * WHY this file exists:
  *   Electron has no password manager or autofill, so Bow builds its own. This helper runs inside every web page of a
  *   profile and every frame embedded in it (main registers it with session.registerPreloadScript, never for private
- *   windows; Apple's sign-in, for one, is an embedded frame). It notices sign-in fields and submitted forms and tells
- *   main; it fills a login only when main says so. It runs in Electron's isolated world, so page scripts cannot see its
- *   variables or ipcRenderer, and it exposes nothing: no contextBridge, no globals, no attributes or elements added to
- *   the page. Main treats every message as untrusted and takes the site from the sending frame. An embedded frame
- *   posts a random key to its parent window when the user is in one of its fields, so the parent's helper can tell
- *   main where that frame sits (the list under a field needs the field's place in the whole tab). Electron runs no
- *   helper in a same-origin frame whose first empty window Chromium keeps for the real page (Apple Developer's
- *   sign-in); the parent's helper reaches into such a frame and handles its fields as part of its own page.
+ *   windows; Apple's sign-in, for one, is an embedded frame). It notices sign-in fields, the fields Bow remembers (the
+ *   known kinds, and any other plain text field by its own name, like Chrome's autocomplete) and sent forms, and tells
+ *   main; it fills a login or a value only when main says so. It runs in Electron's isolated world, so page scripts
+ *   cannot see its variables or ipcRenderer, and it exposes nothing: no contextBridge, no globals, no attributes or
+ *   elements added to the page. Main treats every message as untrusted and takes the site from the sending frame. An
+ *   embedded frame posts a random key to its parent window when the user is in one of its fields, so the parent's
+ *   helper can tell main where that frame sits (the list under a field needs the field's place in the whole tab).
+ *   Electron runs no helper in a same-origin frame whose first empty window Chromium keeps for the real page (Apple
+ *   Developer's sign-in); the parent's helper reaches into such a frame and handles its fields as part of its own page.
  *
  * Data source:
  *   The page's own DOM (inputs, forms) and real user input events (isTrusted). Messages from main (fill, fillValue).
@@ -39,7 +40,7 @@ import type {
   SubmittedEntry,
   SubmittedMessage,
 } from "../shared/forms";
-import type { FORM_FIELD_KINDS, FormFieldKind } from "../shared/passwords";
+import type { FIELD_KEY_KIND, FORM_FIELD_KINDS, FormFieldKind, MAX_FIELD_KEY_LENGTH } from "../shared/passwords";
 
 /** Same names as FORMS_CHANNELS: sandboxed preloads cannot import our files, so the type check guards them. */
 const CHANNELS: typeof FORMS_CHANNELS = {
@@ -86,6 +87,12 @@ const MAX_TYPED: typeof MAX_TYPED_LENGTH = 200;
 
 /** Same value as MAX_SUBMITTED_ENTRIES in shared/forms.ts (typed against it). */
 const MAX_ENTRIES: typeof MAX_SUBMITTED_ENTRIES = 50;
+
+/** Same as FIELD_KEY_KIND in shared/passwords.ts (typed against it): the role and entry kind of a field key. */
+const FIELD_KEY_ROLE: typeof FIELD_KEY_KIND = "field";
+
+/** Same value as MAX_FIELD_KEY_LENGTH in shared/passwords.ts (typed against it). */
+const MAX_KEY_LENGTH: typeof MAX_FIELD_KEY_LENGTH = 60;
 
 /** A click or Tab counts for a focus this long. Our choice: a real click focuses the field within a few frames. */
 const TRUSTED_FOCUS_WINDOW_MS = 1000;
@@ -149,13 +156,32 @@ const KIND_BY_AUTOCOMPLETE_NAME: Readonly<Record<string, FormFieldKind>> = {
 
 /**
  * Fields that must never be remembered, whatever else their name says: payment, identity numbers, one-time codes,
- * secrets, free text. Tested on the normalized name and id (lower case, words split by spaces).
+ * secrets and security questions, searches, free text. Tested on the normalized name and id (lower case, words split
+ * by spaces).
  */
 const DENIED_NAME_PATTERN =
-  /\b(card|cc ?num|cvv|cvc|csc|security ?code|expir|iban|account ?(number|no)|routing|ssn|social|tax|passport|otp|one ?time|verif|2fa|mfa|token|passcode|captcha|passw|search|query|comment|message|subject|coupon|promo)/;
+  /\b(card|cc ?num|cvv|cvc|csc|security ?code|expir|iban|account ?(number|no)|routing|ssn|social|tax|passport|otp|one ?time|verif|2fa|mfa|token|passcode|captcha|passw|pass ?phrase|secret|question|answer|hint|mnemonic|private ?key|api ?key|search|query|keyword|comment|message|subject|coupon|promo)/;
 
 /** A deny word that must stand alone ("pin" is a secret, "pine" and "spinner" are not). */
 const DENIED_WHOLE_WORD_PATTERN = /\bpin\b/;
+
+/**
+ * Short deny words for a field remembered by its own name, whole words (digits may follow: "code2"). Only checked for
+ * fields with no known kind, so "zip code" stays a postal code while a lone "code" (texted, invited, discount) or a
+ * "pass" is never kept.
+ */
+const DENIED_FIELD_KEY_WORD_PATTERN = /\b(code|key|pwd|pw|pass|auth)\d*\b/;
+
+/**
+ * What the page may declare in autocomplete to keep a field from being remembered by its own name: memory off, a
+ * sign-in name (the password manager's, saved with its login), a password or a one-time code. Payment fields are the
+ * names that start with PAYMENT_AUTOCOMPLETE_PREFIX.
+ */
+const DENIED_AUTOCOMPLETE_NAMES = ["off", "username", "current-password", "new-password", "one-time-code"];
+const PAYMENT_AUTOCOMPLETE_PREFIX = "cc-";
+
+/** A field key needs a letter: a name of digits only is generated by the page. */
+const CONTAINS_LETTER_PATTERN = /[a-z]/;
 
 /** Name or id patterns → kind, checked in this order (first match wins). Tested on the normalized name and id. */
 const KIND_BY_NAME_PATTERNS: ReadonlyArray<{ pattern: RegExp; kind: FormFieldKind }> = [
@@ -176,8 +202,8 @@ const KIND_BY_NAME_PATTERNS: ReadonlyArray<{ pattern: RegExp; kind: FormFieldKin
 /** A field whose whole name (or id) is this word is the person's full name. */
 const WHOLE_NAME_FOR_FULL_NAME = "name";
 
-/** A field whose whole name is this letter is a search box (?q=). */
-const WHOLE_NAME_FOR_SEARCH = "q";
+/** Fields whose whole name (or id) is one of these letters are search boxes: ?q= and WordPress's ?s=. */
+const WHOLE_NAMES_FOR_SEARCH = ["q", "s"];
 
 export interface FieldDescription {
   autocomplete: string;
@@ -209,7 +235,7 @@ export function autocompleteFieldName(autocomplete: string): string {
 function kindFromNameAndId(name: string, id: string): FormFieldKind | null {
   const normalizedName = normalizeAttribute(name);
   const normalizedId = normalizeAttribute(id);
-  if (normalizedName === WHOLE_NAME_FOR_SEARCH) {
+  if (WHOLE_NAMES_FOR_SEARCH.includes(normalizedName)) {
     return null;
   }
   const combined = `${normalizedName} ${normalizedId}`;
@@ -252,6 +278,45 @@ export function fieldKindFor(field: FieldDescription): FormFieldKind | null {
   return kindFromNameAndId(field.name, field.id);
 }
 
+/** What fieldKeyFor needs to know about a field besides what fieldKindFor reads. */
+export interface KeyedFieldDescription extends FieldDescription {
+  /** The field's form says autocomplete="off", which by the HTML standard holds for all its fields. */
+  isFormMemoryOff: boolean;
+  /** The field is a search box by its own role, or sits in a search area (role="search", <search>). */
+  isInSearchArea: boolean;
+}
+
+/**
+ * The field's own name as a field key ("VAT_number" → "vat number"; its id when it has no name), or null when Bow must
+ * not remember the field by its name. Asked only for a field with no known kind (fieldKindFor), so a value is
+ * remembered in one place. An allow-list too: plain text fields only, and nothing the page or the deny words mark as
+ * a secret, a payment, a search or free text.
+ */
+export function fieldKeyFor(field: KeyedFieldDescription): string | null {
+  const fieldType = field.type.toLowerCase() === "" ? "text" : field.type.toLowerCase();
+  if (!TEXT_LIKE_TYPES.includes(fieldType) || field.isFormMemoryOff || field.isInSearchArea) {
+    return null;
+  }
+  const declaredName = autocompleteFieldName(field.autocomplete);
+  const isDeclaredDenied = DENIED_AUTOCOMPLETE_NAMES.includes(declaredName);
+  if (isDeclaredDenied || declaredName.startsWith(PAYMENT_AUTOCOMPLETE_PREFIX)) {
+    return null;
+  }
+  const normalizedName = normalizeAttribute(field.name);
+  const normalizedId = normalizeAttribute(field.id);
+  const isSearchBox = WHOLE_NAMES_FOR_SEARCH.includes(normalizedName) || WHOLE_NAMES_FOR_SEARCH.includes(normalizedId);
+  const combined = `${normalizedName} ${normalizedId}`;
+  const isDeniedByWord = DENIED_NAME_PATTERN.test(combined) || DENIED_WHOLE_WORD_PATTERN.test(combined);
+  if (isSearchBox || isDeniedByWord || DENIED_FIELD_KEY_WORD_PATTERN.test(combined)) {
+    return null;
+  }
+  const fieldKey = normalizedName === "" ? normalizedId : normalizedName;
+  if (fieldKey.length > MAX_KEY_LENGTH || !CONTAINS_LETTER_PATTERN.test(fieldKey)) {
+    return null;
+  }
+  return fieldKey;
+}
+
 export interface UsernameCandidate {
   autocompleteName: string;
   type: string;
@@ -282,6 +347,8 @@ export interface RoleFacts {
   isUsernameField: boolean;
   isNewPasswordForm: boolean;
   fieldKind: FormFieldKind | null;
+  /** The field key (fieldKeyFor), or null; only counts for a field with no known kind. */
+  fieldKey: string | null;
 }
 
 /** What a focused input is for. null → Bow reports nothing for it. */
@@ -293,7 +360,10 @@ export function roleForFacts(facts: RoleFacts): FieldRole | null {
   if (facts.isUsernameField && (!facts.isNewPasswordForm || declaresUsername)) {
     return "username";
   }
-  return facts.fieldKind;
+  if (facts.fieldKind !== null) {
+    return facts.fieldKind;
+  }
+  return facts.fieldKey === null ? null : FIELD_KEY_ROLE;
 }
 
 /** The pieces of a sign-in form around one input. */
@@ -355,17 +425,53 @@ function fieldDescriptionOf(input: HTMLInputElement): FieldDescription {
   return { autocomplete: input.autocomplete, type: input.type, name: input.name, id: input.id };
 }
 
-function roleOfInput(input: HTMLInputElement, scopeInfo: ScopeInfo): FieldRole | null {
+function keyedDescriptionOf(input: HTMLInputElement): KeyedFieldDescription {
+  // Read as the page wrote it: a form's autocomplete is not reflected on its fields' own autocomplete property.
+  const formAutocomplete = input.form?.getAttribute("autocomplete") ?? "";
+  const isSearchBox = input.getAttribute("role") === "searchbox";
+  const searchArea = input.closest("[role=search], search");
+  return {
+    ...fieldDescriptionOf(input),
+    isFormMemoryOff: formAutocomplete.trim().toLowerCase() === "off",
+    isInSearchArea: isSearchBox || searchArea !== null,
+  };
+}
+
+/**
+ * The field key of a field with no known kind, or null. The sign-in name is the password manager's: it is saved with
+ * its login and never offered by its field's name on other sites.
+ */
+function fieldKeyOfInput(input: HTMLInputElement, scopeInfo: ScopeInfo): string | null {
+  if (input === scopeInfo.usernameField) {
+    return null;
+  }
+  return fieldKeyFor(keyedDescriptionOf(input));
+}
+
+/** A focused input's role, with its field key for the role "field" ("" for every other role). */
+interface InputRole {
+  role: FieldRole;
+  fieldKey: string;
+}
+
+function roleOfInput(input: HTMLInputElement, scopeInfo: ScopeInfo): InputRole | null {
   if (input.disabled || input.readOnly) {
     return null;
   }
-  return roleForFacts({
+  const fieldKind = fieldKindFor(fieldDescriptionOf(input));
+  const fieldKey = fieldKind === null ? fieldKeyOfInput(input, scopeInfo) : null;
+  const role = roleForFacts({
     type: input.type,
     autocompleteName: autocompleteFieldName(input.autocomplete),
     isUsernameField: scopeInfo.usernameField === input,
     isNewPasswordForm: scopeInfo.isNewPasswordForm,
-    fieldKind: fieldKindFor(fieldDescriptionOf(input)),
+    fieldKind: fieldKind,
+    fieldKey: fieldKey,
   });
+  if (role === null) {
+    return null;
+  }
+  return { role: role, fieldKey: role === FIELD_KEY_ROLE ? (fieldKey ?? "") : "" };
 }
 
 /** The password that was typed: the new one in a sign-up form, the only one in a sign-in form. */
@@ -489,6 +595,9 @@ function startFormsHelper(): void {
 
   // Inputs the user typed or pasted into. A page cannot plant values into Bow's memory by script.
   const typedInputs = new WeakSet<HTMLInputElement>();
+  // Typed inputs whose value went out with a sent form. They count again only after new typing: on a page without a
+  // form every button click is a send, and one value must not be counted as used once per click.
+  const sentInputs = new WeakSet<HTMLInputElement>();
   const lastSubmitTimeByScope = new WeakMap<object, number>();
   let lastPointerTarget: EventTarget | null = null;
   let lastPointerTime = Number.NEGATIVE_INFINITY;
@@ -547,10 +656,11 @@ function startFormsHelper(): void {
       return;
     }
     const scopeInfo = readScope(scopeOf(input));
-    const role = roleOfInput(input, scopeInfo);
-    if (role === null) {
+    const inputRole = roleOfInput(input, scopeInfo);
+    if (inputRole === null) {
       return;
     }
+    const role = inputRole.role;
     if (role === "username" && typedInputs.has(input)) {
       lastTypedUsernameByPage.set(pageDocument, input.value.trim().slice(0, MAX_FILL_LENGTH));
     }
@@ -569,6 +679,7 @@ function startFormsHelper(): void {
       },
       hasPasswordField: scopeInfo.visiblePasswordFields.length > 0,
       frameKey: ownFrameKey,
+      fieldKey: inputRole.fieldKey,
     };
     reportedField = input;
     fillTargetField = input;
@@ -608,16 +719,41 @@ function startFormsHelper(): void {
     }, LOGIN_FINISHED_POLL_MS);
   }
 
-  function collectEntries(scopeInfo: ScopeInfo): SubmittedEntry[] {
+  /** What a sent form's input adds to form memory: its typed value under its known kind or its field key, or null. */
+  function entryOfInput(input: HTMLInputElement, scopeInfo: ScopeInfo): SubmittedEntry | null {
+    if (input.type === "password" || !typedInputs.has(input) || sentInputs.has(input)) {
+      return null;
+    }
+    const value = input.value.trim().slice(0, MAX_TYPED);
+    if (value === "") {
+      return null;
+    }
+    const kind = fieldKindFor(fieldDescriptionOf(input));
+    if (kind !== null) {
+      return { kind, value };
+    }
+    // Stricter for a field remembered by its name: only one the user can still see and change as the form goes.
+    if (input.disabled || input.readOnly || !isVisible(input)) {
+      return null;
+    }
+    const fieldKey = fieldKeyOfInput(input, scopeInfo);
+    if (fieldKey === null) {
+      return null;
+    }
+    return { kind: FIELD_KEY_ROLE, field: fieldKey, value };
+  }
+
+  /** The typed values of the scope's remembered fields. Each is taken once, until the user types into it again. */
+  function takeTypedEntries(scopeInfo: ScopeInfo): SubmittedEntry[] {
     const entries: SubmittedEntry[] = [];
     for (const input of inputsIn(scopeInfo.scope)) {
       if (entries.length >= MAX_ENTRIES) {
         break;
       }
-      const kind = input.type === "password" ? null : fieldKindFor(fieldDescriptionOf(input));
-      const value = input.value.trim().slice(0, MAX_TYPED);
-      if (kind !== null && value !== "" && typedInputs.has(input)) {
-        entries.push({ kind, value });
+      const entry = entryOfInput(input, scopeInfo);
+      if (entry !== null) {
+        entries.push(entry);
+        sentInputs.add(input);
       }
     }
     return entries;
@@ -635,7 +771,7 @@ function startFormsHelper(): void {
     const scopeInfo = readScope(scope);
     const passwordField = chosenPasswordField(scopeInfo);
     const password = passwordField?.value ?? "";
-    const entries = collectEntries(scopeInfo);
+    const entries = takeTypedEntries(scopeInfo);
     if (password === "" && entries.length === 0) {
       return;
     }
@@ -702,8 +838,15 @@ function startFormsHelper(): void {
       return;
     }
     const target = event.target;
-    if (event.key === "Enter" && isInput(target) && scopeHasPassword(scopeOf(target), false)) {
-      reportSubmission(scopeOf(target));
+    // Return while an input method composes a word picks the word; it sends nothing.
+    if (event.key !== "Enter" || event.isComposing || !isInput(target)) {
+      return;
+    }
+    const scope = scopeOf(target);
+    // Return in a text field sends its form (the HTML standard's implicit submission); in a sign-in form, as before,
+    // Return in any of its fields counts. reportSubmission sends only when there is something typed to send.
+    if (TEXT_LIKE_TYPES.includes(target.type) || scopeHasPassword(scope, false)) {
+      reportSubmission(scope);
     }
   }
 
@@ -731,6 +874,7 @@ function startFormsHelper(): void {
       return;
     }
     typedInputs.add(target);
+    sentInputs.delete(target);
     // Typing a password closes the list: it lists saved logins, and the user is typing a new one instead.
     if (target.type === "password") {
       reportFieldLeft();
@@ -743,6 +887,7 @@ function startFormsHelper(): void {
     const target = event.target;
     if (event.isTrusted && isInput(target)) {
       typedInputs.add(target);
+      sentInputs.delete(target);
     }
   }
 
@@ -755,10 +900,9 @@ function startFormsHelper(): void {
     if (button === null) {
       return;
     }
-    const scope = scopeOf(button);
-    if (scopeHasPassword(scope, true)) {
-      reportSubmission(scope);
-    }
+    // Any button of a form, or of a page without one, may send it. reportSubmission sends only a typed password or
+    // typed remembered fields, and a password goes out as before: only when the click comes with one filled in.
+    reportSubmission(scopeOf(button));
   }
 
   function handleSubmit(event: Event): void {
