@@ -43,6 +43,8 @@ import { getProfileSession } from "./profiles";
 import { splitTabs } from "./split";
 import { getSelectedTabId, openTab, updateTabPage } from "./state";
 import { chooseSizedPopup, watchPopups } from "./windowOpenRule";
+import { raiseAutofillPopupIfShown } from "./autofillPopup";
+import { registerPageHost, unregisterPageHost } from "./pageHosts";
 import { adoptTabView, getFocusedContents, getTabViews } from "./tabViews";
 import type { TabViewEvents } from "./tabViews";
 import { createId, findProfileIdOfItem, getActiveSpace } from "./tree";
@@ -301,6 +303,7 @@ function showPeekFrame(contents: WebContents, takesKeyboard: boolean = true, isF
       return;
     }
     window.contentView.addChildView(view);
+    raiseAutofillPopupIfShown(window);
     if (takesKeyboard) {
       view.webContents.focus();
     }
@@ -346,6 +349,8 @@ function raisePeek(): void {
   raiseOverlayIfShown(window);
   if (isPeekPageShown) {
     window.contentView.addChildView(peekView);
+    // Bow Passwords' list over the Peek's page must stay above the page.
+    raiseAutofillPopupIfShown(window);
   }
 }
 
@@ -404,6 +409,13 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
   peekSourceTabId = sourceTabId ?? getSelectedTabId(state);
 
   const contents = view.webContents;
+  // Bow Passwords serves the Peek's page once it is on screen (the list lies over the page, inside its area).
+  registerPageHost({
+    kind: "peek",
+    contents: contents,
+    window: window,
+    getArea: () => (peekView === view && isPeekPageShown && !window.isDestroyed() ? view.getBounds() : null),
+  });
   // A Peek is always opened for a link; when the link is a file there is no page to show, so the Peek closes.
   markLinkView(contents, () => {
     if (peekView === view) {
@@ -558,6 +570,8 @@ function removePeek(keepPage: boolean): WebContentsView | null {
     return null;
   }
   if (keepPage) {
+    // The page becomes a tab: Bow Passwords finds it as one from now on.
+    unregisterPageHost(view.webContents);
     hideOverlay();
     return view;
   }

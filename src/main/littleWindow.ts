@@ -26,6 +26,7 @@ import { rememberSourceApp } from "./linkSourceApps";
 import type { LinkSourceApp } from "../shared/routingRules";
 import { switchSpace } from "./spaces";
 import { addPageToArchive, getSelectedTabId, openTab } from "./state";
+import { registerPageHost } from "./pageHosts";
 import { markLinkView } from "./linkDownloads";
 import { getPageBackgroundColor } from "./pageColor";
 import { openLinkInNewTab, openOrSwitchToTab } from "./tabActions";
@@ -200,6 +201,13 @@ export function openLittleWindow(url: string | null, options: LittleWindowOption
 
   const little: LittleWindow = { window: window, pageView: pageView, isPrivate: isPrivate, lastActiveAt: Date.now(), isSettled: false, faviconUrl: null };
   littleWindows.add(little);
+  // Bow Passwords serves this page (a private window's in-memory session keeps the forms helper out of it).
+  registerPageHost({
+    kind: "littleWindow",
+    contents: pageView.webContents,
+    window: window,
+    getArea: () => (window.isDestroyed() ? null : pageView.getBounds()),
+  });
   layoutPage(little);
   watchPage(little);
   // A window opened for an address is for a link; when the link is a file, the window has nothing to show.

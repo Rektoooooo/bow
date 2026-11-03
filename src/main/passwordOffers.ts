@@ -2,33 +2,39 @@
  * WHY this file exists:
  *   Asks "Save password for example.com?" after the user signed in on a page, like browsers do, and saves, updates
  *   or remembers "never for this site" in the profile's vault. The question comes only once the sign-in went through
- *   (the tab moved on to another page, or a single-page site reported it finished), so a wrong password is rarely
- *   offered, and only while that tab is the one on screen. A password the user did not type (a page script filled
- *   it in) is never offered.
+ *   (the page moved on to another page, or a single-page site reported it finished), so a wrong password is rarely
+ *   offered. A password the user did not type (a page script filled it in) is never offered.
+ *   Where it is asked: a tab gets the overlay's card, and only while that tab is the one on screen. A Peek and a
+ *   Little Window get a native macOS sheet on their window (the overlay is busy drawing the Peek, and a Little Window
+ *   has none). A sign-in popup usually closes right after signing in, before any navigation or report, so its offer
+ *   also triggers when the popup is destroyed; it is asked where its opener lives.
  *
  * Data source:
- *   Form reports from formsBridge.ts (what was typed, in which tab and profile), the profile's vault
- *   (passwordVault.ts, rules in passwords.ts), and the tab's own navigation events.
+ *   Form reports from formsBridge.ts (what was typed, in which page and profile), the profile's vault
+ *   (passwordVault.ts, rules in passwords.ts), pageHosts.ts (the page and its opener) and the page's own events.
  *
  * Data flow:
- *   page helper → formsBridge onFormSubmitted → a pending offer for that tab (the password stays here, in main's
- *   memory, until the offer ends) → the tab navigates / onLoginFinished → the offer is triggered → overlay panel
- *   "savePassword" (never holds the password) → Save / Never for this site / Not now (action answerPasswordOffer)
+ *   page helper → formsBridge onFormSubmitted → a pending offer for that page (the password stays here, in main's
+ *   memory, until the offer ends) → the page navigates / onLoginFinished / a popup is destroyed → the offer is
+ *   triggered → overlay panel "savePassword" (never holds the password) for a tab, or a sheet (dialog.showMessageBox,
+ *   no password in it) for a Peek or Little Window → Save / Never for this site / Not now
  *   → answerPasswordOffer() → changeVault() → a short confirmation. Escape or a click outside means Not now.
  */
 import { randomUUID } from "node:crypto";
-import type { WebContents } from "electron";
+import { dialog } from "electron";
 import type { SubmittedMessage } from "../shared/forms";
-import type { ItemId, ProfileId } from "../shared/types";
+import type { ProfileId } from "../shared/types";
 import { getState } from "./browserCore";
 import { onFormSubmitted, onLoginFinished } from "./formsBridge";
 import { isOverlayShown } from "./overlay";
+import { findHomeHost, isPageHostAlive } from "./pageHosts";
+import type { PageHost } from "./pageHosts";
 import { closePasswordOffer, isPanelShown, onPanelEnded, openPasswordOffer } from "./overlayController";
 import { addNeverSave, decideOffer, findLoginsForOrigin, saveLogin, updateLoginPassword } from "./passwords";
 import type { OfferDecision, PasswordVault } from "./passwords";
 import { changeVault, openVault } from "./passwordVault";
 import { showToast } from "./statusBubble";
-import { getShownTabIdsInWindow, getTabContents } from "./tabViews";
+import { getShownTabIdsInWindow } from "./tabViews";
 
 /** How long after sending the form the sign-in may still finish. Our choice: slow sites answer within seconds. */
 const OFFER_TRIGGER_WINDOW_MS = 20_000;
@@ -47,10 +53,11 @@ export type PasswordOfferAnswer = "save" | "never" | "notNow";
 /** The offer's decision when something is to be asked (never "nothing"). */
 type AskDecision = Exclude<OfferDecision, { kind: "nothing" }>;
 
-/** One sign-in waiting to be asked about. At most one per tab. */
+/** One sign-in waiting to be asked about. At most one per page. */
 interface PendingOffer {
   offerId: string;
-  tabId: ItemId;
+  /** The page that sent the form. A popup's offer is asked where its opener lives (see findHomeHost). */
+  page: PageHost;
   profileId: ProfileId;
   origin: string;
   username: string;
@@ -62,13 +69,17 @@ interface PendingOffer {
   triggeredAt: number | null;
   /** Ends the wait for a sign-in that never finished. */
   expiryTimer: NodeJS.Timeout | null;
-  stopListeningToTab: () => void;
+  stopListeningToPage: () => void;
 }
 
-/** Offers in the order they came, by tab. */
-const pendingOffers = new Map<ItemId, PendingOffer>();
+/** Offers in the order they came, by the key of their page. */
+const pendingOffers = new Map<string, PendingOffer>();
 
+/** The card on the overlay, if an offer is shown there. */
 let shownOfferId: string | null = null;
+
+/** Offers whose sheet is open now (one sheet each; the answer ends the offer). */
+const offersInSheet = new Set<string>();
 let offerCounter = 0;
 let retryTimer: NodeJS.Timeout | null = null;
 
@@ -77,12 +88,12 @@ let retryTimer: NodeJS.Timeout | null = null;
  */
 export function initializePasswordOffers(): void {
   onFormSubmitted((report) => {
-    rememberSubmit(report.tabId, report.profileId, report.origin, report.message).catch((error) => {
+    rememberSubmit(report.page, report.profileId, report.origin, report.message).catch((error) => {
       console.error("Could not prepare the password offer:", error instanceof Error ? error.name : "");
     });
   });
-  onLoginFinished((tabId, origin) => {
-    const offer = pendingOffers.get(tabId);
+  onLoginFinished((page, origin) => {
+    const offer = pendingOffers.get(page.key);
     if (offer !== undefined && offer.origin === origin) {
       triggerOffer(offer);
     }
@@ -103,7 +114,7 @@ export function initializePasswordOffers(): void {
  * Decides from a sent form whether to offer anything, and keeps the offer until the sign-in went through.
  */
 async function rememberSubmit(
-  tabId: ItemId,
+  page: PageHost,
   profileId: ProfileId,
   origin: string,
   message: SubmittedMessage,
@@ -123,19 +134,20 @@ async function rememberSubmit(
   if (decision.kind === "nothing") {
     return;
   }
-  const contents = getTabContents(tabId);
-  if (contents === null) {
+  // A popup may close before the vault answered; its offer still counts (it triggers at once, see below).
+  const hasClosed = page.contents.isDestroyed();
+  if (hasClosed && page.kind !== "popup") {
     return;
   }
-  // A newer sign-in in the same tab replaces the older one.
-  const olderOffer = pendingOffers.get(tabId);
+  // A newer sign-in in the same page replaces the older one.
+  const olderOffer = pendingOffers.get(page.key);
   if (olderOffer !== undefined) {
     dropOffer(olderOffer.offerId);
   }
   offerCounter = offerCounter + 1;
   const offer: PendingOffer = {
     offerId: `password-offer-${offerCounter}`,
-    tabId: tabId,
+    page: page,
     profileId: profileId,
     origin: origin,
     username: username,
@@ -144,11 +156,14 @@ async function rememberSubmit(
     submittedAt: Date.now(),
     triggeredAt: null,
     expiryTimer: null,
-    stopListeningToTab: () => undefined,
+    stopListeningToPage: () => undefined,
   };
-  offer.stopListeningToTab = triggerOnNavigation(contents, offer);
+  offer.stopListeningToPage = triggerOnPageEvents(page, offer);
   offer.expiryTimer = setTimeout(() => dropOffer(offer.offerId), OFFER_TRIGGER_WINDOW_MS);
-  pendingOffers.set(tabId, offer);
+  pendingOffers.set(page.key, offer);
+  if (hasClosed) {
+    triggerOffer(offer);
+  }
 }
 
 /**
@@ -168,15 +183,27 @@ function nameTheAccount(
 }
 
 /**
- * Triggers the offer when the tab loads another page. Returns the function that stops listening.
+ * Triggers the offer when the page loads another page. A popup also triggers it when it is destroyed: a sign-in popup
+ * usually closes itself right after the form was sent, before anything else could say that it went through (a closing
+ * before the trigger window ends counts, the same as a navigation does). Returns the function that stops listening.
  */
-function triggerOnNavigation(contents: WebContents, offer: PendingOffer): () => void {
+function triggerOnPageEvents(page: PageHost, offer: PendingOffer): () => void {
+  const contents = page.contents;
+  if (contents.isDestroyed()) {
+    return () => undefined;
+  }
   const onNavigated = (): void => triggerOffer(offer);
   contents.on("did-navigate", onNavigated);
+  const isPopup = page.kind === "popup";
+  if (isPopup) {
+    contents.once("destroyed", onNavigated);
+  }
   return () => {
-    if (!contents.isDestroyed()) {
-      contents.removeListener("did-navigate", onNavigated);
+    if (contents.isDestroyed()) {
+      return;
     }
+    contents.removeListener("did-navigate", onNavigated);
+    contents.removeListener("destroyed", onNavigated);
   };
 }
 
@@ -193,7 +220,7 @@ function triggerOffer(offer: PendingOffer): void {
     return;
   }
   offer.triggeredAt = now;
-  offer.stopListeningToTab();
+  offer.stopListeningToPage();
   if (offer.expiryTimer !== null) {
     clearTimeout(offer.expiryTimer);
     offer.expiryTimer = null;
@@ -209,8 +236,8 @@ function dropOffer(offerId: string): void {
   if (offer === undefined) {
     return;
   }
-  pendingOffers.delete(offer.tabId);
-  offer.stopListeningToTab();
+  pendingOffers.delete(offer.page.key);
+  offer.stopListeningToPage();
   if (offer.expiryTimer !== null) {
     clearTimeout(offer.expiryTimer);
   }
@@ -220,13 +247,19 @@ function dropOffer(offerId: string): void {
   }
 }
 
+/** The page an offer is asked at: its own, or for a popup the page that opened it. */
+function findOfferHome(offer: PendingOffer): PageHost {
+  return findHomeHost(offer.page);
+}
+
 /**
- * Drops offers whose tab is gone or that waited too long to be shown.
+ * Drops offers whose page is gone (a popup's goes when its opener does: the popup itself is expected to close) or
+ * that waited too long to be shown.
  */
 function dropStaleOffers(): void {
   const now = Date.now();
   for (const offer of [...pendingOffers.values()]) {
-    const isTabGone = getTabContents(offer.tabId) === null;
+    const isTabGone = !isPageHostAlive(findOfferHome(offer));
     const hasWaitedTooLong = offer.triggeredAt !== null && now - offer.triggeredAt > OFFER_SHOW_LIFETIME_MS;
     if (isTabGone || hasWaitedTooLong) {
       dropOffer(offer.offerId);
@@ -235,20 +268,25 @@ function dropStaleOffers(): void {
 }
 
 /**
- * Shows the first finished sign-in whose tab is on screen in the focused window, when nothing else is on the overlay.
- * Otherwise checks again in a moment.
+ * Asks every finished sign-in that is not a tab's in a sheet, then shows the first finished tab sign-in whose tab is
+ * on screen in the focused window, when nothing else is on the overlay. Otherwise checks again in a moment.
  */
 function showNextOffer(): void {
+  dropStaleOffers();
+  const finishedOffers = [...pendingOffers.values()].filter((offer) => offer.triggeredAt !== null);
+  const sheetOffers = finishedOffers.filter((offer) => findOfferHome(offer).kind !== "tab");
+  for (const offer of sheetOffers) {
+    askInSheet(offer);
+  }
   if (shownOfferId !== null) {
     return;
   }
-  dropStaleOffers();
-  const finishedOffers = [...pendingOffers.values()].filter((offer) => offer.triggeredAt !== null);
-  if (finishedOffers.length === 0) {
+  const cardOffers = finishedOffers.filter((offer) => findOfferHome(offer).kind === "tab");
+  if (cardOffers.length === 0) {
     return;
   }
   const shownTabIds = getShownTabIdsInWindow(getState().focusedWindowId);
-  const nextOffer = finishedOffers.find((offer) => shownTabIds.includes(offer.tabId));
+  const nextOffer = cardOffers.find((offer) => shownTabIds.includes(findOfferHome(offer).key));
   const isOverlayBusy = isPanelShown() || isOverlayShown();
   if (nextOffer === undefined || isOverlayBusy) {
     if (retryTimer === null) {
@@ -260,8 +298,59 @@ function showNextOffer(): void {
     return;
   }
   shownOfferId = nextOffer.offerId;
-  const host = new URL(nextOffer.origin).host.replace(LEADING_WWW, "");
-  openPasswordOffer(nextOffer.offerId, host, nextOffer.username, nextOffer.decision.kind === "update");
+  openPasswordOffer(nextOffer.offerId, nameTheSite(nextOffer.origin), nextOffer.username, nextOffer.decision.kind === "update");
+}
+
+function nameTheSite(origin: string): string {
+  return new URL(origin).host.replace(LEADING_WWW, "");
+}
+
+/**
+ * Asks about an offer in a native sheet on the window of the page it belongs to. The sheet never holds the password.
+ * Closing that window ends the offer without an answer. Does nothing for an offer whose sheet is already open.
+ */
+function askInSheet(offer: PendingOffer): void {
+  const window = findOfferHome(offer).window;
+  if (offersInSheet.has(offer.offerId)) {
+    return;
+  }
+  if (window === null || window.isDestroyed()) {
+    dropOffer(offer.offerId);
+    return;
+  }
+  offersInSheet.add(offer.offerId);
+  const isUpdate = offer.decision.kind === "update";
+  const saveButton = isUpdate ? "Update" : "Save";
+  // "Never for This Site" is not offered for an update, as on the card.
+  const choices: { label: string; answer: PasswordOfferAnswer }[] = isUpdate
+    ? [{ label: saveButton, answer: "save" }, { label: "Not Now", answer: "notNow" }]
+    : [{ label: saveButton, answer: "save" }, { label: "Never for This Site", answer: "never" }, { label: "Not Now", answer: "notNow" }];
+  const notNowIndex = choices.length - 1;
+  const handleWindowClose = (): void => dropOffer(offer.offerId);
+  window.once("close", handleWindowClose);
+  dialog
+    .showMessageBox(window, {
+      type: "question",
+      message: `${saveButton} password for ${nameTheSite(offer.origin)}?`,
+      detail: offer.username,
+      buttons: choices.map((choice) => choice.label),
+      defaultId: 0,
+      cancelId: notNowIndex,
+    })
+    .then((result) => {
+      const chosen = choices[result.response];
+      answerPasswordOffer(offer.offerId, chosen === undefined ? "notNow" : chosen.answer);
+    })
+    .catch((error) => {
+      console.error("Could not ask about the password:", error instanceof Error ? error.name : "");
+      dropOffer(offer.offerId);
+    })
+    .finally(() => {
+      offersInSheet.delete(offer.offerId);
+      if (!window.isDestroyed()) {
+        window.removeListener("close", handleWindowClose);
+      }
+    });
 }
 
 /**

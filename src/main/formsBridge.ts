@@ -3,8 +3,9 @@
  *   The connection between Bow Passwords and the web pages. It installs the page helper (src/preload/formsPreload.ts)
  *   in every profile session (never in a private window), listens to what the helper reports, and sends a login or a
  *   remembered value back to one frame when the user picks it. A page can send anything on these channels, so no
- *   message is trusted: main finds the tab, the profile and the site itself (from the sender, never from the
- *   message), refuses anything that is not a frame of a tab's own page on an http(s) site, limits how fast a page may
+ *   message is trusted: main finds the page, the profile and the site itself (from the sender, never from the
+ *   message), refuses anything that is not a frame of a registered page (a tab, a Peek, a Little Window or a sign-in
+ *   popup; pageHosts.ts) on an http(s) site, limits how fast a page may
  *   talk, and checks every payload (formsMessages.ts). Credentials only ever go out through fillLogin / fillValue, to
  *   the one frame that reported the field, while it is still on the site the caller named.
  *   Sign-in forms often sit in an embedded frame (Apple's does). Such a frame's logins are its own site's; to place
@@ -12,13 +13,13 @@
  *   only misplace the list: the fill still goes to the frame that reported the field, by Chromium's frame ids.
  *
  * Data source:
- *   IpcMainEvent (sender, senderFrame, session) + getTabViews() + findSessionProfileId().
+ *   IpcMainEvent (sender, senderFrame, session) + findPageHost() (pageHosts.ts) + findSessionProfileId().
  *
  * Data flow:
  *   page helper → FORMS_CHANNELS.* → registerFormsIpc() checks → listeners (onFieldFocused, onFieldLeft,
  *   onFormSubmitted, onLoginFinished) for the field list, the save prompt and form memory
- *   a field in an embedded frame → locateFieldInTab(): FORMS_CHANNELS.locateFrame to its parent, frameLocated back,
- *   up to the top frame → the field's place in the whole tab → onFieldFocused listeners
+ *   a field in an embedded frame → locateFieldInPage(): FORMS_CHANNELS.locateFrame to its parent, frameLocated back,
+ *   up to the top frame → the field's place in the whole page → onFieldFocused listeners
  *   fillLogin / fillValue → the frame that reported the field → the helper writes into the field the user is in
  */
 import { ipcMain, webFrameMain } from "electron";
@@ -35,11 +36,12 @@ import type {
   LocateFrameMessage,
   SubmittedMessage,
 } from "../shared/forms";
-import type { ItemId, ProfileId } from "../shared/types";
+import type { ProfileId } from "../shared/types";
 import { parseFieldFocusedMessage, parseFrameLocatedMessage, parseSubmittedMessage } from "./formsMessages";
 import { normalizeLoginOrigin } from "./passwords";
 import { findSessionProfileId } from "./profiles";
-import { getTabContents, getTabViews } from "./tabViews";
+import { findPageHost, findPageHostByKey } from "./pageHosts";
+import type { PageHost } from "./pageHosts";
 
 /** The id of the helper in a session's preload scripts (tests look for it). */
 export const FORMS_HELPER_ID = "bow-forms";
@@ -52,7 +54,7 @@ const RATE_WINDOW_MS = 1000;
 /** How long main waits for a parent frame to say where its child frame is. Our choice: it takes milliseconds. */
 const FRAME_LOCATE_TIMEOUT_MS = 500;
 
-/** Most frames between a field and the tab's top frame. Our choice: sign-in frames sit one or two deep. */
+/** Most frames between a field and the page's top frame. Our choice: sign-in frames sit one or two deep. */
 const MAX_FRAME_DEPTH = 5;
 
 /** A frame by Chromium's ids, which stay the same while the frame lives (webFrameMain.fromId finds it again). */
@@ -63,18 +65,19 @@ export interface FrameIds {
 
 /** What the field list needs to know about a field the user is in. */
 export interface FieldReport {
-  tabId: ItemId;
+  /** The page the field is in (a tab, a Peek, a Little Window or a popup). */
+  page: PageHost;
   profileId: ProfileId;
   origin: string;
-  /** The frame the field is in (the tab's top frame or one embedded in it): a fill goes there and nowhere else. */
+  /** The frame the field is in (the page's top frame or one embedded in it): a fill goes there and nowhere else. */
   frame: FrameIds;
-  /** As the helper sent it, except that `rect` is the field's place in the whole tab. */
+  /** As the helper sent it, except that `rect` is the field's place in the whole page. */
   message: FieldFocusedMessage;
 }
 
 /** What the save prompt and form memory need to know about a sent form. */
 export interface SubmittedReport {
-  tabId: ItemId;
+  page: PageHost;
   profileId: ProfileId;
   origin: string;
   message: SubmittedMessage;
@@ -82,7 +85,7 @@ export interface SubmittedReport {
 
 /** Who a checked message came from. `origin` is the sending frame's own site. */
 interface Sender {
-  tabId: ItemId;
+  page: PageHost;
   profileId: ProfileId;
   origin: string;
   frame: WebFrameMain;
@@ -104,14 +107,14 @@ export interface FormsMessageCounts {
   refused: number;
   lastRole: FieldRole | null;
   lastOrigin: string | null;
-  /** Where the last field handed to the list was, in the whole tab. */
+  /** Where the last field handed to the list was, in the whole page. */
   lastRect: FieldRect | null;
 }
 
 const fieldFocusedListeners: ((report: FieldReport) => void)[] = [];
-const fieldLeftListeners: ((tabId: ItemId) => void)[] = [];
+const fieldLeftListeners: ((pageKey: string) => void)[] = [];
 const formSubmittedListeners: ((report: SubmittedReport) => void)[] = [];
-const loginFinishedListeners: ((tabId: ItemId, origin: string) => void)[] = [];
+const loginFinishedListeners: ((page: PageHost, origin: string) => void)[] = [];
 
 const messageCounts: FormsMessageCounts = {
   fieldFocused: 0,
@@ -133,17 +136,17 @@ const pendingLocates = new Map<number, PendingLocate>();
 let locateRequestCounter = 0;
 
 /**
- * The newest field report of each tab that has a field open. A report still being located when a newer one (or the
+ * The newest field report of each page that has a field open. A report still being located when a newer one (or the
  * field being left) comes is dropped, so an old place never replaces a new one.
  */
-const latestFieldReportByTab = new Map<ItemId, number>();
+const latestFieldReportByPage = new Map<string, number>();
 let fieldReportCounter = 0;
 
 export function onFieldFocused(listener: (report: FieldReport) => void): void {
   fieldFocusedListeners.push(listener);
 }
 
-export function onFieldLeft(listener: (tabId: ItemId) => void): void {
+export function onFieldLeft(listener: (pageKey: string) => void): void {
   fieldLeftListeners.push(listener);
 }
 
@@ -151,7 +154,7 @@ export function onFormSubmitted(listener: (report: SubmittedReport) => void): vo
   formSubmittedListeners.push(listener);
 }
 
-export function onLoginFinished(listener: (tabId: ItemId, origin: string) => void): void {
+export function onLoginFinished(listener: (page: PageHost, origin: string) => void): void {
   loginFinishedListeners.push(listener);
 }
 
@@ -161,8 +164,8 @@ export function getFormsMessageCounts(): FormsMessageCounts {
 
 /**
  * Gives a profile session's pages the forms helper. Private windows get nothing: their sessions are in memory and no
- * login or form value of theirs may be saved or offered. Tab views load it in embedded frames too
- * (nodeIntegrationInSubFrames in tabViews.ts).
+ * login or form value of theirs may be saved or offered. Tab views, Peek, Little Windows and popups
+ * load it in embedded frames too (nodeIntegrationInSubFrames).
  */
 export function registerFormsHelper(profileSession: Session): void {
   if (!profileSession.isPersistent()) {
@@ -195,15 +198,6 @@ function isOverRateLimit(contents: WebContents, now: number): boolean {
   return false;
 }
 
-function findTabIdOfContents(contents: WebContents): ItemId | null {
-  for (const [tabId, view] of getTabViews()) {
-    if (view.webContents === contents) {
-      return tabId;
-    }
-  }
-  return null;
-}
-
 function isSameFrame(first: FrameIds, second: FrameIds): boolean {
   return first.processId === second.processId && first.routingId === second.routingId;
 }
@@ -213,20 +207,20 @@ function idsOfFrame(frame: WebFrameMain): FrameIds {
 }
 
 /**
- * Who sent this message, or null when it must be refused: not a frame of a tab's page, not an http(s) site, not a
- * profile's session, or too fast.
+ * Who sent this message, or null when it must be refused: not a frame of a registered page (a tab, a Peek, a Little
+ * Window or a popup), not an http(s) site, not a profile's session, or too fast.
  */
 function identifySender(event: IpcMainEvent): Sender | null {
   const contents = event.sender;
   if (isOverRateLimit(contents, Date.now())) {
     return null;
   }
-  const tabId = findTabIdOfContents(contents);
+  const page = findPageHost(contents);
   const frame = event.senderFrame;
-  if (tabId === null || !frame) {
+  if (page === null || !frame) {
     return null;
   }
-  // The tab's top frame or a frame embedded in its page; the frame's own site is what counts from here on.
+  // The page's top frame or a frame embedded in it; the frame's own site is what counts from here on.
   const topFrame = frame.top;
   if (topFrame === null || !isSameFrame(topFrame, contents.mainFrame)) {
     return null;
@@ -240,7 +234,7 @@ function identifySender(event: IpcMainEvent): Sender | null {
   if (typeof profileId !== "string") {
     return null;
   }
-  return { tabId: tabId, profileId: profileId, origin: origin, frame: frame };
+  return { page: page, profileId: profileId, origin: origin, frame: frame };
 }
 
 function acceptMessage(origin: string): void {
@@ -271,7 +265,7 @@ function askWhereChildFrameIs(parent: WebFrameMain, frameKey: string): Promise<F
   });
 }
 
-/** Adds up where each frame sits in its parent, from the field's frame to the tab's top frame. */
+/** Adds up where each frame sits in its parent, from the field's frame to the page's top frame. */
 async function walkUpToTopFrame(frame: WebFrameMain, message: FieldFocusedMessage): Promise<FieldRect | null> {
   let offsetX = 0;
   let offsetY = 0;
@@ -294,8 +288,8 @@ async function walkUpToTopFrame(frame: WebFrameMain, message: FieldFocusedMessag
   return null;
 }
 
-/** The field's place in the whole tab, or null when a frame on the way cannot say (then the list stays closed). */
-async function locateFieldInTab(frame: WebFrameMain, message: FieldFocusedMessage): Promise<FieldRect | null> {
+/** The field's place in the whole page, or null when a frame on the way cannot say (then the list stays closed). */
+async function locateFieldInPage(frame: WebFrameMain, message: FieldFocusedMessage): Promise<FieldRect | null> {
   try {
     return await walkUpToTopFrame(frame, message);
   } catch {
@@ -316,23 +310,23 @@ function handleFieldFocused(event: IpcMainEvent, payload: unknown): void {
   acceptMessage(sender.origin);
   fieldReportCounter = fieldReportCounter + 1;
   const reportNumber = fieldReportCounter;
-  latestFieldReportByTab.set(sender.tabId, reportNumber);
+  latestFieldReportByPage.set(sender.page.key, reportNumber);
   const senderFrameIds = idsOfFrame(sender.frame);
   // The frame's place is asked for on every report, before anything reads the vault, so the page around the frame
   // learns nothing about whether Bow has logins for the frame's site.
-  locateFieldInTab(sender.frame, message).then((rectInTab) => {
-    const isStillNewest = latestFieldReportByTab.get(sender.tabId) === reportNumber;
-    if (rectInTab === null || !isStillNewest) {
+  locateFieldInPage(sender.frame, message).then((rectInPage) => {
+    const isStillNewest = latestFieldReportByPage.get(sender.page.key) === reportNumber;
+    if (rectInPage === null || !isStillNewest) {
       return;
     }
-    messageCounts.lastRect = rectInTab;
-    const messageInTab: FieldFocusedMessage = { ...message, rect: rectInTab };
+    messageCounts.lastRect = rectInPage;
+    const messageInPage: FieldFocusedMessage = { ...message, rect: rectInPage };
     const report: FieldReport = {
-      tabId: sender.tabId,
+      page: sender.page,
       profileId: sender.profileId,
       origin: sender.origin,
       frame: senderFrameIds,
-      message: messageInTab,
+      message: messageInPage,
     };
     for (const listener of fieldFocusedListeners) {
       listener(report);
@@ -348,9 +342,9 @@ function handleFieldLeft(event: IpcMainEvent): void {
   }
   messageCounts.fieldLeft = messageCounts.fieldLeft + 1;
   acceptMessage(sender.origin);
-  latestFieldReportByTab.delete(sender.tabId);
+  latestFieldReportByPage.delete(sender.page.key);
   for (const listener of fieldLeftListeners) {
-    listener(sender.tabId);
+    listener(sender.page.key);
   }
 }
 
@@ -363,7 +357,7 @@ function handleSubmitted(event: IpcMainEvent, payload: unknown): void {
   }
   messageCounts.submitted = messageCounts.submitted + 1;
   acceptMessage(sender.origin);
-  const report: SubmittedReport = { tabId: sender.tabId, profileId: sender.profileId, origin: sender.origin, message: message };
+  const report: SubmittedReport = { page: sender.page, profileId: sender.profileId, origin: sender.origin, message: message };
   for (const listener of formSubmittedListeners) {
     listener(report);
   }
@@ -378,7 +372,7 @@ function handleLoginFinished(event: IpcMainEvent): void {
   messageCounts.loginFinished = messageCounts.loginFinished + 1;
   acceptMessage(sender.origin);
   for (const listener of loginFinishedListeners) {
-    listener(sender.tabId, sender.origin);
+    listener(sender.page, sender.origin);
   }
 }
 
@@ -411,21 +405,22 @@ export function registerFormsIpc(): void {
 }
 
 /**
- * Sends one message to the frame that reported the field, but only while it is still a frame of that tab's page and
+ * Sends one message to the frame that reported the field, but only while it is still a frame of that page and
  * still shows the site the caller meant (the page may have navigated since the list opened). Then returns the
  * keyboard focus to the page: picking in Bow's list with the mouse took it away.
  */
 function sendToFrame(
-  tabId: ItemId,
+  pageKey: string,
   frameIds: FrameIds,
   expectedOrigin: string,
   channel: string,
   message: FillMessage | FillValueMessage,
 ): boolean {
-  const contents = getTabContents(tabId);
-  if (contents === null) {
+  const page = findPageHostByKey(pageKey);
+  if (page === null) {
     return false;
   }
+  const contents = page.contents;
   const frame = webFrameMain.fromId(frameIds.processId, frameIds.routingId);
   if (frame === undefined || frame.detached) {
     return false;
@@ -440,11 +435,11 @@ function sendToFrame(
 }
 
 /** Fills the sign-in form of the field the user is in. False when the frame is gone or is no longer on that site. */
-export function fillLogin(tabId: ItemId, frame: FrameIds, expectedOrigin: string, credentials: FillMessage): boolean {
-  return sendToFrame(tabId, frame, expectedOrigin, FORMS_CHANNELS.fill, credentials);
+export function fillLogin(pageKey: string, frame: FrameIds, expectedOrigin: string, credentials: FillMessage): boolean {
+  return sendToFrame(pageKey, frame, expectedOrigin, FORMS_CHANNELS.fill, credentials);
 }
 
 /** Puts a remembered value into the field the user is in. False when the frame is gone or is no longer on that site. */
-export function fillValue(tabId: ItemId, frame: FrameIds, expectedOrigin: string, message: FillValueMessage): boolean {
-  return sendToFrame(tabId, frame, expectedOrigin, FORMS_CHANNELS.fillValue, message);
+export function fillValue(pageKey: string, frame: FrameIds, expectedOrigin: string, message: FillValueMessage): boolean {
+  return sendToFrame(pageKey, frame, expectedOrigin, FORMS_CHANNELS.fillValue, message);
 }

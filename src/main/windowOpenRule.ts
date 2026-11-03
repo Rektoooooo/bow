@@ -10,10 +10,13 @@
  *
  * Data flow:
  *   page calls window.open → the place's setWindowOpenHandler → chooseSizedPopup() → "allow" with the page's session
- *   → Electron makes the window and tells the opener (did-create-window) → watchPopups() tags it and lists it
+ *   → Electron makes the window and tells the opener (did-create-window) → watchPopups() tags it, lists it and
+ *   registers it with Bow Passwords (pageHosts.ts) so its sign-in form gets the saved logins
  */
 import type { BrowserWindow, HandlerDetails, WebContents, WindowOpenHandlerResponse } from "electron";
 import { markLinkView } from "./linkDownloads";
+import { findPageHost, registerPageHost } from "./pageHosts";
+import type { PlacementBox } from "./autofillPlacement";
 import { getPageBackgroundColor } from "./pageColor";
 
 /** A popup window that is open, with the page that opened it. */
@@ -29,8 +32,8 @@ const openPopups: OpenPopup[] = [];
 const watchedContents = new WeakSet<WebContents>();
 
 /**
- * The popups that are open now. This is the place for Bow Passwords to find the popups whose sign-in forms it should
- * fill (their pages are in the opener's session, so the forms helper already runs in them).
+ * The popups that are open now. Bow Passwords finds a popup through pageHosts.ts (registered below); its page is in
+ * the opener's session, so the forms helper already runs in it.
  */
 export function listOpenPopups(): OpenPopup[] {
   return [...openPopups];
@@ -64,6 +67,25 @@ export function chooseSizedPopup(contents: WebContents, details: HandlerDetails)
 }
 
 /**
+ * Lets Bow Passwords serve a popup: its list goes over the popup's own content, and its save offer is asked where the
+ * opener lives. A popup whose opener Bow Passwords does not serve gets nothing.
+ */
+function registerPopupForPasswords(popupWindow: BrowserWindow, openerContents: WebContents): void {
+  const openerHost = findPageHost(openerContents);
+  if (openerHost === null) {
+    return;
+  }
+  const getArea = (): PlacementBox | null => {
+    if (popupWindow.isDestroyed()) {
+      return null;
+    }
+    const [width, height] = popupWindow.getContentSize();
+    return { x: 0, y: 0, width: width ?? 0, height: height ?? 0 };
+  };
+  registerPageHost({ kind: "popup", contents: popupWindow.webContents, window: popupWindow, getArea: getArea, opener: openerHost });
+}
+
+/**
  * Follows the popups a page opens: each is listed while it is open, and closes by itself when its first load turns
  * out to be a download (a popup that only fetched a file has nothing to show).
  */
@@ -76,6 +98,7 @@ export function watchPopups(openerContents: WebContents): void {
     const popup: OpenPopup = { window: popupWindow, openerContents: openerContents };
     openPopups.push(popup);
     markLinkView(popupWindow.webContents, () => popupWindow.close());
+    registerPopupForPasswords(popupWindow, openerContents);
     popupWindow.once("closed", () => {
       const index = openPopups.indexOf(popup);
       if (index >= 0) {

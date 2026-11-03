@@ -4,23 +4,24 @@
  *   it: the saved logins of that site (username and dots, never the password), or remembered emails, names and
  *   addresses, or what was typed before into fields of the same name on any site (like Chrome's autocomplete).
  *   Nothing is filled before the user picks. The list is a view of our own above the page (a web page cannot read or
- *   restyle it). Because the field's place is reported by the page, the list is only ever put inside that tab's own
- *   view (autofillPlacement.ts), and the password is read from the vault again at the moment of the pick, so it is
+ *   restyle it). Because the field's place is reported by the page, the list is only ever put inside that page's own
+ *   area (autofillPlacement.ts), and the password is read from the vault again at the moment of the pick, so it is
  *   never held here while the list is open.
  *
  * Data source:
- *   Field reports from formsBridge.ts (the site, the profile, what role the field has and what was typed), the
- *   profile's vault (passwordVault.ts; rules in passwords.ts and formMemory.ts), the tab's view and key events.
+ *   Field reports from formsBridge.ts (the page, the site, the profile, what role the field has and what was typed),
+ *   the page's window and area (pageHosts.ts: a tab, a Peek, a Little Window or a popup), the profile's vault
+ *   (passwordVault.ts; rules in passwords.ts and formMemory.ts), and the page's key events.
  *
  * Data flow:
- *   page helper → formsBridge onFieldFocused → rows from the vault → the list's view above the tab → AUTOFILL show
- *   arrow keys / Return / Escape on the tab's page (before-input-event) or a pointer press on a row (AUTOFILL choose)
+ *   page helper → formsBridge onFieldFocused → rows from the vault → the list's view above the page → AUTOFILL show
+ *   arrow keys / Return / Escape on the page (before-input-event) or a pointer press on a row (AUTOFILL choose)
  *   → pickRow() → vault read → fillLogin / fillValue (formsBridge.ts) → the page helper writes into the field
  *   the "Manage passwords…" footer (a press: AUTOFILL manage; keys: pickRow) → closeAutofillPopup() → Library › Passwords
- *   field left, navigation, tab switch, another window or an open panel → closeAutofillPopup()
+ *   field left, navigation, tab switch, another window, a window resize or an open panel → closeAutofillPopup()
  */
 import { ipcMain, nativeTheme, WebContentsView } from "electron";
-import type { BrowserWindow, IpcMainInvokeEvent, WebContents } from "electron";
+import type { BrowserWindow, IpcMainInvokeEvent } from "electron";
 import * as path from "node:path";
 import { AUTOFILL_CHANNELS } from "../shared/autofill";
 import type { AutofillItem, AutofillShowMessage } from "../shared/autofill";
@@ -28,17 +29,19 @@ import type { FieldReport, FrameIds } from "./formsBridge";
 import type { FieldRect } from "../shared/forms";
 import { FIELD_KEY_KIND } from "../shared/passwords";
 import type { FormEntryKey } from "../shared/passwords";
-import type { ItemId, ProfileId } from "../shared/types";
+import type { ProfileId } from "../shared/types";
 import { addAfterSyncHook, getState, getWindow } from "./browserCore";
 import { computePopupPlacement } from "./autofillPlacement";
 import type { PlacementBox } from "./autofillPlacement";
 import { suggestEntries, forgetEntry } from "./formMemory";
 import { fillLogin, fillValue, onFieldFocused, onFieldLeft } from "./formsBridge";
 import { isOverlayShown } from "./overlay";
+import { isPanelShown } from "./overlayController";
+import type { PageHost } from "./pageHosts";
 import { findLoginsForOrigin, isSameLoginSite, markLoginUsed } from "./passwords";
 import type { PasswordVault } from "./passwords";
 import { changeVault, openVault } from "./passwordVault";
-import { getShownTabIdsInWindow, getTabContents, getTabViews } from "./tabViews";
+import { getShownTabIdsInWindow } from "./tabViews";
 import { getActiveSpace } from "./tree";
 
 /** Most saved logins listed. Our choice: more than a few accounts on one site is rare, and the list must stay short. */
@@ -64,17 +67,17 @@ interface ListRow {
 
 /** The list on screen. */
 interface ShownList {
-  tabId: ItemId;
+  page: PageHost;
   profileId: ProfileId;
   origin: string;
-  /** The frame the field is in (the tab's top frame or an embedded one): a pick fills that frame only. */
+  /** The frame the field is in (the page's top frame or an embedded one): a pick fills that frame only. */
   frame: FrameIds;
   window: BrowserWindow;
   fieldRect: FieldRect;
   rows: ListRow[];
   highlightedIndex: number;
-  /** The tab view's bounds when the list was placed; a change (layout, resize) closes the list. */
-  tabViewBounds: PlacementBox;
+  /** The page's area when the list was placed; a change (layout, resize) closes the list. */
+  pageArea: PlacementBox;
   stopListening: () => void;
 }
 
@@ -102,7 +105,7 @@ export function initializeAutofill(openPasswords: (profileId: ProfileId) => void
   onFieldLeft(handleFieldLeft);
   ipcMain.handle(AUTOFILL_CHANNELS.choose, handleChoose);
   ipcMain.handle(AUTOFILL_CHANNELS.manage, handleManage);
-  addAfterSyncHook(closeWhenTabMoved);
+  addAfterSyncHook(closeWhenPageMoved);
 }
 
 /** The list's view, made the first time a list is needed. Its page loads once and is reused. */
@@ -190,9 +193,8 @@ async function showForField(report: FieldReport): Promise<void> {
   cancelFieldLeft();
   requestCounter = requestCounter + 1;
   const requestNumber = requestCounter;
-  const window = getWindow();
-  const isInFocusedWindow = getShownTabIdsInWindow(getState().focusedWindowId).includes(report.tabId);
-  if (window === null || !isInFocusedWindow || isOverlayShown()) {
+  const page = report.page;
+  if (!canShowListOver(page)) {
     closeAutofillPopup();
     return;
   }
@@ -202,9 +204,9 @@ async function showForField(report: FieldReport): Promise<void> {
   }
   const remembersFormEntries = getState().settings.remembersFormEntries !== false;
   const rows = access.status === "ready" ? makeRows(access.vault, report, remembersFormEntries) : [];
-  const view = getTabViews().get(report.tabId);
-  const contents = getTabContents(report.tabId);
-  if (rows.length === 0 || view === undefined || contents === null) {
+  const pageArea = page.getArea();
+  const window = page.window;
+  if (rows.length === 0 || pageArea === null || window === null || page.contents.isDestroyed()) {
     closeAutofillPopup();
     return;
   }
@@ -217,7 +219,7 @@ async function showForField(report: FieldReport): Promise<void> {
     shownList.stopListening();
   }
   shownList = {
-    tabId: report.tabId,
+    page: page,
     profileId: report.profileId,
     origin: report.origin,
     frame: report.frame,
@@ -225,10 +227,30 @@ async function showForField(report: FieldReport): Promise<void> {
     fieldRect: report.message.rect,
     rows: rows,
     highlightedIndex: -1,
-    tabViewBounds: view.getBounds(),
-    stopListening: listenToTab(contents),
+    pageArea: pageArea,
+    stopListening: listenToPage(page),
   };
   drawList(shownList);
+}
+
+/**
+ * True when a list may go over this page now. A tab must be on screen in the focused window, with no panel on the
+ * overlay. A Peek is on the overlay by itself (its frame), so only a panel stops it. A Little Window and a popup are
+ * windows of their own.
+ */
+function canShowListOver(page: PageHost): boolean {
+  const window = page.window;
+  if (window === null || window.isDestroyed()) {
+    return false;
+  }
+  if (page.kind === "tab") {
+    const isInFocusedWindow = getShownTabIdsInWindow(getState().focusedWindowId).includes(page.key);
+    return getWindow() !== null && isInFocusedWindow && !isOverlayShown();
+  }
+  if (page.kind === "peek") {
+    return !isPanelShown();
+  }
+  return true;
 }
 
 /**
@@ -236,13 +258,13 @@ async function showForField(report: FieldReport): Promise<void> {
  */
 function drawList(list: ShownList): void {
   const view = popupView;
-  const contents = getTabContents(list.tabId);
-  if (view === null || contents === null || list.window.isDestroyed()) {
+  const contents = list.page.contents;
+  if (view === null || contents.isDestroyed() || list.window.isDestroyed()) {
     closeAutofillPopup();
     return;
   }
   const items = list.rows.map((row) => row.item);
-  const placement = computePopupPlacement(list.fieldRect, contents.getZoomFactor(), list.tabViewBounds, items);
+  const placement = computePopupPlacement(list.fieldRect, contents.getZoomFactor(), list.pageArea, items);
   if (placement === null) {
     closeAutofillPopup();
     return;
@@ -306,50 +328,55 @@ function cancelFieldLeft(): void {
  * The field lost the focus. The list waits a moment before it goes: pressing the mouse on the list takes the page's
  * focus first, and the pick must still land.
  */
-function handleFieldLeft(tabId: ItemId): void {
+function handleFieldLeft(pageKey: string): void {
   if (shownList === null) {
     // A list still being prepared for this field is out of date now.
     requestCounter = requestCounter + 1;
     return;
   }
-  if (shownList.tabId !== tabId || fieldLeftTimer !== null) {
+  if (shownList.page.key !== pageKey || fieldLeftTimer !== null) {
     return;
   }
   fieldLeftTimer = setTimeout(() => {
     fieldLeftTimer = null;
-    if (shownList !== null && shownList.tabId === tabId) {
+    if (shownList !== null && shownList.page.key === pageKey) {
       closeAutofillPopup();
     }
   }, FIELD_LEFT_GRACE_MS);
 }
 
 /**
- * Closes the list when its tab is no longer shown in the focused window or its view moved or changed size.
+ * Closes the list when its page is no longer shown (a tab in the focused window) or its area moved or changed size.
  */
-function closeWhenTabMoved(): void {
+function closeWhenPageMoved(): void {
   const list = shownList;
   if (list === null) {
     return;
   }
-  const isStillShown = getShownTabIdsInWindow(getState().focusedWindowId).includes(list.tabId);
-  const currentBounds = getTabViews().get(list.tabId)?.getBounds();
-  const before = list.tabViewBounds;
-  const isSameBounds =
-    currentBounds !== undefined &&
-    currentBounds.x === before.x &&
-    currentBounds.y === before.y &&
-    currentBounds.width === before.width &&
-    currentBounds.height === before.height;
-  if (!isStillShown || !isSameBounds || getWindow() !== list.window) {
+  const currentArea = list.page.getArea();
+  const before = list.pageArea;
+  const isSameArea =
+    currentArea !== null &&
+    currentArea.x === before.x &&
+    currentArea.y === before.y &&
+    currentArea.width === before.width &&
+    currentArea.height === before.height;
+  const isTab = list.page.kind === "tab";
+  const isTabShown = getShownTabIdsInWindow(getState().focusedWindowId).includes(list.page.key);
+  const isTabAway = isTab && (!isTabShown || getWindow() !== list.window);
+  if (!isSameArea || isTabAway) {
     closeAutofillPopup();
   }
 }
 
 /**
- * Watches the tab while its list is shown: the keys that drive the list, a navigation and the page going away.
- * Returns the function that stops watching.
+ * Watches the page while its list is shown: the keys that drive the list, a navigation and the page going away. A page
+ * in a window of its own (a Peek, a Little Window, a popup) also closes the list when that window is resized or
+ * closes. Returns the function that stops watching.
  */
-function listenToTab(contents: WebContents): () => void {
+function listenToPage(page: PageHost): () => void {
+  const contents = page.contents;
+  const window = page.window;
   const handleInput = (event: Electron.Event, input: Electron.Input): void => handleKey(event, input);
   const handleNavigation = (details: Electron.Event<Electron.WebContentsDidStartNavigationEventParams>): void => {
     if (details.isMainFrame && !details.isSameDocument) {
@@ -357,13 +384,25 @@ function listenToTab(contents: WebContents): () => void {
     }
   };
   const handleDestroyed = (): void => closeAutofillPopup();
+  const handleWindowChange = (): void => closeAutofillPopup();
   contents.on("before-input-event", handleInput);
   contents.on("did-start-navigation", handleNavigation);
   contents.once("destroyed", handleDestroyed);
+  const watchesWindow = page.kind !== "tab" && window !== null;
+  if (watchesWindow) {
+    window.on("resize", handleWindowChange);
+    window.once("closed", handleWindowChange);
+  }
   return () => {
-    contents.removeListener("before-input-event", handleInput);
-    contents.removeListener("did-start-navigation", handleNavigation);
-    contents.removeListener("destroyed", handleDestroyed);
+    if (!contents.isDestroyed()) {
+      contents.removeListener("before-input-event", handleInput);
+      contents.removeListener("did-start-navigation", handleNavigation);
+      contents.removeListener("destroyed", handleDestroyed);
+    }
+    if (watchesWindow && !window.isDestroyed()) {
+      window.removeListener("resize", handleWindowChange);
+      window.removeListener("closed", handleWindowChange);
+    }
   };
 }
 
@@ -491,7 +530,7 @@ async function fillRow(list: ShownList, row: ListRow): Promise<void> {
     return;
   }
   if (row.entry.kind === "value") {
-    fillValue(list.tabId, list.frame, list.origin, { value: row.entry.value });
+    fillValue(list.page.key, list.frame, list.origin, { value: row.entry.value });
     return;
   }
   const loginId = row.entry.loginId;
@@ -504,7 +543,7 @@ async function fillRow(list: ShownList, row: ListRow): Promise<void> {
   if (login === undefined || !isSameLoginSite(login.origin, list.origin)) {
     return;
   }
-  const wasFilled = fillLogin(list.tabId, list.frame, list.origin, { username: login.username, password: login.password });
+  const wasFilled = fillLogin(list.page.key, list.frame, list.origin, { username: login.username, password: login.password });
   if (wasFilled) {
     await changeVault(list.profileId, (vault) => markLoginUsed(vault, loginId, Date.now()));
   }
