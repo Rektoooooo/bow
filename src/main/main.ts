@@ -50,7 +50,7 @@ import {
 import { restoreMainWindows } from "./mainWindows";
 import { createCommandActionRegistry } from "./commandBarActions";
 import { onDownloadStarted, startTrackingDownloads } from "./downloads";
-import { startClosingEmptyLinkViews } from "./linkDownloads";
+import { forgetLinkTab, startClosingEmptyLinkViews } from "./linkDownloads";
 import { getExtensionMenuItems, initializeExtensionHost, prepareExtensions } from "./extensionHost";
 import { initializeAutofill } from "./autofillPopup";
 import { initializePasswordOffers } from "./passwordOffers";
@@ -132,6 +132,7 @@ let pendingBowUrls: string[] | null = [];
 /** What tabViews.ts calls when a page does something. */
 const tabViewEvents: TabViewEvents = {
   onPageChanged: (tabId, url, title) => {
+    forgetLinkTab(tabId);
     noticeReaderPageChanged(tabId, url);
     const isOnScreen = getShownTabIds().includes(tabId);
     applyChange((state) => updateTabPage(state, tabId, url, title, isOnScreen));

@@ -37,6 +37,14 @@ export function markLinkTab(tabId: ItemId, origin: LinkOrigin): void {
 }
 
 /**
+ * A link tab showed a page: it is an ordinary tab from now on, and the note about it goes (or every link tab of a long
+ * session would stay listed).
+ */
+export function forgetLinkTab(tabId: ItemId): void {
+  linkTabSources.delete(tabId);
+}
+
+/**
  * Notes that a Peek, Little Window or popup was opened for a link; `closeView` takes it away.
  */
 export function markLinkView(contents: WebContents, closeView: () => void): void {
