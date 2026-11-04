@@ -155,6 +155,16 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   (`webContents.debugger`, which follows the tab across processes: execution contexts per frame and
   `DOMDebugger.getEventListeners` on `window` in Electron's isolated context), not by reasoning.
 
+- Every packaged Bow on this Mac has the same bundle id, so macOS may open any of them, also for a link from another
+  app, and without `--user-data-dir` that copy runs on the real data folder (2026-11-04: macOS opened an old signed
+  build in the main checkout's `release/`, which could not read data version 5, set the user's sidebar aside as
+  `browser-state.broken-*.json` and started empty, then auto-updated itself to 0.2.0 and hid the evidence;
+  `log show` on runningboardd and the ShipIt log proved it). Keep no old build lying around, and when a sidebar looks
+  empty check `browser-state.broken-*.json` before anything else. To update the user's own Bow without a release:
+  `BOW_SIGN_IDENTITY="Developer ID Application" tools/package-mac.sh` in their Terminal panel (an ad-hoc build has
+  another signature, so the Keychain would stop trusting it, and it cannot update itself), then move it to
+  /Applications so no second copy stays.
+
 - A throwaway probe that downloads anything must seed its own download folder in the state file, like
   `e2e/check-downloads.mjs` (2026-11-03: a probe called a `setDownloadFolder` action that does not exist, swallowed
   the error, and saved its test file into the user's real ~/Downloads; it was moved to the Trash). Never `.catch()` a
