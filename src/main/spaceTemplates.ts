@@ -151,8 +151,8 @@ function buildItems(templateItems: SpaceTemplateItem[], now: number): { items: R
 }
 
 /**
- * Makes a new Space from a template and switches to it: the template's look, defaults and Pinned tree, in the active
- * Space's profile. Same state when the template is missing or no more Spaces fit.
+ * Makes a new Space from a template and switches to it: the template's look, defaults and Pinned tree, with a profile
+ * of its own like every new Space (createSpace). Same state when the template is missing or no more Spaces fit.
  */
 export function createSpaceFromTemplate(state: BrowserState, templateId: string, now: number): BrowserState {
   const template = (state.spaceTemplates ?? []).find((candidate) => candidate.id === templateId);

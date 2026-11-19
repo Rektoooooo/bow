@@ -46,14 +46,26 @@ describe("switching Spaces", () => {
 });
 
 describe("createSpace / renameSpace / moveSpace", () => {
-  it("adds a Space at the end with the active Space's profile and switches to it", () => {
-    const state = createSpace(createInitialState(), { name: " Side project ", icon: "🚀", theme: THEME }, ONE_PM);
+  it("adds a Space at the end with a profile of its own (no shared sign-ins) and switches to it", () => {
+    const initial = createInitialState();
+    const state = createSpace(initial, { name: " Side project ", icon: "🚀", theme: THEME }, ONE_PM);
 
     const newSpace = state.spaces[2];
     expect(newSpace?.name).toBe("Side project");
-    expect(newSpace?.profileId).toBe(state.spaces[0]?.profileId);
+    expect(newSpace?.profileId).not.toBe(state.spaces[0]?.profileId);
+    expect(state.profiles).toHaveLength(initial.profiles.length + 1);
+    expect(state.profiles.find((profile) => profile.id === newSpace?.profileId)?.name).toBe("Side project");
     expect(state.activeSpaceId).toBe(newSpace?.id);
     expect(state.selectedTabIdBySpace[newSpace?.id as string]).toBeNull();
+  });
+
+  it("uses the profile it is given, and makes none then", () => {
+    const initial = createInitialState();
+    const sharedProfileId = initial.spaces[0]?.profileId as string;
+    const state = createSpace(initial, { name: "Shared", icon: "", theme: THEME, profileId: sharedProfileId }, ONE_PM);
+
+    expect(state.spaces[2]?.profileId).toBe(sharedProfileId);
+    expect(state.profiles).toEqual(initial.profiles);
   });
 
   it(`refuses more than ${SPACES_LIMIT} Spaces`, () => {

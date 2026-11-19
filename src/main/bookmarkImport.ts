@@ -18,7 +18,7 @@
  * tree, unknown Space). Folders without any bookmark inside are left out.
  */
 import type { BrowserState, FolderItem, ItemId, SidebarItem, SpaceId, SpaceTheme, TabItem } from "../shared/types";
-import { SPACES_LIMIT, STARTER_SPACE_IDS, createProfile, createSpace, removeEmptySpaces, setSpaceProfile, switchSpace } from "./spaces";
+import { SPACES_LIMIT, STARTER_SPACE_IDS, createProfile, createSpace, removeEmptySpaces, switchSpace } from "./spaces";
 import { createId, getActiveSpace } from "./tree";
 
 /** One bookmark from another browser. The address is always http(s): the parsers drop everything else. */
@@ -182,10 +182,9 @@ export function addProfilesAsSpaces(state: BrowserState, profiles: ImportedProfi
     const withProfile = createProfile(current, profile.name, now);
     const theme = themes[index % Math.max(themes.length, 1)] ?? getActiveSpace(current).theme;
     // createSpace() opens the new Space, so the active Space is the new one.
-    const withSpace = createSpace(withProfile.state, { name: profile.name, icon: "", theme: theme }, now);
+    const withSpace = createSpace(withProfile.state, { name: profile.name, icon: "", theme: theme, profileId: withProfile.profileId }, now);
     const newSpaceId = getActiveSpace(withSpace).id;
-    const withOwnProfile = setSpaceProfile(withSpace, newSpaceId, withProfile.profileId);
-    current = addToPinned(withOwnProfile, newSpaceId, profile.tree, now);
+    current = addToPinned(withSpace, newSpaceId, profile.tree, now);
     spaceIds.push(newSpaceId);
   });
   const firstSpaceId = spaceIds[0];

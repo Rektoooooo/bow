@@ -12,9 +12,9 @@
  * Rules: never change the state that was passed in; return a changed copy, or the same object when nothing changed.
  */
 import { FAVORITES_LIMIT } from "../shared/settings";
-import type { BrowserState, ItemId, ItemLocation, SidebarItem, Space, SpaceId, SpaceTheme } from "../shared/types";
+import type { BrowserState, ItemId, ItemLocation, ProfileId, SidebarItem, Space, SpaceId, SpaceTheme } from "../shared/types";
 import { getSelectedTabId, moveTabsToArchive, repairSelections, updateTab } from "./state";
-import { collectTabIdsInList, createId, findRootLocation, findSpace, getActiveSpace, getIdsAt, insertIntoLocation, removeFromLocation } from "./tree";
+import { collectTabIdsInList, createId, findRootLocation, findSpace, getIdsAt, insertIntoLocation, removeFromLocation } from "./tree";
 
 /** The most Spaces we allow. Arc does not document one; nine matches ⌃1–⌃9. */
 export const SPACES_LIMIT = 9;
@@ -84,24 +84,29 @@ export interface NewSpaceDetails {
   name: string;
   icon: string;
   theme: SpaceTheme;
+  /** The profile it uses. Missing: a new profile of its own, named like the Space. */
+  profileId?: ProfileId;
 }
 
 /**
- * Adds a Space after the last one, using the active Space's profile, and switches to it.
+ * Adds a Space after the last one and switches to it. Spaces are kept apart (the user's choice, 2026-11-19): unless
+ * `details.profileId` says otherwise, the Space gets a profile of its own (its own cookies, sign-ins, extensions and
+ * Bow Passwords); the Space menu's Profile list can make it share one again.
  * Returns the same state when SPACES_LIMIT is reached.
  */
 export function createSpace(state: BrowserState, details: NewSpaceDetails, now: number): BrowserState {
   if (state.spaces.length >= SPACES_LIMIT) {
     return state;
   }
-  const activeSpace = getActiveSpace(state);
   const trimmedName = details.name.trim();
+  const spaceName = trimmedName === "" ? "New Space" : trimmedName;
+  const withProfile = details.profileId === undefined ? createProfile(state, spaceName, now) : { state: state, profileId: details.profileId };
   const newSpace: Space = {
     id: createId("space", now),
-    name: trimmedName === "" ? "New Space" : trimmedName,
+    name: spaceName,
     icon: details.icon.trim() === "" ? DEFAULT_SPACE_ICON : details.icon.trim(),
     theme: details.theme,
-    profileId: activeSpace.profileId,
+    profileId: withProfile.profileId,
     favoriteIds: [],
     pinnedIds: [],
     todayIds: [],
@@ -109,7 +114,7 @@ export function createSpace(state: BrowserState, details: NewSpaceDetails, now: 
   };
 
   const stateWithSpace: BrowserState = {
-    ...state,
+    ...withProfile.state,
     spaces: [...state.spaces, newSpace],
     selectedTabIdBySpace: { ...state.selectedTabIdBySpace, [newSpace.id]: null },
   };
