@@ -3,7 +3,8 @@
  *   A page can close itself (`window.close()`, as sign-in "you can close this window" pages do). Electron then destroys
  *   its web contents, and the view's `webContents` reads as undefined from then on, although Electron's types say it
  *   is always there. Code that read `view.webContents.isDestroyed()` threw a TypeError in the main process on every
- *   runtime push (2026-11-19, connecting an MCP server to NetSuite). Every read of a view's page goes through here.
+ *   runtime push (2026-11-19, connecting an MCP server to NetSuite). Every read of a view's page that may come after
+ *   that goes through here (loops over the tab views, Peek, Little Windows, picture in picture, Bow Passwords).
  *
  * Data source:
  *   A WebContentsView (a tab's, the Peek's or a Little Window's page).

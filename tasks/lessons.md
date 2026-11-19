@@ -216,3 +216,8 @@ Rules learned while working on this repo, so the same mistake is not made twice.
 - Read `sysctl -n vm.loadavg` before an e2e suite, and re-run a failed timing check alone before suspecting the change
   (2026-10-29: at load averages of 60 to 127, "the app quits when the last window closes" (10 s), the Control Center
   refresh and the ⌃Tab pictures each failed once and passed on re-runs; three times the change was not the cause).
+- A page in a WebContentsView can end without Bow closing it: `window.close()` destroys its contents, and the view's
+  `webContents` then reads as undefined although Electron's types say it is always there (2026-11-19: a NetSuite
+  sign-in page did it, and every runtime push threw in the main process, again after each restart). Read a view's
+  page through `getLiveContents`, and give every view that holds a page a "destroyed" handler; take a view out of its
+  map before closing it yourself, so that handler can tell the two apart.
