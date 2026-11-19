@@ -345,6 +345,13 @@ const adoptedTab = selectedTab(state);
 const adoptedView = views.find((view) => view.url.includes("iana.org"));
 check("Open as Tab turns the Peek into a Today tab", adoptedTab?.url.includes("iana.org") && activeSpace(state).todayIds[0] === adoptedTab?.id, adoptedTab?.url);
 check("…keeping the same page (no reload)", adoptedView?.id === peekEntry?.id, `${adoptedView?.id} vs ${peekEntry?.id}`);
+// Its keys are the page's own now: the Peek's Escape handler no longer swallows Escape there.
+const inAdoptedPage = (code) => app.evaluate(({ webContents }, { id, source }) => webContents.fromId(id).executeJavaScript(source), { id: adoptedView?.id, source: code });
+await inAdoptedPage("window.escapeKeys = 0; addEventListener('keydown', (event) => { if (event.key === 'Escape') window.escapeKeys += 1; }, true); true");
+await app.evaluate(({ webContents }, id) => webContents.fromId(id).sendInputEvent({ type: "keyDown", keyCode: "Escape" }), adoptedView?.id);
+await sidebar.waitForTimeout(400);
+const escapesInAdoptedTab = await inAdoptedPage("window.escapeKeys");
+check("…and Escape in that tab reaches its page", escapesInAdoptedTab === 1, String(escapesInAdoptedTab));
 
 await dispatch({ type: "selectTab", tabId: pinnedSourceId });
 await sidebar.waitForTimeout(800);

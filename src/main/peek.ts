@@ -432,7 +432,12 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
   // Peek's page keeps the keyboard for a moment: neither may close anything else.
   contents.on("before-input-event", (event, input) => {
     const isPlainEscape = input.type === "keyDown" && input.key === "Escape" && !input.meta && !input.control && !input.alt;
-    if (isPlainEscape && (input.isAutoRepeat || peekView !== view)) {
+    const isOpenPeek = peekView === view;
+    // A Peek that became a tab ("Open as Tab"): its keys are the page's own from now on.
+    if (!isOpenPeek && closingPeek?.view !== view) {
+      return;
+    }
+    if (isPlainEscape && (input.isAutoRepeat || !isOpenPeek)) {
       event.preventDefault();
       return;
     }
