@@ -139,7 +139,8 @@ describe("unpacking", () => {
     const withLink = buildCrx(zipExtension({ "manifest.json": MANIFEST }, { "escape": "/etc" }), [developer], extensionId);
     const dotDotVersion = buildCrx(zipExtension({ "manifest.json": JSON.stringify({ manifest_version: 3, name: "X", version: ".." }) }), [developer], extensionId);
 
-    await expect(unpackCrx(withLink, extensionId, extensionsFolder)).rejects.toThrow(/symbolic link/);
+    // Refused by our check, or (macOS 27 and later) already by the system's unzip, which no longer makes links.
+    await expect(unpackCrx(withLink, extensionId, extensionsFolder)).rejects.toThrow(/symbolic link|symlink error/);
     await expect(unpackCrx(dotDotVersion, extensionId, extensionsFolder)).rejects.toThrow(/version/);
     expect(fs.readdirSync(extensionsFolder)).toEqual(["keep.txt"]);
   });
