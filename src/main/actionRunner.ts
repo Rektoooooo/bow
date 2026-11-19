@@ -158,6 +158,7 @@ import { allowSavingOnSite, choosePasswordsProfile, deleteSavedLogin, forgetAllF
 import { checkCommandChain, createCommandChain, deleteCommandChain, saveCommandChain, toChainActionId } from "./commandChains";
 import { openPeek } from "./peek";
 import { openLittleWindow } from "./littleWindow";
+import { getLiveContents } from "./liveContents";
 import { normalizeTypedInput } from "./urls";
 import { findSpaceSearchEngine } from "../shared/searchEngines";
 
@@ -235,7 +236,10 @@ function createSpaceAndRename(name: string, icon: string, theme: SpaceTheme): vo
  */
 function reapplyCosmeticFiltersToAllPages(): void {
   for (const view of getTabViews().values()) {
-    applyCosmeticFilters(view.webContents).catch(() => undefined);
+    const contents = getLiveContents(view);
+    if (contents !== null) {
+      applyCosmeticFilters(contents).catch(() => undefined);
+    }
   }
 }
 

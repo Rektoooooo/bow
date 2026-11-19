@@ -17,6 +17,7 @@ import type { WebContents } from "electron";
 import type { BrowserState, ItemId } from "../shared/types";
 import { buildBoostCss, findBoostForUrl, getBoostJavaScript } from "./boosts";
 import { getTabContents, getTabViews } from "./tabViews";
+import { getLiveContents } from "./liveContents";
 
 /** An isolated world of our own inside the page (any number above 0; media.ts uses another). */
 const ZAP_WORLD_ID = 1032;
@@ -155,7 +156,10 @@ export function runBoostJavaScript(contents: WebContents, state: BrowserState): 
  */
 export function reapplyBoostsToAllPages(state: BrowserState): void {
   for (const view of getTabViews().values()) {
-    applyBoostToPage(view.webContents, state).catch(() => undefined);
+    const contents = getLiveContents(view);
+    if (contents !== null) {
+      applyBoostToPage(contents, state).catch(() => undefined);
+    }
   }
 }
 

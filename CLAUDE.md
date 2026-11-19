@@ -41,6 +41,8 @@ npm run e2e          # build + drive the real app: check-app, check-overlay, che
                      # tour, the defaults, replay from Help, fits a 760 × 520 window, no dashes in its text),
                      # check-downloads (the downloads card, quarantine mark, views a file link opened close again),
                      # check-popups (sized window.open keeps window.opener in tabs, Peek and Little Windows),
+                     # check-self-closing (a page that calls window.close() closes its tab, Peek or Little Window,
+                     # a pinned one unloads; sleeping and quitting keep every tab; a start with one selected),
                      # check-http-sign-in (the card for sites that ask for a username and password),
                      # check-certificates (a self-signed site gets the warning page and card; HTTPS-only falls back),
                      # check-passwords-windows (Bow Passwords in Little Windows, Peek and sign-in popups)

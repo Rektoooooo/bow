@@ -32,6 +32,7 @@ import { applyChange, getState, getWindow } from "./browserCore";
 import { selectTab } from "./state";
 import { setMuted } from "./tabActions";
 import { findWindowShowingTab, getTabViews } from "./tabViews";
+import { getLiveContents } from "./liveContents";
 import { findTab } from "./tree";
 
 /** The window's width the first time, and its smallest. Our choice: about a fifth of a laptop screen, like Chromium's. */
@@ -568,10 +569,10 @@ const enteringTabIds = new Set<ItemId>();
  */
 async function enterNow(tabId: ItemId): Promise<void> {
   const pageView = getTabViews().get(tabId);
-  if (pageView === undefined || pageView.webContents.isDestroyed() || current?.tabId === tabId) {
+  const contents = pageView === undefined ? null : getLiveContents(pageView);
+  if (pageView === undefined || contents === null || current?.tabId === tabId) {
     return;
   }
-  const contents = pageView.webContents;
   const pageVideoSize = await runScript(contents, MARK_SCRIPT);
   // No video in the page itself: maybe one plays in an embedded player. Only asked while the tab really plays sound
   // (the main process knows; a frame cannot fake it), so ad frames are not asked on every tab switch.

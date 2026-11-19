@@ -18,6 +18,7 @@
 import type { WebContentsView } from "electron";
 import type { BrowserState, ItemId } from "../shared/types";
 import { isCapturing } from "./mediaCapture";
+import { getLiveContents } from "./liveContents";
 import { updateTab } from "./state";
 
 /**
@@ -30,14 +31,15 @@ export function findTabsInUse(tabViews: Map<ItemId, WebContentsView>, visibleTab
   const inUseTabIds: ItemId[] = [];
 
   for (const [tabId, view] of tabViews) {
-    if (view.webContents.isDestroyed()) {
+    const contents = getLiveContents(view);
+    if (contents === null) {
       continue;
     }
 
     const isVisible = visibleTabSet.has(tabId);
-    const isAudible = view.webContents.isCurrentlyAudible();
+    const isAudible = contents.isCurrentlyAudible();
     const isPictureInPicture = tabId === pictureInPictureTabId;
-    if (isVisible || isAudible || isPictureInPicture || isCapturing(view.webContents)) {
+    if (isVisible || isAudible || isPictureInPicture || isCapturing(contents)) {
       inUseTabIds.push(tabId);
     }
   }

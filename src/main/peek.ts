@@ -37,6 +37,7 @@ import { addAfterSyncHook, applyChange, getLayoutOptions, getState, getWindow, s
 import { computeCardBounds } from "./layout";
 import { markLinkView } from "./linkDownloads";
 import { getPageBackgroundColor } from "./pageColor";
+import { getLiveContents } from "./liveContents";
 import type { Bounds } from "./layout";
 import { getOverlayShowCount, hideOverlay, raiseOverlayIfShown, sendPeekClosing, showOverlay } from "./overlay";
 import { getProfileSession } from "./profiles";
@@ -141,10 +142,7 @@ export function isPeekClosing(): boolean {
  * The Peek's page, or null when no Peek is open: the menu's Back, Forward, Reload and zoom act on it then, like Arc.
  */
 export function getPeekContents(): WebContents | null {
-  if (peekView === null || peekView.webContents.isDestroyed()) {
-    return null;
-  }
-  return peekView.webContents;
+  return peekView === null ? null : getLiveContents(peekView);
 }
 
 /**
@@ -215,11 +213,12 @@ function isBox(value: unknown): value is Bounds {
  */
 async function findClickedLink(sourceTabId: ItemId | null, url: string, pointer: { x: number; y: number } | null): Promise<Bounds | null> {
   const sourceView = sourceTabId === null ? undefined : getTabViews().get(sourceTabId);
-  if (sourceView === undefined || sourceView.webContents.isDestroyed()) {
+  const sourceContents = sourceView === undefined ? null : getLiveContents(sourceView);
+  if (sourceView === undefined || sourceContents === null) {
     return null;
   }
   const viewBounds = sourceView.getBounds();
-  const zoomFactor = sourceView.webContents.getZoomFactor();
+  const zoomFactor = sourceContents.getZoomFactor();
   // Page coordinates are CSS pixels; the view's zoom scales them. Off the page means "no pointer".
   const pageX = pointer === null ? -1 : Math.round((pointer.x - viewBounds.x) / zoomFactor);
   const pageY = pointer === null ? -1 : Math.round((pointer.y - viewBounds.y) / zoomFactor);
@@ -236,7 +235,7 @@ async function findClickedLink(sourceTabId: ItemId | null, url: string, pointer:
     const box = link.getBoundingClientRect();
     return { x: box.x, y: box.y, width: box.width, height: box.height };
   })()`;
-  const lookup = sourceView.webContents.executeJavaScriptInIsolatedWorld(LINK_LOOKUP_WORLD_ID, [{ code: code }]).catch(() => null);
+  const lookup = sourceContents.executeJavaScriptInIsolatedWorld(LINK_LOOKUP_WORLD_ID, [{ code: code }]).catch(() => null);
   const deadline = new Promise<null>((resolve) => setTimeout(() => resolve(null), PEEK_LINK_LOOKUP_MS));
   const found: unknown = await Promise.race([lookup, deadline]);
   if (!isBox(found) || found.width <= 0 || found.height <= 0) {
@@ -422,6 +421,13 @@ export function openPeek(url: string, sourceTabId: ItemId | null): void {
       closePeek();
     }
   });
+  // A page that closes itself (window.close(), a sign-in page done) leaves nothing to picture: the Peek goes without
+  // the shrink (removePeek sees the page is gone).
+  contents.once("destroyed", () => {
+    if (peekView === view) {
+      closePeek();
+    }
+  });
   // Escape dismisses a Peek, like Arc; ⌘O and ⌘W come through the app menu. A held Escape repeats, and a closing
   // Peek's page keeps the keyboard for a moment: neither may close anything else.
   contents.on("before-input-event", (event, input) => {
@@ -542,7 +548,8 @@ function finishPeekClose(): void {
   if (!closing.window.isDestroyed()) {
     closing.window.contentView.removeChildView(closing.view);
   }
-  closing.view.webContents.close();
+  // The page may have closed itself while the card shrank.
+  getLiveContents(closing.view)?.close();
   if (getOverlayShowCount() === closing.showCount) {
     getFocusedContents()?.focus();
   }
@@ -579,16 +586,17 @@ function removePeek(keepPage: boolean): WebContentsView | null {
     hideOverlay();
     return view;
   }
-  if (window !== null && !window.isDestroyed() && wasPageShown) {
+  const isPageAlive = getLiveContents(view) !== null;
+  if (window !== null && !window.isDestroyed() && wasPageShown && isPageAlive) {
     playPeekClose(window, view, origin).catch(() => finishPeekClose());
     return null;
   }
-  // Closed before its page showed (Escape while the card grows): the frame fades, the page never appeared.
+  // Closed before its page showed (Escape while the card grows), or the page closed itself: the frame fades.
   hideOverlay();
   if (window !== null && !window.isDestroyed()) {
     window.contentView.removeChildView(view);
   }
-  view.webContents.close();
+  getLiveContents(view)?.close();
   getFocusedContents()?.focus();
   return null;
 }
@@ -613,7 +621,7 @@ export function closePeekIn(window: BrowserWindow): void {
   if (!window.isDestroyed()) {
     window.contentView.removeChildView(view);
   }
-  view.webContents.close();
+  getLiveContents(view)?.close();
 }
 
 /**

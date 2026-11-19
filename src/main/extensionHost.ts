@@ -35,6 +35,7 @@ import { getSelectedTabId, openTab, selectTab } from "./state";
 import { isRecordableUrl } from "./history";
 import { closeTabByUser, openLinkInNewTab } from "./tabActions";
 import { createTabView, getTabContents, getTabViews } from "./tabViews";
+import { getLiveContents } from "./liveContents";
 import type { TabViewEvents } from "./tabViews";
 import { createId, findProfileIdOfItem, findTab, getActiveSpace } from "./tree";
 
@@ -237,8 +238,8 @@ function registerTabPages(state: BrowserState): void {
   for (const [tabId, view] of getTabViews()) {
     const window = findMainWindowShowingTab(tabId) ?? focusedWindow;
     const host = hostsByProfile.get(findProfileIdOfItem(state, tabId) ?? DEFAULT_PROFILE_ID);
-    const contents = view.webContents;
-    if (host === undefined || contents.isDestroyed() || contents.session !== host.session || host.registeredContents.has(contents)) {
+    const contents = getLiveContents(view);
+    if (host === undefined || contents === null || contents.session !== host.session || host.registeredContents.has(contents)) {
       continue;
     }
     host.library.addTab(contents, window);

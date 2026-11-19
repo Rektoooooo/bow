@@ -47,7 +47,7 @@ import {
   setTabViewEvents,
   syncViews,
 } from "./browserCore";
-import { restoreMainWindows } from "./mainWindows";
+import { isAppQuitting, restoreMainWindows } from "./mainWindows";
 import { createCommandActionRegistry } from "./commandBarActions";
 import { onDownloadStarted, startTrackingDownloads } from "./downloads";
 import { forgetLinkTab, startClosingEmptyLinkViews } from "./linkDownloads";
@@ -95,7 +95,7 @@ import { retakeCapture } from "./liveCaptures";
 import { linkNativeMessagingHosts, listOtherBrowserHostFolders } from "./nativeMessagingHosts";
 import { setNoteTitle, updateTabFavicon, updateTabPage } from "./state";
 import { getStateFilePath } from "./store";
-import { openLinkInNewTab } from "./tabActions";
+import { closeTabByUser, openLinkInNewTab } from "./tabActions";
 import { getShownTabIds, getTabViews, refreshShownSnapshots, sleepTabView } from "./tabViews";
 import { findTabsToSleep } from "./tabSleep";
 import { SNAPSHOT_REFRESH_MS } from "./tabSnapshots";
@@ -178,6 +178,13 @@ const tabViewEvents: TabViewEvents = {
   },
   onLinkHover: (tabId, url) => {
     showLinkStatus(tabId, url).catch(() => undefined);
+  },
+  // Like a tab a script opened in Chrome: the tab goes (a Today tab to the Archive, ⇧⌘T brings it back). Pages end
+  // while quitting too, and those must stay.
+  onPageClosedItself: (tabId) => {
+    if (!isAppQuitting()) {
+      closeTabByUser(tabId);
+    }
   },
 };
 

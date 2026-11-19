@@ -47,6 +47,7 @@ import { chooseSizedPopup, watchPopups } from "./windowOpenRule";
 import { findProfileIdOfItem, findSplitOfTab, findTab, getActiveSpace } from "./tree";
 import { forgetCornerMasks, layoutCornerMasks, raiseCornerMasks } from "./cornerMasks";
 import { isCapturing } from "./mediaCapture";
+import { getLiveContents } from "./liveContents";
 import { DEFAULT_PROFILE_ID } from "../shared/settings";
 
 /** How a page asked to open a link somewhere else. */
@@ -81,6 +82,11 @@ export interface TabViewEvents {
   onLoadFailed(tabId: ItemId, contents: WebContents, errorCode: number, validatedUrl: string, isMainFrame: boolean): void;
   /** The pointer moved onto a link in a tab's page (its address) or off it (""). */
   onLinkHover(tabId: ItemId, url: string): void;
+  /**
+   * The page closed itself (`window.close()`, as sign-in "you can close this window" pages do). Its view is already
+   * gone; the tab should close like ⌘W.
+   */
+  onPageClosedItself(tabId: ItemId): void;
 }
 
 /** One main window as this file sees it: where its pages go, and the state as that window shows it. */
@@ -325,10 +331,7 @@ export function getFocusedContents(): WebContents | null {
     return null;
   }
   const view = tabViews.get(focusedTabId);
-  if (view === undefined || view.webContents.isDestroyed()) {
-    return null;
-  }
-  return view.webContents;
+  return view === undefined ? null : getLiveContents(view);
 }
 
 /**
@@ -336,10 +339,7 @@ export function getFocusedContents(): WebContents | null {
  */
 export function getTabContents(tabId: ItemId): WebContents | null {
   const view = tabViews.get(tabId);
-  if (view === undefined || view.webContents.isDestroyed()) {
-    return null;
-  }
-  return view.webContents;
+  return view === undefined ? null : getLiveContents(view);
 }
 
 /**
@@ -459,6 +459,15 @@ function watchTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvent
   });
   contents.setWindowOpenHandler((details) => handleWindowOpen(tabId, contents, details, events));
   watchPopups(contents);
+  // A page that closes itself takes its contents with it: the view is forgotten at once, so nothing reads the dead
+  // page, and the tab closes. Pages Bow closes (sleep, close) leave tabViews before, so they never count here.
+  contents.once("destroyed", () => {
+    if (tabViews.get(tabId) !== view) {
+      return;
+    }
+    destroyTabView(tabId);
+    events.onPageClosedItself(tabId);
+  });
   // No radius: the page meets the toolbar square, and cornerMasks.ts rounds the card's bottom corners over it.
 }
 
@@ -478,8 +487,8 @@ function sampleIfShown(tabId: ItemId, contents: WebContents): void {
  */
 export function refreshShownSnapshots(): void {
   for (const tabId of getShownTabIds()) {
-    const contents = tabViews.get(tabId)?.webContents;
-    if (contents !== undefined && !contents.isLoading()) {
+    const contents = getTabContents(tabId);
+    if (contents !== null && !contents.isLoading()) {
       captureSnapshotSoon(tabId, contents);
     }
   }
@@ -529,19 +538,20 @@ export function createTabView(state: BrowserState, tab: TabItem, events: TabView
  * slept. The tab's snapshot stays for the tab switcher.
  */
 export function sleepTabView(tabId: ItemId): boolean {
-  const view = tabViews.get(tabId);
-  if (view === undefined || view.webContents.isDestroyed() || findWindowShowingTab(tabId) !== null || view.webContents.isDevToolsOpened()) {
+  const contents = getTabContents(tabId);
+  if (contents === null || findWindowShowingTab(tabId) !== null || contents.isDevToolsOpened()) {
     return false;
   }
-  if (isCapturing(view.webContents)) {
+  if (isCapturing(contents)) {
     return false;
   }
-  const history = view.webContents.navigationHistory;
+  const history = contents.navigationHistory;
   sleepingHistories.set(tabId, { entries: history.getAllEntries(), activeIndex: history.getActiveIndex() });
-  view.webContents.close();
+  // Forgotten before it closes, so its "destroyed" is not taken for the page closing itself (watchTabView).
   tabViews.delete(tabId);
   viewProfileIds.delete(tabId);
   requestedMoves.delete(tabId);
+  contents.close();
   return true;
 }
 
@@ -572,8 +582,8 @@ export function collectTabHistories(state: BrowserState): Record<ItemId, SavedHi
     }
   }
   for (const [tabId, view] of tabViews) {
-    const contents = view.webContents;
-    if (contents.isDestroyed() || !contents.session.isPersistent()) {
+    const contents = getLiveContents(view);
+    if (contents === null || !contents.session.isPersistent()) {
       continue;
     }
     const navigation = contents.navigationHistory;
@@ -649,7 +659,8 @@ export function setTabViewHidden(tabId: ItemId, isHidden: boolean): void {
 }
 
 /**
- * Removes a tab's web view from the window that shows it and closes its page to free memory.
+ * Removes a tab's web view from the window that shows it and closes its page to free memory (a page that closed
+ * itself is only forgotten).
  */
 export function destroyTabView(tabId: ItemId): void {
   const view = tabViews.get(tabId);
@@ -662,8 +673,9 @@ export function destroyTabView(tabId: ItemId): void {
       takeOutOfWindow(shown, tabId);
     }
   }
-  view.webContents.close();
+  // Forgotten before it closes, so its "destroyed" is not taken for the page closing itself (watchTabView).
   tabViews.delete(tabId);
+  getLiveContents(view)?.close();
   hiddenTabIds.delete(tabId);
   sleepingHistories.delete(tabId);
   forgetSnapshot(tabId);
@@ -930,8 +942,8 @@ export function syncTabViews(targets: WindowTarget[], events: TabViewEvents): Se
 export function collectTabRuntime(): Record<ItemId, TabRuntimeInfo> {
   const runtimeState: Record<ItemId, TabRuntimeInfo> = {};
   for (const [tabId, view] of tabViews) {
-    const contents = view.webContents;
-    if (contents.isDestroyed()) {
+    const contents = getLiveContents(view);
+    if (contents === null) {
       continue;
     }
     runtimeState[tabId] = {

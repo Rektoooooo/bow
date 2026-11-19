@@ -59,6 +59,13 @@ const SIDEBAR_RELOAD_GUARD_MS = 10_000;
 let isQuitting = false;
 
 /**
+ * True once the app is quitting (or restarting to update): pages that end then are not closing themselves.
+ */
+export function isAppQuitting(): boolean {
+  return isQuitting;
+}
+
+/**
  * A main window got the focus: panels and a Peek stay with the window they opened in (a click in another window is a
  * click outside, so they close), then the window's own Space and selection come forward.
  */

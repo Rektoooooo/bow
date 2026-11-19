@@ -21,6 +21,7 @@ import { findTabsAllowedToSleep } from "./tabSleep";
 import { buildTaskList } from "./taskList";
 import type { AwakePage, ProcessUse } from "./taskList";
 import { findWindowShowingTab, getShownTabIds, getSleepingTabIds, getTabViews, sleepTabView } from "./tabViews";
+import { getLiveContents } from "./liveContents";
 import type { TaskListData } from "../shared/overlay";
 import type { ItemId } from "../shared/types";
 
@@ -76,11 +77,12 @@ export function collectTaskList(): TaskListData {
   const inUseTabIds = new Set(findInUseTabIds());
   const pages: AwakePage[] = [];
   for (const [tabId, view] of getTabViews()) {
-    if (view.webContents.isDestroyed()) {
+    const contents = getLiveContents(view);
+    if (contents === null) {
       continue;
     }
     const isOnScreen = findWindowShowingTab(tabId) !== null;
-    pages.push({ tabId: tabId, processId: view.webContents.getOSProcessId(), canSleep: !isOnScreen && !inUseTabIds.has(tabId) });
+    pages.push({ tabId: tabId, processId: contents.getOSProcessId(), canSleep: !isOnScreen && !inUseTabIds.has(tabId) });
   }
   const processes: ProcessUse[] = app.getAppMetrics().map((metric) => ({
     processId: metric.pid,

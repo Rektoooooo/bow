@@ -34,6 +34,7 @@ import { getActiveSpace } from "./tree";
 import { chooseSizedPopup, watchPopups } from "./windowOpenRule";
 import { normalizeTypedInput } from "./urls";
 import { findSearchEngine } from "../shared/searchEngines";
+import { getLiveContents } from "./liveContents";
 
 /** Window size, close to Arc's Little Arc. Our choice. */
 const LITTLE_WIDTH_PX = 900;
@@ -92,8 +93,8 @@ function layoutPage(little: LittleWindow): void {
  * Tells the bar page the current address and title.
  */
 function sendInfo(little: LittleWindow): void {
-  const contents = little.pageView.webContents;
-  if (little.window.isDestroyed() || contents.isDestroyed()) {
+  const contents = getLiveContents(little.pageView);
+  if (little.window.isDestroyed() || contents === null) {
     return;
   }
   little.window.webContents.send(LITTLE_CHANNELS.info, {
@@ -112,8 +113,8 @@ function archiveLittleWindow(little: LittleWindow, reason: ArchiveReason): void 
     return;
   }
   little.isSettled = true;
-  const contents = little.pageView.webContents;
-  if (contents.isDestroyed()) {
+  const contents = getLiveContents(little.pageView);
+  if (contents === null) {
     return;
   }
   const page = { url: contents.getURL(), title: contents.getTitle(), faviconUrl: little.faviconUrl };
@@ -151,6 +152,12 @@ function watchPage(little: LittleWindow): void {
     }
     openElsewhere(details.url, details.disposition === "background-tab");
     return { action: "deny" };
+  });
+  // A page that closes itself (window.close(), a sign-in page done) closes its window, as it would a popup.
+  contents.once("destroyed", () => {
+    if (!little.window.isDestroyed()) {
+      little.window.close();
+    }
   });
 }
 
@@ -222,9 +229,7 @@ export function openLittleWindow(url: string | null, options: LittleWindowOption
   window.on("close", () => archiveLittleWindow(little, "manual"));
   window.on("closed", () => {
     littleWindows.delete(little);
-    if (!pageView.webContents.isDestroyed()) {
-      pageView.webContents.close();
-    }
+    getLiveContents(pageView)?.close();
   });
 
   window.webContents.once("did-finish-load", () => sendInfo(little));
@@ -290,11 +295,13 @@ export function registerLittleWindowIpc(): void {
     }
     const state = getState();
     const searchEngine = findSearchEngine(state.settings.searchEngine);
-    little.pageView.webContents.loadURL(normalizeTypedInput(typedText, searchEngine, state.searchKeywords)).catch(() => undefined);
+    const contents = getLiveContents(little.pageView);
+    contents?.loadURL(normalizeTypedInput(typedText, searchEngine, state.searchKeywords)).catch(() => undefined);
   });
   ipcMain.handle(LITTLE_CHANNELS.moveToSpace, (event) => {
     const little = findSender(event);
-    const url = little === undefined ? "" : little.pageView.webContents.getURL();
+    const contents = little === undefined ? null : getLiveContents(little.pageView);
+    const url = contents === null ? "" : contents.getURL();
     // A private page must not end up in the saved sidebar.
     if (little === undefined || url === "" || little.isPrivate) {
       return;
@@ -308,14 +315,16 @@ export function registerLittleWindowIpc(): void {
   });
   ipcMain.handle(LITTLE_CHANNELS.copyLink, (event) => {
     const little = findSender(event);
-    if (little !== undefined) {
-      clipboard.writeText(little.pageView.webContents.getURL());
+    const contents = little === undefined ? null : getLiveContents(little.pageView);
+    if (contents !== null) {
+      clipboard.writeText(contents.getURL());
     }
   });
   ipcMain.handle(LITTLE_CHANNELS.goBack, (event) => {
     const little = findSender(event);
-    if (little !== undefined && little.pageView.webContents.navigationHistory.canGoBack()) {
-      little.pageView.webContents.navigationHistory.goBack();
+    const contents = little === undefined ? null : getLiveContents(little.pageView);
+    if (contents !== null && contents.navigationHistory.canGoBack()) {
+      contents.navigationHistory.goBack();
     }
   });
 }
