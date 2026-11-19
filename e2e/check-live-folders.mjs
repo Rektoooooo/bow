@@ -419,24 +419,35 @@ await app.evaluate(({ session }) => session.fromPartition("persist:profile-defau
 await sidebar.screenshot({ path: path.join(outDir, "live-folders-sidebar.png") });
 
 // A Space template keeps a live folder's source; a Space made from it fills that folder right away (not at the next
-// timer). The original folder goes first: a live folder skips pages already open elsewhere.
+// timer). The original folder goes first: a live folder skips pages already open elsewhere. Like every new Space, it
+// has a profile of its own (Spaces share no sign-ins), so its GitHub folders ask to sign in there first.
 await dispatch({ type: "saveSpaceAsTemplate", spaceId: "space-a" });
 await sidebar.waitForTimeout(300);
 const liveTemplate = ((await getState()).spaceTemplates ?? [])[0];
 await dispatch({ type: "deleteItem", itemId: notificationsFolder.id });
 await dispatch({ type: "createSpaceFromTemplate", templateId: liveTemplate.id });
+const stateWithTemplateSpace = await getState();
+const templateSpace = stateWithTemplateSpace.spaces.find((space) => space.id === stateWithTemplateSpace.activeSpaceId);
+const templateNotifications = (templateSpace?.pinnedIds ?? []).map((itemId) => stateWithTemplateSpace.items[itemId]).find((item) => item?.kind === "folder" && item.live?.source.list === "notifications");
+check("a Space made from a template has a profile of its own", templateSpace !== undefined && templateSpace.profileId !== "profile-default", String(templateSpace?.profileId));
+const templateSignIn = templateNotifications === undefined ? null : await waitForStatusLine(templateNotifications.id, "Sign in to GitHub");
+check("its GitHub folder is read at once, and asks to sign in in that profile", templateSignIn === "Sign in to GitHub", String(templateSignIn));
+// Signed in to (the local) GitHub in the new Space's profile, the folder fills.
+await app.evaluate(({ session }, { partition, url }) => session.fromPartition(partition).cookies.set({ url: url, name: "logged_in", value: "yes" }), { partition: `persist:${templateSpace?.profileId}`, url: origin });
+await waitForStatusLine(templateNotifications?.id, "Sign in to GitHub");
+await dispatch({ type: "refreshLiveFolder", folderId: templateNotifications?.id });
 state = await waitForState((current) => {
   const madeSpace = current.spaces.find((space) => space.id === current.activeSpaceId);
   const folders = (madeSpace?.pinnedIds ?? []).map((itemId) => current.items[itemId]);
   return folders.some((item) => item?.kind === "folder" && item.live?.source.list === "notifications" && item.childIds.length === 2);
-}, 20000);
+}, 40000);
 const madeSpace = state.spaces.find((space) => space.id === state.activeSpaceId);
 const madeFolders = (madeSpace?.pinnedIds ?? []).map((itemId) => state.items[itemId]).filter((item) => item?.kind === "folder");
 const madeNotifications = madeFolders.find((folder) => folder.live?.source.list === "notifications");
 const templateLiveCount = liveTemplate.pinned.filter((item) => item.kind === "folder" && item.live !== undefined).length;
 const madeLiveCount = madeFolders.filter((folder) => folder.live !== undefined).length;
 check(
-  "a Space made from a template has its live folders, and fills them at once",
+  "a Space made from a template has its live folders, and they fill once its profile is signed in",
   madeSpace?.id !== "space-a" && templateLiveCount > 0 && madeLiveCount === templateLiveCount && madeNotifications?.childIds.length === 2,
   `${madeFolders.map((folder) => folder.title).join(", ")} / notifications ${madeNotifications?.childIds.length}`,
 );
