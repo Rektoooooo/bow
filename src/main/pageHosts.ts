@@ -24,6 +24,7 @@ import type { ItemId } from "../shared/types";
 import type { PlacementBox } from "./autofillPlacement";
 import { getWindow } from "./browserCore";
 import { findTabIdOfContents, getTabViews } from "./tabViews";
+import { getLiveContents } from "./liveContents";
 
 /** The kinds of page Bow Passwords serves. */
 export type PageKind = "tab" | "peek" | "littleWindow" | "popup";
@@ -108,7 +109,8 @@ export function findPageHost(contents: WebContents): PageHost | null {
 export function findPageHostByKey(key: string): PageHost | null {
   const tabView = getTabViews().get(key);
   if (tabView !== undefined) {
-    return tabView.webContents.isDestroyed() ? null : makeTabHost(key, tabView.webContents);
+    const tabContents = getLiveContents(tabView);
+    return tabContents === null ? null : makeTabHost(key, tabContents);
   }
   for (const host of registeredHosts.values()) {
     if (host.key === key && !host.contents.isDestroyed()) {

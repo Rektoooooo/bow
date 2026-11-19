@@ -154,6 +154,13 @@ function ensureHost(profileId: ProfileId): ProfileExtensionHost {
     createTab: (details) => createTabForExtension(profileId, details),
     selectTab: (contents) => selectTabOfContents(contents),
     removeTab: (contents) => closeTabOfContents(contents),
+    // chrome.windows.remove closes a window as the user would, so its pages leave it first (mainWindows.ts); the
+    // library's own default destroys it, skipping that, and the pages would end with it.
+    removeWindow: (window) => {
+      if (!window.isDestroyed()) {
+        window.close();
+      }
+    },
   });
   // Links an extension's popup opens (target=_blank, window.open) become tabs, as in Chrome, not bare windows.
   library.on("browser-action-popup-created", (popup: { browserWindow?: Electron.BrowserWindow }) => {

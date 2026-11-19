@@ -294,7 +294,8 @@ function runVideoScript(pip: OpenPictureInPicture, script: string, isUserGesture
     // without one anyway (autoplay needs no gesture).
     return runFrameScript(pip.videoFrame, script, false);
   }
-  return runScript(pip.pageView.webContents, script, isUserGesture);
+  const contents = getLiveContents(pip.pageView);
+  return contents === null ? Promise.resolve(null) : runScript(contents, script, isUserGesture);
 }
 
 /** A playing video found in one of the page's iframes, already marked there and in the page. */
@@ -522,14 +523,15 @@ function closePictureInPicture(pausesVideo: boolean): void {
   clearInterval(pip.statusTimer);
   clearInterval(pip.hoverTimer);
   pip.stopWatchingPage();
-  const contents = pip.pageView.webContents;
+  // Null when the page closed itself (window.close()): there is nothing left to unmark.
+  const contents = getLiveContents(pip.pageView);
   if (!pip.window.isDestroyed()) {
     lastBounds = pip.window.getBounds();
     if (pip.window.contentView.children.includes(pip.pageView)) {
       pip.window.contentView.removeChildView(pip.pageView);
     }
   }
-  if (!contents.isDestroyed()) {
+  if (contents !== null) {
     contents.removeInsertedCSS(pip.cssKey).catch(() => undefined);
     runScript(contents, buildUnmarkScript(pausesVideo));
   }
