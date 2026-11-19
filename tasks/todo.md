@@ -467,6 +467,20 @@ first (probes, nothing typed), then an audit of Electron-vs-Chrome gaps.
       list in the Library, one shared queue for the four overlay prompt cards (permission, password offer, sign-in,
       certificate), geolocation and media keys checked by hand in a packaged build.
 
+## Fixes (2026-11-19, the user on the local Milestone 8 build)
+"when i connect mcp to netsuite the browser just stops working … even when i force quit it and open this is still
+there"; "spaces should be completely separated so they don't share a log in … it should open in space 1 not switch
+to space 2".
+- [x] A page that closes itself (`window.close()`) no longer leaves a dead view: its tab closes like ⌘W (a pinned one
+      unloads), a Peek or Little Window closes; every read of a view's page goes through `liveContents.ts`
+      (check-self-closing)
+- [x] Spaces kept apart: the Command Bar offers only the active Space's tabs and closed tabs, "switch to the tab you
+      already have" looks only in the active Space; tab search (⇧⌘A), ⇧⌘T and the Archive's Restore still reach
+      every Space
+- [x] A new Space (also from a template) gets a profile of its own; the Space menu's Profile list shares one again
+- [x] Signed Developer ID build installed to /Applications for the user (still labelled 0.2.0, no release)
+- [ ] Later: deleting a Space leaves its profile (cookies on disk) behind; offer to remove a profile no Space uses
+
 ## Review (2026-11-01, release 0.2.0)
 - Released v0.2.0 (Latest): Bow Passwords (with embedded frames and the direct import from Chromium browsers),
   Favorites per Space, the Google sign-in fix, hover and scroll bar polish, and the download's own window. Full e2e
