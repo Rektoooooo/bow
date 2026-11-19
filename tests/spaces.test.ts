@@ -59,6 +59,20 @@ describe("createSpace / renameSpace / moveSpace", () => {
     expect(state.selectedTabIdBySpace[newSpace?.id as string]).toBeNull();
   });
 
+  it("renames the profile made for a Space along with it, never a profile other Spaces share", () => {
+    const initial = createInitialState();
+    const made = createSpace(initial, { name: "New Space", icon: "", theme: THEME }, ONE_PM);
+    const newSpace = made.spaces[2];
+    const renamed = renameSpace(made, newSpace?.id as string, "Work");
+
+    expect(renamed.profiles.find((profile) => profile.id === newSpace?.profileId)?.name).toBe("Work");
+    const sharedRename = renameSpace(initial, PERSONAL_SPACE_ID, "Home");
+    expect(sharedRename.profiles).toEqual(initial.profiles);
+    const sharedWithWork = setSpaceProfile(made, WORK_SPACE_ID, newSpace?.profileId as string);
+    const renamedShared = renameSpace(sharedWithWork, newSpace?.id as string, "Work");
+    expect(renamedShared.profiles.find((profile) => profile.id === newSpace?.profileId)?.name).toBe("New Space");
+  });
+
   it("uses the profile it is given, and makes none then", () => {
     const initial = createInitialState();
     const sharedProfileId = initial.spaces[0]?.profileId as string;

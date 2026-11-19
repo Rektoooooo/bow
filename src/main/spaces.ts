@@ -122,7 +122,9 @@ export function createSpace(state: BrowserState, details: NewSpaceDetails, now: 
 }
 
 /**
- * Renames a Space. An empty name is ignored.
+ * Renames a Space. An empty name is ignored. The profile made for it (createSpace names it like the Space, and no
+ * other Space uses it) takes the new name too, so the Profile menu does not fill up with "New Space".
+ * Example: "New Space" with its profile "New Space" → "Work", profile "Work"
  */
 export function renameSpace(state: BrowserState, spaceId: SpaceId, newName: string): BrowserState {
   const space = findSpace(state, spaceId);
@@ -130,7 +132,14 @@ export function renameSpace(state: BrowserState, spaceId: SpaceId, newName: stri
   if (space === undefined || trimmedName === "" || space.name === trimmedName) {
     return state;
   }
-  return updateSpace(state, spaceId, { name: trimmedName });
+  const renamed = updateSpace(state, spaceId, { name: trimmedName });
+  const isOnlyUser = state.spaces.every((other) => other.id === spaceId || other.profileId !== space.profileId);
+  const ownProfile = state.profiles.find((profile) => profile.id === space.profileId && profile.name === space.name);
+  if (!isOnlyUser || ownProfile === undefined) {
+    return renamed;
+  }
+  const profiles = renamed.profiles.map((profile) => (profile.id === ownProfile.id ? { ...profile, name: trimmedName } : profile));
+  return { ...renamed, profiles: profiles };
 }
 
 /**
