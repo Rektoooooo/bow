@@ -9,7 +9,8 @@ import { HISTORY_LIMIT, recordVisit, searchHistory, updateHistoryTitle } from ".
 import { addToFavorites, closeTab, createInitialState, setSearchEngine, updateTabPage } from "../src/main/state";
 import { HOUR_MS } from "../src/shared/settings";
 import type { BrowserState, ItemId } from "../src/shared/types";
-import { ONE_PM, openTabs } from "./builders";
+import { switchSpace } from "../src/main/spaces";
+import { ONE_PM, openTabs, PERSONAL_SPACE_ID, WORK_SPACE_ID } from "./builders";
 
 /** Builds a ranking input with sensible empty defaults. */
 function makeInput(query: string, state: BrowserState, changes: Partial<CommandBarInput> = {}): CommandBarInput {
@@ -200,3 +201,42 @@ describe("history by date", () => {
   });
 });
 
+
+describe("Spaces are kept apart", () => {
+  const { state: personal, tabIds } = openTabs(["https://github.com/", "https://docs.example/guide"]);
+  const titled = updateTabPage(personal, tabIds[0] as ItemId, "https://github.com/", "GitHub");
+  const inWork = switchSpace(titled, WORK_SPACE_ID, ONE_PM + 1000);
+
+  it("opens a site here that is open only in another Space, instead of switching to its tab", () => {
+    const history = recordVisit([], "https://github.com/", "GitHub", ONE_PM);
+
+    const results = rankCommandBarResults(makeInput("github", inWork, { history: history }), ONE_PM + 2000);
+
+    expect(results.some((result) => result.kind === "tab")).toBe(false);
+    expect(results[0]?.url).toBe("https://github.com/");
+    expect(results[0]?.kind).not.toBe("tab");
+  });
+
+  it("still switches to the tab when it is open in this Space", () => {
+    const results = rankCommandBarResults(makeInput("github", titled), ONE_PM + 2000);
+
+    expect(results[0]).toMatchObject({ kind: "tab", tabId: tabIds[0] });
+  });
+
+  it("lists only this Space's recent tabs when nothing is typed", () => {
+    expect(rankCommandBarResults(makeInput("", inWork), ONE_PM + 2000)).toEqual([]);
+    const personalResults = rankCommandBarResults(makeInput("", titled), ONE_PM + 2000);
+    expect(personalResults.map((result) => result.tabId).sort()).toEqual([...tabIds].sort());
+  });
+
+  it("offers only the tabs closed in this Space (reopening one closed elsewhere would switch Space)", () => {
+    const closed = closeTab(titled, tabIds[1] as ItemId, ONE_PM + 1000);
+    const closedInWork = switchSpace(closed, WORK_SPACE_ID, ONE_PM + 2000);
+
+    const workResults = rankCommandBarResults(makeInput("docs", closedInWork), ONE_PM + 3000);
+    const personalResults = rankCommandBarResults(makeInput("docs", switchSpace(closedInWork, PERSONAL_SPACE_ID, ONE_PM + 3000)), ONE_PM + 3000);
+
+    expect(workResults.some((result) => result.kind === "closed")).toBe(false);
+    expect(personalResults.some((result) => result.kind === "closed")).toBe(true);
+  });
+});

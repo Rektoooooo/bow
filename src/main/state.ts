@@ -917,6 +917,17 @@ export function setSpaceArchiveAfter(state: BrowserState, spaceId: SpaceId, arch
 }
 
 /**
+ * The Space an archived tab comes back in: the one it left, or the active Space when that one is unknown or gone.
+ * Example: a tab closed in Work → Work's id, even while Home is active
+ */
+export function findRestoreSpaceId(state: BrowserState, entry: ArchivedTab): SpaceId {
+  if (entry.fromSpaceId !== null && findSpace(state, entry.fromSpaceId) !== undefined) {
+    return entry.fromSpaceId;
+  }
+  return state.activeSpaceId;
+}
+
+/**
  * Takes a tab out of the archive and puts it back at the top of Today in the Space it left, then selects it.
  * It comes back as a Today tab (no home URL) with lastActiveAt = now. If its Space is gone, it goes to the active Space.
  */
@@ -926,10 +937,7 @@ export function restoreArchivedTab(state: BrowserState, tabId: ItemId, now: numb
     return state;
   }
 
-  let spaceId = state.activeSpaceId;
-  if (archivedEntry.fromSpaceId !== null && findSpace(state, archivedEntry.fromSpaceId) !== undefined) {
-    spaceId = archivedEntry.fromSpaceId;
-  }
+  const spaceId = findRestoreSpaceId(state, archivedEntry);
 
   // A tab with the same id may exist if it was restored before and archived again; give it a fresh id then.
   const restoredId = state.items[tabId] === undefined ? tabId : createId("tab", now);

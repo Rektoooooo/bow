@@ -1,7 +1,6 @@
 // Duplicate tabs: an address you already have open is switched to; Close Duplicate Tabs keeps one copy.
 import { describe, expect, it } from "vitest";
 import { findDuplicateTodayTabs, findOpenTabForUrl } from "../src/main/duplicateTabs";
-import { createProfile, setSpaceProfile } from "../src/main/spaces";
 import { pinTab, selectTab } from "../src/main/state";
 import type { ItemId } from "../src/shared/types";
 import { ONE_PM, openPinnedTabs, openTabs, PERSONAL_SPACE_ID, WORK_SPACE_ID } from "./builders";
@@ -19,11 +18,9 @@ describe("findOpenTabForUrl", () => {
     expect(findOpenTabForUrl(pinned.state, "https://calendar.example", PERSONAL_SPACE_ID)).toBe(pinned.tabIds[0]);
   });
 
-  it("looks only in the Space's profile: another profile is another sign-in", () => {
-    const created = createProfile(state, "Other", ONE_PM);
-    const separate = setSpaceProfile(created.state, WORK_SPACE_ID, created.profileId);
-    expect(findOpenTabForUrl(separate, "https://news.example/", WORK_SPACE_ID)).toBeNull();
-    expect(findOpenTabForUrl(state, "https://news.example/", WORK_SPACE_ID)).toBe(tabIds[1]);
+  it("looks only in the given Space: a tab in another Space never counts, even one of the same profile", () => {
+    expect(findOpenTabForUrl(state, "https://news.example/", PERSONAL_SPACE_ID)).toBe(tabIds[1]);
+    expect(findOpenTabForUrl(state, "https://news.example/", WORK_SPACE_ID)).toBeNull();
   });
 });
 

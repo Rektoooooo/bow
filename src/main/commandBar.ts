@@ -7,6 +7,9 @@
  * Data source:
  *   The typed query, the BrowserState (open tabs, Favorites, the tabs you closed in the Archive), browsing history,
  *   search suggestions, the action list, the current page's address and the recently used tabs.
+ *   Spaces are kept apart (the user's choice, 2026-11-19): only the active Space's tabs, and the tabs closed there,
+ *   are offered, so typing a site open in another Space opens it here instead of switching Space. Tab search (⇧⌘A)
+ *   is the one place that finds tabs in every Space.
  *
  * Data flow:
  *   overlay sends a query → main.ts → rankCommandBarResults() → up to RESULTS_LIMIT results → overlay shows them
@@ -33,7 +36,8 @@ import { looksLikeWebAddress, normalizeTypedInput } from "./urls";
 import { buildSearchUrl, findSpaceSearchEngine } from "../shared/searchEngines";
 import { matchSearchKeyword } from "../shared/searchKeywords";
 import { describeSpaceIconAsText } from "../shared/spaceIcons";
-import { findSpaceIdOfItem } from "./tree";
+import { collectTabIdsInList, findSpaceIdOfItem, findTab, getActiveSpace } from "./tree";
+import { findRestoreSpaceId } from "./state";
 import { calculate } from "./calculator";
 import { convertUnits } from "./unitConversion";
 
@@ -210,6 +214,24 @@ function listAllTabs(state: BrowserState): { tab: TabItem; isFavorite: boolean }
 }
 
 /**
+ * Lists the active Space's tabs (Favorites, Pinned and Today, inside folders and split views too) with whether each
+ * is a Favorite.
+ */
+function listActiveSpaceTabs(state: BrowserState): { tab: TabItem; isFavorite: boolean }[] {
+  const space = getActiveSpace(state);
+  const favoriteIds = new Set(collectTabIdsInList(state, space.favoriteIds));
+  const tabIds = collectTabIdsInList(state, [...space.favoriteIds, ...space.pinnedIds, ...space.todayIds]);
+  const tabs: { tab: TabItem; isFavorite: boolean }[] = [];
+  for (const tabId of tabIds) {
+    const tab = findTab(state, tabId);
+    if (tab !== undefined) {
+      tabs.push({ tab: tab, isFavorite: favoriteIds.has(tabId) });
+    }
+  }
+  return tabs;
+}
+
+/**
  * Builds the "Switch to Tab" result for a tab.
  */
 function createTabResult(tab: TabItem): CommandBarResult {
@@ -267,11 +289,11 @@ export function rankTabSearchResults(input: TabSearchInput): CommandBarResult[] 
 }
 
 /**
- * Scores the open tabs against the query.
+ * Scores the active Space's open tabs against the query.
  */
 function scoreTabs(input: CommandBarInput): ScoredResult[] {
   const scored: ScoredResult[] = [];
-  for (const { tab, isFavorite } of listAllTabs(input.state)) {
+  for (const { tab, isFavorite } of listActiveSpaceTabs(input.state)) {
     const name = tab.customTitle ?? tab.title;
     const matchScore = Math.max(scoreTextMatch(name, input.query), scoreAddressMatch(tab.url, input.query));
     if (matchScore === 0) {
@@ -414,16 +436,18 @@ function removeDuplicates(scored: ScoredResult[]): ScoredResult[] {
 }
 
 /**
- * The tabs you closed (the ones ⇧⌘T reopens; not those the sweep or Clear archived), newest first, one per page, and
- * none whose page is open again in a tab.
+ * The tabs you closed (the ones ⇧⌘T reopens; not those the sweep or Clear archived) that come back in the active
+ * Space, newest first, one per page, and none whose page is open again in a tab of that Space.
  */
 function listClosedTabs(input: CommandBarInput): ArchivedTab[] {
-  const openTabs = listAllTabs(input.state);
+  const openTabs = listActiveSpaceTabs(input.state);
   const seenKeys = new Set(openTabs.map((entry) => toDedupeKey(entry.tab.url)));
   const closed: ArchivedTab[] = [];
   for (const entry of input.state.archive) {
     const key = toDedupeKey(entry.tab.url);
-    if (entry.reason !== "manual" || seenKeys.has(key)) {
+    // Reopening one closed in another Space would switch to that Space.
+    const comesBackHere = findRestoreSpaceId(input.state, entry) === input.state.activeSpaceId;
+    if (entry.reason !== "manual" || seenKeys.has(key) || !comesBackHere) {
       continue;
     }
     seenKeys.add(key);
@@ -507,10 +531,10 @@ function scoreDatedHistory(input: CommandBarInput, now: number): ScoredResult[] 
 }
 
 /**
- * The results for an empty query: the most recently used tabs, except the one on screen.
+ * The results for an empty query: the active Space's most recently used tabs, except the one on screen.
  */
 function listRecentTabs(input: CommandBarInput): CommandBarResult[] {
-  const tabs = listAllTabs(input.state)
+  const tabs = listActiveSpaceTabs(input.state)
     .map((entry) => entry.tab)
     .filter((tab) => tab.url !== input.currentUrl);
   tabs.sort((first, second) => second.lastActiveAt - first.lastActiveAt);

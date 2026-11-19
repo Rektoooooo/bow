@@ -1,15 +1,17 @@
 /**
  * WHY this file exists:
  *   The same page open twice is clutter, and it happens without noticing: typing an address you already have, or a
- *   link from another app. Opening an address the user asks for switches to the tab that already shows it (the
- *   sidebar offers "Open Another"), and Close Duplicate Tabs tidies up what piled up. Within one profile only: the
- *   same address in another profile is a different sign-in.
+ *   link from another app. Opening an address the user asks for switches to the tab of the active Space that already
+ *   shows it (the sidebar offers "Open Another"); a tab in another Space never counts, so the Space never changes
+ *   (Spaces are kept apart, the user's choice, 2026-11-19). Close Duplicate Tabs tidies up what piled up, within one
+ *   profile: the same address in another profile is a different sign-in.
  *
  * Data source:
  *   The state's tabs (Favorites, Pinned and Today, with their addresses and home addresses) and an address.
  *
  * Data flow:
- *   typed / Command Bar / routed link → tabActions.openOrSwitchToTab → findOpenTabForUrl → select it or open a tab
+ *   typed / Command Bar / routed link → tabActions.openOrSwitchToTab → findOpenTabForUrl (active Space) → select it or
+ *   open a tab
  *   Close Duplicate Tabs → findDuplicateTodayTabs → archiveUndoController (archived, with Undo)
  *
  * Rules: pure. Two addresses match when they differ only in http/https, "www." and a trailing slash
@@ -26,10 +28,9 @@ interface PlacedTab {
 }
 
 /**
- * The tabs of a profile, in the order a match is preferred: the given Space's Pinned, Today and Favorites, then those
- * of the profile's other Spaces.
+ * The tabs of a Space, in the order a match is preferred: its Pinned, Today and Favorites.
  */
-function listProfileTabs(state: BrowserState, profileId: string, preferredSpaceId: SpaceId | null): PlacedTab[] {
+function listSpaceTabs(state: BrowserState, space: Space): PlacedTab[] {
   const placed: PlacedTab[] = [];
   const addList = (itemIds: ItemId[], isToday: boolean): void => {
     for (const tabId of collectTabIdsInList(state, itemIds)) {
@@ -39,17 +40,18 @@ function listProfileTabs(state: BrowserState, profileId: string, preferredSpaceI
       }
     }
   };
-  const spaces = state.spaces.filter((space) => space.profileId === profileId);
-  const preferred = spaces.filter((space) => space.id === preferredSpaceId);
-  const others = spaces.filter((space) => space.id !== preferredSpaceId);
-  const addSpace = (space: Space): void => {
-    addList(space.pinnedIds, false);
-    addList(space.todayIds, true);
-    addList(space.favoriteIds, false);
-  };
-  preferred.forEach(addSpace);
-  others.forEach(addSpace);
+  addList(space.pinnedIds, false);
+  addList(space.todayIds, true);
+  addList(space.favoriteIds, false);
   return placed;
+}
+
+/**
+ * The tabs of every Space of a profile.
+ */
+function listProfileTabs(state: BrowserState, profileId: string): PlacedTab[] {
+  const spaces = state.spaces.filter((space) => space.profileId === profileId);
+  return spaces.flatMap((space) => listSpaceTabs(state, space));
 }
 
 /**
@@ -61,7 +63,7 @@ function showsAddress(tab: TabItem, addressKey: string): boolean {
 }
 
 /**
- * The tab already showing an address, among the tabs of the Space's profile (that Space's first). Null when none.
+ * The tab of a Space already showing an address. Null when none (a tab in another Space does not count).
  * Example: Today has https://mail.example/ and the user types "mail.example" → that tab's id
  */
 export function findOpenTabForUrl(state: BrowserState, url: string, spaceId: SpaceId): ItemId | null {
@@ -70,7 +72,7 @@ export function findOpenTabForUrl(state: BrowserState, url: string, spaceId: Spa
     return null;
   }
   const addressKey = toDedupeKey(url);
-  const match = listProfileTabs(state, space.profileId, spaceId).find((placed) => showsAddress(placed.tab, addressKey));
+  const match = listSpaceTabs(state, space).find((placed) => showsAddress(placed.tab, addressKey));
   return match === undefined ? null : match.tab.id;
 }
 
@@ -82,7 +84,7 @@ export function findDuplicateTodayTabs(state: BrowserState): ItemId[] {
   const duplicates: ItemId[] = [];
   for (const profile of state.profiles) {
     const byAddress = new Map<string, PlacedTab[]>();
-    for (const placed of listProfileTabs(state, profile.id, null)) {
+    for (const placed of listProfileTabs(state, profile.id)) {
       const addressKey = toDedupeKey(placed.tab.url);
       byAddress.set(addressKey, [...(byAddress.get(addressKey) ?? []), placed]);
     }

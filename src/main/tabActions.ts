@@ -44,7 +44,7 @@ export function openLinkInNewTab(url: string, disposition: OpenDisposition, orig
 
 /**
  * Opens an address the user asked for (typed in the sidebar or the Command Bar, a link from another app sent to a
- * Space) in a new Today tab, unless a tab of the active Space's profile already shows it (duplicateTabs.ts): then
+ * Space) in a new Today tab, unless a tab of the active Space already shows it (duplicateTabs.ts): then
  * that tab is shown (in its own window when another window has it on screen), and the sidebar offers to open another
  * anyway. Links opened from pages keep opening new tabs: there the user chose where to go. With `origin` a new tab is
  * remembered as made for a link (see openLinkInNewTab).
