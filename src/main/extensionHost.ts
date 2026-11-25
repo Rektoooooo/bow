@@ -260,8 +260,10 @@ function registerTabPages(state: BrowserState): void {
   }
   const selectedHost = Array.from(hostsByProfile.values()).find((host) => host.registeredContents.has(selectedContents));
   if (selectedHost !== undefined) {
-    selectedHost.library.selectTab(selectedContents);
+    // Noted before the library hears of it: the library may answer by asking Bow to select that tab
+    // (selectTabOfContents), which changes the state and comes back here before selectTab returns.
     lastSelectedContents = selectedContents;
+    selectedHost.library.selectTab(selectedContents);
   }
 }
 
@@ -309,9 +311,13 @@ async function createTabForExtension(profileId: ProfileId, details: chrome.tabs.
  */
 function selectTabOfContents(contents: WebContents): void {
   const tabId = findTabIdOfContents(contents);
-  if (tabId !== null) {
-    applyChange((state) => selectTab(state, tabId, Date.now()));
+  // The library also asks when Bow told it first (registerTabPages); the tab is selected already then. A tab it first
+  // met in a window that has since closed never counts as active there, so without this check the two would answer
+  // each other until the main process ran out of stack (2026-11-25).
+  if (tabId === null || tabId === getSelectedTabId(getState())) {
+    return;
   }
+  applyChange((state) => selectTab(state, tabId, Date.now()));
 }
 
 /**

@@ -156,6 +156,47 @@ await sidebar.waitForTimeout(300);
 check("and hides the toolbar button", (await extensionsButton.count()) === 0);
 await dispatch(sidebar, { type: "setExtensionEnabled", profileId: "profile-default", extensionId, isEnabled: true });
 check("turning it on loads it again", (await waitFor(() => loadedNames(app), (names) => names.length === 1)).length === 1);
+
+// A tab the extension library first met in a window that has since closed (⌘N, a tab there, the window closed):
+// selecting it again looped between the library ("this tab is now active") and Bow ("select it") until the main
+// process ran out of stack (2026-11-25). The library keeps the closed window as that tab's window.
+await app.evaluate(() => {
+  globalThis.mainErrors = [];
+  process.on("uncaughtException", (error) => globalThis.mainErrors.push(String(error?.stack ?? error).split("\n").slice(0, 2).join(" | ")));
+});
+const mainWindowsModulePath = path.join(appDir, "dist", "node", "main", "mainWindows.js");
+const mainWindowCount = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((window) => window.webContents.getURL().endsWith("/renderer/index.html")).length);
+await app.evaluate((_electron, modulePath) => process.mainModule.require(modulePath).openNewWindow(), mainWindowsModulePath);
+await waitFor(mainWindowCount, (count) => count === 2);
+const secondSidebar = await waitFor(() => app.windows().find((page) => page !== sidebar && page.url().endsWith("/renderer/index.html")) ?? null, (page) => page !== null);
+await secondSidebar.waitForSelector(".sidebar");
+await dispatch(secondSidebar, { type: "openTab", typedText: "example.org" });
+const stateWithSecondTab = await waitFor(() => getState(secondSidebar), (value) => {
+  const selectedId = value.selectedTabIdBySpace[value.activeSpaceId];
+  return value.items[selectedId]?.url.includes("example.org") === true;
+});
+const secondWindowTabId = stateWithSecondTab.selectedTabIdBySpace[stateWithSecondTab.activeSpaceId];
+await sidebar.waitForTimeout(1500);
+// The window ⌘N made is the newest one.
+await app.evaluate(({ BrowserWindow }) => {
+  const mainWindows = BrowserWindow.getAllWindows().filter((window) => window.webContents.getURL().endsWith("/renderer/index.html"));
+  const newestFirst = mainWindows.sort((first, second) => second.webContents.id - first.webContents.id);
+  newestFirst[0].close();
+});
+await waitFor(mainWindowCount, (count) => count === 1);
+let selectError = "";
+try {
+  await dispatch(sidebar, { type: "selectTab", tabId: secondWindowTabId });
+} catch (error) {
+  selectError = String(error).slice(0, 160);
+}
+const stateAfterSelect = await waitFor(() => getState(sidebar), (value) => value.selectedTabIdBySpace[value.activeSpaceId] === secondWindowTabId, 5000);
+const mainErrors = await app.evaluate(() => globalThis.mainErrors);
+check(
+  "a tab first shown in a window that closed can be selected again (no endless loop with the extension library)",
+  selectError === "" && mainErrors.length === 0 && stateAfterSelect.selectedTabIdBySpace[stateAfterSelect.activeSpaceId] === secondWindowTabId,
+  `${selectError} ${mainErrors.join(" || ")}`.trim(),
+);
 check("no page errors in the sidebar (first run)", pageErrors.length === 0, pageErrors.join(" | "));
 await app.close();
 
