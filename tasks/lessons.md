@@ -221,3 +221,7 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   sign-in page did it, and every runtime push threw in the main process, again after each restart). Read a view's
   page through `getLiveContents`, and give every view that holds a page a "destroyed" handler; take a view out of its
   map before closing it yourself, so that handler can tell the two apart.
+- Both macOS accounts run the same `/Applications/Bow.app`, and `pgrep -f` lists the other account's processes too
+  (2026-11-26: a quit loop waited on the other account's Bow, which macOS then refused to signal). Look for this
+  account's Bow with `pgrep -u "$(whoami)"`. Swapping the app leaves the other account's running Bow on the old
+  version until it restarts there; say so to the user.
