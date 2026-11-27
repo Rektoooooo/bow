@@ -2,13 +2,16 @@
  * WHY this file exists:
  *   People switching to Bow bring their passwords as the CSV file their old browser or password manager exports.
  *   These pure functions read that text (the file format has a few traps: quoted commas, newlines inside quotes,
- *   a byte order mark) and merge the logins into the vault without ever overwriting what Bow already holds.
+ *   a byte order mark) and merge the logins into the vault without ever overwriting what Bow already holds. Moving to
+ *   another Mac goes the other way: buildPasswordsCsv() writes the same format, which Bow there reads back.
  *
  * Data source:
  *   The text of a CSV file the user picked. Column names differ per program (see the alias lists below).
+ *   For an export, a profile's saved logins.
  *
  * Data flow:
  *   file text → parseCsv() → readLoginsFromCsv() → CsvLogin[] → mergeImportedLogins() → new vault + counts for the user
+ *   saved logins → buildPasswordsCsv() → file text (passwordExport.ts writes it)
  */
 import {
   findLoginForSiteAndUsername,
@@ -38,6 +41,9 @@ const QUOTE = '"';
 const SEPARATOR = ",";
 const LINE_FEED = "\n";
 const CARRIAGE_RETURN = "\r";
+
+/** The columns an export has, in the order Chrome writes them; Bow, Chrome, Safari and Firefox all read them back. */
+const EXPORT_HEADER = ["name", "url", "username", "password"];
 
 interface CsvReaderState {
   rows: string[][];
@@ -218,4 +224,44 @@ export function mergeImportedLogins(
   }
   const mergedVault = addedCount === 0 ? vault : { ...vault, logins: mergedLogins };
   return { vault: mergedVault, addedCount, alreadySavedCount, keptDifferentCount, skippedCount };
+}
+
+/**
+ * One cell of an export: quoted when it holds a comma, a quote or a line break, with inner quotes doubled. The value
+ * itself never changes (a password that starts with "=" stays as it is: it is a password, not a formula).
+ */
+function toCsvCell(value: string): string {
+  const needsQuotes = value.includes(SEPARATOR) || value.includes(QUOTE) || value.includes(LINE_FEED) || value.includes(CARRIAGE_RETURN);
+  if (!needsQuotes) {
+    return value;
+  }
+  const doubledQuotes = value.split(QUOTE).join(QUOTE + QUOTE);
+  return QUOTE + doubledQuotes + QUOTE;
+}
+
+/**
+ * The site's name for the "name" column: its host, or the address as it is when it has none.
+ */
+function describeSite(origin: string): string {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return origin;
+  }
+}
+
+/**
+ * A profile's saved logins as the text of a CSV file, in Chrome's export format (name, url, username, password), which
+ * readLoginsFromCsv() reads back unchanged.
+ * Example: [{ origin: "https://mail.example", username: "ana", password: "a,b" }] →
+ *   "name,url,username,password\nmail.example,https://mail.example,ana,\"a,b\"\n"
+ */
+export function buildPasswordsCsv(logins: readonly SavedLogin[]): string {
+  const lines = [EXPORT_HEADER.join(SEPARATOR)];
+  for (const login of logins) {
+    const cells = [describeSite(login.origin), login.origin, login.username, login.password];
+    const quotedCells = cells.map(toCsvCell);
+    lines.push(quotedCells.join(SEPARATOR));
+  }
+  return lines.join(LINE_FEED) + LINE_FEED;
 }

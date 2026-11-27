@@ -249,14 +249,21 @@ function createToolbar(passwords: PasswordsData, list: HTMLElement): HTMLElement
   return toolbar;
 }
 
-/** The row at the top of the list: bring passwords over from the CSV file another browser or app exported. */
+/**
+ * The rows at the top of the list: bring passwords over from the CSV file another browser or app exported, and take
+ * this profile's to another Mac or browser the same way.
+ */
 function createImportGroup(passwords: PasswordsData): HTMLElement {
   const group = createElement("section", "password-group password-import");
   const row = createElement("div", "library-line password-import-row");
   const text = createElement("span", "library-line-text");
   text.append(createElement("span", "library-line-title", "Import passwords"), createElement("span", "library-line-meta", "From the CSV file your browser, password manager or the Mac's Passwords app (File › Export All Passwords) exported."));
   row.append(text, createTextButton("Import passwords…", "library-chip is-active password-import-button", () => dispatch({ type: "importPasswordsFromFile", profileId: passwords.profileId })));
-  group.append(row);
+  const exportRow = createElement("div", "library-line password-import-row");
+  const exportText = createElement("span", "library-line-text");
+  exportText.append(createElement("span", "library-line-title", "Export passwords"), createElement("span", "library-line-meta", "This profile's passwords as a CSV file, to import in Bow on another Mac or in another browser. The file is not encrypted."));
+  exportRow.append(exportText, createTextButton("Export passwords…", "library-chip password-export-button", () => dispatch({ type: "exportPasswordsToFile", profileId: passwords.profileId })));
+  group.append(row, exportRow);
   return group;
 }
 

@@ -8,9 +8,10 @@
  *
  * Data flow:
  *   CSV text → parseCsv() / readLoginsFromCsv() → logins; logins + vault → mergeImportedLogins() → counts
+ *   saved logins → buildPasswordsCsv() → CSV text → readLoginsFromCsv() → the same logins (an export Bow reads back)
  */
 import { describe, expect, it } from "vitest";
-import { mergeImportedLogins, parseCsv, readLoginsFromCsv } from "../src/main/passwordCsv";
+import { buildPasswordsCsv, mergeImportedLogins, parseCsv, readLoginsFromCsv } from "../src/main/passwordCsv";
 import { createEmptyVault, MAX_LOGIN_FIELD_LENGTH, MAX_SAVED_LOGINS, type PasswordVault } from "../src/main/passwords";
 
 const NOW = 7_000;
@@ -189,5 +190,38 @@ describe("mergeImportedLogins", () => {
     expect(result).toMatchObject({ addedCount: 1, skippedCount: 2 });
     expect(result.vault.logins).toHaveLength(MAX_SAVED_LOGINS);
     expect(result.vault.logins[0].id).toBe("id-0");
+  });
+});
+
+describe("buildPasswordsCsv", () => {
+  const savedLogin = (origin: string, username: string, password: string) => ({ id: `id-${origin}-${username}`, origin, username, password, createdAt: NOW, changedAt: NOW });
+
+  it("writes Chrome's columns, and Bow reads every login back unchanged", () => {
+    const logins = [
+      savedLogin("https://mail.example", "ana@example.com", "plain"),
+      savedLogin("https://shop.example", "with,comma", 'quote " and , comma'),
+      savedLogin("https://bank.example", "", "line\nbreak and\r\nmore"),
+      savedLogin("https://formula.example", "=cmd", "=SUM(A1)"),
+      savedLogin("https://unicode.example", "žluťoučký kůň", "pässwörd 密码 🔑"),
+      savedLogin("http://router.local:8080", "admin", " spaces kept "),
+    ];
+
+    const text = buildPasswordsCsv(logins);
+    const readBack = readLoginsFromCsv(text);
+
+    expect(text.startsWith("name,url,username,password\n")).toBe(true);
+    expect(readBack.isRecognized).toBe(true);
+    expect(readBack.skippedCount).toBe(0);
+    expect(readBack.logins).toEqual(logins.map((login) => ({ origin: login.origin, username: login.username, password: login.password })));
+  });
+
+  it("names each row after its site's host", () => {
+    const text = buildPasswordsCsv([savedLogin("https://mail.example", "ana", "pw")]);
+
+    expect(parseCsv(text)[1]).toEqual(["mail.example", "https://mail.example", "ana", "pw"]);
+  });
+
+  it("writes only the header for an empty vault", () => {
+    expect(buildPasswordsCsv([])).toBe("name,url,username,password\n");
   });
 });

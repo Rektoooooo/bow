@@ -196,6 +196,8 @@ export type BrowserAction =
   | { type: "retryPasswordVault"; profileId: ProfileId }
   /** Asks for a passwords export (CSV) and adds its logins to this profile (main/passwordImport.ts). */
   | { type: "importPasswordsFromFile"; profileId: ProfileId }
+  /** Writes this profile's saved logins to a CSV file the user names, after Touch ID (main/passwordExport.ts). */
+  | { type: "exportPasswordsToFile"; profileId: ProfileId }
   | { type: "setTabNeverArchived"; tabId: ItemId; isNeverArchived: boolean }
   | { type: "setSpaceArchiveAfter"; spaceId: SpaceId; archiveAfterMs: number | null | "default" }
   /** A Space's own search engine, or the one in Settings ("default"). */
@@ -376,6 +378,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "forgetFormEntries",
   "retryPasswordVault",
   "importPasswordsFromFile",
+  "exportPasswordsToFile",
   "setTabNeverArchived",
   "setSpaceArchiveAfter",
   "setSpaceSearchEngine",

@@ -154,6 +154,7 @@ import { closeSplitByUser, closeTabByUser, navigateFocusedPage, openLinkInNewTab
 import { getFocusedContents, getTabContents, getTabViews } from "./tabViews";
 import { createId } from "./tree";
 import { offerPasswordsFileImport } from "./passwordImport";
+import { exportPasswordsToFile } from "./passwordExport";
 import { allowSavingOnSite, choosePasswordsProfile, deleteSavedLogin, forgetAllFormEntries, retryPasswordVault } from "./passwordsLibrary";
 import { checkCommandChain, createCommandChain, deleteCommandChain, saveCommandChain, toChainActionId } from "./commandChains";
 import { openPeek } from "./peek";
@@ -667,6 +668,9 @@ export function runAction(action: BrowserAction): void {
       return retryPasswordVault(getState(), action.profileId, refreshOpenPanel);
     case "importPasswordsFromFile":
       offerPasswordsFileImport(getState(), action.profileId).catch((error) => console.error("Importing passwords failed:", error instanceof Error ? error.name : ""));
+      return;
+    case "exportPasswordsToFile":
+      exportPasswordsToFile(getState(), action.profileId).catch((error) => console.error("Exporting passwords failed:", error instanceof Error ? error.name : ""));
       return;
     case "chooseSyncFolder":
       chooseSyncFolder().catch((error) => console.error("Starting sync failed:", error));

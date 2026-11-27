@@ -1060,6 +1060,41 @@ check("an action for a profile that does not exist asks nothing and changes noth
   return stub.messages.length === 3 && stub.trashed.length === trashedCount;
 })());
 
+// ---------- 13k. Exporting passwords (for another Mac) ----------
+// The save sheet is stood in for: a cancel writes nothing; a file under e2e/output gets every login of the (test)
+// vault, readable by this user only, in a form Bow's own import reads back unchanged.
+const exportPath = path.join(importFolder, "Bow Passwords - Default.csv");
+const chooseExportFile = (filePath) =>
+  app.evaluate(({ dialog }, value) => {
+    dialog.showSaveDialog = async () => (value === "" ? { canceled: true, filePath: "" } : { canceled: false, filePath: value });
+  }, filePath);
+const messagesBeforeExport = (await readImportStub()).messages.length;
+await chooseExportFile("");
+await dispatch({ type: "exportPasswordsToFile", profileId: "profile-default" });
+await sleep(800);
+check("a cancelled export writes nothing and says nothing", !fs.existsSync(exportPath) && (await readImportStub()).messages.length === messagesBeforeExport);
+await chooseExportFile(exportPath);
+await dispatch({ type: "exportPasswordsToFile", profileId: "profile-default" });
+const exportStub = await waitForImportMessages(messagesBeforeExport + 1);
+const exportMessage = exportStub.messages[messagesBeforeExport];
+const vaultAtExport = await readVault();
+const { readLoginsFromCsv } = createRequire(import.meta.url)(path.join(appDir, "dist", "node", "main", "passwordCsv.js"));
+const exportedText = fs.existsSync(exportPath) ? fs.readFileSync(exportPath, "utf8") : "";
+const exportedLogins = readLoginsFromCsv(exportedText).logins;
+const sortLogins = (logins) => [...logins].map((login) => JSON.stringify(login)).sort();
+check(
+  "Export passwords writes every login, and Bow's import reads them back unchanged",
+  vaultAtExport.logins.length > 0 && JSON.stringify(sortLogins(exportedLogins)) === JSON.stringify(sortLogins(vaultAtExport.logins)),
+  `${exportedLogins.length} of ${vaultAtExport.logins.length}`,
+);
+check("the exported file is readable by this macOS user only", fs.existsSync(exportPath) && (fs.statSync(exportPath).mode & 0o777) === 0o600, fs.existsSync(exportPath) ? (fs.statSync(exportPath).mode & 0o777).toString(8) : "no file");
+check(
+  "a closing sheet gives the count and says the file is not encrypted",
+  exportMessage?.message === `Exported ${vaultAtExport.logins.length} passwords from Default` && exportMessage.detail.includes("not encrypted"),
+  JSON.stringify(exportMessage),
+);
+fs.rmSync(exportPath, { force: true });
+
 // ---------- 14. A restart keeps the logins ----------
 const quitApp = async () => {
   const appPid = app.process().pid;
