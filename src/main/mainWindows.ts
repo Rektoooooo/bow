@@ -1,8 +1,10 @@
 /**
  * WHY this file exists:
  *   Arc's ⌘N: more than one main window, each a full browser window with its own sidebar, Space and selected tabs.
- *   This file makes them (and opens the saved ones again at start), follows which one has the focus, and closes them:
- *   the app quits with the last one, and ⌘Q keeps every window for the next start.
+ *   This file makes them (and opens the saved ones again at start), follows which one has the focus, and closes them.
+ *   Like other Mac apps, Bow keeps running when the last one closes (the user, 2026-11-27: closing the window used to
+ *   quit Bow, which with "Forget Site Data on Quit" signed them out of every site): the Dock icon, ⌘N or a link opens
+ *   that window again as it was. ⌘Q quits and keeps every window for the next start.
  *
  * Data source:
  *   The window list in BrowserState (windows.ts), window-state.json (windowState.ts), Electron's BrowserWindow.
@@ -11,7 +13,9 @@
  *   start → restoreMainWindows() → one BrowserWindow per saved window → attachWindow() → (main.ts) syncViews()
  *   ⌘N → openNewWindow() → openWindow(state, id) → its sidebar asks for the state as it shows it → Command Bar
  *   a main window gets the focus → floating panels close → focusWindow(state, id)
- *   a main window closes → its pages leave it → closeWindow(state, id) (not while quitting) → quit after the last
+ *   a main window closes → its pages leave it → closeWindow(state, id) (not while quitting); after the last, pages
+ *   playing sound sleep and Bow keeps running
+ *   Dock icon, ⌘N, a link or a menu panel with no window open → showMainWindow() → reopenLastWindow()
  *   the sidebar page opens a window → only the card's corner pages are allowed (cornerMasks.ts)
  *   the sidebar's process goes away → reloadSidebarAfterCrash() → it loads again (cornerMasks.ts reopens the corners)
  */
@@ -19,13 +23,15 @@ import { app, autoUpdater, BrowserWindow } from "electron";
 import type { Rectangle } from "electron";
 import * as path from "node:path";
 import type { WindowId } from "../shared/types";
-import { applyChange, attachWindow, detachWindow, getMainWindow, getState, getWindow, isLibraryOpenIn, listMainWindows, relayoutWindow, scheduleRuntimePush } from "./browserCore";
+import { applyChange, attachWindow, detachWindow, getMainWindow, getState, getWindow, isLibraryOpenIn, listMainWindows, relayoutWindow, scheduleRuntimePush, syncViews } from "./browserCore";
 import { answerSidebarWindowOpen } from "./cornerMasks";
 import { closeOverlay, openCommandBar, relayoutOverlay } from "./overlayController";
 import { leaveWindow as overlayLeaveWindow } from "./overlay";
 import { closePeekIn, refreshPeekFrame, relayoutPeek } from "./peek";
 import { leaveWindow as statusBubbleLeaveWindow } from "./statusBubble";
 import { closeAutofillPopup, leaveWindow as autofillLeaveWindow } from "./autofillPopup";
+import { exitPageFullscreenIn } from "./tabViews";
+import { sleepAudiblePagesNow } from "./tabSleepController";
 import { createId } from "./tree";
 import { closeWindow, focusWindow, listWindowIds, openWindow } from "./windows";
 import { forgetWindowBounds, loadWindowBounds, rememberWindowBounds } from "./windowState";
@@ -83,7 +89,7 @@ function handleWindowFocus(windowId: WindowId): void {
 
 /**
  * A main window is closing: the shared floating views and its pages leave it (they live on), and unless the app is
- * quitting, the window leaves the saved list (the last window always stays, so the next start opens it again).
+ * quitting, the window leaves the saved list (the last window always stays, so it can open again as it was).
  */
 function handleWindowClose(windowId: WindowId, window: BrowserWindow): void {
   if (windowId === getState().focusedWindowId) {
@@ -169,6 +175,8 @@ function createMainWindow(windowId: WindowId, bounds: Rectangle | null): Browser
     }
   });
   window.on("move", () => rememberWindowBounds(windowId, window));
+  // The green button or ⌃⌘F ends a page's fullscreen video too (tabViews.ts lays that page over the whole window).
+  window.on("leave-full-screen", () => exitPageFullscreenIn(windowId));
   window.on("focus", () => handleWindowFocus(windowId));
   // Arc draws an active window darker than an inactive one: the sidebar hears of every change (also to another app).
   window.on("focus", () => scheduleRuntimePush());
@@ -180,10 +188,11 @@ function createMainWindow(windowId: WindowId, bounds: Rectangle | null): Browser
   window.on("focus", () => relayoutWindow(windowId));
   window.on("blur", () => relayoutWindow(windowId));
   window.on("close", () => handleWindowClose(windowId, window));
-  // Little Windows cannot live without a main window; closing the last one ends the app.
+  // Bow keeps running after the last window (main.ts keeps Electron from quitting). Nothing on screen could stop a
+  // page that plays sound now, so those sleep; Little Windows stay open.
   window.on("closed", () => {
-    if (listMainWindows().length === 0) {
-      app.quit();
+    if (listMainWindows().length === 0 && !isQuitting) {
+      sleepAudiblePagesNow();
     }
   });
   attachWindow(windowId, window);
@@ -205,6 +214,12 @@ export function restoreMainWindows(isHidden: boolean = false): void {
   // the last would be closed for good instead of opening again in the new version.
   autoUpdater.on("before-quit-for-update", () => {
     isQuitting = true;
+  });
+  // A click on the Dock icon with every window closed opens the last one again, like other Mac apps.
+  app.on("activate", () => {
+    if (listMainWindows().length === 0) {
+      showMainWindow();
+    }
   });
   const state = getState();
   const openingOrder = [...listWindowIds(state)].reverse();
@@ -248,10 +263,40 @@ export async function showMainWindows(fadeMs: number = 0): Promise<void> {
 }
 
 /**
+ * Opens the last closed main window again, as it was: closeWindow (windows.ts) keeps the last window in the state as
+ * the focused one, with its Space, selection and sidebar, and its saved place stays too. For when every window was
+ * closed and Bow kept running.
+ */
+function reopenLastWindow(): BrowserWindow {
+  const windowId = getState().focusedWindowId;
+  const window = createMainWindow(windowId, loadWindowBounds(windowId));
+  // Its pages come back into it (pages that were left alone are still loaded; sleeping ones wake).
+  syncViews();
+  return window;
+}
+
+/**
+ * Brings Bow's main window forward: the last focused one, or with every window closed, the last one opened again.
+ * The Dock icon, links from other apps, Little Windows and the menu's panels (⌘T, ⌘L, the Library) use it.
+ */
+export function showMainWindow(): BrowserWindow {
+  const window = getWindow() ?? reopenLastWindow();
+  window.show();
+  window.focus();
+  return window;
+}
+
+/**
  * File › New Window (⌘N, like Arc): a second full window on the same Space, with nothing selected and the Command
- * Bar open for a new tab (our choice: a new window is for something new).
+ * Bar open for a new tab (our choice: a new window is for something new). With every window closed, the last one
+ * opens again instead (a second window needs a first), with the Command Bar for a new tab.
  */
 export function openNewWindow(): void {
+  if (getWindow() === null) {
+    const reopened = showMainWindow();
+    reopened.webContents.once("did-finish-load", () => openCommandBar("newTab"));
+    return;
+  }
   const fromWindow = getWindow();
   const fromBounds = fromWindow === null ? null : fromWindow.getNormalBounds();
   const bounds = fromBounds === null ? null : { ...fromBounds, x: fromBounds.x + NEW_WINDOW_OFFSET_PX, y: fromBounds.y + NEW_WINDOW_OFFSET_PX };

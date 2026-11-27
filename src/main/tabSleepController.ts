@@ -11,6 +11,7 @@
  * Data flow:
  *   Sleep Tab → sleepTabNow(tabId) → tabViews.sleepTabView → runtime push (the sidebar dims the tab)
  *   Sleep Other Tabs → sleepOtherTabsNow() → findTabsAllowedToSleep → sleepTabView each → runtime push
+ *   the last main window closes (mainWindows.ts) → sleepAudiblePagesNow() → pages playing sound sleep
  *   Library › Task Manager → collectTaskList() → taskList.buildTaskList
  */
 import { app } from "electron";
@@ -59,6 +60,33 @@ export function sleepOtherTabsNow(): number {
     scheduleRuntimePush();
   }
   return sleptCount;
+}
+
+/**
+ * Every main window closed (Bow keeps running, like other Mac apps): pages still playing sound go to sleep, since
+ * nothing on screen could stop them any more. The page in picture in picture plays on in its own window, and a page in
+ * a call refuses (sleepTabView). Every other page stays awake, so a Favorite's notifications keep coming.
+ */
+export function sleepAudiblePagesNow(): void {
+  const pictureInPictureTabId = getPictureInPictureTabId();
+  const audibleTabIds: ItemId[] = [];
+  for (const [tabId, view] of getTabViews()) {
+    const contents = getLiveContents(view);
+    const isAudible = contents !== null && contents.isCurrentlyAudible();
+    if (isAudible && tabId !== pictureInPictureTabId) {
+      audibleTabIds.push(tabId);
+    }
+  }
+  // Collected first: sleeping a page takes it out of the map being read above.
+  let sleptCount = 0;
+  for (const tabId of audibleTabIds) {
+    if (sleepTabView(tabId)) {
+      sleptCount += 1;
+    }
+  }
+  if (sleptCount > 0) {
+    scheduleRuntimePush();
+  }
 }
 
 /**

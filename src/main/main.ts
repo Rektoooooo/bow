@@ -39,6 +39,7 @@ import {
   getState,
   getStateForWindow,
   getWindow,
+  handlePageFullscreenChanged,
   initializeState,
   onStateChanged,
   saveStateNow,
@@ -47,7 +48,7 @@ import {
   setTabViewEvents,
   syncViews,
 } from "./browserCore";
-import { isAppQuitting, restoreMainWindows } from "./mainWindows";
+import { isAppQuitting, restoreMainWindows, showMainWindow } from "./mainWindows";
 import { createCommandActionRegistry } from "./commandBarActions";
 import { onDownloadStarted, startTrackingDownloads } from "./downloads";
 import { forgetLinkTab, startClosingEmptyLinkViews } from "./linkDownloads";
@@ -186,6 +187,7 @@ const tabViewEvents: TabViewEvents = {
       closeTabByUser(tabId);
     }
   },
+  onPageFullscreenChanged: (tabId) => handlePageFullscreenChanged(tabId),
 };
 
 /**
@@ -542,7 +544,8 @@ function keepDataFolder(): void {
 
 /**
  * Entry point: one instance only (a second launch with a link opens it in a Little Window, like Arc),
- * then start once Electron is ready. Quits when the last main window closes (mainWindows.ts).
+ * then start once Electron is ready. Keeps running when the last main window closes, like other Mac apps
+ * (mainWindows.ts); ⌘Q quits.
  */
 function startApp(): void {
   // e2e runs only: windows stay invisible and never take the focus (backgroundTesting.ts).
@@ -563,9 +566,8 @@ function startApp(): void {
       readFrontApp().then((sourceApp) => handleExternalUrl(url, sourceApp));
       return;
     }
-    const lastFocusedWindow = getWindow();
-    lastFocusedWindow?.show();
-    lastFocusedWindow?.focus();
+    // Opening Bow again (Finder, Spotlight) brings its window forward, or the last one back after all were closed.
+    showMainWindow();
   });
   // Links from other apps (when this browser is the default) open in a Little Window, like Arc. A link that
   // launched the app arrives before it is ready and waits in pendingExternalUrls.
@@ -602,9 +604,9 @@ function startApp(): void {
     saveStateNow();
     flushSyncNow();
   });
-  app.on("window-all-closed", () => {
-    app.quit();
-  });
+  // Bow keeps running with every window closed, like other Mac apps: without a listener here Electron would quit.
+  // ⌘Q quits; the Dock icon, ⌘N or a link opens the last window again (mainWindows.ts showMainWindow).
+  app.on("window-all-closed", () => undefined);
 }
 
 startApp();

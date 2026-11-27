@@ -18,7 +18,8 @@ import * as path from "node:path";
 import { LITTLE_WINDOW_ARCHIVE_AFTER_MS } from "../shared/settings";
 import type { ArchiveReason } from "../shared/types";
 import { menuHost } from "./actionRunner";
-import { applyChange, getState, getWindow } from "./browserCore";
+import { applyChange, getState } from "./browserCore";
+import { showMainWindow } from "./mainWindows";
 import { showPageContextMenu } from "./menus";
 import { createPrivateSession, getProfileSession } from "./profiles";
 import { findRoutedSpaceId } from "./routing";
@@ -168,9 +169,7 @@ function watchPage(little: LittleWindow): void {
 function closeLittleWindowForDownload(little: LittleWindow): void {
   little.isSettled = true;
   little.window.close();
-  const mainWindow = getWindow();
-  mainWindow?.show();
-  mainWindow?.focus();
+  showMainWindow();
 }
 
 /**
@@ -255,9 +254,7 @@ export function handleExternalUrl(url: string, sourceApp: LinkSourceApp | null):
   const previousTabId = getSelectedTabId(getState());
   applyChange((state) => switchSpace(state, routedSpaceId, now));
   openOrSwitchToTab(url, { sourceTabId: previousTabId });
-  const mainWindow = getWindow();
-  mainWindow?.show();
-  mainWindow?.focus();
+  showMainWindow();
 }
 
 /**
@@ -309,9 +306,7 @@ export function registerLittleWindowIpc(): void {
     little.isSettled = true;
     applyChange((state) => openTab(state, url, Date.now()));
     little.window.close();
-    const mainWindow = getWindow();
-    mainWindow?.show();
-    mainWindow?.focus();
+    showMainWindow();
   });
   ipcMain.handle(LITTLE_CHANNELS.copyLink, (event) => {
     const little = findSender(event);

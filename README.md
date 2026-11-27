@@ -167,8 +167,9 @@ source never updates itself.
   a split, or a Space button). A tab or split comes along: the other window selects it and its page moves over; the
   window it came from shows another of its tabs. On a Space button it only moves to that Space.
 - Menus, shortcuts, the Command Bar, the Library, Peek and the other panels act in the window in front. ⇧⌘W closes a
-  window; the app quits with the last one. Every window (place, size, Space, selection) opens again at the next
-  start; links from Little Windows go to the main window you used last.
+  window. Like other Mac apps, Bow keeps running when you close the last one: the Dock icon, ⌘N, ⌘T or a link opens
+  it again as it was, and ⌘Q quits. Every window (place, size, Space, selection) opens again at the next start; links
+  from Little Windows go to the main window you used last.
 
 **Command Bar** (⌘T, ⌘L)
 - Finishes addresses as you type ("git" → github.com, also well-known sites you never visited).
