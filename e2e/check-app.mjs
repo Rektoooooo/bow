@@ -129,6 +129,22 @@ check("preload exposes window.browserApi", (await page.evaluate(() => typeof win
 check("sidebar shows the Personal Space title", (await page.textContent(".space-title-name")).includes("Personal"));
 check("empty card shows with no tabs", await page.isVisible("#empty-card"));
 check("bottom bar has Library, two Spaces and +", (await page.locator(".bottom-bar .space-button").count()) === 2 && (await page.locator(".bottom-bar .bottom-button").count()) === 2);
+// SF Symbols are drawn at AppKit's 13 pt (SF_SYMBOL_POINT_SIZE in shared/settings.ts): the bottom bar's + is about
+// 14 × 13 px and the sidebar button's icon about 18 × 14 px. Left to Electron's default of 30 pt, macOS 27 drew them
+// at 32 × 30 and 42 × 32 (2026-11-27).
+const LARGEST_13_POINT_SYMBOL_PX = 20;
+await page.waitForFunction(() => getComputedStyle(document.querySelector('.icon-symbol[data-symbol="plus"]')).getPropertyValue("--symbol-width") !== "", null, { timeout: 10000 }).catch(() => undefined);
+const symbolSizes = await page.evaluate(() => {
+  const sizes = {};
+  for (const name of ["plus", "sidebar"]) {
+    const icon = document.querySelector(`.bottom-bar .icon-symbol[data-symbol="${name}"], .sidebar-header .icon-symbol[data-symbol="${name}"]`);
+    const style = icon === null ? null : getComputedStyle(icon);
+    sizes[name] = style === null ? null : { width: parseFloat(style.getPropertyValue("--symbol-width")), height: parseFloat(style.getPropertyValue("--symbol-height")) };
+  }
+  return sizes;
+});
+const isSymbolAt13Points = (size) => size !== null && size.width > 0 && size.width <= LARGEST_13_POINT_SYMBOL_PX && size.height > 0 && size.height <= LARGEST_13_POINT_SYMBOL_PX;
+check("SF Symbols are drawn at 13 pt, not Electron's 30 pt default", Object.values(symbolSizes).every(isSymbolAt13Points), JSON.stringify(symbolSizes));
 await windowShot(app, "01-empty");
 
 await dispatch(page, { type: "openTab", typedText: "example.com" });

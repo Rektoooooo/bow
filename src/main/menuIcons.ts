@@ -11,6 +11,7 @@
  *   menus.ts / overlayController.ts / page right-click → addMenuIcons(template) → Menu.buildFromTemplate → popup
  */
 import { nativeImage } from "electron";
+import { SF_SYMBOL_POINT_SIZE } from "../shared/settings";
 import type { MenuItem, MenuItemConstructorOptions, NativeImage } from "electron";
 
 /** Item label → SF Symbol. Labels not listed get no icon. */
@@ -84,7 +85,7 @@ function getSymbolIcon(symbolName: string): NativeImage | null {
   if (cached !== undefined) {
     return cached;
   }
-  const rendered = nativeImage.createFromNamedImage(symbolName);
+  const rendered = nativeImage.createFromNamedImage(symbolName, { pointSize: SF_SYMBOL_POINT_SIZE });
   if (rendered.isEmpty()) {
     iconCache.set(symbolName, null);
     return null;
