@@ -79,6 +79,8 @@ export interface AppMenuCommands {
   /** File › Export Bow Backup… and Restore from Backup… (backupController.ts). */
   exportBackup(): void;
   restoreBackup(): void;
+  /** File › Install Extensions from Backup… (backupController.ts). */
+  installExtensionsFromBackup(): void;
   newNote(): void;
   newEasel(): void;
   /** The import menu's items (Arc first); the File menu shows the browser part. */
@@ -176,6 +178,7 @@ function buildTemplate(commands: AppMenuCommands): MenuItemConstructorOptions[] 
         { label: "Import From Browser", submenu: commands.buildImportMenu().slice(2) },
         { label: "Export Bow Backup…", click: () => commands.exportBackup() },
         { label: "Restore from Backup…", click: () => commands.restoreBackup() },
+        { label: "Install Extensions from Backup…", click: () => commands.installExtensionsFromBackup() },
         { type: "separator" },
         { label: "Save Page As…", accelerator: "CommandOrControl+Shift+S", click: () => commands.savePageAs() },
         { label: "Export as PDF…", click: () => commands.exportPdf() },

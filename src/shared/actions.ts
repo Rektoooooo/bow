@@ -148,6 +148,8 @@ export type BrowserAction =
   | { type: "importFromArc" }
   | { type: "exportBackup" }
   | { type: "restoreBackup" }
+  /** File › Install Extensions from Backup…: a backup's Web Store extensions, after the user sees their names. */
+  | { type: "installExtensionsFromBackup" }
   | { type: "showExtensionsMenu"; anchor: { x: number; y: number; width: number; height: number } }
   | { type: "answerPermissionPrompt"; requestId: string; isAllowed: boolean }
   | { type: "answerPasswordOffer"; offerId: string; answer: "save" | "never" | "notNow" }
@@ -336,6 +338,7 @@ export const BROWSER_ACTION_TYPES: BrowserAction["type"][] = [
   "importFromArc",
   "exportBackup",
   "restoreBackup",
+  "installExtensionsFromBackup",
   "showExtensionsMenu",
   "answerPermissionPrompt",
   "answerPasswordOffer",

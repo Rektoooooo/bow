@@ -454,6 +454,7 @@ const ACTION_FIELDS: Record<BrowserAction["type"], Record<string, FieldCheck>> =
   importFromArc: {},
   exportBackup: {},
   restoreBackup: {},
+  installExtensionsFromBackup: {},
   showExtensionsMenu: { anchor: isAnchor },
   answerPermissionPrompt: { requestId: isText, isAllowed: isBoolean },
   answerPasswordOffer: { offerId: isText, answer: isPasswordOfferAnswer },

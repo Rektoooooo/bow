@@ -4,7 +4,7 @@
  *   made-up states: a round trip, files that are not backups, and every check on untrusted contents.
  */
 import { describe, expect, it } from "vitest";
-import { addSpacesFromBackup, BACKUP_FORMAT_VERSION, chooseSnapshotsToDelete, createBackup, isRestorableUrl, parseBackup, replaceFromBackup } from "../src/main/backup";
+import { addSpacesFromBackup, BACKUP_FORMAT_VERSION, chooseSnapshotsToDelete, createBackup, isRestorableUrl, parseBackup, planBackupExtensionInstalls, readBackupExtensions, replaceFromBackup } from "../src/main/backup";
 import type { BowBackup, SnapshotFile } from "../src/main/backup";
 import { createFolder, createInitialState, createNote, moveItem, setDownloadFolder } from "../src/main/state";
 import { openWindow } from "../src/main/windows";
@@ -383,5 +383,63 @@ describe("automatic snapshots", () => {
   it("keep only the newest copies from before a restore", () => {
     const files: SnapshotFile[] = Array.from({ length: BEFORE_RESTORE_SNAPSHOTS_KEPT + 2 }, (_unused, index) => ({ name: `Before Restore ${index}`, kind: "beforeRestore", takenAt: ONE_PM - index * DAY_MS }));
     expect(chooseSnapshotsToDelete(files)).toEqual(["Before Restore 5", "Before Restore 6"]);
+  });
+});
+
+describe("a backup's extensions", () => {
+  const DARK_READER = "eimadpbcbfnmbkopoojfekhnkhdbieeh";
+  const CLAUDE = "fcoeoabgfenejglbffodgkkbkcdhcgfn";
+  const UNPACKED = "abcdefghijklmnopabcdefghijklmnop";
+  const listed = [
+    { id: DARK_READER, profileId: "profile-default", name: " Dark Reader ", version: "4.9", path: "", isEnabled: true, source: "arc" },
+    { id: CLAUDE, profileId: "profile-default", name: "Claude", version: "1.0", path: "", isEnabled: false, source: "webstore" },
+    { id: CLAUDE, profileId: "profile-work", name: "Claude", version: "1.0", path: "", isEnabled: true, source: "webstore" },
+    { id: UNPACKED, profileId: "profile-default", name: "My Tool", version: "0.1", path: "", isEnabled: true, source: "unpacked" },
+  ];
+
+  it("are read with their profile and on/off, unpacked ones marked", () => {
+    expect(readBackupExtensions(listed)).toEqual([
+      { id: DARK_READER, profileId: "profile-default", name: "Dark Reader", isEnabled: true, isFromWebStore: true },
+      { id: CLAUDE, profileId: "profile-default", name: "Claude", isEnabled: false, isFromWebStore: true },
+      { id: CLAUDE, profileId: "profile-work", name: "Claude", isEnabled: true, isFromWebStore: true },
+      { id: UNPACKED, profileId: "profile-default", name: "My Tool", isEnabled: true, isFromWebStore: false },
+    ]);
+  });
+
+  it("leave out anything that is not a real extension entry (a backup is untrusted)", () => {
+    const crafted = [
+      { id: "../../etc", profileId: "profile-default", name: "Path", source: "webstore" },
+      { id: DARK_READER.toUpperCase(), profileId: "profile-default", name: "Upper case", source: "webstore" },
+      { id: DARK_READER, profileId: 7, name: "No profile", source: "webstore" },
+      { id: DARK_READER, profileId: "profile-default", name: null, source: "webstore" },
+      { id: DARK_READER, profileId: "", name: "Empty profile", source: "webstore" },
+      { id: DARK_READER, profileId: "profile-default", name: "First", source: "webstore" },
+      { id: DARK_READER, profileId: "profile-default", name: "Second for the same profile", source: "webstore" },
+      "not an object",
+    ];
+    const read = readBackupExtensions(crafted);
+
+    expect(read.map((extension) => extension.name)).toEqual(["First"]);
+    expect(readBackupExtensions("not a list")).toEqual([]);
+  });
+
+  it("come through parseBackup", () => {
+    const { state } = buildSetup();
+    const withExtensions = { ...state, extensions: listed.map((extension) => ({ ...extension, path: "/Users/someone/x" })) } as BrowserState;
+    const backup = createBackup(withExtensions, {}, {}, LATER, APP_VERSION);
+
+    expect(parseOrFail(JSON.stringify(backup)).extensions.map((extension) => extension.id)).toEqual([DARK_READER, CLAUDE, CLAUDE, UNPACKED]);
+  });
+
+  it("are planned against this Mac: Web Store ones to install, unpacked ones for the user, unknown profiles apart", () => {
+    const state: BrowserState = {
+      ...createInitialState(),
+      extensions: [{ id: DARK_READER, profileId: "profile-default", name: "Dark Reader", version: "4.9", path: "/x", isEnabled: true, source: "webstore" }],
+    };
+    const plan = planBackupExtensionInstalls(readBackupExtensions(listed), state);
+
+    expect(plan.toInstall.map((extension) => `${extension.profileId} ${extension.name}`)).toEqual(["profile-default Claude"]);
+    expect(plan.unpacked.map((extension) => extension.name)).toEqual(["My Tool"]);
+    expect(plan.withoutProfile.map((extension) => `${extension.profileId} ${extension.name}`)).toEqual(["profile-work Claude"]);
   });
 });

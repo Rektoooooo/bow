@@ -21,6 +21,13 @@ const WEB_STORE_PAGES = [
 const EXTENSION_ID_PATTERN = /^[a-p]{32}$/;
 
 /**
+ * True for a Chrome extension id (32 letters a–p), the only form an id from an untrusted file is accepted in.
+ */
+export function isExtensionId(value: unknown): value is string {
+  return typeof value === "string" && EXTENSION_ID_PATTERN.test(value);
+}
+
+/**
  * Returns the extension id of a Web Store extension page, or null for any other address.
  * Example: "https://chromewebstore.google.com/detail/dark-reader/eimadpbcbfnmbkopoojfekhnkhdbieeh?hl=en" → "eimadp…"
  */

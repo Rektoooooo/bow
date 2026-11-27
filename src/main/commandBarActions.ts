@@ -93,6 +93,7 @@ function buildFixedActions(host: CommandActionHost): FixedAction[] {
     { entry: { id: "import-arc", title: "Import from Arc", keywords: ["arc", "migrate"] }, run: () => commands.importFromArc() },
     { entry: { id: "export-backup", title: "Export Bow Backup", keywords: ["backup", "export", "save setup"] }, run: () => commands.exportBackup() },
     { entry: { id: "restore-backup", title: "Restore from Backup", keywords: ["backup", "restore", "import backup"] }, run: () => commands.restoreBackup() },
+    { entry: { id: "install-backup-extensions", title: "Install Extensions from Backup", keywords: ["backup", "extensions", "new mac", "move"] }, run: () => commands.installExtensionsFromBackup() },
     { entry: { id: "default-browser", title: "Set as Default Browser", keywords: ["default browser", "open links"] }, run: () => commands.setAsDefaultBrowser() },
     { entry: { id: "check-updates", title: "Check for Updates", keywords: ["update", "new version", "upgrade"] }, run: () => commands.checkForUpdates() },
   ];

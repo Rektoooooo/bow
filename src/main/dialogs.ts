@@ -32,6 +32,15 @@ export async function askWhichFile(options: OpenDialogOptions): Promise<string |
 }
 
 /**
+ * A question with a checkbox under it (options.checkboxLabel); returns the button chosen and whether the box was ticked.
+ */
+export async function askWithCheckbox(options: MessageBoxOptions): Promise<{ response: number; isChecked: boolean }> {
+  const window = getWindow();
+  const result = window === null ? await dialog.showMessageBox(options) : await dialog.showMessageBox(window, options);
+  return { response: result.response, isChecked: result.checkboxChecked };
+}
+
+/**
  * A message or question; returns the index of the button chosen.
  */
 export async function ask(options: MessageBoxOptions): Promise<number> {

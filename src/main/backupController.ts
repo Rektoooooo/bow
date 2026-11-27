@@ -3,7 +3,9 @@
  *   File › Export Bow Backup… and Restore from Backup…: the parts of backups that need the Mac (dialogs and files).
  *   backup.ts builds and checks backups; this file reads the Notes and Easels the tabs use, asks where to save or
  *   which file to restore, asks whether to replace the setup or add the backup's Spaces, keeps a copy of the current
- *   setup before replacing it, and writes the restored Notes and Easels.
+ *   setup before replacing it, and writes the restored Notes and Easels. A backup only names its extensions (their
+ *   files stay on the Mac that made it): File › Install Extensions from Backup… and the restore question's checkbox
+ *   install them again from the Chrome Web Store, once the user has seen their names.
  *
  * Data source:
  *   The state (browserCore.ts), the Notes and Easels files (notesStore.ts, easelsStore.ts), the file the user picks.
@@ -14,14 +16,18 @@
  *   Notes/Easels written → applyChange(replaceFromBackup | addSpacesFromBackup)
  *   Every SNAPSHOT_INTERVAL_MS with changes since the last copy → saveSnapshot("Snapshot") → old copies pruned
  *   (chooseSnapshotsToDelete in backup.ts)
+ *   Install Extensions from Backup → open dialog → parseBackup() → planBackupExtensionInstalls → question with the
+ *   names → addFromWebStoreQuietly one by one (extensionsController.ts) → one sheet that sums up
  */
 import { app, shell } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { addSpacesFromBackup, chooseSnapshotsToDelete, collectNoteAndEaselIds, createBackup, parseBackup, replaceFromBackup } from "./backup";
-import type { BackupReport, BowBackup, CheckedBackup, SnapshotFile } from "./backup";
+import { addSpacesFromBackup, chooseSnapshotsToDelete, collectNoteAndEaselIds, createBackup, parseBackup, planBackupExtensionInstalls, replaceFromBackup } from "./backup";
+import type { BackupExtension, BackupExtensionPlan, BackupReport, BowBackup, CheckedBackup, SnapshotFile } from "./backup";
 import { applyChange, getState, onStateChanged } from "./browserCore";
-import { ask, askWhereToSave, askWhichFile } from "./dialogs";
+import { ask, askWhereToSave, askWhichFile, askWithCheckbox } from "./dialogs";
+import { findExtension } from "./extensionList";
+import { addFromWebStoreQuietly } from "./extensionsController";
 import { SNAPSHOT_INTERVAL_MS } from "../shared/settings";
 import { readEasel, writeEasel } from "./easelsStore";
 import { readNote, writeNote } from "./notesStore";
@@ -53,6 +59,10 @@ let hasChangesSinceSnapshot = false;
 const REPLACE_BUTTON_INDEX = 0;
 const ADD_BUTTON_INDEX = 1;
 const CANCEL_BUTTON_INDEX = 2;
+
+/** The buttons of the question before installing a backup's extensions. Cancel is the default: installing is a yes. */
+const INSTALL_BUTTON_INDEX = 0;
+const DONT_INSTALL_BUTTON_INDEX = 1;
 
 /**
  * A backup of everything now: the state and the Notes and Easels its tabs use.
@@ -157,7 +167,9 @@ export function describeBackup(report: BackupReport): string {
     lines.push(`${count(report.scriptsTurnedOff, "Boost")} with JavaScript ${verb} switched off. Turn it on in Library › Boosts once you trust it.`);
   }
   if (report.extensionNames.length > 0) {
-    lines.push(`Extensions are not in a backup. Install these again if this Mac doesn't have them: ${report.extensionNames.join(", ")}.`);
+    // An extension in two profiles is listed twice; it is one name here.
+    const names = Array.from(new Set(report.extensionNames));
+    lines.push(`Its extensions are not in the file, only their names: ${names.join(", ")}. Bow can install them again from the Chrome Web Store (the box below, or later File › Install Extensions from Backup…).`);
   }
   if (report.leftOut > 0) {
     lines.push(`${report.leftOut === 1 ? "1 damaged or unsafe entry" : `${report.leftOut} damaged or unsafe entries`} will be left out.`);
@@ -233,21 +245,123 @@ export async function restoreBackup(): Promise<void> {
     await ask({ type: "warning", message: "This backup can't be restored", detail: read.error });
     return;
   }
-  const choice = await ask({
-    type: "question",
+  const question = {
+    type: "question" as const,
     message: "Restore this backup?",
     detail: describeBackup(read.backup.report),
     buttons: ["Replace My Setup", "Add Its Spaces", "Cancel"],
     defaultId: ADD_BUTTON_INDEX,
     cancelId: CANCEL_BUTTON_INDEX,
-  });
-  if (choice !== REPLACE_BUTTON_INDEX && choice !== ADD_BUTTON_INDEX) {
+  };
+  // Off by default: installing extensions is a choice of its own (the question names them).
+  const webStoreCount = read.backup.extensions.filter((extension) => extension.isFromWebStore).length;
+  const checkbox = { checkboxLabel: "Also install its extensions from the Chrome Web Store", checkboxChecked: false };
+  const choice = await askWithCheckbox(webStoreCount === 0 ? question : { ...question, ...checkbox });
+  if (choice.response !== REPLACE_BUTTON_INDEX && choice.response !== ADD_BUTTON_INDEX) {
     return;
   }
-  const isRestored = applyBackup(read.backup, choice === REPLACE_BUTTON_INDEX ? "replace" : "add", Date.now());
+  const isRestored = applyBackup(read.backup, choice.response === REPLACE_BUTTON_INDEX ? "replace" : "add", Date.now());
   if (!isRestored) {
     await ask({ type: "warning", message: "Nothing was restored", detail: "Bow could not keep a copy of your current setup first (is the disk full?), so it left everything as it was." });
+    return;
   }
+  if (choice.isChecked && webStoreCount > 0) {
+    await installExtensionsFromBackup(read.backup.extensions, false);
+  }
+}
+
+/**
+ * The names of these extensions, each once (an extension in two profiles is one name), for a sheet.
+ */
+function listNames(extensions: readonly BackupExtension[]): string {
+  const names = new Set(extensions.map((extension) => extension.name));
+  return Array.from(names).join(", ");
+}
+
+/**
+ * The lines of the closing sheet about what was not installed: failures (and why), unpacked extensions only the user
+ * can load, and those for a profile this Mac lacks.
+ */
+function describeNotInstalled(plan: BackupExtensionPlan, failures: readonly string[]): string[] {
+  const lines: string[] = [];
+  if (failures.length > 0) {
+    lines.push(`Could not be installed: ${failures.join("; ")}.`);
+  }
+  if (plan.unpacked.length > 0) {
+    lines.push(`Not from the Web Store, so load these yourself (Library › Extensions › Load Unpacked…): ${listNames(plan.unpacked)}.`);
+  }
+  if (plan.withoutProfile.length > 0) {
+    lines.push(`For Spaces this Mac doesn't have (restore the backup first): ${listNames(plan.withoutProfile)}.`);
+  }
+  return lines;
+}
+
+/**
+ * Installs a backup's extensions from the Chrome Web Store, one at a time (a second profile then shares the first one's
+ * copy), each into the profile it was in, on or off as it was. With `shouldAsk` the user first sees their names (the
+ * restore question names them already). Ends with one sheet: what was installed, what was not and why. A backup is
+ * untrusted, so it only names extensions: what gets installed is the Web Store's own signed copy (webStoreInstall.ts),
+ * never anything from the file, and never an unpacked folder.
+ */
+export async function installExtensionsFromBackup(extensions: readonly BackupExtension[], shouldAsk: boolean): Promise<void> {
+  const plan = planBackupExtensionInstalls(extensions, getState());
+  if (plan.toInstall.length === 0) {
+    const notInstalled = describeNotInstalled(plan, []);
+    const detail = notInstalled.length === 0 ? "This Mac already has every extension the backup lists." : notInstalled.join("\n\n");
+    await ask({ type: "info", message: "No extensions to install", detail: detail });
+    return;
+  }
+  if (shouldAsk) {
+    const answer = await ask({
+      type: "question",
+      message: "Install these extensions from the Chrome Web Store?",
+      detail: `${listNames(plan.toInstall)}.\n\nBow downloads each one from Google and checks its signature, as when you add one on its Web Store page. Each goes into the profile it was in, on or off as it was.`,
+      buttons: ["Install", "Cancel"],
+      defaultId: DONT_INSTALL_BUTTON_INDEX,
+      cancelId: DONT_INSTALL_BUTTON_INDEX,
+    });
+    if (answer !== INSTALL_BUTTON_INDEX) {
+      return;
+    }
+  }
+  const installed: BackupExtension[] = [];
+  const failures: string[] = [];
+  for (const extension of plan.toInstall) {
+    const failure = await addFromWebStoreQuietly(extension.profileId, extension.id, extension.isEnabled);
+    if (failure !== null) {
+      failures.push(`${extension.name} (${failure})`);
+      continue;
+    }
+    // The name the extension gives itself, not the backup's (anyone could have written that).
+    const added = findExtension(getState(), extension.profileId, extension.id);
+    installed.push({ ...extension, name: added?.name ?? extension.name });
+  }
+  const installedLine = installed.length === 0 ? [] : [`${listNames(installed)}.`];
+  const message = failures.length === 0 ? `Installed ${count(installed.length, "extension")}` : `Installed ${installed.length} of ${count(plan.toInstall.length, "extension")}`;
+  const detailLines = [...installedLine, ...describeNotInstalled(plan, failures)];
+  await ask({ type: failures.length === 0 ? "info" : "warning", message: message, detail: detailLines.join("\n\n") });
+}
+
+/**
+ * File › Install Extensions from Backup…: pick a backup (the one from the other Mac, often in Downloads after AirDrop),
+ * see the names, install. For a setup restored before, without restoring it again.
+ */
+export async function installExtensionsFromBackupFile(): Promise<void> {
+  const filePath = await askWhichFile({
+    title: "Install Extensions from Backup",
+    defaultPath: app.getPath("downloads"),
+    properties: ["openFile"],
+    filters: [{ name: "Bow Backup", extensions: [BACKUP_FILE_EXTENSION, "json"] }],
+  });
+  if (filePath === null) {
+    return;
+  }
+  const read = readBackupFile(filePath);
+  if ("error" in read) {
+    await ask({ type: "warning", message: "This backup can't be read", detail: read.error });
+    return;
+  }
+  await installExtensionsFromBackup(read.backup.extensions, true);
 }
 
 // ---------- Automatic snapshots ----------

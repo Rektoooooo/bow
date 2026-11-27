@@ -127,6 +127,9 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   the pick). Form memory: `formMemoryRecorder.ts`. Library › Passwords: `passwordsLibrary.ts` / `passwordsView.ts`;
   Show, Copy password and Edit go through `passwordAuth.ts` (macOS's Touch ID or password prompt, unlocked 5 minutes,
   fails closed). Import: `passwordImport.ts` (CSV from the Library, File › Import From Browser, the onboarding).
+  Export (the way to another Mac, whose Keychain lacks this one's key): `passwordExport.ts`, Library › Passwords ›
+  Export passwords… for the shown profile: Touch ID first, Chrome's CSV (`buildPasswordsCsv`, which the import reads
+  back unchanged), file mode 0600, a closing sheet saying it is not encrypted; only the profile id crosses IPC.
   Importing from Arc and the other Chromium browsers reads their saved passwords directly (`chromiumPasswords.ts`
   reads each profile's `Login Data`, `chromiumPasswordCrypto.ts` decrypts it, `chromiumPasswordsImport.ts` asks macOS
   once for the browser's "<Name> Safe Storage" Keychain secret and merges into the right profile's vault; it is one more
@@ -173,7 +176,11 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   our own (`crx.ts` verifies CRX3 signatures, `webStoreInstall.ts` unpacks with `/usr/bin/unzip`, refuses symlinks
   and non-Chrome versions, writes the key so the id stays the Web Store id); copies live in
   `<userData>/Extensions/<id>/<version>/`, are shared by every profile that adds the extension (never downloaded
-  again into a folder a session has loaded), and are deleted only one by one when nothing uses them.
+  again into a folder a session has loaded), and are deleted only one by one when nothing uses them. A backup only
+  *names* extensions (id, profile, on/off): File › Install Extensions from Backup… and the restore question's checkbox
+  (off by default) install the Web Store ones again from the Chrome Web Store, verified like Add Extension, after the
+  user has seen their names (`backupController.installExtensionsFromBackup`, `extensionsController.addFromWebStoreQuietly`,
+  one at a time). Nothing from the file is installed, and never an unpacked folder.
 - **Security:** web pages stay sandboxed. Pages get at most these preloads, all in isolated worlds (page scripts see
   nothing new; `permission-check` proves it):
   - `googleSignInPreload.ts`, in every web page session (profiles and private windows), does nothing except on

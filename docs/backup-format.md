@@ -41,11 +41,14 @@ Order lives only in these id lists: an item's place is the list that holds its i
 Things that only mean something on the Mac that made it:
 
 - other windows' places and choices (`otherWindows` is empty);
-- installed extensions' files: `extensions` lists them by name with an empty `path`, so a restore can tell you what to
-  install again;
+- installed extensions' files: `extensions` lists each one (id, profile, on or off, where it came from) with an empty
+  `path`. On another Mac, File › Install Extensions from Backup… (or the box in the restore question) installs the Chrome
+  Web Store ones again from the Web Store, into the same profiles, once you have seen their names. Bow never installs
+  anything from the file itself, and unpacked extensions are only named (load those again yourself);
 - pictures in the Library (screenshots and captures) and browsing history;
 - saved passwords and remembered form entries (Bow Passwords): they are encrypted with a key in this Mac's Keychain,
-  which another Mac does not have. Library › Passwords imports a CSV file on the new Mac instead.
+  which another Mac does not have. Library › Passwords › Export passwords… writes a profile's passwords to a CSV file
+  (not encrypted: delete it once imported), and Library › Passwords › Import passwords… on the new Mac reads it.
 
 ## Restoring
 

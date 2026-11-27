@@ -41,7 +41,7 @@ import { addRoutingRule, removeRoutingRule } from "./routing";
 import { deleteBoost, setBoostCss, setBoostEnabled, setBoostJavaScript, setBoostStyle } from "./boosts";
 import { reapplyBoostsToAllPages } from "./boostPages";
 import { importFromArc } from "./arcImportController";
-import { exportBackup, restoreBackup, revealBackupsFolder } from "./backupController";
+import { exportBackup, installExtensionsFromBackupFile, restoreBackup, revealBackupsFolder } from "./backupController";
 import { exportBoostToFile, importBoostFromFile } from "./boostFilesController";
 import { chooseSyncFolder, revealSyncFolder, stopSyncing } from "./syncController";
 import { setFavoritesKeptAwake, setSiteKeptAwake } from "./tabSleep";
@@ -497,6 +497,9 @@ export function runAction(action: BrowserAction): void {
       return;
     case "restoreBackup":
       restoreBackup().catch((error) => console.error("Restoring a backup failed:", error));
+      return;
+    case "installExtensionsFromBackup":
+      installExtensionsFromBackupFile().catch((error) => console.error("Installing a backup's extensions failed:", error));
       return;
     case "showExtensionsMenu":
       return showExtensionsMenu(action.anchor);

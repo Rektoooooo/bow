@@ -55,6 +55,7 @@ import { MAX_NOTE_LENGTH } from "./notesStore";
 import { MAX_EASEL_LENGTH } from "./easelsStore";
 import { repairSelections } from "./state";
 import { createId } from "./tree";
+import { isExtensionId } from "../shared/webStore";
 import { repairOtherWindows } from "./windows";
 
 /** What every backup file says it is. */
@@ -98,12 +99,36 @@ export interface BackupReport {
   extensionNames: string[];
 }
 
+/**
+ * An extension a backup lists. Its files are not in a backup: Bow can install it again from the Chrome Web Store into
+ * the same profile, on or off as it was (installing from a backup needs the user's yes, with the names shown).
+ */
+export interface BackupExtension {
+  id: string;
+  profileId: ProfileId;
+  name: string;
+  isEnabled: boolean;
+  /** False for an unpacked extension: its folder was on the other Mac, so only the user can load it again. */
+  isFromWebStore: boolean;
+}
+
 /** A backup that passed every check. */
 export interface CheckedBackup {
   state: BrowserState;
   notes: Record<string, string>;
   easels: Record<string, string>;
   report: BackupReport;
+  extensions: BackupExtension[];
+}
+
+/** What can be installed from a backup's extensions on this Mac, and what cannot (planBackupExtensionInstalls). */
+export interface BackupExtensionPlan {
+  /** From the Chrome Web Store, into a profile this Mac has, and not there yet. */
+  toInstall: BackupExtension[];
+  /** Unpacked: the user loads these again (Library › Extensions › Load Unpacked). */
+  unpacked: BackupExtension[];
+  /** For a profile this Mac does not have (the backup's Spaces were not restored). */
+  withoutProfile: BackupExtension[];
 }
 
 export type BackupParseResult = { isValid: true; backup: CheckedBackup } | { isValid: false; error: string };
@@ -599,6 +624,60 @@ function checkSettings(raw: unknown): BrowserSettings {
   return settings;
 }
 
+/** Longest extension name or profile id kept from a backup. Our choice: real ones are far shorter. */
+const MAX_EXTENSION_FIELD_LENGTH = 200;
+
+/**
+ * The extensions a backup lists, each checked (a backup is untrusted): a real extension id, a profile id, a name, on
+ * or off, and where it came from. Anything else is left out, and so is a second entry for the same profile.
+ * Example: [{ id: "eimadp…", profileId: "profile-default", name: "Dark Reader", isEnabled: true, source: "arc" }] →
+ *   [{ id: "eimadp…", profileId: "profile-default", name: "Dark Reader", isEnabled: true, isFromWebStore: true }]
+ */
+export function readBackupExtensions(raw: unknown): BackupExtension[] {
+  const extensions: BackupExtension[] = [];
+  const seenKeys = new Set<string>();
+  for (const entry of Array.isArray(raw) ? raw : []) {
+    if (!isRecord(entry) || !isExtensionId(entry.id) || typeof entry.profileId !== "string" || typeof entry.name !== "string") {
+      continue;
+    }
+    const profileId = entry.profileId.slice(0, MAX_EXTENSION_FIELD_LENGTH);
+    const key = `${profileId} ${entry.id}`;
+    if (profileId === "" || seenKeys.has(key)) {
+      continue;
+    }
+    seenKeys.add(key);
+    const trimmedName = entry.name.trim().slice(0, MAX_EXTENSION_FIELD_LENGTH);
+    extensions.push({
+      id: entry.id,
+      profileId: profileId,
+      name: trimmedName === "" ? entry.id : trimmedName,
+      isEnabled: entry.isEnabled !== false,
+      isFromWebStore: entry.source === "arc" || entry.source === "webstore",
+    });
+  }
+  return extensions;
+}
+
+/**
+ * Sorts a backup's extensions for this Mac's state: what to install from the Chrome Web Store, what only the user can
+ * load (unpacked), and what belongs to a profile this Mac lacks. One a profile already has is left alone.
+ */
+export function planBackupExtensionInstalls(extensions: readonly BackupExtension[], state: BrowserState): BackupExtensionPlan {
+  const plan: BackupExtensionPlan = { toInstall: [], unpacked: [], withoutProfile: [] };
+  const installed = new Set((state.extensions ?? []).map((extension) => `${extension.profileId} ${extension.id}`));
+  for (const extension of extensions) {
+    const hasProfile = state.profiles.some((profile) => profile.id === extension.profileId);
+    if (!extension.isFromWebStore) {
+      plan.unpacked.push(extension);
+    } else if (!hasProfile) {
+      plan.withoutProfile.push(extension);
+    } else if (!installed.has(`${extension.profileId} ${extension.id}`)) {
+      plan.toInstall.push(extension);
+    }
+  }
+  return plan;
+}
+
 /**
  * The extensions a backup lists, by name (their files are not in a backup).
  */
@@ -837,7 +916,8 @@ export function parseBackup(text: string, now: number): BackupParseResult {
     scriptsTurnedOff: counter.scriptsTurnedOff,
     extensionNames: readExtensionNames(isRecord(upgraded) ? upgraded.extensions : []),
   };
-  return { isValid: true, backup: { state: state, notes: notes, easels: easels, report: report } };
+  const extensions = readBackupExtensions(isRecord(upgraded) ? upgraded.extensions : []);
+  return { isValid: true, backup: { state: state, notes: notes, easels: easels, report: report, extensions: extensions } };
 }
 
 // ---------- Restoring ----------

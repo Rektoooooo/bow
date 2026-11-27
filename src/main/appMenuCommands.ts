@@ -189,6 +189,7 @@ export const appMenuCommands: AppMenuCommands = {
   },
   exportBackup: () => menuHost.runAction({ type: "exportBackup" }),
   restoreBackup: () => menuHost.runAction({ type: "restoreBackup" }),
+  installExtensionsFromBackup: () => menuHost.runAction({ type: "installExtensionsFromBackup" }),
   openUrlInNewTab: (url) => openLinkInNewTab(url, "foreground"),
   openPeekAsTab: () => openPeekAsTab(),
   openPrivateWindow: () => openLittleWindow(null, { isPrivate: true }),

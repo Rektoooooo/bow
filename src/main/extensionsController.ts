@@ -16,6 +16,8 @@
  *   Import from Arc → importArcExtensions() → copy each folder → addExtension → extensionHost.ts loads the enabled ones
  *   toolbar "Add Extension" → installFromWebStore(id) → another profile's copy? share it : download → unpackCrx() →
  *   addExtension for every profile that asked meanwhile (RuntimeState.extensionsBeingAdded shows "Adding…")
+ *   Install Extensions from Backup → addFromWebStoreQuietly(profile, id, on/off) the same way, one at a time, with no
+ *   Library and no error box (backupController.ts sums up)
  *   timer / "Check for Updates" → updateExtensionsFromWebStore() → newer version? → unpackCrx() → updateExtensionFolder
  */
 import { app, dialog, net } from "electron";
@@ -204,15 +206,52 @@ export async function installFromWebStore(extensionId: string): Promise<void> {
   }
   const isDownloading = beingAdded.some((entry) => entry.extensionId === extensionId);
   setExtensionsBeingAdded([...beingAdded, { profileId: profileId, extensionId: extensionId }]);
-  if (!isDownloading) {
-    await downloadForWaitingProfiles(extensionId);
+  if (isDownloading) {
+    return;
   }
+  const failure = await downloadForWaitingProfiles(extensionId);
+  if (failure === null) {
+    openLibrary("extensions");
+    return;
+  }
+  dialog.showErrorBox("Add Extension", `The extension could not be added: ${failure}`);
+}
+
+/**
+ * Adds a Chrome Web Store extension to a profile, on or off, without opening the Library or an error box (Install
+ * Extensions from Backup sums up at the end). Already there: only its on/off is set. Another profile has it: that copy
+ * is shared. Otherwise it is downloaded and verified like Add Extension. Returns null once it is there, or the reason
+ * it could not be added.
+ */
+export async function addFromWebStoreQuietly(profileId: string, extensionId: string, isEnabled: boolean): Promise<string | null> {
+  if (findExtension(getState(), profileId, extensionId) !== undefined) {
+    applyChange((state) => setExtensionEnabled(state, profileId, extensionId, isEnabled));
+    return null;
+  }
+  const copy = findExtensionCopy(getState(), extensionId);
+  if (copy !== undefined && readExtensionManifestInfo(copy.path) !== null) {
+    const extension: InstalledExtension = { ...copy, profileId: profileId, isEnabled: isEnabled, source: "webstore" };
+    applyChange((state) => addExtension(state, extension));
+    return null;
+  }
+  const beingAdded = getExtensionsBeingAdded();
+  // Downloading again would empty the folder the running download unpacks into.
+  if (beingAdded.some((entry) => entry.extensionId === extensionId)) {
+    return "it is being added from its Web Store page right now";
+  }
+  setExtensionsBeingAdded([...beingAdded, { profileId: profileId, extensionId: extensionId }]);
+  const failure = await downloadForWaitingProfiles(extensionId);
+  if (failure === null && !isEnabled) {
+    applyChange((state) => setExtensionEnabled(state, profileId, extensionId, false));
+  }
+  return failure;
 }
 
 /**
  * Downloads, verifies and unpacks a Web Store extension, then adds it to every profile that asked for it meanwhile.
+ * Returns null when it was added, or the reason it was not (the caller tells the user).
  */
-async function downloadForWaitingProfiles(extensionId: string): Promise<void> {
+async function downloadForWaitingProfiles(extensionId: string): Promise<string | null> {
   try {
     const crx = await downloadExtensionFile(buildDownloadUrl(extensionId, process.versions.chrome));
     const unpacked = await unpackCrx(crx, extensionId, getExtensionsFolder());
@@ -229,10 +268,9 @@ async function downloadForWaitingProfiles(extensionId: string): Promise<void> {
       }),
     );
     applyChange((state) => additions.reduce((next, extension) => addExtension(next, extension), state));
-    openLibrary("extensions");
+    return null;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    dialog.showErrorBox("Add Extension", `The extension could not be added: ${message}`);
+    return error instanceof Error ? error.message : String(error);
   } finally {
     const stillBeingAdded = getExtensionsBeingAdded().filter((entry) => entry.extensionId !== extensionId);
     setExtensionsBeingAdded(stillBeingAdded);

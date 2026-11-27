@@ -421,6 +421,94 @@ await releaseStoreDownloads();
 state = await waitFor(() => getState(sidebar), (value) => findStoreExtension(value, "profile-default") !== undefined && findStoreExtension(value, secondProfileId) !== undefined, 10000);
 const sharedPaths = [findStoreExtension(state, "profile-default")?.path, findStoreExtension(state, secondProfileId)?.path];
 check("when it finishes, both profiles get the one copy", sharedPaths.every((folder) => folder === expectedCopyFolder) && (await storeDownloadCount()) === 2, JSON.stringify(sharedPaths));
+// ---------- Install Extensions from Backup (a new Mac whose setup came from a backup) ----------
+// A backup only names extensions. The file below names the stand-in store extension in two profiles (one off), an
+// unpacked one, one whose download fails verification (any other id gets the stand-in's file, signed for another id)
+// and one for a profile this Mac lacks. The open sheet and every message are stood in for.
+await dispatch(sidebar, { type: "removeExtension", profileId: "profile-default", extensionId: storeExtensionId });
+await dispatch(sidebar, { type: "removeExtension", profileId: secondProfileId, extensionId: storeExtensionId });
+await waitFor(() => getState(sidebar), (value) => findStoreExtension(value, "profile-default") === undefined && findStoreExtension(value, secondProfileId) === undefined);
+const FAILING_EXTENSION_ID = "pppppppppppppppppppppppppppppppp";
+const UNPACKED_EXTENSION_ID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const backupFilePath = path.join(outDir, "extensions-check.bowbackup");
+const backupControllerPath = path.join(appDir, "dist", "node", "main", "backupController.js");
+const listedExtensions = [
+  { id: storeExtensionId, profileId: "profile-default", name: "Store Extension (as the backup names it)", version: "0.9", path: "", isEnabled: true, source: "arc" },
+  { id: storeExtensionId, profileId: secondProfileId, name: "Store Extension (as the backup names it)", version: "0.9", path: "", isEnabled: false, source: "webstore" },
+  { id: UNPACKED_EXTENSION_ID, profileId: "profile-default", name: "Hand-Made Tool", version: "0.1", path: "", isEnabled: true, source: "unpacked" },
+  { id: FAILING_EXTENSION_ID, profileId: "profile-default", name: "Broken Download", version: "1.0", path: "", isEnabled: true, source: "webstore" },
+  { id: storeExtensionId, profileId: "profile-elsewhere", name: "Store Extension (as the backup names it)", version: "0.9", path: "", isEnabled: true, source: "webstore" },
+];
+await app.evaluate((_electron, { modulePath, filePath, extensions }) => {
+  const controller = process.mainModule.require(modulePath);
+  const backup = controller.buildBackupNow(Date.now());
+  controller.writeBackupFile(filePath, { ...backup, state: { ...backup.state, extensions: extensions } });
+}, { modulePath: backupControllerPath, filePath: backupFilePath, extensions: listedExtensions });
+const stubBackupSheets = (answer, isChecked) =>
+  app.evaluate(({ dialog }, { filePath, response, checked }) => {
+    globalThis.backupSheets = [];
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [filePath] });
+    dialog.showMessageBox = async (...parts) => {
+      const options = parts.at(-1);
+      globalThis.backupSheets.push({ message: options.message, detail: options.detail ?? "", checkboxLabel: options.checkboxLabel ?? "" });
+      const isQuestion = (options.buttons ?? []).length > 1;
+      return { response: isQuestion ? response : 0, checkboxChecked: checked };
+    };
+  }, { filePath: backupFilePath, response: answer, checked: isChecked });
+const readBackupSheets = () => app.evaluate(() => globalThis.backupSheets);
+const storeCopiesIn = (value) => ["profile-default", secondProfileId].map((profileId) => findStoreExtension(value, profileId)?.isEnabled ?? "none");
+
+// Cancel installs nothing.
+await stubBackupSheets(1, false);
+await dispatch(sidebar, { type: "installExtensionsFromBackup" });
+const cancelSheets = await waitFor(readBackupSheets, (sheets) => sheets.length >= 1);
+await sidebar.waitForTimeout(500);
+check(
+  "Install Extensions from Backup first names what it would install, and Cancel installs nothing",
+  cancelSheets[0]?.message === "Install these extensions from the Chrome Web Store?" && cancelSheets[0].detail.startsWith("Store Extension (as the backup names it), Broken Download.") && JSON.stringify(storeCopiesIn(await getState(sidebar))) === JSON.stringify(["none", "none"]),
+  JSON.stringify(cancelSheets),
+);
+
+// Install: both profiles get it, on and off as listed, from one download; the summary names the rest.
+const downloadsBeforeBackupInstall = await storeDownloadCount();
+await stubBackupSheets(0, false);
+await dispatch(sidebar, { type: "installExtensionsFromBackup" });
+const installSheets = await waitFor(readBackupSheets, (sheets) => sheets.length >= 2, 20000);
+state = await getState(sidebar);
+const installSummary = installSheets[1] ?? { message: "", detail: "" };
+check("it installs the listed Web Store extension into both profiles, on and off as the backup had it", JSON.stringify(storeCopiesIn(state)) === JSON.stringify([true, false]), JSON.stringify(storeCopiesIn(state)));
+check("…from one download (the second profile shares it; the other download is the one that fails)", (await storeDownloadCount()) - downloadsBeforeBackupInstall === 2, String((await storeDownloadCount()) - downloadsBeforeBackupInstall));
+check(
+  "one closing sheet: the extension's own name, the failure, the unpacked one and the missing profile's",
+  installSummary.message === "Installed 2 of 3 extensions" && installSummary.detail.startsWith(`${STORE_EXTENSION_NAME}.`) && installSummary.detail.includes("Broken Download (") && installSummary.detail.includes("Load Unpacked…): Hand-Made Tool.") && installSummary.detail.includes("doesn't have (restore the backup first): Store Extension (as the backup names it)."),
+  JSON.stringify(installSummary),
+);
+check("nothing unpacked or failed was added", (state.extensions ?? []).every((extension) => extension.id !== UNPACKED_EXTENSION_ID && extension.id !== FAILING_EXTENSION_ID));
+
+// The restore question: its box is off by default, and only a ticked box installs (without asking again).
+await dispatch(sidebar, { type: "removeExtension", profileId: "profile-default", extensionId: storeExtensionId });
+await dispatch(sidebar, { type: "removeExtension", profileId: secondProfileId, extensionId: storeExtensionId });
+await waitFor(() => getState(sidebar), (value) => JSON.stringify(storeCopiesIn(value)) === JSON.stringify(["none", "none"]));
+const ADD_ITS_SPACES = 1;
+await stubBackupSheets(ADD_ITS_SPACES, false);
+await dispatch(sidebar, { type: "restoreBackup" });
+const uncheckedSheets = await waitFor(readBackupSheets, (sheets) => sheets.length >= 1);
+await sidebar.waitForTimeout(800);
+check(
+  "Restore from Backup offers a box to install its extensions, off by default; left off, nothing is installed",
+  uncheckedSheets[0]?.checkboxLabel === "Also install its extensions from the Chrome Web Store" && JSON.stringify(storeCopiesIn(await getState(sidebar))) === JSON.stringify(["none", "none"]),
+  JSON.stringify(uncheckedSheets),
+);
+await stubBackupSheets(ADD_ITS_SPACES, true);
+await dispatch(sidebar, { type: "restoreBackup" });
+const checkedSheets = await waitFor(readBackupSheets, (sheets) => sheets.length >= 2, 20000);
+check(
+  "ticked, it restores and installs them without a second question",
+  checkedSheets[1]?.message === "Installed 2 of 3 extensions" && JSON.stringify(storeCopiesIn(await getState(sidebar))) === JSON.stringify([true, false]),
+  JSON.stringify(checkedSheets.map((sheet) => sheet.message)),
+);
+fs.rmSync(backupFilePath, { force: true });
+
 const errorBoxes = await app.evaluate(() => globalThis.errorBoxes);
 check("no Add Extension error dialogs", errorBoxes.length === 0, errorBoxes.join(" | "));
 check("no page errors in the sidebar (second run)", pageErrors.length === 0, pageErrors.join(" | "));

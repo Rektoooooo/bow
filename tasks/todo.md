@@ -467,6 +467,14 @@ first (probes, nothing typed), then an audit of Electron-vs-Chrome gaps.
       list in the Library, one shared queue for the four overlay prompt cards (permission, password offer, sign-in,
       certificate), geolocation and media keys checked by hand in a packaged build.
 
+## Milestone 9 — Moving Bow to another Mac, then 0.2.1 (user-approved 2026-11-27)
+The user's new MacBook has their restored backup; passwords and extensions are missing (a backup leaves them out).
+- [x] 1. Library › Passwords › Export passwords… (CSV that Bow and Chrome import; Touch ID first; file mode 0600)
+- [x] 2. File › Install Extensions from Backup… and a Restore checkbox: the backup's Web Store extensions, installed
+      from the Chrome Web Store into their profiles with their on/off, after the user sees their names
+- [ ] 3. Tests (CSV round trip, backup extension list, check-passwords, check-extensions), full suite, review, push
+- [ ] 4. Publish 0.2.1 (the user's choice): notarized release on GitHub, installed on this Mac
+
 ## Fixes (2026-11-19, the user on the local Milestone 8 build)
 "when i connect mcp to netsuite the browser just stops working … even when i force quit it and open this is still
 there"; "spaces should be completely separated so they don't share a log in … it should open in space 1 not switch
