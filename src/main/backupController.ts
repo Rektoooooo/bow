@@ -22,7 +22,7 @@
 import { app, shell } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { addSpacesFromBackup, chooseSnapshotsToDelete, collectNoteAndEaselIds, createBackup, parseBackup, planBackupExtensionInstalls, replaceFromBackup } from "./backup";
+import { addSpacesFromBackup, chooseSnapshotsToDelete, collectNoteAndEaselIds, createBackup, listExtensionNamesOnce, parseBackup, planBackupExtensionInstalls, replaceFromBackup } from "./backup";
 import type { BackupExtension, BackupExtensionPlan, BackupReport, BowBackup, CheckedBackup, SnapshotFile } from "./backup";
 import { applyChange, getState, onStateChanged } from "./browserCore";
 import { ask, askWhereToSave, askWhichFile, askWithCheckbox } from "./dialogs";
@@ -166,10 +166,11 @@ export function describeBackup(report: BackupReport): string {
     const verb = report.scriptsTurnedOff === 1 ? "arrives" : "arrive";
     lines.push(`${count(report.scriptsTurnedOff, "Boost")} with JavaScript ${verb} switched off. Turn it on in Library › Boosts once you trust it.`);
   }
-  if (report.extensionNames.length > 0) {
-    // An extension in two profiles is listed twice; it is one name here.
-    const names = Array.from(new Set(report.extensionNames));
-    lines.push(`Its extensions are not in the file, only their names: ${names.join(", ")}. Bow can install them again from the Chrome Web Store (the box below, or later File › Install Extensions from Backup…).`);
+  if (report.webStoreExtensionNames.length > 0) {
+    lines.push(`Its extensions are not in the file, only named: ${report.webStoreExtensionNames.join(", ")}. Tick the box below to install them again from the Chrome Web Store (or later: File › Install Extensions from Backup…).`);
+  }
+  if (report.unpackedExtensionNames.length > 0) {
+    lines.push(`Not from the Web Store, so load these again yourself: ${report.unpackedExtensionNames.join(", ")}.`);
   }
   if (report.leftOut > 0) {
     lines.push(`${report.leftOut === 1 ? "1 damaged or unsafe entry" : `${report.leftOut} damaged or unsafe entries`} will be left out.`);
@@ -274,8 +275,30 @@ export async function restoreBackup(): Promise<void> {
  * The names of these extensions, each once (an extension in two profiles is one name), for a sheet.
  */
 function listNames(extensions: readonly BackupExtension[]): string {
-  const names = new Set(extensions.map((extension) => extension.name));
-  return Array.from(names).join(", ");
+  return listExtensionNamesOnce(extensions).join(", ");
+}
+
+/**
+ * One line per extension for the question before installing: its name and the profiles it goes into.
+ * Example: "• Claude (Default, Profile 2)"
+ */
+function describeEachExtension(extensions: readonly BackupExtension[]): string[] {
+  const profileNames = new Map(getState().profiles.map((profile) => [profile.id, profile.name]));
+  const profilesById = new Map<string, string[]>();
+  const nameById = new Map<string, string>();
+  for (const extension of extensions) {
+    const profileName = profileNames.get(extension.profileId) ?? extension.profileId;
+    profilesById.set(extension.id, [...(profilesById.get(extension.id) ?? []), profileName]);
+    if (!nameById.has(extension.id)) {
+      nameById.set(extension.id, extension.name);
+    }
+  }
+  const lines: string[] = [];
+  for (const [extensionId, name] of nameById) {
+    const profiles = profilesById.get(extensionId) ?? [];
+    lines.push(`• ${name} (${profiles.join(", ")})`);
+  }
+  return lines;
 }
 
 /**
@@ -300,8 +323,9 @@ function describeNotInstalled(plan: BackupExtensionPlan, failures: readonly stri
  * Installs a backup's extensions from the Chrome Web Store, one at a time (a second profile then shares the first one's
  * copy), each into the profile it was in, on or off as it was. With `shouldAsk` the user first sees their names (the
  * restore question names them already). Ends with one sheet: what was installed, what was not and why. A backup is
- * untrusted, so it only names extensions: what gets installed is the Web Store's own signed copy (webStoreInstall.ts),
- * never anything from the file, and never an unpacked folder.
+ * untrusted, so it only names extensions: what gets installed is what the Chrome Web Store serves for each id, checked
+ * against the developer's signature for that id like Add Extension (crx.ts), never anything from the file, and never an
+ * unpacked folder.
  */
 export async function installExtensionsFromBackup(extensions: readonly BackupExtension[], shouldAsk: boolean): Promise<void> {
   const plan = planBackupExtensionInstalls(extensions, getState());
@@ -312,10 +336,11 @@ export async function installExtensionsFromBackup(extensions: readonly BackupExt
     return;
   }
   if (shouldAsk) {
+    const extensionLines = describeEachExtension(plan.toInstall);
     const answer = await ask({
       type: "question",
-      message: "Install these extensions from the Chrome Web Store?",
-      detail: `${listNames(plan.toInstall)}.\n\nBow downloads each one from Google and checks its signature, as when you add one on its Web Store page. Each goes into the profile it was in, on or off as it was.`,
+      message: `Install ${count(extensionLines.length, "extension")} from the Chrome Web Store?`,
+      detail: `${extensionLines.join("\n")}\n\nBow downloads each one from the Chrome Web Store and checks its signature, as when you add one on its Web Store page. Each goes into the profile shown, on or off as it was.`,
       buttons: ["Install", "Cancel"],
       defaultId: DONT_INSTALL_BUTTON_INDEX,
       cancelId: DONT_INSTALL_BUTTON_INDEX,

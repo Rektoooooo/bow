@@ -3,9 +3,11 @@
  *   Moving to another Mac (or another browser): a vault cannot simply be copied, because it is encrypted with a key in
  *   this Mac's Keychain. So a profile's saved logins leave Bow as the CSV file Chrome exports, which Bow on the other
  *   Mac (Library › Passwords › Import passwords…) and other browsers read. That file holds every password in plain
- *   text: the user proves it is them first (Touch ID or the Mac's password), the file is readable by this macOS user
- *   only, and the closing sheet says to delete it once imported. Only the profile id comes from the page; passwords
- *   never leave the main process except into the file the user named.
+ *   text: the user proves it is them first, every time (Touch ID or the Mac's password), the file is readable by this
+ *   macOS user only from its first byte (written to a new file of its own, then moved into place), it goes to
+ *   Downloads by default (iCloud syncs Documents and Desktop for many people), and the closing sheet says to delete it
+ *   once imported. Only the profile id comes from the page; passwords never leave the main process except into the
+ *   file the user named.
  *
  * Data source:
  *   The profile's vault (passwordVault.ts) and buildPasswordsCsv (passwordCsv.ts).
@@ -15,6 +17,7 @@
  *   save sheet → buildPasswordsCsv → file (owner only) → a sheet with the count
  */
 import { app } from "electron";
+import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { BrowserState, ProfileId } from "../shared/types";
@@ -28,6 +31,26 @@ const OWNER_ONLY_FILE_MODE = 0o600;
 
 /** Characters a file name cannot hold on macOS (a profile name may have them). */
 const UNSAFE_FILE_NAME_CHARACTERS = /[/:]/g;
+
+/** What macOS says Touch ID is for. An export always asks, even right after Show or Copy password. */
+const EXPORT_TOUCH_ID_REASON = "export your saved passwords to a file";
+
+/**
+ * Writes the text to a new file next to the target, readable by this user only from the start ("wx": never an existing
+ * file), then moves it over the target. An existing file is replaced whole, so its old permissions never apply. On
+ * any failure nothing is left behind and the target is as it was. Returns whether it worked.
+ */
+function writeOwnerOnlyFile(filePath: string, text: string): boolean {
+  const temporaryPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.${randomUUID()}.tmp`);
+  try {
+    fs.writeFileSync(temporaryPath, text, { mode: OWNER_ONLY_FILE_MODE, flag: "wx" });
+    fs.renameSync(temporaryPath, filePath);
+    return true;
+  } catch {
+    fs.rmSync(temporaryPath, { force: true });
+    return false;
+  }
+}
 
 /**
  * Library › Passwords › Export passwords…: writes the profile's saved logins to a CSV file the user names. Form memory
@@ -48,7 +71,7 @@ export async function exportPasswordsToFile(state: BrowserState, profileId: Prof
     await ask({ type: "info", message: `${profile.name} has no saved passwords to export.` });
     return;
   }
-  const isUserPresent = await ensureUserPresent();
+  const isUserPresent = await ensureUserPresent(EXPORT_TOUCH_ID_REASON, false);
   if (!isUserPresent) {
     return;
   }
@@ -56,18 +79,15 @@ export async function exportPasswordsToFile(state: BrowserState, profileId: Prof
   const filePath = await askWhereToSave({
     title: "Export Passwords",
     message: "The file holds your passwords in plain text. Keep it somewhere only you can reach, and delete it once imported.",
-    defaultPath: path.join(app.getPath("documents"), `Bow Passwords - ${safeProfileName}.csv`),
+    defaultPath: path.join(app.getPath("downloads"), `Bow Passwords - ${safeProfileName}.csv`),
     filters: [{ name: "Passwords (CSV)", extensions: ["csv"] }],
   });
   if (filePath === null) {
     return;
   }
-  try {
-    fs.writeFileSync(filePath, buildPasswordsCsv(logins), { mode: OWNER_ONLY_FILE_MODE });
-    // A file that was already there keeps its old permissions when written over.
-    fs.chmodSync(filePath, OWNER_ONLY_FILE_MODE);
-  } catch {
-    await ask({ type: "warning", message: "The passwords could not be exported", detail: "Bow could not write the file. Try another folder." });
+  const isWritten = writeOwnerOnlyFile(filePath, buildPasswordsCsv(logins));
+  if (!isWritten) {
+    await ask({ type: "warning", message: "The passwords could not be exported", detail: "Bow could not write the file there. Try another folder." });
     return;
   }
   const countText = logins.length === 1 ? "1 password" : `${logins.length} passwords`;

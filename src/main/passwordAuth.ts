@@ -11,6 +11,7 @@
  *
  * Data flow:
  *   passwordsLibrary.ts (reveal / copy / edit) → ensureUserPresent() → true: go on, false: nothing happens
+ *   passwordExport.ts → ensureUserPresent(its own reason, never the recent unlock) → the same
  *   powerMonitor "lock-screen" / "suspend" → the unlock ends
  */
 import { powerMonitor, systemPreferences } from "electron";
@@ -43,19 +44,20 @@ function isStillUnlocked(): boolean {
 }
 
 /**
- * True when the user has just proved it is them, or did so within PASSWORD_UNLOCK_MS. Asks through macOS otherwise.
+ * True when the user has just proved it is them, or did so within PASSWORD_UNLOCK_MS. Asks through macOS otherwise,
+ * with `reason` as what it is for. With `isRecentUnlockEnough` false it always asks (exporting every password).
  */
-export async function ensureUserPresent(): Promise<boolean> {
+export async function ensureUserPresent(reason: string = TOUCH_ID_REASON, isRecentUnlockEnough: boolean = true): Promise<boolean> {
   // Test runs only: a real vault cannot be opened with the test key, so there is nothing to protect and no person to
   // touch a sensor. The mock is on only when BOW_E2E_MOCK_KEYCHAIN is set by an e2e check.
   if (isKeychainMocked()) {
     return true;
   }
-  if (isStillUnlocked()) {
+  if (isRecentUnlockEnough && isStillUnlocked()) {
     return true;
   }
   try {
-    await systemPreferences.promptTouchID(TOUCH_ID_REASON);
+    await systemPreferences.promptTouchID(reason);
   } catch {
     // Cancelled, failed, or this Mac cannot ask: the passwords stay locked.
     lockAgain();

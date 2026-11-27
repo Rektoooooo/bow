@@ -27,7 +27,7 @@ import type { InstalledExtension } from "../shared/types";
 import { findArcExtensions } from "./arcExtensionsImport";
 import { applyChange, getExtensionsBeingAdded, getState, getWindow, setExtensionsBeingAdded } from "./browserCore";
 import { loadExtensionNow } from "./extensionHost";
-import { addExtension, findExtension, findExtensionCopy, removeExtension, setExtensionEnabled, updateExtensionFolder } from "./extensionList";
+import { addExtension, findExtension, findExtensionCopy, MAX_EXTENSIONS_PER_PROFILE, removeExtension, setExtensionEnabled, updateExtensionFolder } from "./extensionList";
 import { readExtensionManifestInfo } from "./extensionManifest";
 import { whenExtensionsSettled } from "./extensionHost";
 import {
@@ -179,6 +179,45 @@ async function downloadExtensionFile(url: string): Promise<Buffer> {
   return bytes;
 }
 
+/** A download running now: what it will return, and whether Install Extensions from Backup started it. */
+interface RunningDownload {
+  result: Promise<string | null>;
+  isQuiet: boolean;
+}
+
+/** Downloads running now, by extension id. Another request for the same id waits for it (unpackCrx empties the folder). */
+const runningDownloads = new Map<string, RunningDownload>();
+
+/** Waiting profiles that get the extension turned off from the start (a backup listed it off). Keys: "profile id". */
+const wantedOffKeys = new Set<string>();
+
+/** Why an extension was downloaded but is not in the profile: addExtension refuses past the limit or for a gone profile. */
+const NOT_ADDED_REASON = `the profile already has ${MAX_EXTENSIONS_PER_PROFILE} extensions, or is gone`;
+
+function toProfileExtensionKey(profileId: string, extensionId: string): string {
+  return `${profileId} ${extensionId}`;
+}
+
+/**
+ * Puts a profile on the list waiting for an extension's download (RuntimeState.extensionsBeingAdded shows "Adding…").
+ */
+function joinWaitingProfiles(profileId: string, extensionId: string): void {
+  const beingAdded = getExtensionsBeingAdded();
+  const isWaiting = beingAdded.some((entry) => entry.extensionId === extensionId && entry.profileId === profileId);
+  if (!isWaiting) {
+    setExtensionsBeingAdded([...beingAdded, { profileId: profileId, extensionId: extensionId }]);
+  }
+}
+
+/**
+ * Starts the download for every profile waiting for this extension, remembered while it runs.
+ */
+function startDownload(extensionId: string, isQuiet: boolean): Promise<string | null> {
+  const result = downloadForWaitingProfiles(extensionId);
+  runningDownloads.set(extensionId, { result: result, isQuiet: isQuiet });
+  return result;
+}
+
 /**
  * Adds a Chrome Web Store extension to the active Space's profile (toolbar "Add Extension" on its Web Store page).
  * Already added there: it is turned on. Another profile has it: that copy is shared. Otherwise it is downloaded; a
@@ -199,57 +238,59 @@ export async function installFromWebStore(extensionId: string): Promise<void> {
     openLibrary("extensions");
     return;
   }
-  const beingAdded = getExtensionsBeingAdded();
-  const isWaiting = beingAdded.some((entry) => entry.extensionId === extensionId && entry.profileId === profileId);
+  const isWaiting = getExtensionsBeingAdded().some((entry) => entry.extensionId === extensionId && entry.profileId === profileId);
   if (isWaiting) {
     return;
   }
-  const isDownloading = beingAdded.some((entry) => entry.extensionId === extensionId);
-  setExtensionsBeingAdded([...beingAdded, { profileId: profileId, extensionId: extensionId }]);
-  if (isDownloading) {
+  joinWaitingProfiles(profileId, extensionId);
+  const running = runningDownloads.get(extensionId);
+  // Another click started it: that click tells the user how it went. A backup install tells nobody, so this one does.
+  if (running !== undefined && !running.isQuiet) {
     return;
   }
-  const failure = await downloadForWaitingProfiles(extensionId);
-  if (failure === null) {
+  const failure = running === undefined ? await startDownload(extensionId, false) : await running.result;
+  const isAdded = findExtension(getState(), profileId, extensionId) !== undefined;
+  if (failure === null && isAdded) {
     openLibrary("extensions");
     return;
   }
-  dialog.showErrorBox("Add Extension", `The extension could not be added: ${failure}`);
+  dialog.showErrorBox("Add Extension", `The extension could not be added: ${failure ?? NOT_ADDED_REASON}`);
 }
 
 /**
  * Adds a Chrome Web Store extension to a profile, on or off, without opening the Library or an error box (Install
- * Extensions from Backup sums up at the end). Already there: only its on/off is set. Another profile has it: that copy
- * is shared. Otherwise it is downloaded and verified like Add Extension. Returns null once it is there, or the reason
- * it could not be added.
+ * Extensions from Backup sums up at the end). One the profile has already stays as it is (the user may have changed
+ * it since the backup). Another profile has it: that copy is shared. Otherwise it is downloaded and verified like Add
+ * Extension, joining a download of it already running. Returns null once it is there, or why it is not.
  */
 export async function addFromWebStoreQuietly(profileId: string, extensionId: string, isEnabled: boolean): Promise<string | null> {
   if (findExtension(getState(), profileId, extensionId) !== undefined) {
-    applyChange((state) => setExtensionEnabled(state, profileId, extensionId, isEnabled));
     return null;
   }
   const copy = findExtensionCopy(getState(), extensionId);
   if (copy !== undefined && readExtensionManifestInfo(copy.path) !== null) {
     const extension: InstalledExtension = { ...copy, profileId: profileId, isEnabled: isEnabled, source: "webstore" };
     applyChange((state) => addExtension(state, extension));
-    return null;
+    return findExtension(getState(), profileId, extensionId) === undefined ? NOT_ADDED_REASON : null;
   }
-  const beingAdded = getExtensionsBeingAdded();
-  // Downloading again would empty the folder the running download unpacks into.
-  if (beingAdded.some((entry) => entry.extensionId === extensionId)) {
-    return "it is being added from its Web Store page right now";
+  const key = toProfileExtensionKey(profileId, extensionId);
+  if (!isEnabled) {
+    wantedOffKeys.add(key);
   }
-  setExtensionsBeingAdded([...beingAdded, { profileId: profileId, extensionId: extensionId }]);
-  const failure = await downloadForWaitingProfiles(extensionId);
-  if (failure === null && !isEnabled) {
-    applyChange((state) => setExtensionEnabled(state, profileId, extensionId, false));
+  joinWaitingProfiles(profileId, extensionId);
+  const running = runningDownloads.get(extensionId);
+  const failure = running === undefined ? await startDownload(extensionId, true) : await running.result;
+  wantedOffKeys.delete(key);
+  if (failure !== null) {
+    return failure;
   }
-  return failure;
+  return findExtension(getState(), profileId, extensionId) === undefined ? NOT_ADDED_REASON : null;
 }
 
 /**
- * Downloads, verifies and unpacks a Web Store extension, then adds it to every profile that asked for it meanwhile.
- * Returns null when it was added, or the reason it was not (the caller tells the user).
+ * Downloads, verifies and unpacks a Web Store extension, then adds it to every profile that asked for it meanwhile,
+ * each on, or off when a backup listed it off (it never runs then, not even once). Returns null when it was added,
+ * or the reason it was not (the callers tell the user).
  */
 async function downloadForWaitingProfiles(extensionId: string): Promise<string | null> {
   try {
@@ -263,17 +304,23 @@ async function downloadForWaitingProfiles(extensionId: string): Promise<string |
         name: unpacked.name,
         version: unpacked.version,
         path: unpacked.folder,
-        isEnabled: true,
+        isEnabled: !wantedOffKeys.has(toProfileExtensionKey(entry.profileId, extensionId)),
         source: "webstore",
       }),
     );
     applyChange((state) => additions.reduce((next, extension) => addExtension(next, extension), state));
+    const isAddedAnywhere = additions.some((extension) => findExtension(getState(), extension.profileId, extensionId) !== undefined);
+    if (!isAddedAnywhere) {
+      deleteUnusedCopy(unpacked.folder).catch(() => undefined);
+      return NOT_ADDED_REASON;
+    }
     return null;
   } catch (error) {
     return error instanceof Error ? error.message : String(error);
   } finally {
     const stillBeingAdded = getExtensionsBeingAdded().filter((entry) => entry.extensionId !== extensionId);
     setExtensionsBeingAdded(stillBeingAdded);
+    runningDownloads.delete(extensionId);
   }
 }
 

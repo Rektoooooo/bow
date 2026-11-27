@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { addSpacesFromBackup, BACKUP_FORMAT_VERSION, chooseSnapshotsToDelete, createBackup, isRestorableUrl, parseBackup, planBackupExtensionInstalls, readBackupExtensions, replaceFromBackup } from "../src/main/backup";
 import type { BowBackup, SnapshotFile } from "../src/main/backup";
+import { MAX_EXTENSIONS_PER_PROFILE } from "../src/main/extensionList";
 import { createFolder, createInitialState, createNote, moveItem, setDownloadFolder } from "../src/main/state";
 import { openWindow } from "../src/main/windows";
 import { createNoteUrl } from "../src/shared/notes";
@@ -95,11 +96,11 @@ describe("backups", () => {
   it("leave out what only means something on this Mac", () => {
     const { state } = buildSetup();
     const withWindow = openWindow(state, "window-2");
-    const withExtension: BrowserState = { ...withWindow, extensions: [{ id: "abc", profileId: "profile-default", name: "Notes Helper", version: "1.0", path: "/Users/someone/Extensions/abc", isEnabled: true, source: "webstore" }] };
+    const withExtension: BrowserState = { ...withWindow, extensions: [{ id: "abcdefghijklmnopabcdefghijklmnop", profileId: "profile-default", name: "Notes Helper", version: "1.0", path: "/Users/someone/Extensions/abc", isEnabled: true, source: "webstore" }] };
     const backup = createBackup(withExtension, {}, {}, LATER, APP_VERSION);
     expect(backup.state.otherWindows).toEqual([]);
     expect(backup.state.extensions?.[0]?.path).toBe("");
-    expect(parseOrFail(JSON.stringify(backup)).report.extensionNames).toEqual(["Notes Helper"]);
+    expect(parseOrFail(JSON.stringify(backup)).report.webStoreExtensionNames).toEqual(["Notes Helper"]);
   });
 
   it("never take a download folder from a file, and keep this Mac's on replacing", () => {
@@ -421,6 +422,27 @@ describe("a backup's extensions", () => {
 
     expect(read.map((extension) => extension.name)).toEqual(["First"]);
     expect(readBackupExtensions("not a list")).toEqual([]);
+  });
+
+  it("show a name on one line, without control characters, and count as on only when they say so", () => {
+    const read = readBackupExtensions([
+      { id: DARK_READER, profileId: "profile-default", name: "Dark\n\nBow checked this one\u2028Reader\u0007", source: "webstore" },
+      { id: CLAUDE, profileId: "profile-default", name: " \t ", isEnabled: "yes", source: "webstore" },
+    ]);
+
+    expect(read.map((extension) => extension.name)).toEqual(["Dark Bow checked this one Reader", CLAUDE]);
+    expect(read.map((extension) => extension.isEnabled)).toEqual([false, false]);
+  });
+
+  it("keep no more per profile than a profile can hold", () => {
+    const many = Array.from({ length: MAX_EXTENSIONS_PER_PROFILE + 5 }, (_unused, index) => ({
+      id: index.toString(16).padStart(32, "a").replace(/[0-9]/g, (digit) => String.fromCharCode(103 + Number(digit))),
+      profileId: "profile-default",
+      name: `Extension ${index}`,
+      source: "webstore",
+    }));
+
+    expect(readBackupExtensions(many)).toHaveLength(MAX_EXTENSIONS_PER_PROFILE);
   });
 
   it("come through parseBackup", () => {

@@ -56,6 +56,7 @@ import { MAX_EASEL_LENGTH } from "./easelsStore";
 import { repairSelections } from "./state";
 import { createId } from "./tree";
 import { isExtensionId } from "../shared/webStore";
+import { MAX_EXTENSIONS_PER_PROFILE } from "./extensionList";
 import { repairOtherWindows } from "./windows";
 
 /** What every backup file says it is. */
@@ -95,8 +96,10 @@ export interface BackupReport {
   leftOut: number;
   /** JavaScript Boosts switched off: their code stays, and runs again only when the user turns it back on. */
   scriptsTurnedOff: number;
-  /** Extensions the backup lists: their files are not in it, so they must be installed again on another Mac. */
-  extensionNames: string[];
+  /** The Chrome Web Store extensions the backup lists (each once): Bow can install them again on another Mac. */
+  webStoreExtensionNames: string[];
+  /** Unpacked extensions the backup lists (each once): only the user can load them again. */
+  unpackedExtensionNames: string[];
 }
 
 /**
@@ -627,35 +630,66 @@ function checkSettings(raw: unknown): BrowserSettings {
 /** Longest extension name or profile id kept from a backup. Our choice: real ones are far shorter. */
 const MAX_EXTENSION_FIELD_LENGTH = 200;
 
+/** Control characters and line or paragraph separators: a name from a backup is shown in a question, on one line. */
+const NAME_BREAKING_CHARACTERS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g;
+
+/** Runs of spaces left where breaking characters were. */
+const SPACE_RUNS = /\s+/g;
+
 /**
- * The extensions a backup lists, each checked (a backup is untrusted): a real extension id, a profile id, a name, on
- * or off, and where it came from. Anything else is left out, and so is a second entry for the same profile.
+ * An extension's name from a backup, made safe to show: on one line, without control characters, capped. Empty: its id.
+ */
+function cleanExtensionName(name: string, extensionId: string): string {
+  const oneLine = name.replace(NAME_BREAKING_CHARACTERS, " ").replace(SPACE_RUNS, " ");
+  const trimmed = oneLine.trim().slice(0, MAX_EXTENSION_FIELD_LENGTH);
+  return trimmed === "" ? extensionId : trimmed;
+}
+
+/**
+ * The extensions a backup lists, each checked (a backup is untrusted): a real extension id, a profile id, a name (on
+ * one line), on only when it says so, and where it came from. Anything else is left out, and so is a second entry for
+ * the same profile, or more than a profile can hold.
  * Example: [{ id: "eimadp…", profileId: "profile-default", name: "Dark Reader", isEnabled: true, source: "arc" }] →
  *   [{ id: "eimadp…", profileId: "profile-default", name: "Dark Reader", isEnabled: true, isFromWebStore: true }]
  */
 export function readBackupExtensions(raw: unknown): BackupExtension[] {
   const extensions: BackupExtension[] = [];
   const seenKeys = new Set<string>();
+  const countByProfile = new Map<string, number>();
   for (const entry of Array.isArray(raw) ? raw : []) {
     if (!isRecord(entry) || !isExtensionId(entry.id) || typeof entry.profileId !== "string" || typeof entry.name !== "string") {
       continue;
     }
     const profileId = entry.profileId.slice(0, MAX_EXTENSION_FIELD_LENGTH);
     const key = `${profileId} ${entry.id}`;
-    if (profileId === "" || seenKeys.has(key)) {
+    const profileCount = countByProfile.get(profileId) ?? 0;
+    if (profileId === "" || seenKeys.has(key) || profileCount >= MAX_EXTENSIONS_PER_PROFILE) {
       continue;
     }
     seenKeys.add(key);
-    const trimmedName = entry.name.trim().slice(0, MAX_EXTENSION_FIELD_LENGTH);
+    countByProfile.set(profileId, profileCount + 1);
     extensions.push({
       id: entry.id,
       profileId: profileId,
-      name: trimmedName === "" ? entry.id : trimmedName,
-      isEnabled: entry.isEnabled !== false,
+      name: cleanExtensionName(entry.name, entry.id),
+      isEnabled: entry.isEnabled === true,
       isFromWebStore: entry.source === "arc" || entry.source === "webstore",
     });
   }
   return extensions;
+}
+
+/**
+ * The names of these extensions, one per extension id (an extension in two profiles is one name).
+ */
+export function listExtensionNamesOnce(extensions: readonly BackupExtension[]): string[] {
+  const nameById = new Map<string, string>();
+  for (const extension of extensions) {
+    if (!nameById.has(extension.id)) {
+      nameById.set(extension.id, extension.name);
+    }
+  }
+  return Array.from(nameById.values());
 }
 
 /**
@@ -676,19 +710,6 @@ export function planBackupExtensionInstalls(extensions: readonly BackupExtension
     }
   }
   return plan;
-}
-
-/**
- * The extensions a backup lists, by name (their files are not in a backup).
- */
-function readExtensionNames(raw: unknown): string[] {
-  const names: string[] = [];
-  for (const entry of Array.isArray(raw) ? raw : []) {
-    if (isRecord(entry) && typeof entry.name === "string") {
-      names.push(entry.name.slice(0, 200));
-    }
-  }
-  return names;
 }
 
 /**
@@ -901,6 +922,7 @@ export function parseBackup(text: string, now: number): BackupParseResult {
   const notes = keepUsedFiles(parsed.notes, used.noteIds, isNoteId, MAX_NOTE_LENGTH);
   const easels = keepUsedFiles(parsed.easels, used.easelIds, isEaselId, MAX_EASEL_LENGTH);
   const counts = countState(state);
+  const extensions = readBackupExtensions(isRecord(upgraded) ? upgraded.extensions : []);
   const report: BackupReport = {
     createdAt: typeof parsed.createdAt === "string" ? parsed.createdAt.slice(0, 64) : "",
     appVersion: typeof parsed.appVersion === "string" ? parsed.appVersion.slice(0, 32) : "",
@@ -914,9 +936,9 @@ export function parseBackup(text: string, now: number): BackupParseResult {
     boosts: (state.boosts ?? []).length,
     leftOut: counter.leftOut,
     scriptsTurnedOff: counter.scriptsTurnedOff,
-    extensionNames: readExtensionNames(isRecord(upgraded) ? upgraded.extensions : []),
+    webStoreExtensionNames: listExtensionNamesOnce(extensions.filter((extension) => extension.isFromWebStore)),
+    unpackedExtensionNames: listExtensionNamesOnce(extensions.filter((extension) => !extension.isFromWebStore)),
   };
-  const extensions = readBackupExtensions(isRecord(upgraded) ? upgraded.extensions : []);
   return { isValid: true, backup: { state: state, notes: notes, easels: easels, report: report, extensions: extensions } };
 }
 

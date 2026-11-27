@@ -465,11 +465,16 @@ const cancelSheets = await waitFor(readBackupSheets, (sheets) => sheets.length >
 await sidebar.waitForTimeout(500);
 check(
   "Install Extensions from Backup first names what it would install, and Cancel installs nothing",
-  cancelSheets[0]?.message === "Install these extensions from the Chrome Web Store?" && cancelSheets[0].detail.startsWith("Store Extension (as the backup names it), Broken Download.") && JSON.stringify(storeCopiesIn(await getState(sidebar))) === JSON.stringify(["none", "none"]),
+  cancelSheets[0]?.message === "Install 2 extensions from the Chrome Web Store?" && cancelSheets[0].detail.startsWith("• Store Extension (as the backup names it) (Default, ") && cancelSheets[0].detail.includes("\n• Broken Download (Default)\n") && JSON.stringify(storeCopiesIn(await getState(sidebar))) === JSON.stringify(["none", "none"]),
   JSON.stringify(cancelSheets),
 );
 
-// Install: both profiles get it, on and off as listed, from one download; the summary names the rest.
+// Install: both profiles get it, on and off as listed, from one download; the summary names the rest. The profile
+// that gets it off never loads it, not even for a moment (its scripts would run).
+await app.evaluate(({ session }, partition) => {
+  globalThis.secondProfileLoads = [];
+  session.fromPartition(partition).on("extension-loaded", (_event, extension) => globalThis.secondProfileLoads.push(extension.name));
+}, `persist:${secondProfileId}`);
 const downloadsBeforeBackupInstall = await storeDownloadCount();
 await stubBackupSheets(0, false);
 await dispatch(sidebar, { type: "installExtensionsFromBackup" });
@@ -484,6 +489,8 @@ check(
   JSON.stringify(installSummary),
 );
 check("nothing unpacked or failed was added", (state.extensions ?? []).every((extension) => extension.id !== UNPACKED_EXTENSION_ID && extension.id !== FAILING_EXTENSION_ID));
+const secondProfileLoads = await app.evaluate(() => globalThis.secondProfileLoads);
+check("the profile that gets it turned off never loads it", !secondProfileLoads.includes(STORE_EXTENSION_NAME), JSON.stringify(secondProfileLoads));
 
 // The restore question: its box is off by default, and only a ticked box installs (without asking again).
 await dispatch(sidebar, { type: "removeExtension", profileId: "profile-default", extensionId: storeExtensionId });
