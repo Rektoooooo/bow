@@ -39,6 +39,7 @@ import {
   getState,
   getStateForWindow,
   getWindow,
+  handlePageFullscreenChanged,
   initializeState,
   onStateChanged,
   saveStateNow,
@@ -186,6 +187,7 @@ const tabViewEvents: TabViewEvents = {
       closeTabByUser(tabId);
     }
   },
+  onPageFullscreenChanged: (tabId) => handlePageFullscreenChanged(tabId),
 };
 
 /**

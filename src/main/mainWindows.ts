@@ -26,6 +26,7 @@ import { leaveWindow as overlayLeaveWindow } from "./overlay";
 import { closePeekIn, refreshPeekFrame, relayoutPeek } from "./peek";
 import { leaveWindow as statusBubbleLeaveWindow } from "./statusBubble";
 import { closeAutofillPopup, leaveWindow as autofillLeaveWindow } from "./autofillPopup";
+import { exitPageFullscreenIn } from "./tabViews";
 import { createId } from "./tree";
 import { closeWindow, focusWindow, listWindowIds, openWindow } from "./windows";
 import { forgetWindowBounds, loadWindowBounds, rememberWindowBounds } from "./windowState";
@@ -169,6 +170,8 @@ function createMainWindow(windowId: WindowId, bounds: Rectangle | null): Browser
     }
   });
   window.on("move", () => rememberWindowBounds(windowId, window));
+  // The green button or ⌃⌘F ends a page's fullscreen video too (tabViews.ts lays that page over the whole window).
+  window.on("leave-full-screen", () => exitPageFullscreenIn(windowId));
   window.on("focus", () => handleWindowFocus(windowId));
   // Arc draws an active window darker than an inactive one: the sidebar hears of every change (also to another app).
   window.on("focus", () => scheduleRuntimePush());

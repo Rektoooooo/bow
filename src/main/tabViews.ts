@@ -17,6 +17,8 @@
  *   browserCore.ts applyChange() → syncTabViews(windows) → destroy views of removed tabs → take views out of the
  *   windows that no longer show them → put each window's visible tabs in → lay out panes
  *   page events → TabViewEvents callbacks → main.ts → state change or runtime update
+ *   a page's own fullscreen → enter/leave-html-full-screen → onPageFullscreenChanged → browserCore.ts lays the window
+ *   out again (the page over the whole window, or back in the card) and stacks it (stackPagesForFullscreen)
  *
  * Pattern: "reconcile". We never add or remove views by hand from a click handler.
  * We change the state, then one function compares state with the views and fixes the difference.
@@ -27,6 +29,7 @@
  * state, and the next createTabView() for that tab restores it, scroll position and form values included.
  */
 import { watchResponsiveness } from "./unresponsivePages";
+import { isBackgroundTestRun } from "./backgroundTesting";
 import { WebContentsView } from "electron";
 import * as path from "node:path";
 import type { BrowserWindow, ContextMenuParams, HandlerDetails, NavigationEntry, Rectangle, WebContents } from "electron";
@@ -87,6 +90,8 @@ export interface TabViewEvents {
    * gone; the tab should close like ⌘W.
    */
   onPageClosedItself(tabId: ItemId): void;
+  /** The page entered or left its own fullscreen (a video's fullscreen button): its window lays it out again. */
+  onPageFullscreenChanged(tabId: ItemId): void;
 }
 
 /** One main window as this file sees it: where its pages go, and the state as that window shows it. */
@@ -454,6 +459,14 @@ function watchTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvent
     sampleIfShown(tabId, contents);
   });
   contents.on("audio-state-changed", () => events.onRuntimeChanged());
+  contents.on("enter-html-full-screen", () => {
+    fullscreenTabIds.add(tabId);
+    events.onPageFullscreenChanged(tabId);
+  });
+  contents.on("leave-html-full-screen", () => {
+    fullscreenTabIds.delete(tabId);
+    events.onPageFullscreenChanged(tabId);
+  });
   contents.on("context-menu", (_event, params) => {
     events.onContextMenu(tabId, contents, params);
   });
@@ -511,6 +524,9 @@ export function createTabView(state: BrowserState, tab: TabItem, events: TabView
       contextIsolation: true,
       nodeIntegration: false,
       nodeIntegrationInSubFrames: true,
+      // e2e runs in the background (backgroundTesting.ts): a page's fullscreen stays inside its invisible window.
+      // A real macOS fullscreen gets a desktop of its own, and switched the user's screen to it (2026-11-27).
+      disableHtmlFullscreenWindowResize: isBackgroundTestRun(),
     },
   });
   watchTabView(tab.id, view, events);
@@ -633,6 +649,11 @@ function ignoreLoadFailure(): void {
  */
 function takeOutOfWindow(shown: ShownInWindow, tabId: ItemId): void {
   const view = tabViews.get(tabId);
+  // Like Chrome: a page leaving the screen (another tab selected) leaves its fullscreen too, or it would come back
+  // stretched over the whole window.
+  if (view !== undefined && fullscreenTabIds.has(tabId)) {
+    exitPageFullscreen(view.webContents);
+  }
   if (view !== undefined && !shown.window.isDestroyed()) {
     shown.window.contentView.removeChildView(view);
   }
@@ -645,6 +666,26 @@ function takeOutOfWindow(shown: ShownInWindow, tabId: ItemId): void {
 
 /** Tabs whose page stays loaded but hidden: Reader view draws the article in its place (readerController.ts). */
 const hiddenTabIds = new Set<ItemId>();
+
+/**
+ * Tabs whose page is in its own fullscreen (a video's fullscreen button, `requestFullscreen()`). Electron makes the
+ * window fullscreen for such a page, but the page's view would stay in the card beside the sidebar; while it is in
+ * fullscreen it covers the whole window instead (layoutShownTabViews, stackPagesForFullscreen).
+ */
+const fullscreenTabIds = new Set<ItemId>();
+
+/** The isolated world Bow asks a page to leave its fullscreen in (page scripts never see it). Our choice of number. */
+const FULLSCREEN_WORLD_ID = 1037;
+
+/**
+ * Asks a page to leave its own fullscreen, as the page's own "exit fullscreen" button does. Electron ends a page's
+ * fullscreen by itself only for a window's own page, not for the views Bow lays over the window (measured 2026-11-27:
+ * after the window left fullscreen, or its tab left the screen, the page still said it was in fullscreen).
+ */
+function exitPageFullscreen(contents: WebContents): void {
+  const script = { code: "document.exitFullscreen()" };
+  contents.executeJavaScriptInIsolatedWorld(FULLSCREEN_WORLD_ID, [script]).catch(() => undefined);
+}
 
 /**
  * Hides a tab's page (it stays loaded, scrolled where it was) or shows it again.
@@ -677,6 +718,7 @@ export function destroyTabView(tabId: ItemId): void {
   tabViews.delete(tabId);
   getLiveContents(view)?.close();
   hiddenTabIds.delete(tabId);
+  fullscreenTabIds.delete(tabId);
   sleepingHistories.delete(tabId);
   forgetSnapshot(tabId);
   viewProfileIds.delete(tabId);
@@ -727,6 +769,47 @@ function isEditorTab(state: BrowserState, tabId: ItemId): boolean {
 }
 
 /**
+ * The view of a window's page that is in its own fullscreen, or null when none is.
+ */
+function findFullscreenView(windowId: WindowId): WebContentsView | null {
+  const shownTabIds = getShownTabIdsInWindow(windowId);
+  const fullscreenTabId = shownTabIds.find((tabId) => fullscreenTabIds.has(tabId));
+  if (fullscreenTabId === undefined) {
+    return null;
+  }
+  return tabViews.get(fullscreenTabId) ?? null;
+}
+
+/**
+ * A window left macOS fullscreen (the green button, ⌃⌘F) while one of its pages was in its own fullscreen: the page
+ * leaves too, or it would stay stretched over the whole window with the sidebar and toolbar under it.
+ */
+export function exitPageFullscreenIn(windowId: WindowId): void {
+  const fullscreenView = findFullscreenView(windowId);
+  if (fullscreenView !== null) {
+    exitPageFullscreen(fullscreenView.webContents);
+  }
+}
+
+/**
+ * Stacks a window's pages after one of them entered or left its own fullscreen: the page in fullscreen goes above the
+ * other panes and the card's corners, and once none is, the corners go back above the pages. browserCore.ts then
+ * raises the floating layers (the field list, the overlay) above both.
+ */
+export function stackPagesForFullscreen(windowId: WindowId): void {
+  const shown = shownByWindow.get(windowId);
+  if (shown === undefined || shown.window.isDestroyed()) {
+    return;
+  }
+  const fullscreenView = findFullscreenView(windowId);
+  if (fullscreenView === null) {
+    raiseCornerMasks(windowId, shown.window);
+    return;
+  }
+  shown.window.contentView.addChildView(fullscreenView);
+}
+
+/**
  * Places a window's shown views: one card, or the card divided into split panes. With isAnimated, views already on
  * screen glide to their new place (⌘S, the sidebar peeking in, split changes); window resizes and drags follow at once.
  */
@@ -734,6 +817,13 @@ export function layoutShownTabViews(target: WindowTarget, isAnimated: boolean = 
   const contentSize = target.window.getContentSize();
   const contentWidth = contentSize[0] ?? 0;
   const contentHeight = contentSize[1] ?? 0;
+  // A page in its own fullscreen covers the whole window; the other panes and the card's corners stay under it
+  // (stackPagesForFullscreen) and take their places again when it leaves.
+  const fullscreenView = findFullscreenView(target.windowId);
+  if (fullscreenView !== null) {
+    moveView(fullscreenView, { x: 0, y: 0, width: contentWidth, height: contentHeight }, false);
+    return;
+  }
   const card = computeCardBounds(contentWidth, contentHeight, target.layoutOptions);
 
   const state = target.state;

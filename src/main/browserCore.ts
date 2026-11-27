@@ -46,6 +46,7 @@ import {
   layoutShownTabViews,
   requestTabsMoveToWindow,
   setEditorOpen,
+  stackPagesForFullscreen,
   syncTabViews,
 } from "./tabViews";
 import type { TabViewEvents, WindowTarget } from "./tabViews";
@@ -342,6 +343,26 @@ export function relayoutWindow(windowId: WindowId, isAnimated: boolean = false):
   if (target !== null) {
     layoutShownTabViews(target, isAnimated);
   }
+}
+
+/**
+ * A tab's page entered or left its own fullscreen (YouTube's fullscreen button): Electron has made its window
+ * fullscreen or brought it back, and the page now covers the whole window or goes back into the card. The field list
+ * and the overlay stay above it, so the Command Bar still opens over a fullscreen video.
+ */
+export function handlePageFullscreenChanged(tabId: ItemId): void {
+  const windowId = findWindowShowingTab(tabId);
+  if (windowId === null) {
+    return;
+  }
+  const window = getMainWindow(windowId);
+  if (window === null) {
+    return;
+  }
+  relayoutWindow(windowId);
+  stackPagesForFullscreen(windowId);
+  raiseAutofillPopupIfShown(window);
+  raiseOverlayIfShown(window);
 }
 
 /**
