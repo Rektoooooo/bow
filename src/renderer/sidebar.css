@@ -346,7 +346,12 @@ body.toolbar-hidden.toolbar-peeking .reveal-top-edge {
   display: none;
 }
 
-/* The strip that reveals a hidden sidebar: the card's left inset, where the page does not cover the window. */
+/*
+  The strip that reveals a hidden sidebar: the card's left inset, where the page does not cover the window. It lies in
+  the frame that moves the window (.main-column), and a draggable area never reports the pointer to the page, so it
+  says no-drag, like the top edge's strip (the user, 2026-11-27: the edge stopped revealing the sidebar once the frame
+  became draggable).
+*/
 .reveal-edge {
   display: none;
 }
@@ -359,6 +364,7 @@ body.sidebar-hidden .reveal-edge {
   left: 0;
   width: var(--card-inset);
   z-index: 3;
+  -webkit-app-region: no-drag;
 }
 
 body.sidebar-hidden.sidebar-peeking .reveal-edge {

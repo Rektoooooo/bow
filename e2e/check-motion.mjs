@@ -111,6 +111,46 @@ check("⌘S again: the page glides back", between(distinct(showing.views), hidde
 
 await dispatch({ type: "setSidebarVisible", isVisible: false });
 await sidebar.waitForTimeout(LAYOUT_MOTION_MS + 200);
+// The strip that reveals the hidden sidebar: along the window's left edge, and outside the window's drag area.
+// Electron applies drag and no-drag areas in page order (the last one over a point wins) and never reports a pointer
+// in a draggable area to the page, so a strip under the draggable frame (.main-column) never revealed the sidebar
+// with a real pointer (the user, 2026-11-27). A pointer sent through the DevTools protocol skips that, so the hover
+// below could not catch it alone: the drag areas are worked out here the way Electron does.
+const revealStrip = await sidebar.evaluate(() => {
+  const isDraggableAt = (pointX, pointY) => {
+    let isDraggable = false;
+    for (const element of document.querySelectorAll("*")) {
+      const style = getComputedStyle(element);
+      const region = style.getPropertyValue("-webkit-app-region") || style.getPropertyValue("app-region");
+      const box = element.getBoundingClientRect();
+      const isOver = pointX >= box.left && pointX < box.right && pointY >= box.top && pointY < box.bottom;
+      if (isOver && (region === "drag" || region === "no-drag")) {
+        isDraggable = region === "drag";
+      }
+    }
+    return isDraggable;
+  };
+  const strip = document.getElementById("reveal-edge").getBoundingClientRect();
+  return {
+    x: Math.round(strip.x),
+    width: Math.round(strip.width),
+    height: Math.round(strip.height),
+    windowHeight: window.innerHeight,
+    isStripDraggable: isDraggableAt(strip.x + strip.width / 2, strip.y + strip.height / 2),
+    // The frame above the card still moves the window (so the drag areas were found at all).
+    isFrameDraggable: isDraggableAt(window.innerWidth / 2, 4),
+  };
+});
+check("the hidden sidebar's reveal strip lies along the window's left edge", revealStrip.x === 0 && revealStrip.width === CARD_INSET && revealStrip.height === revealStrip.windowHeight, JSON.stringify(revealStrip));
+check("and is not part of the window's drag area, so the page hears the pointer there", revealStrip.isFrameDraggable && !revealStrip.isStripDraggable, JSON.stringify(revealStrip));
+await sidebar.mouse.move(CARD_INSET / 2, revealStrip.height / 2);
+const isPeekingOnHover = await sidebar.waitForFunction(() => document.body.classList.contains("sidebar-peeking"), null, { timeout: 3000 }).then(() => true).catch(() => false);
+check("pointing at the window's left edge reveals the hidden sidebar", isPeekingOnHover);
+// Moving the pointer away, right of the sidebar, hides it again after a short delay.
+await sidebar.mouse.move(revealStrip.height, revealStrip.height / 2);
+const isHiddenAfterLeaving = await sidebar.waitForFunction(() => !document.body.classList.contains("sidebar-peeking"), null, { timeout: 3000 }).then(() => true).catch(() => false);
+check("and moving the pointer away hides it again", isHiddenAfterLeaving);
+await sidebar.waitForTimeout(LAYOUT_MOTION_MS + 200);
 const peeking = await sampleWhile(() => dispatch({ type: "setSidebarPeek", isPeeking: true }), LAYOUT_MOTION_MS + 250);
 check("the hidden sidebar peeking in slides the page aside smoothly", between(distinct(peeking.views), hiddenLeft, hiddenLeft + SIDEBAR_WIDTH).length >= 3 && peeking.views.at(-1) === hiddenLeft + SIDEBAR_WIDTH, `${distinct(peeking.views).join(" ")}`);
 // The card (and its toolbar) goes along at its full width: it used to fall into the hidden sidebar's empty grid
