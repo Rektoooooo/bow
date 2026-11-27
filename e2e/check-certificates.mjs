@@ -189,6 +189,10 @@ check("and shows no warning", strayWarning === 0 && !(await isOverlayOnScreen())
 await dispatch({ type: "setHttpsOnly", isOn: false });
 
 // ---------- 7. A restart forgets the allowance ----------
+// The restart must not open on a page that fails to load (the upgraded page has no plain version): Chromium swaps in
+// its error page while Playwright attaches, and the launch can hang (tasks/lessons.md). A page that loads goes first.
+await dispatch({ type: "openTab", typedText: `${safeOrigin}/before-restart` });
+await findTabPage("/before-restart", "Safe page");
 await sleep(1500);
 await app.close();
 await startApp();
