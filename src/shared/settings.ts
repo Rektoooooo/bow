@@ -425,3 +425,11 @@ export const PASSWORD_UNLOCK_MS = 5 * MINUTE_MS;
  * password managers use (Safari's Passwords clears after 30 s, 1Password after 90 s).
  */
 export const CLIPBOARD_CLEAR_MS = 60 * 1000;
+
+/**
+ * The size SF Symbols are drawn at, in points: AppKit's own default for a symbol image (NSFont.systemFontSize), the
+ * size every icon of ours was measured and laid out at. Electron's nativeImage.createFromNamedImage() takes it as
+ * `pointSize` and defaults to 30 pt when it is left out, which on macOS 27 drew every icon more than twice too big
+ * (2026-11-27: arrow.left came out 35 × 28 pt instead of AppKit's 15 × 12 pt).
+ */
+export const SF_SYMBOL_POINT_SIZE = 13;

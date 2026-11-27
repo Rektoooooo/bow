@@ -1,11 +1,12 @@
 /**
  * WHY this file exists:
  *   Our icons are Apple's SF Symbols, like Arc's. macOS draws them for us: nativeImage.createFromNamedImage() renders
- *   a symbol by name as a template image (a black glyph on transparent, at 2× resolution). This file renders every
+ *   a symbol by name as a template image (a black glyph on transparent, at 2× resolution), at the point size we ask
+ *   for (SF_SYMBOL_POINT_SIZE; Electron's own default is 30 pt, far too big). This file renders every
  *   symbol in SYMBOL_NAMES once and hands them to our pages, which tint them with the text color. Nothing is copied
  *   into the project; the images come from the running system. Rendering all of them takes about 190 ms (measured
  *   2026-10-27) and the sidebar's first picture waited for it, so the rendered images are kept in a cache file in the
- *   user's data folder, made again when macOS or the list of symbols changes.
+ *   user's data folder, made again when macOS, Electron, the point size or the list of symbols changes.
  *
  * Data source:
  *   SYMBOL_NAMES (src/shared/symbols.ts) and macOS, or <userData>/symbol-cache.json from an earlier start.
@@ -18,6 +19,7 @@ import { app, ipcMain, nativeImage, session } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { IPC_CHANNELS } from "../shared/ipcChannels";
+import { SF_SYMBOL_POINT_SIZE } from "../shared/settings";
 import { SPACE_ICON_CHOICES } from "../shared/spaceIcons";
 import { SYMBOL_NAMES } from "../shared/symbols";
 import type { SymbolImage } from "../shared/symbols";
@@ -31,9 +33,15 @@ let renderedSymbols: Record<string, SymbolImage> | null = null;
 
 const SYMBOL_CACHE_FILE_NAME = "symbol-cache.json";
 
-/** What the cache file holds: the images, and what they were made from (a mismatch means render again). */
+/**
+ * What the cache file holds: the images, and what they were made from (a mismatch means render again). The Electron
+ * version and point size are part of it because Bow 0.2.0 kept 30 pt images in this file (no point size was asked
+ * for), and the same macOS and symbol list would otherwise keep serving them.
+ */
 interface SymbolCache {
   systemVersion: string;
+  electronVersion: string;
+  pointSize: number;
   symbolList: string;
   images: Record<string, SymbolImage>;
 }
@@ -48,12 +56,15 @@ function listSymbolEntries(): [string, string][] {
 }
 
 /**
- * The cache file's images when they were made by this macOS for this list of symbols, else null.
+ * The cache file's images when they were made by this macOS and Electron, at this point size, for this list of
+ * symbols, else null.
  */
 function readSymbolCache(cachePath: string, symbolList: string): Record<string, SymbolImage> | null {
   try {
     const cache = JSON.parse(fs.readFileSync(cachePath, "utf8")) as Partial<SymbolCache>;
-    const isCurrent = cache.systemVersion === process.getSystemVersion() && cache.symbolList === symbolList;
+    const isSameSystem = cache.systemVersion === process.getSystemVersion();
+    const isSameRenderer = cache.electronVersion === process.versions.electron && cache.pointSize === SF_SYMBOL_POINT_SIZE;
+    const isCurrent = isSameSystem && isSameRenderer && cache.symbolList === symbolList;
     return isCurrent && typeof cache.images === "object" && cache.images !== null ? cache.images : null;
   } catch {
     return null;
@@ -78,7 +89,7 @@ export function getSymbolImages(): Record<string, SymbolImage> {
   }
   const images: Record<string, SymbolImage> = {};
   for (const [iconName, symbolName] of entries) {
-    const image = nativeImage.createFromNamedImage(symbolName);
+    const image = nativeImage.createFromNamedImage(symbolName, { pointSize: SF_SYMBOL_POINT_SIZE });
     if (image.isEmpty()) {
       console.warn(`macOS has no SF Symbol named ${symbolName}`);
       continue;
@@ -87,7 +98,13 @@ export function getSymbolImages(): Record<string, SymbolImage> {
     images[iconName] = { url: image.toDataURL(), width: size.width / SYMBOL_SCALE_FACTOR, height: size.height / SYMBOL_SCALE_FACTOR };
   }
   renderedSymbols = images;
-  const cache: SymbolCache = { systemVersion: process.getSystemVersion(), symbolList: symbolList, images: images };
+  const cache: SymbolCache = {
+    systemVersion: process.getSystemVersion(),
+    electronVersion: process.versions.electron,
+    pointSize: SF_SYMBOL_POINT_SIZE,
+    symbolList: symbolList,
+    images: images,
+  };
   // Written in the background; a failed write only means rendering again next time.
   fs.promises.writeFile(cachePath, JSON.stringify(cache)).catch((error) => console.warn("Could not keep the rendered symbols:", error));
   return images;
