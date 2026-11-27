@@ -3,7 +3,8 @@
 // "Open in another window" in the second one (and Move to This Window takes the page over); ⌘W on a Pinned tab puts
 // its page away in every window that selected it; the Command Bar opens in
 // the focused window; menus act on the focused window; closing one window keeps the other; a restart opens both
-// again where they were; and the app quits with the last window, which the next start opens again. Each window's card
+// again where they were; closing every window keeps the app running and the Dock icon opens the last one again, ⌘Q
+// quits, and the next start opens that window again. Each window's card
 // corners run in its sidebar's process, and a sidebar whose process is gone loads again with them.
 // usage: npm run build && node e2e/check-windows.mjs      (uses a throwaway --user-data-dir)
 import "./background.mjs";
@@ -605,10 +606,13 @@ check(
 );
 
 // "Restart to Update" (Electron's quitAndInstall) closes every window before it quits: they must all come back.
+// Electron's own quitAndInstall quits once the last window closed (it watches the window list itself); Bow alone would
+// keep running then, so the stand-in quits the same way.
 const exitedForUpdate = new Promise((resolve) => app.process().once("exit", () => resolve(true)));
 const updateRunLog = mainLog.join("");
-await app.evaluate(({ autoUpdater, BrowserWindow }) => {
+await app.evaluate(({ app: electronApp, autoUpdater, BrowserWindow }) => {
   autoUpdater.emit("before-quit-for-update");
+  electronApp.once("window-all-closed", () => electronApp.quit());
   const mainWindows = BrowserWindow.getAllWindows().filter((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
   for (const window of mainWindows) {
     window.close();
@@ -621,16 +625,53 @@ sidebars = await waitForSidebars(app, 2).catch(() => app.windows().filter(isSide
 await new Promise((resolve) => setTimeout(resolve, 1000));
 check("Restart to Update brings every window back (it closes them before quitting)", app.windows().filter(isSidebarPage).length === 2, `${app.windows().filter(isSidebarPage).length} sidebars`);
 
-// Closing every window ends the app; the last one is kept for the next start.
+// Closing every window keeps Bow running, like other Mac apps (the user, 2026-11-27: closing the window quit Bow, and
+// with "Forget Site Data on Quit" that signed them out). The Dock icon opens the last window again as it was; ⌘Q ends
+// the app, and the next start opens that window again.
 const exited = new Promise((resolve) => app.process().once("exit", () => resolve(true)));
-const secondRunLog = updateRunLog + mainLog.join("");
 await app.evaluate(({ BrowserWindow }) => {
   const mainWindows = BrowserWindow.getAllWindows().filter((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
   mainWindows[0]?.close();
   setTimeout(() => mainWindows[1]?.close(), 500);
 }).catch(() => undefined);
+const quitWithLastWindow = await Promise.race([exited, new Promise((resolve) => setTimeout(() => resolve(false), 3000))]);
+const openMainWindowCount = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html")).length);
+const windowsLeftOpen = quitWithLastWindow ? null : await openMainWindowCount();
+check("closing every window keeps Bow running (only ⌘Q quits)", quitWithLastWindow === false && windowsLeftOpen === 0, `quit: ${quitWithLastWindow}, windows: ${windowsLeftOpen}`);
+if (!quitWithLastWindow) {
+  // What the last window showed: the state keeps it while no window is open.
+  const browserCorePath = path.join(appDir, "dist", "node", "main", "browserCore.js");
+  const whileClosed = await app.evaluate((_electron, modulePath) => {
+    const state = process.mainModule.require(modulePath).getState();
+    return { windowId: state.focusedWindowId, spaceId: state.activeSpaceId, selectedTabId: state.selectedTabIdBySpace[state.activeSpaceId] ?? null };
+  }, browserCorePath);
+  await app.evaluate(({ app: electronApp }) => electronApp.emit("activate"));
+  sidebars = await waitForSidebars(app, 1).catch(() => []);
+  const reopenedState = sidebars[0] === undefined ? null : await getState(sidebars[0]);
+  const isSameWindow =
+    reopenedState !== null &&
+    reopenedState.focusedWindowId === whileClosed.windowId &&
+    reopenedState.activeSpaceId === whileClosed.spaceId &&
+    (reopenedState.selectedTabIdBySpace[reopenedState.activeSpaceId] ?? null) === whileClosed.selectedTabId &&
+    reopenedState.otherWindows.length === 0;
+  check("the Dock icon opens the last window again, on its Space with its tab", (await openMainWindowCount()) === 1 && isSameWindow, JSON.stringify({ whileClosed, reopened: reopenedState?.focusedWindowId }));
+  // ⌘T with every window closed opens the window again with the Command Bar, as Chrome's ⌘T opens a window.
+  await app.evaluate(({ BrowserWindow }) => {
+    const mainWindows = BrowserWindow.getAllWindows().filter((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+    mainWindows[0]?.close();
+  });
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  const commandsPath = path.join(appDir, "dist", "node", "main", "appMenuCommands.js");
+  const overlayControllerPath = path.join(appDir, "dist", "node", "main", "overlayController.js");
+  await app.evaluate((_electron, modulePath) => process.mainModule.require(modulePath).appMenuCommands.openCommandBar("newTab"), commandsPath);
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  const isCommandBarShown = await app.evaluate((_electron, modulePath) => process.mainModule.require(modulePath).isPanelShown(), overlayControllerPath);
+  check("⌘T with every window closed opens the window again with the Command Bar", (await openMainWindowCount()) === 1 && isCommandBarShown === true);
+  await app.evaluate(({ app: electronApp }) => electronApp.quit()).catch(() => undefined);
+}
 const didQuit = await Promise.race([exited, new Promise((resolve) => setTimeout(() => resolve(false), 10000))]);
-check("the app quits when the last main window closes", didQuit === true);
+check("⌘Q quits", didQuit === true);
+const secondRunLog = updateRunLog + mainLog.join("");
 if (!didQuit) await app.close().catch(() => undefined);
 await new Promise((resolve) => setTimeout(resolve, 1500));
 

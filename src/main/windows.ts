@@ -170,7 +170,8 @@ export function openWindow(state: BrowserState, windowId: WindowId): BrowserStat
 
 /**
  * Forgets a closed window. When the focused one closes, the most recently focused other window takes its place. The
- * last window is kept: the app quits with it, and the next start opens it again. Either way its sidebar becomes the
+ * last window is kept: Bow keeps running and opens it again as it was (the Dock icon, ⌘N, a link), and so does the
+ * next start. Either way its sidebar becomes the
  * one new windows start with (Arc's sidebarViewPreferences follow the last window closed).
  */
 export function closeWindow(state: BrowserState, windowId: WindowId): BrowserState {

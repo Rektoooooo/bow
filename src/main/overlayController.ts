@@ -47,7 +47,7 @@ import { closeAutofillPopup } from "./autofillPopup";
 import { MAX_LOGIN_FIELD_LENGTH } from "./passwords";
 import { onVaultChanged } from "./passwordVault";
 import { buildPasswordsData, choosePasswordsProfile, copyPassword, copyUsername, revealPassword, saveEditedLogin } from "./passwordsLibrary";
-import { focusMainWindow } from "./mainWindows";
+import { focusMainWindow, showMainWindow } from "./mainWindows";
 import type { CommandBarResult } from "./commandBar";
 import type { CommandActionRegistry } from "./commandBarActions";
 import * as os from "node:os";
@@ -509,9 +509,11 @@ function startZapping(site: string, tabId: string): void {
 function openPanel(panel: OverlayPanel): void {
   // The field list and a panel never share the screen.
   closeAutofillPopup();
-  const window = getWindow();
+  // Panels live in a main window: with every window closed (Bow keeps running), ⌘T, ⌘L or the Library open the last
+  // window again first, as Chrome's ⌘T opens a window.
+  const window = getWindow() ?? showMainWindow();
   const bounds = computeOverlayBounds(panel);
-  if (window === null || bounds === null) {
+  if (bounds === null) {
     return;
   }
   const state = getState();
