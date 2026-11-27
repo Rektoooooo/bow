@@ -5,7 +5,8 @@ Public repo: https://github.com/Rektoooooo/bow
 
 ## Start here
 
-1. Read the newest file in `.handoffs/` (`2026-11-03-chrome-gaps.md`: downloads, sign-in popups, Chrome-like form
+1. Read the newest file in `.handoffs/` (`2026-11-28-moving-macs.md`: password export, extensions from a backup,
+   self-closing pages, Spaces kept apart, 0.2.1; then `2026-11-03-chrome-gaps.md`: downloads, sign-in popups, Chrome-like form
    memory, Bow Passwords beyond tabs, HTTP sign-in, certificate warnings, Widevine still to do; then
    `2026-10-29-passwords.md`: onboarding v2 and 0.1.1, Google sign-in, Bow Passwords, Favorites per Space; then `2026-10-28-night.md`: open source, releases, auto-update, sleeping tabs,
    speed; then `2026-10-27-arc-polish.md`, `2026-10-27-multiple-windows.md`, `2026-10-26-arc-look.md`,
