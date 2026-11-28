@@ -75,6 +75,7 @@ import { startGlobalShortcut } from "./globalShortcutController";
 import { handleBowUrl } from "./bowUrlController";
 import { loadPrivacyReport, savePrivacyReportNow } from "./privacyReportStore";
 import { noticeLoadFailed } from "./httpsOnlyController";
+import { showLoadErrorPage } from "./loadErrorPage";
 import { clearForgettingProfiles, clearSiteDataOnQuit } from "./siteDataCleaner";
 import { reinstallAppMenu, startShortcutEditing } from "./shortcutEditor";
 import { loadTabHistories, saveTabHistoriesNow, startSavingTabHistories } from "./tabHistoryStore";
@@ -164,12 +165,18 @@ const tabViewEvents: TabViewEvents = {
   },
   onContextMenu: (tabId, contents, params) => showPageContextMenu(menuHost, contents, params, getExtensionMenuItems(contents, params), tabId),
   onLoadFinished: (tabId, contents) => probeReaderPage(tabId, contents),
-  onLoadFailed: (_tabId, contents, errorCode, validatedUrl, isMainFrame) => {
-    // Exactly one of them decides: a page Bow upgraded to https falls back to http; otherwise a refused certificate warns.
+  onLoadFailed: (_tabId, contents, errorCode, errorName, validatedUrl, isMainFrame) => {
+    // Exactly one of them decides: a page Bow upgraded to https falls back to http; a refused certificate warns; any
+    // other failure of the page shows why, instead of a white page.
     const isHandledByHttpsOnly = noticeLoadFailed(contents, errorCode, validatedUrl, isMainFrame);
-    if (!isHandledByHttpsOnly) {
-      noticeCertificateFailure(contents, errorCode, validatedUrl, isMainFrame);
+    if (isHandledByHttpsOnly) {
+      return;
     }
+    const isHandledByCertificateWarning = noticeCertificateFailure(contents, errorCode, validatedUrl, isMainFrame);
+    if (isHandledByCertificateWarning) {
+      return;
+    }
+    showLoadErrorPage(contents, errorCode, errorName, validatedUrl, isMainFrame);
   },
   onDomReady: (_tabId, contents) => {
     applySiteZoom(contents);

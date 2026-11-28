@@ -113,23 +113,25 @@ function handleCertificateError(event: Event, contents: WebContents | null, url:
 
 /**
  * A tab's page failed to load. When the reason was a refused certificate, the tab shows the warning page and the
- * card asks what to do. Anything else is not ours.
+ * card asks what to do. Anything else is not ours. Returns whether the warning page is coming, so that the general
+ * "can't open this page" page (loadErrorPage.ts) stays out of its way.
  */
-export function noticeCertificateFailure(contents: WebContents, errorCode: number, validatedUrl: string, isMainFrame: boolean): void {
+export function noticeCertificateFailure(contents: WebContents, errorCode: number, validatedUrl: string, isMainFrame: boolean): boolean {
   const isCertificateError = errorCode <= CERTIFICATE_ERROR_FIRST && errorCode >= CERTIFICATE_ERROR_LAST;
   const refused = refusedByContents.get(contents.id);
   const tabId = findTabIdOfContents(contents);
   if (!isMainFrame || !isCertificateError || refused === undefined || tabId === null) {
-    return;
+    return false;
   }
   refusedByContents.delete(contents.id);
   if (readHost(validatedUrl) !== refused.host) {
-    return;
+    return false;
   }
   contents
     .loadFile(CERTIFICATE_PAGE_PATH, { query: { url: refused.url, code: String(errorCode) } })
     .then(() => addWarning(contents, tabId, refused))
     .catch(() => undefined);
+  return true;
 }
 
 function readHost(url: string): string | null {

@@ -49,11 +49,15 @@ npm run e2e          # build + drive the real app: check-app, check-overlay, che
                      # a pinned one unloads; sleeping and quitting keep every tab; a start with one selected),
                      # check-http-sign-in (the card for sites that ask for a username and password),
                      # check-certificates (a self-signed site gets the warning page and card; HTTPS-only falls back),
+                     # check-load-errors (a page that fails to load says why instead of staying white; Try Again,
+                     # Back and Reload around it; a failed frame leaves its page alone),
                      # check-passwords-windows (Bow Passwords in Little Windows, Peek and sign-in popups)
 node e2e/window-shot.mjs --open  # after npm run package: Bow on the sample profile, for the README's hand-taken
                                  # screenshots (docs/screenshot-*.png); without --open: the views → e2e/output/readme-shots
 node e2e/arc-compare.mjs   # side-by-side crops with the user's Arc screenshots (reference/, local only) → e2e/output
-npm run package      # release/Bow-darwin-arm64/Bow.app (ad-hoc signed, git-ignored)
+npm run package      # release/Bow-darwin-arm64/Bow.app (ad-hoc signed, git-ignored); tools/package-mac.mjs runs the
+                     # packager, whose afterExtract hook gives Electron's executables build UUIDs of their own
+                     # (tools/build-uuids.mjs: macOS's Local Network privacy tracks programs by them, TN3179)
 npm run release      # release/: Bow-<version>-arm64.dmg (Developer ID, hardened runtime, notarized + stapled), the
                      # updater's Bow-<version>-arm64.zip and update-darwin-arm64.json; upload all three to the release
                      # (needs the keychain's Developer ID certificate and the notarytool profile "bow-notary"). The
@@ -161,7 +165,10 @@ Playwright's `dragAndDrop` and `click` on links that open a Peek hang in Electro
   password; a saved login is filled by main and never reaches the overlay; new credentials are saved only when the
   site did not ask again); `certificateErrors.ts` turns a tab's certificate failure into our warning page
   (`src/certificate/`, Try Again) plus a card with Back to Safety / Visit Anyway (host + certificate fingerprint,
-  this run only; `httpsOnlyController.ts` decides first for pages it upgraded). `unresponsivePages.ts`: a native
+  this run only; `httpsOnlyController.ts` decides first for pages it upgraded). Any other failed load of a tab's page
+  (a dev server that is down, a LAN device macOS's Local Network privacy keeps Bow from) shows why: `loadErrorPage.ts`
+  writes `loadErrors.ts`'s page into Chromium's own error document, never a page of ours, so Reload, Try Again and
+  Back act on the real address (Electron has no error pages; it used to be white). `unresponsivePages.ts`: a native
   Wait / Close Page sheet for a hung tab.
 - **Render from state.** `src/renderer/sidebar.ts` redraws the sidebar and toolbar on every state; redraws wait while
   a drag is in progress.

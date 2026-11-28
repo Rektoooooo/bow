@@ -81,8 +81,11 @@ export interface TabViewEvents {
   onDomReady(tabId: ItemId, contents: WebContents): void;
   /** The page finished loading (Reader view looks whether it is an article). */
   onLoadFinished(tabId: ItemId, contents: WebContents): void;
-  /** The page, or a frame in it, failed to load (HTTPS-Only Mode offers http when the secure version is missing). */
-  onLoadFailed(tabId: ItemId, contents: WebContents, errorCode: number, validatedUrl: string, isMainFrame: boolean): void;
+  /**
+   * The page, or a frame in it, failed to load (HTTPS-Only Mode offers http when the secure version is missing; other
+   * failures of the page show why). errorName is Chromium's ("ERR_CONNECTION_REFUSED").
+   */
+  onLoadFailed(tabId: ItemId, contents: WebContents, errorCode: number, errorName: string, validatedUrl: string, isMainFrame: boolean): void;
   /** The pointer moved onto a link in a tab's page (its address) or off it (""). */
   onLinkHover(tabId: ItemId, url: string): void;
   /**
@@ -452,7 +455,16 @@ function watchTabView(tabId: ItemId, view: WebContentsView, events: TabViewEvent
   });
   contents.on("dom-ready", () => events.onDomReady(tabId, contents));
   contents.on("did-finish-load", () => events.onLoadFinished(tabId, contents));
-  contents.on("did-fail-load", (_event, errorCode, _description, validatedUrl, isMainFrame) => events.onLoadFailed(tabId, contents, errorCode, validatedUrl, isMainFrame));
+  contents.on("did-fail-load", (_event, errorCode, errorName, validatedUrl, isMainFrame) => {
+    events.onLoadFailed(tabId, contents, errorCode, errorName, validatedUrl, isMainFrame);
+    // Chromium's error document now holds the failed address, and did-navigate never comes for it. The tab records it,
+    // as Chrome's address bar shows it, so the sidebar, Try Again and a restart all mean the page that failed. A load
+    // that was only stopped leaves the old page, and its address, in place.
+    const hasErrorDocument = isMainFrame && contents.getURL() === validatedUrl;
+    if (hasErrorDocument && isRecordableTabUrl(validatedUrl)) {
+      events.onPageChanged(tabId, validatedUrl, contents.getTitle());
+    }
+  });
   contents.on("did-start-loading", () => events.onRuntimeChanged());
   contents.on("did-stop-loading", () => {
     events.onRuntimeChanged();

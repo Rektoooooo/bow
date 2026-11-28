@@ -490,6 +490,25 @@ to space 2".
 - [x] Signed Developer ID build installed to /Applications for the user (still labelled 0.2.0, no release)
 - [ ] Later: deleting a Space leaves its profile (cookies on disk) behind; offer to remove a profile no Space uses
 
+## Fixes (2026-11-28, the user on 0.2.1: "sometimes localhost doesn't load but other browsers do")
+Found: a dev server on another Mac (192.168.0.7) failed with ERR_ADDRESS_UNREACHABLE. macOS's Local Network privacy
+kept Bow off the network (its rule: never asked), while Terminal and Chrome reached it. Bow's executables shared their
+build UUIDs with every Electron 44.9.3 app, among them the dev Electron.app, which was allowed (Apple's TN3179: "may
+behave weirdly"). Every failed load was a white page, so a dev server that was down looked the same.
+- [x] A failed page says why instead of staying white: Bow fills Chromium's own error document (`loadErrors.ts`,
+      `loadErrorPage.ts`), so Reload, Try Again and Back act on the real address; a Local Network tip for an
+      unreachable address, a "check that it is running" tip for a refused local one; the tab records the failed
+      address like Chrome's address bar (it kept the page before) (check-load-errors)
+- [x] check-overlay's two capture checks expect the screen's pixels (they failed on the MacBook's 2× display, on main
+      too)
+- [ ] Later: a page HTTPS-Only Mode upgraded that fails keeps the "Open with HTTP" notice and a white page
+- [x] `NSLocalNetworkUsageDescription` in Info.plist, so macOS has words to ask with (check-package)
+- [x] Electron's executables get build UUIDs of their own when packaging (`tools/build-uuids.mjs`, run from the
+      packager's afterExtract hook in the new `tools/package-mac.mjs`; check-package compares them with Electron's)
+- [ ] Not verified live: the Local Network question itself and its answer staying put. That needs a signed release on
+      the user's Mac (a second ad-hoc copy with the same bundle id is one of Apple's own causes of odd results)
+- [ ] Later: Peek and Little Windows still show a white page when their page fails
+
 ## Review (2026-11-01, release 0.2.0)
 - Released v0.2.0 (Latest): Bow Passwords (with embedded frames and the direct import from Chromium browsers),
   Favorites per Space, the Google sign-in fix, hover and scroll bar polish, and the download's own window. Full e2e
