@@ -186,8 +186,9 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   own time limit instead. And a `cat > file` with no input waits for ever: write test files with `printf` or Write.
 - The `pkill -f` rule above was broken again on 2026-10-28 (the pattern sat in the same command line): look the pid
   up with `pgrep -fl` in one call, kill it by number in the next.
-- Two macOS accounts; facts differ per account (Homebrew owner, Node location, gh accounts). Check `whoami` and the
-  "This Mac" section of `CLAUDE.md` before installing anything.
+- Two Macs, and the older one has two macOS accounts; facts differ per Mac and account (Homebrew owner, Node
+  location, gh accounts). Check the clone's folder, `whoami` and "The Macs" section of `CLAUDE.md` before installing
+  anything (2026-11-28: on the MacBook, CLAUDE.md's nvm line failed; Node comes from fnm there).
 - `npm ci` in a fresh worktree (2026-10-28, npm 11 printing install-scripts warnings) left `node_modules/electron`
   without its binary (no `dist/`, no `path.txt`), so no check could start the app. `node
   node_modules/electron/install.js` fetches it from the download cache.

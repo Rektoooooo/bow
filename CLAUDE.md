@@ -20,7 +20,8 @@ Public repo: https://github.com/Rektoooooo/bow
 ## Commands
 
 ```bash
-source ~/.nvm/nvm.sh && nvm use   # Arc account only: Node 24 from .nvmrc
+eval "$(fnm env --shell bash)" && fnm use   # the MacBook, agent shells: Node 24 from .nvmrc
+source ~/.nvm/nvm.sh && nvm use   # the older Mac's Arc account only: Node 24 from .nvmrc
 npm install
 npm start            # build + open the browser
 npm test             # Vitest unit tests (pure state rules, ranking, importers)
@@ -259,8 +260,8 @@ The owner must be able to explain every line to a reviewer:
 - `main` tracks `origin` = `https://github.com/Rektoooooo/bow.git` (public).
 - Commits in this repo use the repo-local author `Rektoooooo <95218813+Rektoooooo@users.noreply.github.com>`
   (already set in `.git/config`). Do not commit with the machine's global identity, which is a work address.
-- Run `gh auth status` first. On the Arc account (below) the only gh account is Rektoooooo, so
-  plain `git push` works. On the other account, gh has two accounts and the **active one is a work account** that
+- Run `gh auth status` first. On the MacBook and on the older Mac's Arc account (below) the only gh account is
+  Rektoooooo, so plain `git push` works. On the older Mac's other account, gh has two accounts and the **active one is a work account** that
   must stay active: do not `gh auth switch`; use the personal token per command:
 
   ```bash
@@ -269,18 +270,25 @@ The owner must be able to explain every line to a reviewer:
     -c 'credential.helper=!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; }; f' push
   ```
 
-## This Mac (gotchas)
+## The Macs (gotchas)
 
-One Mac, two macOS accounts. Check which one you are on (`whoami`).
+Two Macs. Check which one you are on: the clone's folder and `whoami`.
 
-- **The Arc account** (the one that uses Arc and owns Homebrew; clone at `~/Developer/sidebar-browser`):
-  Homebrew works. The default `node` is Homebrew 23.10, which Vitest 5 rejects; Node 24 is installed with nvm,
-  which the shell does not load. Prefix commands with
-  `source ~/.nvm/nvm.sh && nvm use` (reads `.nvmrc`). Arc's real data is here; a full copy is in
-  `~/Arc-Backup-2026-10-26/` (personal, never commit it). REA and Ghidra are not installed on this account.
-- **The other account** (where milestone 1 was built): Homebrew belongs to the Arc account, so `brew install`
-  fails. Tools live in `~/.local` (Node 24.22.1 first on PATH, JDK 21, Ghidra 12.1.4, REA).
-- 16 GB RAM and swap is often full. Check `sysctl vm.swapusage` before heavy work like a Ghidra import.
+- **The MacBook** (since 2026-11; clone at `~/Developer/bow`): one macOS account, 64 GB RAM, Homebrew at
+  `/opt/homebrew`. Node 24 comes from fnm, which `~/.zshrc` loads; an agent's shell does not read that file, so
+  `node`, `npm` and `npx` are missing there until a command starts with
+  `eval "$(fnm env --shell bash)" && fnm use` (reads `.nvmrc`). There is no nvm. Arc, `reference/`, the Arc backup,
+  REA and Ghidra are not on this Mac, so `e2e/arc-compare.mjs` cannot run here. One account, so the two-account
+  `pgrep -u` lesson in `tasks/lessons.md` does not bite here.
+- **The older Mac**, two macOS accounts:
+  - **The Arc account** (the one that uses Arc and owns Homebrew; clone at `~/Developer/sidebar-browser`):
+    Homebrew works. The default `node` is Homebrew 23.10, which Vitest 5 rejects; Node 24 is installed with nvm,
+    which the shell does not load. Prefix commands with
+    `source ~/.nvm/nvm.sh && nvm use` (reads `.nvmrc`). Arc's real data is here; a full copy is in
+    `~/Arc-Backup-2026-10-26/` (personal, never commit it). REA and Ghidra are not installed on this account.
+  - **The other account** (where milestone 1 was built): Homebrew belongs to the Arc account, so `brew install`
+    fails. Tools live in `~/.local` (Node 24.22.1 first on PATH, JDK 21, Ghidra 12.1.4, REA).
+  - 16 GB RAM and swap is often full. Check `sysctl vm.swapusage` before heavy work like a Ghidra import.
 - Screenshots: `e2e/window-shot.mjs` composites window captures, so it works without Screen Recording permission.
 - `reference/` (git-ignored) holds the user's Arc screenshots. They show personal bookmarks: never commit them.
 
