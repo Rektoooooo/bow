@@ -913,7 +913,15 @@ for (let attempt = 0; attempt < 50 && capturedFiles.length === 0; attempt += 1) 
   capturedFiles = fs.existsSync(capturesDir) ? fs.readdirSync(capturesDir).filter((name) => name.endsWith(".png")) : [];
 }
 const capturedSize = await app.evaluate(({ nativeImage }, filePath) => (filePath === null ? null : nativeImage.createFromPath(filePath).getSize()), capturedFiles.length === 1 ? path.join(capturesDir, capturedFiles[0]) : null);
-check("Capture keeps exactly the dragged part of the page", capturedSize?.width === 100 && capturedSize?.height === 50, `${capturedFiles.join(",")} ${JSON.stringify(capturedSize)}`);
+// The picture has the screen's pixels: the 100 × 50 point drag is 200 × 100 on a Retina display (2026-11-28, the
+// MacBook; the check was written on a 1× screen).
+const displayScale = await app.evaluate(({ BrowserWindow, screen }) => {
+  const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().endsWith("/renderer/index.html"));
+  return screen.getDisplayMatching(win.getBounds()).scaleFactor;
+});
+const draggedWidth = 100 * displayScale;
+const draggedHeight = 50 * displayScale;
+check("Capture keeps exactly the dragged part of the page", capturedSize?.width === draggedWidth && capturedSize?.height === draggedHeight, `${capturedFiles.join(",")} ${JSON.stringify(capturedSize)} at ${displayScale}×`);
 check("and closes the capture layer", !(await overlayIsShown()));
 await dispatch({ type: "openLibrary" });
 await overlay.waitForSelector(".library-tab[data-section='media']", { timeout: 5000 });
@@ -945,7 +953,7 @@ const copiedSize = await app.evaluate(async ({ clipboard, nativeImage }) => {
   const pictureBlob = await pictureItem.getType("image/png");
   return nativeImage.createFromBuffer(Buffer.from(await pictureBlob.arrayBuffer())).getSize();
 });
-check("Media's Copy puts the picture on the clipboard and says \"Copied\"", copyFeedback === "Copied" && copiedSize?.width === 100 && copiedSize?.height === 50, `${copyFeedback} ${JSON.stringify(copiedSize)}`);
+check("Media's Copy puts the picture on the clipboard and says \"Copied\"", copyFeedback === "Copied" && copiedSize?.width === draggedWidth && copiedSize?.height === draggedHeight, `${copyFeedback} ${JSON.stringify(copiedSize)}`);
 await overlay.click(".library-tab[data-section='spaces']");
 await overlay.waitForTimeout(200);
 const spaceLines = await overlay.$$eval(".space-column", (columns) => columns.length);
