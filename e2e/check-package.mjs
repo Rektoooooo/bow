@@ -44,6 +44,25 @@ check("Info.plist names the app", infoPlist.CFBundleName === "Bow", infoPlist.CF
 check("the bundle id stays the same after the rename", infoPlist.CFBundleIdentifier === "io.github.rektoooooo.sidebar-browser", infoPlist.CFBundleIdentifier);
 const usageTexts = [infoPlist.NSCameraUsageDescription, infoPlist.NSMicrophoneUsageDescription, infoPlist.NSLocationWhenInUseUsageDescription];
 check("Info.plist explains camera, microphone and location use", usageTexts.every((text) => typeof text === "string" && text.startsWith("Websites you allow")), usageTexts.join(" | "));
+// macOS 15 and later ask before an app reaches the local network, with this text (Apple's TN3179).
+check("Info.plist explains local network use", typeof infoPlist.NSLocalNetworkUsageDescription === "string" && infoPlist.NSLocalNetworkUsageDescription.includes("local network"), infoPlist.NSLocalNetworkUsageDescription);
+// Local Network privacy tracks programs by their build UUID; Bow's executables must not share Electron's
+// (tools/build-uuids.mjs). Each one is compared with the same executable in the Electron that npm start runs.
+// dwarfdump prints "UUID: <uuid> (arm64) <path>".
+function readBuildUuid(file) {
+  const line = execFileSync("dwarfdump", ["--uuid", file]).toString();
+  const words = line.split(" ");
+  return words[1];
+}
+const electronAppPath = path.join(appDir, "node_modules", "electron", "dist", "Electron.app");
+const executablePairs = [[executablePath, path.join(electronAppPath, "Contents", "MacOS", "Electron")]];
+for (const helperSuffix of ["", " (GPU)", " (Plugin)", " (Renderer)"]) {
+  const bowHelper = path.join(bundlePath, "Contents", "Frameworks", `Bow Helper${helperSuffix}.app`, "Contents", "MacOS", `Bow Helper${helperSuffix}`);
+  const electronHelper = path.join(electronAppPath, "Contents", "Frameworks", `Electron Helper${helperSuffix}.app`, "Contents", "MacOS", `Electron Helper${helperSuffix}`);
+  executablePairs.push([bowHelper, electronHelper]);
+}
+const sharedUuids = executablePairs.filter(([bowFile, electronFile]) => readBuildUuid(bowFile) === readBuildUuid(electronFile));
+check("Bow's executables have build UUIDs of their own, not Electron's", sharedUuids.length === 0, sharedUuids.map(([bowFile]) => path.basename(bowFile)).join(", ") || `${executablePairs.length} executables, main ${readBuildUuid(executablePath)}`);
 // Only a release build (signed with a Developer ID by tools/release-mac.sh) updates itself from GitHub; an ad-hoc build
 // would download every release and have each one refused.
 // codesign prints the signature's details on stderr.

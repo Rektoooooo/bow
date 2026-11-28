@@ -226,3 +226,14 @@ Rules learned while working on this repo, so the same mistake is not made twice.
   (2026-11-26: a quit loop waited on the other account's Bow, which macOS then refused to signal). Look for this
   account's Bow with `pgrep -u "$(whoami)"`. Swapping the app leaves the other account's running Bow on the old
   version until it restarts there; say so to the user.
+- An app started from a shell, a terminal or Claude runs under that app's macOS privacy permissions, Local Network
+  included (2026-11-28: the same Bow.app reached a LAN device when started from the shell and got
+  ERR_ADDRESS_UNREACHABLE when macOS started it). e2e can never show a Local Network problem. To see what the user's
+  Bow sees, start it with `open -n -g /Applications/Bow.app --env BOW_E2E_BACKGROUND=1 --args --user-data-dir=<scratch>
+  --skip-welcome --inspect=<port>` and ask from its main process (`session.defaultSession.fetch`). macOS's answer per
+  app is in `/Library/Preferences/com.apple.networkextension.plist` (the rule whose SigningIdentifier is the bundle id:
+  MulticastPreferenceSet false means never asked).
+- A page that goes elsewhere without a user gesture is skipped by Chromium's Back (its history intervention), so an
+  e2e navigation that Back must return to needs `executeJavaScript(code, true)` (2026-11-28, check-load-errors).
+- The packager's command line read `--tmpdir=<folder>` as a yes/no flag, i.e. "no temporary folder" (found
+  2026-11-28). Before trusting a CLI flag, look at what it parses into; tools/package-mac.mjs now calls the API.

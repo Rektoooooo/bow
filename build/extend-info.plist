@@ -63,6 +63,11 @@
   <string>Websites you allow can see your location, for example maps.</string>
   <key>NSLocationWhenInUseUsageDescription</key>
   <string>Websites you allow can see your location, for example maps.</string>
+  <!-- macOS 15 and later keep apps off the local network until the user allows it (Apple's TN3179), and show this in
+       the question. Without it Bow had no text to ask with, and pages on other devices failed as unreachable
+       (2026-11-28, a development server on another Mac). -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Websites on your local network, such as development servers and devices at home, open in Bow.</string>
   <key>LSApplicationCategoryType</key>
   <string>public.app-category.productivity</string>
   <key>NSHumanReadableCopyright</key>

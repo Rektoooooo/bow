@@ -1,6 +1,7 @@
 #!/bin/zsh
 # Builds release/Bow-darwin-<arch>/Bow.app: our compiled code, the icon (build/icon.icns) and
-# the Info.plist entries that let macOS use it as the default browser (build/extend-info.plist). The app is signed
+# the Info.plist entries that let macOS use it as the default browser and explain its questions (build/extend-info.plist),
+# and Electron's executables with build UUIDs of their own (tools/build-uuids.mjs). The app is signed
 # ad hoc, which is enough to run it on this Mac. With BOW_SIGN_IDENTITY set (tools/release-mac.sh does that) it is
 # signed with that certificate instead, with the hardened runtime and Chromium's entitlements for each helper
 # (@electron/osx-sign's defaults: JIT, camera, microphone, location), as notarization needs, and marked as a build
@@ -21,10 +22,8 @@ electron_version="$(node -p 'require("electron/package.json").version')"
 cached_zip="$(find "$HOME/Library/Caches/electron" -name "electron-v${electron_version}-darwin-${architecture}.zip" 2>/dev/null | head -1)"
 zip_options=()
 [[ -n "$cached_zip" ]] && zip_options=(--electron-zip-dir="$(dirname "$cached_zip")")
-sign_options=()
 extend_info="build/extend-info.plist"
 if [[ -n "$BOW_SIGN_IDENTITY" ]]; then
-  sign_options=(--osx-sign.identity="$BOW_SIGN_IDENTITY")
   # Only a release build updates itself from GitHub (src/main/appUpdates.ts reads this key): an ad-hoc build would
   # download every release and have each one refused, because it accepts only its own signature.
   release_info_folder="$(mktemp -d)"
@@ -33,20 +32,16 @@ if [[ -n "$BOW_SIGN_IDENTITY" ]]; then
   plutil -insert BowUpdatesFromGitHub -bool YES "$extend_info"
 fi
 # A temporary folder of its own: two packaging runs at once shared the packager's default one, and one cleaned it up
-# while the other was signing (2026-10-28, a release build failed with "No such file or directory").
+# while the other was signing (2026-10-28, a release build failed with "No such file or directory"). (The command line
+# read --tmpdir=<folder> as "no temporary folder"; tools/package-mac.mjs passes the folder itself.)
 packager_tmpdir="$(mktemp -d)"
-npx electron-packager . "Bow" "${zip_options[@]}" "${sign_options[@]}" \
+# The packager runs from a script, not its command line, for one hook: Electron's executables get build UUIDs of their
+# own before they are renamed and signed (tools/build-uuids.mjs, for macOS's Local Network privacy). The options,
+# ignore patterns included, are in tools/package-mac.mjs; the signing identity comes from BOW_SIGN_IDENTITY.
+node tools/package-mac.mjs "${zip_options[@]}" \
   --tmpdir="$packager_tmpdir" \
-  --platform=darwin \
   --arch="$architecture" \
-  --out=release \
-  --overwrite \
-  --icon=build/icon.icns \
-  --app-bundle-id=io.github.rektoooooo.sidebar-browser \
-  --extend-info="$extend_info" \
-  --ignore='^/(src|tests|e2e|docs|reference|tools|tasks|build|release|\.handoffs|\.claude|\.github)(/|$)' \
-  --ignore='^/node_modules/(?!(electron-chrome-extensions|debug|ms)(/|$))' \
-  --ignore='^/(tsconfig[^/]*\.json|vitest\.config\.ts|README\.md|CLAUDE\.md|\.nvmrc|\.gitignore)$'
+  --extend-info="$extend_info"
 rm -rf "$packager_tmpdir"
 app_path="release/Bow-darwin-$architecture/Bow.app"
 [[ -z "$BOW_SIGN_IDENTITY" ]] && codesign --force --deep --sign - "$app_path"
